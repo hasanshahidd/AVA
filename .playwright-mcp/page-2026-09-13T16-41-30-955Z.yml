@@ -1,0 +1,150 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e18]:
+    - complementary [ref=f1e19]:
+      - generic [ref=f1e20]:
+        - generic [ref=f1e21]:
+          - text: Ava
+          - generic [ref=f1e22]: AI
+        - button "Collapse sidebar" [ref=f1e23] [cursor=pointer]
+      - navigation [ref=f1e26]:
+        - generic [ref=f1e27]:
+          - button "Cybersecurity Assurance" [ref=f1e28] [cursor=pointer]
+          - generic [ref=f1e37]:
+            - link "Performance" [ref=f1e38] [cursor=pointer]:
+              - /url: /dashboard
+            - link "IT Asset Discovery" [ref=f1e45] [cursor=pointer]:
+              - /url: /asset-discovery
+            - link "IT Asset Inventory" [ref=f1e54] [cursor=pointer]:
+              - /url: /assets
+            - link "Assets Risk Posture" [ref=f1e59] [cursor=pointer]:
+              - /url: /risk-posture
+            - link "Vulnerabilities" [ref=f1e63] [cursor=pointer]:
+              - /url: /vulnerabilities
+      - button "Administration" [ref=f1e75] [cursor=pointer]
+    - generic [ref=f1e82]:
+      - banner [ref=f1e83]:
+        - generic [ref=f1e85]:
+          - generic [ref=f1e86]: Cybersecurity Assurance
+          - generic [ref=f1e87]: /
+          - link "IT Asset Inventory" [ref=f1e88] [cursor=pointer]:
+            - /url: /assets
+        - generic [ref=f1e89]:
+          - generic [ref=f1e90]:
+            - textbox "Ask Ava Assist" [ref=f1e93]:
+              - /placeholder: Ask Ava Assist anything…
+            - button "Send" [ref=f1e94] [cursor=pointer]
+          - button "Toggle Guide mode" [ref=f1e97] [cursor=pointer]:
+            - generic [ref=f1e101]: Guide
+          - button "Notifications" [ref=f1e103] [cursor=pointer]
+          - button "User menu" [ref=f1e108] [cursor=pointer]:
+            - generic [ref=f1e109]: A
+      - main [ref=f1e112]:
+        - generic [ref=f1e113]:
+          - link "‹ Back to register" [ref=f1e115] [cursor=pointer]:
+            - /url: /assets
+          - generic [ref=f1e116]:
+            - complementary [ref=f1e117]:
+              - generic [ref=f1e120]:
+                - generic [ref=f1e124]: DESKTOP-CE3EFJB
+                - generic [ref=f1e125]: infrastructure · host · Microsoft Windows 11 Pro 25H2 · discovered on network
+                - generic [ref=f1e126]:
+                  - generic [ref=f1e127]: infrastructure
+                  - generic [ref=f1e128]: active
+                - generic [ref=f1e129]:
+                  - button "Assess risk" [ref=f1e130] [cursor=pointer]
+                  - button "Edit" [ref=f1e131] [cursor=pointer]
+              - generic [ref=f1e132]:
+                - heading "Security snapshot" [level=4] [ref=f1e134]
+                - generic [ref=f1e135]:
+                  - generic [ref=f1e136]:
+                    - generic [ref=f1e137]: Antivirus
+                    - generic [ref=f1e138]: None detected
+                  - generic [ref=f1e139]:
+                    - generic [ref=f1e140]: EDR
+                    - generic [ref=f1e141]: None detected
+                  - generic [ref=f1e142]:
+                    - generic [ref=f1e143]: Endpoint Protected
+                    - generic [ref=f1e144]: "No"
+                  - generic [ref=f1e145]:
+                    - generic [ref=f1e146]: Packages Found
+                    - generic [ref=f1e147]: "31"
+              - generic [ref=f1e148]:
+                - heading "Ownership" [level=4] [ref=f1e150]
+                - generic [ref=f1e151]:
+                  - generic [ref=f1e152]:
+                    - generic [ref=f1e153]: Owner
+                    - generic [ref=f1e154]: Not set
+                  - generic [ref=f1e155]:
+                    - generic [ref=f1e156]: IP address
+                    - generic [ref=f1e157]: 192.168.1.3
+                  - generic [ref=f1e158]:
+                    - generic [ref=f1e159]: Criticality
+                    - generic [ref=f1e160]: —
+              - generic [ref=f1e162]:
+                - button "CIS scans →" [ref=f1e163] [cursor=pointer]
+                - button "Risk posture →" [ref=f1e164] [cursor=pointer]
+                - button "Change lifecycle →" [ref=f1e165] [cursor=pointer]
+                - button "Delete asset" [ref=f1e166] [cursor=pointer]
+            - generic [ref=f1e167]:
+              - generic [ref=f1e168]:
+                - button "Overview" [ref=f1e169] [cursor=pointer]
+                - button "Risk & Controls" [ref=f1e170] [cursor=pointer]
+                - button "Vulnerabilities 5" [ref=f1e171] [cursor=pointer]:
+                  - text: Vulnerabilities
+                  - generic [ref=f1e172]: "5"
+                - button "Software 31" [ref=f1e173] [cursor=pointer]:
+                  - text: Software
+                  - generic [ref=f1e174]: "31"
+                - button "Relationships" [ref=f1e175] [cursor=pointer]
+                - button "Lifecycle" [ref=f1e176] [cursor=pointer]
+                - button "Attachments" [ref=f1e177] [cursor=pointer]
+                - button "Notes" [ref=f1e178] [cursor=pointer]
+                - button "History" [ref=f1e179] [cursor=pointer]
+                - button "Compliance" [ref=f1e180] [cursor=pointer]
+                - button "Trajectory" [ref=f1e181] [cursor=pointer]
+              - generic [ref=f1e182]:
+                - article [ref=f1e183]:
+                  - generic [ref=f1e184]:
+                    - generic [ref=f1e185]: —
+                    - generic [ref=f1e191]:
+                      - generic [ref=f1e192]: CIS Microsoft Windows 11 Enterprise Benchmark v5.0.1
+                      - generic [ref=f1e193]: 537 rules · Not scanned · agent scans every 30s when installed, or via scheduled cron
+                    - 'generic "Strict: the normalized OS matched an operator-confirmed os_pattern → benchmark mapping. AI never auto-applies a mapping; archived benchmarks are never picked." [ref=f1e194]': Strict match
+                    - generic [ref=f1e195]: EOL 2028
+                    - button "Scan now" [ref=f1e196] [cursor=pointer]
+                - generic [ref=f1e197]:
+                  - button "Host group" [ref=f1e198] [cursor=pointer]
+                  - button "Benchmark match" [ref=f1e199] [cursor=pointer]
+                  - button "Manual checks 1" [ref=f1e200] [cursor=pointer]:
+                    - text: Manual checks
+                    - generic [ref=f1e201]: "1"
+                  - button "Scan sessions 0" [ref=f1e202] [cursor=pointer]:
+                    - text: Scan sessions
+                    - generic [ref=f1e203]: "0"
+                  - button "Activity 0" [ref=f1e204] [cursor=pointer]:
+                    - text: Activity
+                    - generic [ref=f1e205]: "0"
+                - article [ref=f1e206]:
+                  - generic [ref=f1e207]:
+                    - generic [ref=f1e214]:
+                      - 'heading "IP Group: 192.168.1.3" [level=3] [ref=f1e215]'
+                      - generic [ref=f1e216]: This asset is standalone — no co-located assets at this IP
+                    - generic [ref=f1e217]: 1 host + 1 software benchmark
+                  - generic [ref=f1e218]:
+                    - generic [ref=f1e223]:
+                      - text: DESKTOP-CE3EFJB
+                      - generic [ref=f1e224]: this asset
+                      - generic [ref=f1e225]: host OS
+                      - generic [ref=f1e226]: windows-11-25H2 · CIS_Microsoft_Windows_11_Enterprise_Benchmark_v5.0.1 · 537 rules
+                    - generic [ref=f1e227]: Not scanned
+                    - button "Set up scan" [ref=f1e228] [cursor=pointer]
+                  - generic [ref=f1e229]: Agent-detected software with CIS benchmarks
+                  - generic [ref=f1e231]:
+                    - generic [ref=f1e236]:
+                      - text: PostgreSQL 18
+                      - generic [ref=f1e237]: ✓ CIS ready
+                      - generic [ref=f1e238]: postgresql-18 · CIS_PostgreSQL_18_Benchmark_v1.0.0 · 69 rules
+                    - link "Set up scan →" [ref=f1e239] [cursor=pointer]:
+                      - /url: /admin/integrations/connect?asset_id=164&hostname=DESKTOP-CE3EFJB&label=PostgreSQL+18&platform=postgres
+  - generic "Notifications"
+  - alert [ref=f1e240]

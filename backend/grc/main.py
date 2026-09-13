@@ -60,6 +60,9 @@ from .modules.automation import (
     automation_frameworks_router,
     automation_common_router,
 )
+# CTEM Phase-3 scopes/cycles — the only slice of the stripped ERM module Ava keeps
+# (the Vulnerabilities → CTEM Scopes board consumes it at /erm/ctem/scopes/*).
+from .modules.erm import ctem_scopes_router as erm_ctem_scopes_router
 from .routers.connect_wizard_router import router as connect_wizard_router
 from .routers.admin_ai_usage_router import router as admin_ai_usage_router
 from .routers.ai_recommendations_router import router as ai_recommendations_router
@@ -234,6 +237,9 @@ app.include_router(compliance_plugins_router)
 app.include_router(automation_soc2_router)
 app.include_router(automation_common_router)
 app.include_router(automation_frameworks_router)
+# CTEM scopes/cycles — mounted under /erm so the paths are /erm/ctem/scopes/*
+# (matches the CTEM Scopes board's API calls). Router carries its own /ctem/scopes prefix.
+app.include_router(erm_ctem_scopes_router, prefix="/erm")
 app.include_router(connect_wizard_router)
 app.include_router(admin_ai_usage_router)
 

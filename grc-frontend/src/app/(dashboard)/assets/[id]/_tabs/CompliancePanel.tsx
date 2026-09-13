@@ -44,6 +44,7 @@ import { apiClient, assetsApi, compliancePluginsApi } from '@/lib/api';
 import { GuideMarker } from '@/components/guide';
 import { useRoomScan } from '../_room-scan-context';
 import { softwareKeyToSqlPlatform } from '@/components/integrations/SqlDbForm';
+import ManualChecksPanel from './ManualChecksPanel';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -196,7 +197,7 @@ const totalsOf = (rs: any[]) =>
 export default function CompliancePanel({ asset }: { asset: any }) {
   const queryClient = useQueryClient();
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
-  const [cTab, setCTab] = useState<'grp' | 'bench' | 'sess' | 'act'>('grp');
+  const [cTab, setCTab] = useState<'grp' | 'bench' | 'sess' | 'act' | 'manual'>('grp');
   const [noBenchOpen, setNoBenchOpen] = useState(false);
   const [openSessions, setOpenSessions] = useState<Set<string>>(new Set());
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -286,6 +287,15 @@ export default function CompliancePanel({ asset }: { asset: any }) {
     queryKey: ['compliance-plugins', 'match-preview', asset.id],
     queryFn: () => compliancePluginsApi.matchPreview(asset.id).then((r: any) => r.data),
   });
+
+  // Manual attestation checks for this asset — same query key ManualChecksPanel
+  // uses, so this badge read and the tab share one request. Only the count is
+  // used here; the panel renders the full grouped payload.
+  const manualChecksQ = useQuery({
+    queryKey: ['compliance-plugins', 'manual-checks', asset.id],
+    queryFn: () => compliancePluginsApi.assetManualChecks(asset.id).then((r: any) => r.data),
+  });
+  const manualCount = manualChecksQ.data?.total_manual ?? null;
 
   const reDetectMut = useMutation({
     mutationFn: () => compliancePluginsApi.reDetectAssetOs(asset.id).then((r: any) => r.data),
@@ -767,6 +777,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
         {([
           ['grp', 'Host group', null],
           ['bench', 'Benchmark match', null],
+          ['manual', 'Manual checks', manualCount],
           ['sess', 'Scan sessions', sessions.length],
           ['act', 'Activity', sessions.length],
         ] as const).map(([key, label, n]) => (
@@ -1083,6 +1094,9 @@ export default function CompliancePanel({ asset }: { asset: any }) {
           </article>
         </>
       )}
+
+      {/* ══ MANUAL CHECKS ══ */}
+      {cTab === 'manual' && <ManualChecksPanel asset={asset} />}
 
       {/* ══ SCAN SESSIONS ══ */}
       {cTab === 'sess' && (
