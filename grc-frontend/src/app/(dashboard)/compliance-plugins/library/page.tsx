@@ -132,7 +132,7 @@ export default function RuleLibraryPage() {
               platform-admin half stays in the codebase but no tenant
               route exposes it. */}
           <Link
-            href="/my-runs"
+            href="/compliance-overview"
             className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
             title="Your scan pass-rate, team activity, and the recent runs feed"
           >

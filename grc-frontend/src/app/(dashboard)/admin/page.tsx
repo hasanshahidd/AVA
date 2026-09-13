@@ -13,14 +13,13 @@ import CloudConnectorsAdminPage from './cloud-connectors/page';
 import ConnectorsAdminPage from './connectors/page';
 import EvidenceCollectorsPage from './evidence-collectors/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
-import WorkflowEnginePage from '../workflow-engine/page';
 import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'password-policy' | 'integrations' | 'cloud-connectors' | 'connectors' | 'evidence-collectors' | 'identity' | 'workflow' | 'audit';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'password-policy' | 'integrations' | 'cloud-connectors' | 'connectors' | 'evidence-collectors' | 'identity' | 'audit';
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
   'company','users','roles','teams','password-policy','integrations',
-  'cloud-connectors','connectors','evidence-collectors','identity','workflow','audit',
+  'cloud-connectors','connectors','evidence-collectors','identity','audit',
 ]);
 
 export default function AdminPage() {
@@ -51,7 +50,6 @@ export default function AdminPage() {
     // SOC 2 SaaS evidence collectors — github/okta/slack/… → live evidence.
     { id: 'evidence-collectors', label: 'Connections', icon: PlugZap },
     { id: 'identity', label: 'Identity Providers', icon: KeyRound },
-    { id: 'workflow', label: 'Workflow Engine', icon: GitPullRequest },
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
 
@@ -91,7 +89,6 @@ export default function AdminPage() {
         {activeTab === 'connectors' && <ConnectorsAdminPage />}
         {activeTab === 'evidence-collectors' && <EvidenceCollectorsPage />}
         {activeTab === 'identity' && <IdentityProvidersCard />}
-        {activeTab === 'workflow' && <WorkflowEnginePage />}
         {activeTab === 'audit' && <AuditLogsPage />}
       </div>
     </div>

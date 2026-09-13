@@ -284,3 +284,53 @@ def applicable_plugins_for_asset_multi(
     for b in benchmarks:
         b["rule_count"] = counts.get(b["benchmark"], 0)
     return (plugins, benchmarks)
+
+
+def applicable_manual_plugins_for_asset(
+    db: Session, tenant_id: int, asset,
+) -> Tuple[List[CompliancePlugin], List[dict]]:
+    """Manual / attestation rules that apply to an asset — the human-attested
+    companion to ``applicable_plugins_for_asset_multi`` (which returns only the
+    automatable rules).
+
+    Same benchmark resolution (OS benchmark + every merged software benchmark),
+    but ``runner_type == 'manual'``. These are the CIS items a scanner can't
+    verify — a human confirms them — so they belong in a per-asset "manual
+    checks" tab alongside the automated scan, NOT in the automated pass-rate.
+
+    Only genuinely-unwritten TODO stubs are excluded. NOTE the deliberate
+    difference from the automated path: ``expect.kind == 'any'`` is NOT
+    excluded here. For an automated rule kind:any is a hollow auto-pass; for a
+    manual rule it is *normal* — the check has no machine expectation because a
+    human decides. These rows carry full title / description / audit-steps /
+    remediation (they are real CIS attestation items), so excluding them would
+    hide the majority of an asset's manual checks. Returns ``(plugins,
+    benchmarks)`` like the ``_multi`` variant, with a per-benchmark
+    ``manual_count``.
+    """
+    benchmarks = applicable_benchmarks_for_asset(db, tenant_id, asset)
+    if not benchmarks:
+        return ([], [])
+    names = [b["benchmark"] for b in benchmarks]
+    cdef = cast(CompliancePlugin.check_definition, String)
+    plugins = (
+        db.query(CompliancePlugin)
+        .filter(
+            or_(
+                CompliancePlugin.tenant_id == tenant_id,
+                CompliancePlugin.tenant_id.is_(None),
+            ),
+            CompliancePlugin.benchmark.in_(names),
+            CompliancePlugin.enabled.is_(True),
+            CompliancePlugin.runner_type == "manual",
+            # Only exclude genuinely unwritten stubs. kind:any is intentionally
+            # kept — see docstring (it is the normal shape of a manual check).
+            ~cdef.ilike("%TODO%"),
+        )
+        .all()
+    )
+    from collections import Counter
+    counts = Counter(p.benchmark for p in plugins)
+    for b in benchmarks:
+        b["manual_count"] = counts.get(b["benchmark"], 0)
+    return (plugins, benchmarks)
