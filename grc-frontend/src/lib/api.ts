@@ -4161,6 +4161,8 @@ export const compliancePluginsApi = {
   assetsOverview: () => apiClient.get('/compliance-plugins/assets-overview'),
   perAssetCoverage: (assetId: number) =>
     apiClient.get('/compliance-plugins/per-asset-coverage', { params: { asset_id: assetId } }),
+  assetManualChecks: (assetId: number) =>
+    apiClient.get(`/compliance-plugins/asset/${assetId}/manual-checks`),
   reviewBulk: (pluginIds: number[], decision: 'approve' | 'reject') =>
     apiClient.post('/compliance-plugins/review-bulk', { plugin_ids: pluginIds, decision }),
   updateSchedule: (pluginId: number, cron: string | null) =>
