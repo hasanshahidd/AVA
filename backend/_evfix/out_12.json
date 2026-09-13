@@ -1,0 +1,60 @@
+{
+ "set_id": "S012",
+ "di": 4,
+ "groups": [
+  {
+   "name": "MFA configuration and implementation documentation",
+   "absorbs": [
+    "MFA configuration for external applications",
+    "MFA implementation documentation",
+    "MFA implementation policy and deployment records",
+    "MFA configuration documentation",
+    "MFA Configuration for All CDE Non-Console Access"
+   ]
+  },
+  {
+   "name": "MFA coverage report/assessment",
+   "absorbs": [
+    "MFA coverage report",
+    "MFA coverage assessment for sensitive systems",
+    "MFA coverage assessment for critical systems"
+   ]
+  },
+  {
+   "name": "MFA enrollment records",
+   "absorbs": [
+    "MFA enrollment records",
+    "MFA enrollment records"
+   ]
+  },
+  {
+   "name": "Authentication logs",
+   "absorbs": [
+    "Authentication logs",
+    "Authentication Logs"
+   ]
+  },
+  {
+   "name": "Token/device inventory",
+   "absorbs": [
+    "Token/device inventory"
+   ]
+  },
+  {
+   "name": "MFA bypass exception documentation",
+   "absorbs": [
+    "MFA Bypass Exception Documentation"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Secured communications solution documentation",
+   "reason": "Secure-communication artifact, not MFA evidence; off-topic for an MFA-access heading."
+  },
+  {
+   "name": "Emergency communication system testing records",
+   "reason": "Emergency comms testing artifact, not MFA evidence; off-topic for an MFA-access heading."
+  }
+ ]
+}

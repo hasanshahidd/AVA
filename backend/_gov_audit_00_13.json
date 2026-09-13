@@ -1,0 +1,16 @@
+{"results": [
+  {"set_id": "GOV-001", "verdict": "REVIEW", "loose_members": [], "offtopic_evidence": ["Physical access logs and visitor register", "CCTV deployment and footage retention records", "Third-party agreements with security clauses and right-to-audit", "Third-party risk assessment and monitoring records"], "should_merge": []},
+  {"set_id": "GOV-002", "verdict": "REVIEW", "loose_members": [{"fw": "ARAMCO Cybersecurity Compliance Certification", "cid": "1.2", "why": "'Security Governance Structure' is a governance-structure/framework requirement, not defining and allocating individual roles and responsibilities"}], "offtopic_evidence": ["Management commitment evidence", "Signed non-disclosure agreements", "Residual risk acceptance records", "Partner agreements"], "should_merge": [["Security roles and responsibilities policy / charter", "Job descriptions with security duties"]]},
+  {"set_id": "GOV-003", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-004", "verdict": "REVIEW", "loose_members": [{"fw": "SOC 2 Type II", "cid": "CC1.1", "why": "COSO Principle 1 'Commitment to Integrity and Ethical Values' is about ethics/code of conduct, a near-but-different requirement from management leadership and commitment to information security"}], "offtopic_evidence": ["Employee code of conduct acknowledgement records", "Disciplinary action records for conduct violations"], "should_merge": []},
+  {"set_id": "GOV-005", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-006", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-007", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-008", "verdict": "REVIEW", "loose_members": [], "offtopic_evidence": ["Change management procedure with CAB approvals", "Change records (RFC) with risk classification"], "should_merge": []},
+  {"set_id": "GOV-009", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-010", "verdict": "REVIEW", "loose_members": [], "offtopic_evidence": ["Change management procedure with CAB approvals", "Change records (RFC) with risk classification"], "should_merge": []},
+  {"set_id": "GOV-011", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-012", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-013", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []},
+  {"set_id": "GOV-014", "verdict": "ACCURATE", "loose_members": [], "offtopic_evidence": [], "should_merge": []}
+]}

@@ -1,0 +1,25 @@
+# Python
+backend/venv/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+grc-frontend/node_modules/
+grc-frontend/.next/
+grc-frontend/out/
+grc-frontend/dist/
+npm-debug.log*
+yarn-error.log*
+
+# Local DB backups / dumps (never ship)
+_db_backups/
+*.dump
+*.sql.gz
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db

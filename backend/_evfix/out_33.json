@@ -1,0 +1,109 @@
+{
+ "set_id": "S002",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Third-party/supplier agreements with security clauses (executed/signed)",
+   "absorbs": [
+    "Third-party agreements with security clauses, SLAs, and right-to-audit",
+    "Sample contract clauses",
+    "Sample vendor contracts with required clauses",
+    "Sample Executed TPSP Agreements",
+    "Signed Supplier Agreements"
+   ]
+  },
+  {
+   "name": "Contract security requirements checklist",
+   "absorbs": [
+    "Contract security requirements checklist",
+    "Contract clause checklist",
+    "Contract review checklists covering required provisions"
+   ]
+  },
+  {
+   "name": "Contract security clause library / sample clauses",
+   "absorbs": [
+    "Supplier Contract Security Clause Library"
+   ]
+  },
+  {
+   "name": "Contract review records",
+   "absorbs": [
+    "Contract review records"
+   ]
+  },
+  {
+   "name": "Agreement repository",
+   "absorbs": [
+    "Agreement Repository"
+   ]
+  },
+  {
+   "name": "Agreement maintenance records",
+   "absorbs": [
+    "Agreement Maintenance Records"
+   ]
+  },
+  {
+   "name": "Contract compliance tracker",
+   "absorbs": [
+    "Contract Compliance Tracker"
+   ]
+  },
+  {
+   "name": "Right-to-audit clause evidence",
+   "absorbs": [
+    "Right-to-Audit Clause Evidence"
+   ]
+  },
+  {
+   "name": "Supplier NDAs",
+   "absorbs": [
+    "Supplier NDAs"
+   ]
+  },
+  {
+   "name": "SLA documentation",
+   "absorbs": [
+    "SLA documentation"
+   ]
+  },
+  {
+   "name": "Third-party security policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Addressing Security in Third"
+   ]
+  },
+  {
+   "name": "Third-party security procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Addressing Security in"
+   ]
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "absorbs": [
+    "Third-party risk assessment and ongoing monitoring records"
+   ]
+  },
+  {
+   "name": "Service description documentation",
+   "absorbs": [
+    "Service description documentation"
+   ]
+  },
+  {
+   "name": "Data processing location inventory",
+   "absorbs": [
+    "Data processing location inventories"
+   ]
+  },
+  {
+   "name": "Third-party security awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": []
+}

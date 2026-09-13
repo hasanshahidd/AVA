@@ -1,0 +1,471 @@
+[
+ {
+  "control_id": "1.3",
+  "title": "Apply cyber security controls to information assets",
+  "description": "Organizations must implement cybersecurity controls to safeguard their information assets from threats and vulnerabilities.",
+  "native_domain": "Asset",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Apply cyber security controls to information storage devices",
+  "description": "Organizations must implement cybersecurity controls to secure information storage devices, such as hard disks and USB sticks, against unauthorized access or data breaches.",
+  "native_domain": "Asset",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Improve cyber security controls",
+  "description": "Organizations must continuously improve their cybersecurity controls in alignment with the principles and objectives defined in the SAMA Cyber Security Framework.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Initiate cyber security controls",
+  "description": "Ensure that foundational cyber security controls are established to protect the organization from cyber threats.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Maintain cyber security controls",
+  "description": "Ensure that existing cyber security controls are regularly reviewed and updated to remain effective.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Monitor cyber security controls",
+  "description": "Ensure that cyber security controls are continuously monitored to detect and respond to potential issues.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.3",
+  "title": "Provide direction for cyber security requirements for subsidiaries",
+  "description": "Ensure that subsidiaries comply with the organization's cyber security requirements.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.5",
+  "title": "Mandate framework adoption by SAMA",
+  "description": "Ensure compliance with the mandatory adoption of the SAMA Cyber Security Framework.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.5",
+  "title": "Update the framework periodically",
+  "description": "Ensure that the framework is reviewed and updated periodically to address emerging threats and changes.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.8",
+  "title": "Review the framework periodically",
+  "description": "Conduct regular reviews of the framework to ensure it remains effective and aligned with organizational and regulatory requirements.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.8",
+  "title": "Submit framework update requests formally",
+  "description": "Member organizations should use a formal process to request updates to the framework when necessary.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "1.8",
+  "title": "Update the framework based on review outcomes",
+  "description": "Make necessary updates to the framework based on findings from periodic reviews to address gaps or changes in requirements.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.3",
+  "title": "Perform self-assessment based on a questionnaire",
+  "description": "Use a standardized questionnaire to guide the self-assessment process and ensure consistency.",
+  "native_domain": "Compliance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.3",
+  "title": "SAMA to review and audit self-assessments",
+  "description": "SAMA will review and audit the self-assessments to verify compliance and assess the organization's cybersecurity maturity.",
+  "native_domain": "Compliance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.4",
+  "title": "Measure cyber security maturity level",
+  "description": "Use a predefined model to measure and evaluate the organization's cybersecurity maturity level.",
+  "native_domain": "Compliance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.4.1",
+  "title": "Ensure cyber security documentation includes 'why', 'what', and 'how'",
+  "description": "Ensure that cyber security documentation provides clear reasoning, scope, and implementation details for controls.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.4.1",
+  "title": "Establish cyber security policies, standards, and procedures",
+  "description": "Develop and maintain comprehensive cyber security policies, standards, and procedures to guide organizational practices.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.4.1",
+  "title": "Monitor compliance with cyber security documentation",
+  "description": "Regularly monitor and assess adherence to established cyber security documentation to ensure compliance.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "2.4.2",
+  "title": "Use KRIs for trend reporting and improvement identification",
+  "description": "Leverage KRIs to identify trends and areas for improvement in cyber security practices.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "3.1.1",
+  "title": "Appoint a full-time senior manager (CISO) for cyber security",
+  "description": "Ensure the appointment of a qualified, full-time CISO to oversee the organization's cyber security function.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "3.1.1",
+  "title": "Develop and approve a cyber security committee charter",
+  "description": "Create and formally approve a charter that defines the purpose, structure, and responsibilities of the cyber security committee.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "3.1.1",
+  "title": "Ensure CISO has Saudi nationality and is qualified",
+  "description": "Verify that the appointed CISO is a Saudi national and possesses the necessary qualifications for the role.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "3.1.1",
+  "title": "Ensure cyber security function is independent from IT",
+  "description": "Establish a cyber security function that operates independently from the IT department to avoid conflicts of interest.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3",
+  "title": "Implement security requirements for information assets",
+  "description": "Organizations must ensure that the defined security requirements for information assets are put into practice.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.1",
+  "title": "Define cyber security requirements in HR processes",
+  "description": "HR processes should define specific cyber security requirements relevant to their operations.",
+  "native_domain": "HR",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.1",
+  "title": "Implement cyber security requirements in HR processes",
+  "description": "HR processes should ensure that defined cyber security requirements are implemented effectively.",
+  "native_domain": "HR",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.1",
+  "title": "Measure and evaluate HR process effectiveness",
+  "description": "Organizations should periodically assess the effectiveness of HR processes in meeting cyber security requirements.",
+  "native_domain": "HR",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.1",
+  "title": "Monitor effectiveness of HR processes",
+  "description": "Organizations should monitor the ongoing effectiveness of HR processes in meeting cyber security requirements.",
+  "native_domain": "HR",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.12 Principle",
+  "title": "Measure and evaluate effectiveness of payment systems standard",
+  "description": "Regularly assess the effectiveness of the payment systems cyber security standard.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.2",
+  "title": "Measure and evaluate physical security process effectiveness",
+  "description": "Regularly assess the performance of physical security measures to ensure they meet objectives and identify areas for improvement.",
+  "native_domain": "Physical",
+  "evidence": []
+ },
+ {
+  "control_id": "3.3.2",
+  "title": "Monitor effectiveness of physical security process",
+  "description": "Continuously monitor physical security measures to detect and respond to potential weaknesses or breaches.",
+  "native_domain": "Physical",
+  "evidence": []
+ },
+ {
+  "control_id": "3.4.3",
+  "title": "Measure and evaluate cloud security controls",
+  "description": "Assess the performance of cloud security controls to ensure they meet objectives and identify areas for improvement.",
+  "native_domain": "Cloud",
+  "evidence": []
+ },
+ {
+  "control_id": "Control Considerations 6",
+  "title": "Measure and evaluate third-party secure disposal effectiveness",
+  "description": "Assess the effectiveness of third-party secure disposal processes to ensure compliance and adequacy.",
+  "native_domain": "Vendor",
+  "evidence": []
+ },
+ {
+  "control_id": "Cyber security governance",
+  "title": "Provide strategic direction for cyber security",
+  "description": "The organization should define and communicate a strategic plan for its cybersecurity initiatives.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Cyber security governance",
+  "title": "Verify responsible use of enterprise resources",
+  "description": "Ensure that enterprise resources, such as IT systems, data, and personnel, are utilized in a manner that aligns with organizational policies and objectives.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Cyber security risk management",
+  "title": "Employ techniques for continuous monitoring of security state",
+  "description": "Implement tools and processes to continuously monitor the security posture of the organization's information systems.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Cyber security risk management",
+  "title": "Implement a risk mitigation strategy",
+  "description": "Develop and execute a strategy to reduce identified risks to an acceptable level.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Define information security roles and responsibilities",
+  "description": "Clearly define and document roles and responsibilities for information security within the organization.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Facilitate and monitor implementation of effective information security practices",
+  "description": "Oversee and track the adoption of information security practices by operational teams to ensure effectiveness.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Identify known and emerging information security issues",
+  "description": "Continuously identify and document both existing and emerging security threats to the organization.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Identify shifts in the organization's implicit information risk appetite",
+  "description": "Monitor and document changes in the organization's tolerance for information security risks.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Provide guidance and training on information security and risk management",
+  "description": "Deliver training and guidance to employees on information security and risk management to ensure awareness and compliance.",
+  "native_domain": "Compliance",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Provide information security and risk management frameworks",
+  "description": "Develop and provide structured frameworks for managing information security and associated risks.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Set information security goals for implementation",
+  "description": "Define clear and measurable goals for implementing information security initiatives.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "Information security function",
+  "title": "Support information security policies",
+  "description": "Ensure that information security policies are supported, roles and responsibilities are defined, and goals are established.",
+  "native_domain": "Governance",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Define service level agreements (SLAs)",
+  "description": "Establish SLAs with service providers to define responsibilities and set clear expectations.",
+  "native_domain": "Vendor",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Establish a risk register",
+  "description": "Maintain a centralized repository to document, track, and manage identified risks and their mitigation plans.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Establish a security operations center (SOC)",
+  "description": "Set up a dedicated team and infrastructure to monitor, detect, and respond to security incidents in real-time.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Implement red-teaming exercises",
+  "description": "Conduct simulated attacks to test the organization's ability to detect, respond to, and recover from security incidents.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Implement risk treatment processes",
+  "description": "Develop and implement strategies to address identified risks, including mitigation, transfer, or acceptance.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Implement sandboxing for controlled execution",
+  "description": "Use sandboxing to isolate and analyze potentially malicious software in a controlled environment.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Implement SIEM tools for security data gathering",
+  "description": "Deploy SIEM tools to collect, analyze, and correlate security data for real-time monitoring and incident response.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Implement vulnerability management practices",
+  "description": "Establish a process to regularly identify, assess, and remediate vulnerabilities in the organization's systems and applications.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Mitigate negative consequences of risks",
+  "description": "This control ensures that risks with negative consequences are addressed through appropriate mitigation strategies to reduce their impact.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Perform security testing of information systems",
+  "description": "This control ensures that security testing is conducted to evaluate the effectiveness of safeguards protecting information systems.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Promote a risk-aware culture",
+  "description": "This control ensures that the organization fosters a culture where employees are aware of and take responsibility for managing risks.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "N/A",
+  "title": "Recover to effective operational posture",
+  "description": "This control ensures that the organization can recover operations effectively within a timeframe that supports its mission.",
+  "native_domain": "BCP",
+  "evidence": []
+ },
+ {
+  "control_id": "SOC description",
+  "title": "Assess security-related data in SOC",
+  "description": "This control ensures that the SOC evaluates security-related data to identify potential threats or vulnerabilities.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "SOC description",
+  "title": "Detect indicators of compromise in SOC",
+  "description": "This control ensures that the SOC is focused on identifying indicators of compromise to detect potential security incidents.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "SOC description",
+  "title": "Disseminate security-related information from SOC",
+  "description": "This control ensures that the SOC shares security-related information with relevant stakeholders within the organization.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "SOC description",
+  "title": "Investigate indicators of compromise in SOC",
+  "description": "This control ensures that the SOC investigates indicators of compromise to determine the nature and scope of potential security incidents.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "SOC description",
+  "title": "Monitor security-related data in SOC",
+  "description": "The Security Operations Center (SOC) must continuously monitor security-related data from all enterprise systems to detect potential threats or anomalies.",
+  "native_domain": "Security",
+  "evidence": []
+ },
+ {
+  "control_id": "Threat landscape",
+  "title": "Provide an overview of threats and trends",
+  "description": "Organizations must maintain an up-to-date overview of current and emerging threats and trends to inform risk management strategies.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Vendor management",
+  "title": "Ensure third-party providers adhere to security standards",
+  "description": "Organizations must ensure that third-party providers comply with the same security standards and requirements as the organization itself.",
+  "native_domain": "Vendor",
+  "evidence": []
+ },
+ {
+  "control_id": "Vulnerability management",
+  "title": "Identify vulnerabilities",
+  "description": "Organizations must identify vulnerabilities in their systems, applications, and networks to address potential risks.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Vulnerability management",
+  "title": "Mitigate vulnerabilities",
+  "description": "Organizations must implement measures to mitigate identified vulnerabilities and reduce associated risks.",
+  "native_domain": "Risk",
+  "evidence": []
+ },
+ {
+  "control_id": "Vulnerability management",
+  "title": "Remediate vulnerabilities",
+  "description": "Organizations must remediate vulnerabilities by applying fixes or patches to eliminate risks.",
+  "native_domain": "Risk",
+  "evidence": []
+ }
+]

@@ -1,0 +1,56 @@
+[
+ {
+  "i": 39,
+  "decision": "join",
+  "set_id": "S003",
+  "reason": "Continuously identify/document threats = collect and analyze cyber threat intelligence"
+ },
+ {
+  "i": 48,
+  "decision": "join",
+  "set_id": "S014",
+  "reason": "Red-teaming simulated attacks = adversarial/red-team threat-led penetration testing"
+ },
+ {
+  "i": 50,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Sandboxing for malware analysis has no matching existing set"
+ },
+ {
+  "i": 52,
+  "decision": "join",
+  "set_id": "S001",
+  "reason": "Establish process to identify/assess/remediate vulnerabilities = vulnerability management program"
+ },
+ {
+  "i": 54,
+  "decision": "join",
+  "set_id": "S002",
+  "reason": "Security testing to evaluate safeguards = vulnerability assessments/scans"
+ },
+ {
+  "i": 62,
+  "decision": "join",
+  "set_id": "S003",
+  "reason": "Up-to-date overview of threats/trends = collect and analyze threat intelligence"
+ },
+ {
+  "i": 64,
+  "decision": "join",
+  "set_id": "S002",
+  "reason": "Identify vulnerabilities in systems = conduct vulnerability assessments/scans"
+ },
+ {
+  "i": 65,
+  "decision": "join",
+  "set_id": "S005",
+  "reason": "Mitigate identified vulnerabilities = remediate/correct identified vulnerabilities"
+ },
+ {
+  "i": 66,
+  "decision": "join",
+  "set_id": "S013",
+  "reason": "Remediate by applying fixes/patches = flaw remediation and security patching"
+ }
+]

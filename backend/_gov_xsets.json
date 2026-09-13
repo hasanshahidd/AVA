@@ -1,0 +1,2416 @@
+{
+ "sets": [
+  {
+   "set_id": "GOV-001",
+   "normalized_title": "Establish and maintain an information security policy",
+   "members": [
+    2,
+    120,
+    227,
+    240,
+    261,
+    354,
+    359,
+    381,
+    390
+   ]
+  },
+  {
+   "set_id": "GOV-002",
+   "normalized_title": "Define and allocate information security roles and responsibilities",
+   "members": [
+    1,
+    111,
+    167,
+    229,
+    262,
+    370,
+    382,
+    391
+   ]
+  },
+  {
+   "set_id": "GOV-003",
+   "normalized_title": "Formally appoint a CISO or senior information security officer",
+   "members": [
+    185,
+    223,
+    230,
+    250,
+    380,
+    399
+   ]
+  },
+  {
+   "set_id": "GOV-004",
+   "normalized_title": "Demonstrate management leadership and commitment to information security",
+   "members": [
+    109,
+    128,
+    165,
+    209,
+    366,
+    410
+   ]
+  },
+  {
+   "set_id": "GOV-005",
+   "normalized_title": "Establish an information security governance and management framework",
+   "members": [
+    0,
+    17,
+    237,
+    265,
+    289,
+    352
+   ]
+  },
+  {
+   "set_id": "GOV-006",
+   "normalized_title": "Implement a security awareness and training program",
+   "members": [
+    3,
+    208,
+    263,
+    355,
+    375
+   ]
+  },
+  {
+   "set_id": "GOV-007",
+   "normalized_title": "Conduct information security risk assessments",
+   "members": [
+    16,
+    264,
+    353,
+    367,
+    377
+   ]
+  },
+  {
+   "set_id": "GOV-008",
+   "normalized_title": "Review and update the information security policy at planned intervals",
+   "members": [
+    121,
+    228,
+    243,
+    360
+   ]
+  },
+  {
+   "set_id": "GOV-009",
+   "normalized_title": "Develop a risk management strategy",
+   "members": [
+    21,
+    186,
+    224,
+    279
+   ]
+  },
+  {
+   "set_id": "GOV-010",
+   "normalized_title": "Perform independent review and audit of information security",
+   "members": [
+    116,
+    256,
+    356,
+    373
+   ]
+  },
+  {
+   "set_id": "GOV-011",
+   "normalized_title": "Address information security in third-party and vendor agreements",
+   "members": [
+    14,
+    119,
+    217,
+    357
+   ]
+  },
+  {
+   "set_id": "GOV-012",
+   "normalized_title": "Board oversight and accountability for cyber and technology risk",
+   "members": [
+    183,
+    197,
+    239,
+    411
+   ]
+  },
+  {
+   "set_id": "GOV-013",
+   "normalized_title": "Establish and maintain contact with relevant authorities",
+   "members": [
+    114,
+    371,
+    385
+   ]
+  },
+  {
+   "set_id": "GOV-014",
+   "normalized_title": "Establish and maintain contact with special interest groups",
+   "members": [
+    115,
+    372,
+    386
+   ]
+  },
+  {
+   "set_id": "GOV-015",
+   "normalized_title": "Establish an information security management program",
+   "members": [
+    108,
+    222,
+    245
+   ]
+  },
+  {
+   "set_id": "GOV-016",
+   "normalized_title": "Determine internal and external communications",
+   "members": [
+    137,
+    176,
+    415
+   ]
+  },
+  {
+   "set_id": "GOV-017",
+   "normalized_title": "Establish an authorization process for information assets and systems",
+   "members": [
+    112,
+    225,
+    362
+   ]
+  },
+  {
+   "set_id": "GOV-018",
+   "normalized_title": "Establish a project management framework",
+   "members": [
+    327,
+    387,
+    388
+   ]
+  },
+  {
+   "set_id": "GOV-019",
+   "normalized_title": "Coordinate information security activities across the organization",
+   "members": [
+    110,
+    369
+   ]
+  },
+  {
+   "set_id": "GOV-020",
+   "normalized_title": "Establish and maintain the management system",
+   "members": [
+    125,
+    156
+   ]
+  },
+  {
+   "set_id": "GOV-021",
+   "normalized_title": "Continual improvement of the management system",
+   "members": [
+    127,
+    157
+   ]
+  },
+  {
+   "set_id": "GOV-022",
+   "normalized_title": "Nonconformity and corrective action",
+   "members": [
+    126,
+    158
+   ]
+  },
+  {
+   "set_id": "GOV-023",
+   "normalized_title": "Determine resources needed for the management system",
+   "members": [
+    134,
+    173
+   ]
+  },
+  {
+   "set_id": "GOV-024",
+   "normalized_title": "Determine competence of persons doing work",
+   "members": [
+    135,
+    174
+   ]
+  },
+  {
+   "set_id": "GOV-025",
+   "normalized_title": "Ensure awareness of policy and responsibilities",
+   "members": [
+    136,
+    175
+   ]
+  },
+  {
+   "set_id": "GOV-026",
+   "normalized_title": "Establish requirements for documented information",
+   "members": [
+    138,
+    177
+   ]
+  },
+  {
+   "set_id": "GOV-027",
+   "normalized_title": "Create and update documented information appropriately",
+   "members": [
+    139,
+    178
+   ]
+  },
+  {
+   "set_id": "GOV-028",
+   "normalized_title": "Control of documented information",
+   "members": [
+    140,
+    179
+   ]
+  },
+  {
+   "set_id": "GOV-029",
+   "normalized_title": "Understand the organization and its context",
+   "members": [
+    122,
+    153
+   ]
+  },
+  {
+   "set_id": "GOV-030",
+   "normalized_title": "Understand needs and expectations of interested parties",
+   "members": [
+    123,
+    154
+   ]
+  },
+  {
+   "set_id": "GOV-031",
+   "normalized_title": "Determine the scope of the management system",
+   "members": [
+    124,
+    155
+   ]
+  },
+  {
+   "set_id": "GOV-032",
+   "normalized_title": "Determine actions to address risks and opportunities",
+   "members": [
+    131,
+    202
+   ]
+  },
+  {
+   "set_id": "GOV-033",
+   "normalized_title": "Establish a top-management policy",
+   "members": [
+    129,
+    166
+   ]
+  },
+  {
+   "set_id": "GOV-034",
+   "normalized_title": "Assign organizational roles, responsibilities and authorities",
+   "members": [
+    130,
+    412
+   ]
+  },
+  {
+   "set_id": "GOV-035",
+   "normalized_title": "Establish and review an AI policy",
+   "members": [
+    150,
+    201
+   ]
+  },
+  {
+   "set_id": "GOV-036",
+   "normalized_title": "Define AI roles, responsibilities and oversight",
+   "members": [
+    163,
+    207
+   ]
+  },
+  {
+   "set_id": "GOV-037",
+   "normalized_title": "Maintain an inventory of in-scope systems",
+   "members": [
+    205,
+    234
+   ]
+  },
+  {
+   "set_id": "GOV-038",
+   "normalized_title": "Establish acceptable use / rules of behavior policy",
+   "members": [
+    221,
+    231
+   ]
+  },
+  {
+   "set_id": "GOV-039",
+   "normalized_title": "Develop and protect system security plans",
+   "members": [
+    220,
+    247
+   ]
+  },
+  {
+   "set_id": "GOV-040",
+   "normalized_title": "Communicate with external parties on matters affecting internal control",
+   "members": [
+    162,
+    416
+   ]
+  },
+  {
+   "set_id": "GOV-041",
+   "normalized_title": "Define third-party contingency and dependency processes",
+   "members": [
+    218,
+    285
+   ]
+  },
+  {
+   "set_id": "GOV-042",
+   "normalized_title": "Compliance Reporting",
+   "members": [
+    4
+   ]
+  },
+  {
+   "set_id": "GOV-043",
+   "normalized_title": "Managed I&T Management Framework",
+   "members": [
+    5
+   ]
+  },
+  {
+   "set_id": "GOV-044",
+   "normalized_title": "Managed Strategy",
+   "members": [
+    6
+   ]
+  },
+  {
+   "set_id": "GOV-045",
+   "normalized_title": "Managed Enterprise Architecture",
+   "members": [
+    7
+   ]
+  },
+  {
+   "set_id": "GOV-046",
+   "normalized_title": "Managed Innovation",
+   "members": [
+    8
+   ]
+  },
+  {
+   "set_id": "GOV-047",
+   "normalized_title": "Managed Portfolio",
+   "members": [
+    9
+   ]
+  },
+  {
+   "set_id": "GOV-048",
+   "normalized_title": "Managed Budget and Costs",
+   "members": [
+    10
+   ]
+  },
+  {
+   "set_id": "GOV-049",
+   "normalized_title": "Managed Human Resources",
+   "members": [
+    11
+   ]
+  },
+  {
+   "set_id": "GOV-050",
+   "normalized_title": "Managed Relationships",
+   "members": [
+    12
+   ]
+  },
+  {
+   "set_id": "GOV-051",
+   "normalized_title": "Managed Service Agreements",
+   "members": [
+    13
+   ]
+  },
+  {
+   "set_id": "GOV-052",
+   "normalized_title": "Managed Quality",
+   "members": [
+    15
+   ]
+  },
+  {
+   "set_id": "GOV-053",
+   "normalized_title": "Managed Data",
+   "members": [
+    18
+   ]
+  },
+  {
+   "set_id": "GOV-054",
+   "normalized_title": "Ensured Governance Framework Setting and Maintenance",
+   "members": [
+    19
+   ]
+  },
+  {
+   "set_id": "GOV-055",
+   "normalized_title": "Ensured Benefits Delivery",
+   "members": [
+    20
+   ]
+  },
+  {
+   "set_id": "GOV-056",
+   "normalized_title": "Ensured Resource Optimization",
+   "members": [
+    22
+   ]
+  },
+  {
+   "set_id": "GOV-057",
+   "normalized_title": "Ensured Stakeholder Engagement",
+   "members": [
+    23
+   ]
+  },
+  {
+   "set_id": "GOV-058",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Regulate Health System",
+   "members": [
+    24
+   ]
+  },
+  {
+   "set_id": "GOV-059",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Governance Measures for Patient Safety",
+   "members": [
+    25
+   ]
+  },
+  {
+   "set_id": "GOV-060",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Provide Stewardship for ADHIE Requirements",
+   "members": [
+    26
+   ]
+  },
+  {
+   "set_id": "GOV-061",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Meet DOH and ADHIE Operator Requirements",
+   "members": [
+    27
+   ]
+  },
+  {
+   "set_id": "GOV-062",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Accountable for PHI Use and Safeguarding",
+   "members": [
+    28
+   ]
+  },
+  {
+   "set_id": "GOV-063",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Establish Governance Arrangements",
+   "members": [
+    29
+   ]
+  },
+  {
+   "set_id": "GOV-064",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Receive, Access, Use and Process PHI for Platform Operations",
+   "members": [
+    30
+   ]
+  },
+  {
+   "set_id": "GOV-065",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Notify ADHIE of User Access Termination",
+   "members": [
+    31
+   ]
+  },
+  {
+   "set_id": "GOV-066",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Notify ADHIE of Breach Within 5 Business Days",
+   "members": [
+    32
+   ]
+  },
+  {
+   "set_id": "GOV-067",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Contractual Adherence via Licensing Agreement",
+   "members": [
+    33
+   ]
+  },
+  {
+   "set_id": "GOV-068",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Legal Agreements with ADHIE Operator and Others",
+   "members": [
+    34
+   ]
+  },
+  {
+   "set_id": "GOV-069",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Complete Readiness Assessment and Maintain Participant System",
+   "members": [
+    35
+   ]
+  },
+  {
+   "set_id": "GOV-070",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Adhere to ADHIE Launch Schedule",
+   "members": [
+    36
+   ]
+  },
+  {
+   "set_id": "GOV-071",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Submit Required Patient Data Timely",
+   "members": [
+    37
+   ]
+  },
+  {
+   "set_id": "GOV-072",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Receive and Integrate Incoming Data Timely",
+   "members": [
+    38
+   ]
+  },
+  {
+   "set_id": "GOV-073",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Maintain Interface Availability",
+   "members": [
+    39
+   ]
+  },
+  {
+   "set_id": "GOV-074",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Prohibit VIP Data Sharing Outside Authorized Channels",
+   "members": [
+    40
+   ]
+  },
+  {
+   "set_id": "GOV-075",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Appoint Authorized Users at Appropriate Access Levels",
+   "members": [
+    41
+   ]
+  },
+  {
+   "set_id": "GOV-076",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Provide Authorized User List to ADHIE Operator",
+   "members": [
+    42
+   ]
+  },
+  {
+   "set_id": "GOV-077",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Notify ADHIE Operator of User Changes Within 48 Hours",
+   "members": [
+    43
+   ]
+  },
+  {
+   "set_id": "GOV-078",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Authorized User Written Agreements with Required Clauses",
+   "members": [
+    44
+   ]
+  },
+  {
+   "set_id": "GOV-079",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Establish and Maintain Master Patient Index",
+   "members": [
+    45
+   ]
+  },
+  {
+   "set_id": "GOV-080",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Require Authorized Users Sign Obligations Statement",
+   "members": [
+    46
+   ]
+  },
+  {
+   "set_id": "GOV-081",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Provide Written Statement of Access Rights",
+   "members": [
+    47
+   ]
+  },
+  {
+   "set_id": "GOV-082",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Emirates ID Verification of Authorized Users",
+   "members": [
+    48
+   ]
+  },
+  {
+   "set_id": "GOV-083",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Unique Password Per Authorized User",
+   "members": [
+    49
+   ]
+  },
+  {
+   "set_id": "GOV-084",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Unique Username and Password Assignment",
+   "members": [
+    50
+   ]
+  },
+  {
+   "set_id": "GOV-085",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Minimum Password Standards",
+   "members": [
+    51
+   ]
+  },
+  {
+   "set_id": "GOV-086",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Limit Consecutive Failed Access Attempts",
+   "members": [
+    52
+   ]
+  },
+  {
+   "set_id": "GOV-087",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Automatic Logout After Inactivity",
+   "members": [
+    53
+   ]
+  },
+  {
+   "set_id": "GOV-088",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Assign Unique Identifier for User Tracking",
+   "members": [
+    54
+   ]
+  },
+  {
+   "set_id": "GOV-089",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Restrict Data Center Access with Physical Cages",
+   "members": [
+    55
+   ]
+  },
+  {
+   "set_id": "GOV-090",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Control Facility Access by Role and Visitor Control",
+   "members": [
+    56
+   ]
+  },
+  {
+   "set_id": "GOV-091",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Session Timeout, Removable Media, Anti-Malware",
+   "members": [
+    57
+   ]
+  },
+  {
+   "set_id": "GOV-092",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d No Suspension/Termination Without ADHIE Operator Consent",
+   "members": [
+    58
+   ]
+  },
+  {
+   "set_id": "GOV-093",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Notify ADHIE of Material Impact Developments",
+   "members": [
+    59
+   ]
+  },
+  {
+   "set_id": "GOV-094",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Discipline Non-Compliant Authorized Users",
+   "members": [
+    60
+   ]
+  },
+  {
+   "set_id": "GOV-095",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Notify ADHIE and DOH of Breach Within 5 Working Days",
+   "members": [
+    61
+   ]
+  },
+  {
+   "set_id": "GOV-096",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Internal Policies Aligned with Participation Criteria",
+   "members": [
+    62
+   ]
+  },
+  {
+   "set_id": "GOV-097",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Issue and Manage Launch Schedule",
+   "members": [
+    63
+   ]
+  },
+  {
+   "set_id": "GOV-098",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Develop Readiness Assessment Tool",
+   "members": [
+    64
+   ]
+  },
+  {
+   "set_id": "GOV-099",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Establish Mandatory Participation Criteria and Technical Standards",
+   "members": [
+    65
+   ]
+  },
+  {
+   "set_id": "GOV-100",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Inform Members of ADHIE Participation Requirement",
+   "members": [
+    66
+   ]
+  },
+  {
+   "set_id": "GOV-101",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Impose Measures to Prevent Unauthorized VIP Data Exchange",
+   "members": [
+    67
+   ]
+  },
+  {
+   "set_id": "GOV-102",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Establish and Enter into Participant Agreements",
+   "members": [
+    68
+   ]
+  },
+  {
+   "set_id": "GOV-103",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Remove Access Rights Within 24 Hours of Notification",
+   "members": [
+    69
+   ]
+  },
+  {
+   "set_id": "GOV-104",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Disable Inactive Accounts After 60 Days",
+   "members": [
+    70
+   ]
+  },
+  {
+   "set_id": "GOV-105",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Unique Username and Password Access",
+   "members": [
+    71
+   ]
+  },
+  {
+   "set_id": "GOV-106",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Server Hardening to Industry Standards",
+   "members": [
+    72
+   ]
+  },
+  {
+   "set_id": "GOV-107",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Operating Procedures and Controls",
+   "members": [
+    73
+   ]
+  },
+  {
+   "set_id": "GOV-108",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Log All Clinical Data Transactions",
+   "members": [
+    74
+   ]
+  },
+  {
+   "set_id": "GOV-109",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Log Files Tamper-Proof",
+   "members": [
+    75
+   ]
+  },
+  {
+   "set_id": "GOV-110",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Network Segregation and Firewall for Patient Health Data",
+   "members": [
+    76
+   ]
+  },
+  {
+   "set_id": "GOV-111",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Regular Review and Audit with Minimum Audit Functions",
+   "members": [
+    77
+   ]
+  },
+  {
+   "set_id": "GOV-112",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Disaster Relief Agency Emergency Access",
+   "members": [
+    78
+   ]
+  },
+  {
+   "set_id": "GOV-113",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Additional Audit Function Procedures",
+   "members": [
+    79
+   ]
+  },
+  {
+   "set_id": "GOV-114",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d System Interoperability Standards (HL7, SNOMED, XML)",
+   "members": [
+    80
+   ]
+  },
+  {
+   "set_id": "GOV-115",
+   "normalized_title": "Emergency Access (Break the Seal) \u00e2\u20ac\u201d General Authority",
+   "members": [
+    81
+   ]
+  },
+  {
+   "set_id": "GOV-116",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Qualified Condition and Immediate Medical Need",
+   "members": [
+    82
+   ]
+  },
+  {
+   "set_id": "GOV-117",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Material to Emergency Treatment Judgment",
+   "members": [
+    83
+   ]
+  },
+  {
+   "set_id": "GOV-118",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Record Healthcare Professional Direction",
+   "members": [
+    84
+   ]
+  },
+  {
+   "set_id": "GOV-119",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Attestation and Platform Record",
+   "members": [
+    85
+   ]
+  },
+  {
+   "set_id": "GOV-120",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Track and Document All Break-the-Seal Occurrences",
+   "members": [
+    86
+   ]
+  },
+  {
+   "set_id": "GOV-121",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d ADHIE Operator and DOH Audit Rights",
+   "members": [
+    87
+   ]
+  },
+  {
+   "set_id": "GOV-122",
+   "normalized_title": "Emergency Access \u00e2\u20ac\u201d Terminate Access on Treatment Completion",
+   "members": [
+    88
+   ]
+  },
+  {
+   "set_id": "GOV-123",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Develop and Oversee ADHIE Policies",
+   "members": [
+    89
+   ]
+  },
+  {
+   "set_id": "GOV-124",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Ensure Compliance with ADHIE Policies",
+   "members": [
+    90
+   ]
+  },
+  {
+   "set_id": "GOV-125",
+   "normalized_title": "DOH \u00e2\u20ac\u201d Perform Role per ADHIE Operator Agreement",
+   "members": [
+    91
+   ]
+  },
+  {
+   "set_id": "GOV-126",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Enter Participant Agreement",
+   "members": [
+    92
+   ]
+  },
+  {
+   "set_id": "GOV-127",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Group Company Declaration",
+   "members": [
+    93
+   ]
+  },
+  {
+   "set_id": "GOV-128",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Comply with Platform Access Requirements",
+   "members": [
+    94
+   ]
+  },
+  {
+   "set_id": "GOV-129",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Accurate Recording in Medical Record Systems",
+   "members": [
+    95
+   ]
+  },
+  {
+   "set_id": "GOV-130",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Integration Readiness per Launch Schedule",
+   "members": [
+    96
+   ]
+  },
+  {
+   "set_id": "GOV-131",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Implement and Support Connectivity Infrastructure",
+   "members": [
+    97
+   ]
+  },
+  {
+   "set_id": "GOV-132",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Comply with HIE Technology, Privacy, and Security Requirements",
+   "members": [
+    98
+   ]
+  },
+  {
+   "set_id": "GOV-133",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Supply Patient Data to ADHIE Platform",
+   "members": [
+    99
+   ]
+  },
+  {
+   "set_id": "GOV-134",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Share VIP Patient Data per DOH Direction",
+   "members": [
+    100
+   ]
+  },
+  {
+   "set_id": "GOV-135",
+   "normalized_title": "Healthcare Facility \u00e2\u20ac\u201d Comply with ADHICS for ADHIE Data Systems",
+   "members": [
+    101
+   ]
+  },
+  {
+   "set_id": "GOV-136",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Support Policy Development",
+   "members": [
+    102
+   ]
+  },
+  {
+   "set_id": "GOV-137",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Establish and Maintain ADHIE IT Infrastructure",
+   "members": [
+    103
+   ]
+  },
+  {
+   "set_id": "GOV-138",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Maintain Privacy and Security Protocols",
+   "members": [
+    104
+   ]
+  },
+  {
+   "set_id": "GOV-139",
+   "normalized_title": "ADHIE \u00e2\u20ac\u201d Ensure ADHICS Compliance",
+   "members": [
+    105
+   ]
+  },
+  {
+   "set_id": "GOV-140",
+   "normalized_title": "Business Associate Contracts or Other Arrangements - Standard",
+   "members": [
+    106
+   ]
+  },
+  {
+   "set_id": "GOV-141",
+   "normalized_title": "Requirements for Group Health Plans",
+   "members": [
+    107
+   ]
+  },
+  {
+   "set_id": "GOV-142",
+   "normalized_title": "Confidentiality Agreements",
+   "members": [
+    113
+   ]
+  },
+  {
+   "set_id": "GOV-143",
+   "normalized_title": "Identification of Risks Related to External Parties",
+   "members": [
+    117
+   ]
+  },
+  {
+   "set_id": "GOV-144",
+   "normalized_title": "Addressing Security When Dealing with Customers",
+   "members": [
+    118
+   ]
+  },
+  {
+   "set_id": "GOV-145",
+   "normalized_title": "Business Continuity Objectives and Plans to Achieve Them",
+   "members": [
+    132
+   ]
+  },
+  {
+   "set_id": "GOV-146",
+   "normalized_title": "Planning Changes to the BCMS",
+   "members": [
+    133
+   ]
+  },
+  {
+   "set_id": "GOV-147",
+   "normalized_title": "Objectives for Responsible Development of AI System",
+   "members": [
+    141
+   ]
+  },
+  {
+   "set_id": "GOV-148",
+   "normalized_title": "Processes for Responsible AI System Design and Development",
+   "members": [
+    142
+   ]
+  },
+  {
+   "set_id": "GOV-149",
+   "normalized_title": "AI System Requirements and Specification",
+   "members": [
+    143
+   ]
+  },
+  {
+   "set_id": "GOV-150",
+   "normalized_title": "Documentation of AI System Design and Development",
+   "members": [
+    144
+   ]
+  },
+  {
+   "set_id": "GOV-151",
+   "normalized_title": "AI System Verification and Validation",
+   "members": [
+    145
+   ]
+  },
+  {
+   "set_id": "GOV-152",
+   "normalized_title": "AI System Deployment",
+   "members": [
+    146
+   ]
+  },
+  {
+   "set_id": "GOV-153",
+   "normalized_title": "AI System Operation and Monitoring",
+   "members": [
+    147
+   ]
+  },
+  {
+   "set_id": "GOV-154",
+   "normalized_title": "AI System Technical Documentation",
+   "members": [
+    148
+   ]
+  },
+  {
+   "set_id": "GOV-155",
+   "normalized_title": "AI System Recording of Event Logs",
+   "members": [
+    149
+   ]
+  },
+  {
+   "set_id": "GOV-156",
+   "normalized_title": "Alignment with Other Organizational Policies",
+   "members": [
+    151
+   ]
+  },
+  {
+   "set_id": "GOV-157",
+   "normalized_title": "Review of the AI Policy",
+   "members": [
+    152
+   ]
+  },
+  {
+   "set_id": "GOV-158",
+   "normalized_title": "System Documentation and Information for Users",
+   "members": [
+    159
+   ]
+  },
+  {
+   "set_id": "GOV-159",
+   "normalized_title": "External Reporting",
+   "members": [
+    160
+   ]
+  },
+  {
+   "set_id": "GOV-160",
+   "normalized_title": "Communication of Incidents",
+   "members": [
+    161
+   ]
+  },
+  {
+   "set_id": "GOV-161",
+   "normalized_title": "Reporting of Concerns",
+   "members": [
+    164
+   ]
+  },
+  {
+   "set_id": "GOV-162",
+   "normalized_title": "Resource Documentation",
+   "members": [
+    168
+   ]
+  },
+  {
+   "set_id": "GOV-163",
+   "normalized_title": "Data Resources",
+   "members": [
+    169
+   ]
+  },
+  {
+   "set_id": "GOV-164",
+   "normalized_title": "Tooling Resources",
+   "members": [
+    170
+   ]
+  },
+  {
+   "set_id": "GOV-165",
+   "normalized_title": "System and Computing Resources",
+   "members": [
+    171
+   ]
+  },
+  {
+   "set_id": "GOV-166",
+   "normalized_title": "Human Resources",
+   "members": [
+    172
+   ]
+  },
+  {
+   "set_id": "GOV-167",
+   "normalized_title": "Processes for Responsible Use of AI Systems",
+   "members": [
+    180
+   ]
+  },
+  {
+   "set_id": "GOV-168",
+   "normalized_title": "Objectives for Responsible Use of AI System",
+   "members": [
+    181
+   ]
+  },
+  {
+   "set_id": "GOV-169",
+   "normalized_title": "Intended Use of the AI System",
+   "members": [
+    182
+   ]
+  },
+  {
+   "set_id": "GOV-170",
+   "normalized_title": "Board Technology Risk Knowledge",
+   "members": [
+    184
+   ]
+  },
+  {
+   "set_id": "GOV-171",
+   "normalized_title": "IT Decisions and Risk Appetite",
+   "members": [
+    187
+   ]
+  },
+  {
+   "set_id": "GOV-172",
+   "normalized_title": "Technology Risk Culture",
+   "members": [
+    188
+   ]
+  },
+  {
+   "set_id": "GOV-173",
+   "normalized_title": "Board Responsibilities for Technology Risk",
+   "members": [
+    189
+   ]
+  },
+  {
+   "set_id": "GOV-174",
+   "normalized_title": "Senior Management Responsibilities",
+   "members": [
+    190
+   ]
+  },
+  {
+   "set_id": "GOV-175",
+   "normalized_title": "Technology Risk Policies and Standards",
+   "members": [
+    191
+   ]
+  },
+  {
+   "set_id": "GOV-176",
+   "normalized_title": "Deviation Risk Assessment",
+   "members": [
+    192
+   ]
+  },
+  {
+   "set_id": "GOV-177",
+   "normalized_title": "Compliance Verification Processes",
+   "members": [
+    193
+   ]
+  },
+  {
+   "set_id": "GOV-178",
+   "normalized_title": "Project Steering Committee",
+   "members": [
+    194
+   ]
+  },
+  {
+   "set_id": "GOV-179",
+   "normalized_title": "Issue Escalation Process",
+   "members": [
+    195
+   ]
+  },
+  {
+   "set_id": "GOV-180",
+   "normalized_title": "Change Advisory Board",
+   "members": [
+    196
+   ]
+  },
+  {
+   "set_id": "GOV-181",
+   "normalized_title": "Management Body Cybersecurity Competence",
+   "members": [
+    198
+   ]
+  },
+  {
+   "set_id": "GOV-182",
+   "normalized_title": "National Cybersecurity Strategy",
+   "members": [
+    199
+   ]
+  },
+  {
+   "set_id": "GOV-183",
+   "normalized_title": "Legal and Regulatory Requirements",
+   "members": [
+    200
+   ]
+  },
+  {
+   "set_id": "GOV-184",
+   "normalized_title": "Risk Management Process and Outcomes",
+   "members": [
+    203
+   ]
+  },
+  {
+   "set_id": "GOV-185",
+   "normalized_title": "Ongoing Monitoring and Periodic Review",
+   "members": [
+    204
+   ]
+  },
+  {
+   "set_id": "GOV-186",
+   "normalized_title": "Decommissioning and Phasing Out AI Systems",
+   "members": [
+    206
+   ]
+  },
+  {
+   "set_id": "GOV-187",
+   "normalized_title": "Diverse Team Decision-Making",
+   "members": [
+    210
+   ]
+  },
+  {
+   "set_id": "GOV-188",
+   "normalized_title": "Human-AI Configuration Roles and Oversight",
+   "members": [
+    211
+   ]
+  },
+  {
+   "set_id": "GOV-189",
+   "normalized_title": "Critical Thinking and Safety-First Mindset",
+   "members": [
+    212
+   ]
+  },
+  {
+   "set_id": "GOV-190",
+   "normalized_title": "Documenting and Communicating Risks and Impacts",
+   "members": [
+    213
+   ]
+  },
+  {
+   "set_id": "GOV-191",
+   "normalized_title": "AI Testing, Incident Identification, and Information Sharing",
+   "members": [
+    214
+   ]
+  },
+  {
+   "set_id": "GOV-192",
+   "normalized_title": "Collecting and Integrating External Feedback",
+   "members": [
+    215
+   ]
+  },
+  {
+   "set_id": "GOV-193",
+   "normalized_title": "Incorporating Adjudicated Feedback",
+   "members": [
+    216
+   ]
+  },
+  {
+   "set_id": "GOV-194",
+   "normalized_title": "Policy and Procedures",
+   "members": [
+    219
+   ]
+  },
+  {
+   "set_id": "GOV-195",
+   "normalized_title": "Mission and Business Process Definition",
+   "members": [
+    226
+   ]
+  },
+  {
+   "set_id": "GOV-196",
+   "normalized_title": "Additional Requirement for Service Providers: Establish Executive Management Responsibility for PCI DSS Program",
+   "members": [
+    232
+   ]
+  },
+  {
+   "set_id": "GOV-197",
+   "normalized_title": "Additional Requirement for Service Providers: Perform Quarterly Compliance Reviews",
+   "members": [
+    233
+   ]
+  },
+  {
+   "set_id": "GOV-198",
+   "normalized_title": "Document and Confirm PCI DSS Scope at Least Annually",
+   "members": [
+    235
+   ]
+  },
+  {
+   "set_id": "GOV-199",
+   "normalized_title": "Additional Requirement for Service Providers: Review Scope Impact of Significant Organizational Changes",
+   "members": [
+    236
+   ]
+  },
+  {
+   "set_id": "GOV-200",
+   "normalized_title": "Annual senior-management review of controls",
+   "members": [
+    238
+   ]
+  },
+  {
+   "set_id": "GOV-201",
+   "normalized_title": "Board-approved cyber strategy and budget with contingency",
+   "members": [
+    241
+   ]
+  },
+  {
+   "set_id": "GOV-202",
+   "normalized_title": "Cyber security function with cross-functional representation",
+   "members": [
+    242
+   ]
+  },
+  {
+   "set_id": "GOV-203",
+   "normalized_title": "Board oversight of technology risk and IT committees",
+   "members": [
+    244
+   ]
+  },
+  {
+   "set_id": "GOV-204",
+   "normalized_title": "Minimum contents of the security program",
+   "members": [
+    246
+   ]
+  },
+  {
+   "set_id": "GOV-205",
+   "normalized_title": "Segregation of Information Security Group from IT",
+   "members": [
+    248
+   ]
+  },
+  {
+   "set_id": "GOV-206",
+   "normalized_title": "Information Security Group sized to bank's activities",
+   "members": [
+    249
+   ]
+  },
+  {
+   "set_id": "GOV-207",
+   "normalized_title": "Security forum facilitated by CISO",
+   "members": [
+    251
+   ]
+  },
+  {
+   "set_id": "GOV-208",
+   "normalized_title": "Information Security Committee responsibilities",
+   "members": [
+    252
+   ]
+  },
+  {
+   "set_id": "GOV-209",
+   "normalized_title": "Adequate resourcing of Information Security Group",
+   "members": [
+    253
+   ]
+  },
+  {
+   "set_id": "GOV-210",
+   "normalized_title": "CISO responsibilities",
+   "members": [
+    254
+   ]
+  },
+  {
+   "set_id": "GOV-211",
+   "normalized_title": "Cyber resilience indicators",
+   "members": [
+    255
+   ]
+  },
+  {
+   "set_id": "GOV-212",
+   "normalized_title": "Semi-annual board monitoring of indicators",
+   "members": [
+    257
+   ]
+  },
+  {
+   "set_id": "GOV-213",
+   "normalized_title": "Periodic Review of Safeguard Adequacy by the Competent Authority",
+   "members": [
+    258
+   ]
+  },
+  {
+   "set_id": "GOV-214",
+   "normalized_title": "Issuance of Guides and Guidelines by the Competent Authority",
+   "members": [
+    259
+   ]
+  },
+  {
+   "set_id": "GOV-215",
+   "normalized_title": "Enforcement \u00e2\u20ac\u201d Entry into Force",
+   "members": [
+    260
+   ]
+  },
+  {
+   "set_id": "GOV-216",
+   "normalized_title": "Implement cyber security controls",
+   "members": [
+    266
+   ]
+  },
+  {
+   "set_id": "GOV-217",
+   "normalized_title": "Adopt and implement the framework",
+   "members": [
+    267
+   ]
+  },
+  {
+   "set_id": "GOV-218",
+   "normalized_title": "Implement version control for the framework",
+   "members": [
+    268
+   ]
+  },
+  {
+   "set_id": "GOV-219",
+   "normalized_title": "Define, approve, and implement cyber security controls",
+   "members": [
+    269
+   ]
+  },
+  {
+   "set_id": "GOV-220",
+   "normalized_title": "Periodically measure and evaluate effectiveness of controls",
+   "members": [
+    270
+   ]
+  },
+  {
+   "set_id": "GOV-221",
+   "normalized_title": "Allocate sufficient budget for cyber security activities",
+   "members": [
+    271
+   ]
+  },
+  {
+   "set_id": "GOV-222",
+   "normalized_title": "Approve cyber security committee charter",
+   "members": [
+    272
+   ]
+  },
+  {
+   "set_id": "GOV-223",
+   "normalized_title": "Endorse cyber security governance",
+   "members": [
+    273
+   ]
+  },
+  {
+   "set_id": "GOV-224",
+   "normalized_title": "Endorse cyber security strategy",
+   "members": [
+    274
+   ]
+  },
+  {
+   "set_id": "GOV-225",
+   "normalized_title": "Endorse cyber security policy",
+   "members": [
+    275
+   ]
+  },
+  {
+   "set_id": "GOV-226",
+   "normalized_title": "Review cyber security strategy to align with objectives",
+   "members": [
+    276
+   ]
+  },
+  {
+   "set_id": "GOV-227",
+   "normalized_title": "Approve and monitor KRIs and KPIs for cyber security",
+   "members": [
+    277
+   ]
+  },
+  {
+   "set_id": "GOV-228",
+   "normalized_title": "Ensure standards, processes, and procedures reflect security requirements",
+   "members": [
+    278
+   ]
+  },
+  {
+   "set_id": "GOV-229",
+   "normalized_title": "Establish an independent cyber security function",
+   "members": [
+    280
+   ]
+  },
+  {
+   "set_id": "GOV-230",
+   "normalized_title": "Ensure cyber security objectives are achieved",
+   "members": [
+    281
+   ]
+  },
+  {
+   "set_id": "GOV-231",
+   "normalized_title": "Assist management in developing information security processes and controls",
+   "members": [
+    282
+   ]
+  },
+  {
+   "set_id": "GOV-232",
+   "normalized_title": "Permissible Onshore Cloud Outsourcing",
+   "members": [
+    283
+   ]
+  },
+  {
+   "set_id": "GOV-233",
+   "normalized_title": "EMI and Non-Designated PSO/PSP Offshore Outsourcing",
+   "members": [
+    284
+   ]
+  },
+  {
+   "set_id": "GOV-234",
+   "normalized_title": "Board-Approved Cloud Outsourcing Policy",
+   "members": [
+    286
+   ]
+  },
+  {
+   "set_id": "GOV-235",
+   "normalized_title": "ITSC Cloud Governance Delegation",
+   "members": [
+    287
+   ]
+  },
+  {
+   "set_id": "GOV-236",
+   "normalized_title": "Defined Roles and Responsibilities Before Transfer",
+   "members": [
+    288
+   ]
+  },
+  {
+   "set_id": "GOV-237",
+   "normalized_title": "Evaluate technology use and direct implementation",
+   "members": [
+    290
+   ]
+  },
+  {
+   "set_id": "GOV-238",
+   "normalized_title": "Align IT and business strategies with risk management",
+   "members": [
+    291
+   ]
+  },
+  {
+   "set_id": "GOV-239",
+   "normalized_title": "Align technology governance with corporate governance",
+   "members": [
+    292
+   ]
+  },
+  {
+   "set_id": "GOV-240",
+   "normalized_title": "Adopt international standards for technology governance",
+   "members": [
+    293
+   ]
+  },
+  {
+   "set_id": "GOV-241",
+   "normalized_title": "Approve IT Strategy",
+   "members": [
+    294
+   ]
+  },
+  {
+   "set_id": "GOV-242",
+   "normalized_title": "Establish and maintain strategic IT review process",
+   "members": [
+    295
+   ]
+  },
+  {
+   "set_id": "GOV-243",
+   "normalized_title": "Approve Digital Strategy for customer-focused products",
+   "members": [
+    296
+   ]
+  },
+  {
+   "set_id": "GOV-244",
+   "normalized_title": "Approve Digital Strategy for end-to-end digitization",
+   "members": [
+    297
+   ]
+  },
+  {
+   "set_id": "GOV-245",
+   "normalized_title": "Approve Digital Strategy for interoperability",
+   "members": [
+    298
+   ]
+  },
+  {
+   "set_id": "GOV-246",
+   "normalized_title": "Review and approve IT governance framework",
+   "members": [
+    299
+   ]
+  },
+  {
+   "set_id": "GOV-247",
+   "normalized_title": "Review and approve IT and Digital Strategies",
+   "members": [
+    300
+   ]
+  },
+  {
+   "set_id": "GOV-248",
+   "normalized_title": "Establish efficient IT organization structure",
+   "members": [
+    301
+   ]
+  },
+  {
+   "set_id": "GOV-249",
+   "normalized_title": "Approve and review technology-related policies",
+   "members": [
+    302
+   ]
+  },
+  {
+   "set_id": "GOV-250",
+   "normalized_title": "Ensure resource gaps are adequately filled",
+   "members": [
+    303
+   ]
+  },
+  {
+   "set_id": "GOV-251",
+   "normalized_title": "Ensure skills for technology functions",
+   "members": [
+    304
+   ]
+  },
+  {
+   "set_id": "GOV-252",
+   "normalized_title": "Approve and monitor major technology projects",
+   "members": [
+    305
+   ]
+  },
+  {
+   "set_id": "GOV-253",
+   "normalized_title": "Implement IT and Digital Strategy approved by BoD",
+   "members": [
+    306
+   ]
+  },
+  {
+   "set_id": "GOV-254",
+   "normalized_title": "Monitor and assess technology governance program",
+   "members": [
+    307
+   ]
+  },
+  {
+   "set_id": "GOV-255",
+   "normalized_title": "Implement BoD-approved technology policies and information security awareness program",
+   "members": [
+    308
+   ]
+  },
+  {
+   "set_id": "GOV-256",
+   "normalized_title": "Constitute Board IT Committee",
+   "members": [
+    309
+   ]
+  },
+  {
+   "set_id": "GOV-257",
+   "normalized_title": "Board IT Committee membership requirements",
+   "members": [
+    310
+   ]
+  },
+  {
+   "set_id": "GOV-258",
+   "normalized_title": "Board IT Committee advisory and reporting responsibilities",
+   "members": [
+    311
+   ]
+  },
+  {
+   "set_id": "GOV-259",
+   "normalized_title": "Board IT Committee review of IT and Digital strategies",
+   "members": [
+    312
+   ]
+  },
+  {
+   "set_id": "GOV-260",
+   "normalized_title": "Board IT Committee monitoring of technology projects",
+   "members": [
+    313
+   ]
+  },
+  {
+   "set_id": "GOV-261",
+   "normalized_title": "Ensure technology procurements align with IT strategy",
+   "members": [
+    314
+   ]
+  },
+  {
+   "set_id": "GOV-262",
+   "normalized_title": "Seek expert opinion when necessary",
+   "members": [
+    315
+   ]
+  },
+  {
+   "set_id": "GOV-263",
+   "normalized_title": "IT Steering Committee terms of reference approved by Board IT Committee",
+   "members": [
+    316
+   ]
+  },
+  {
+   "set_id": "GOV-264",
+   "normalized_title": "IT Steering Committee cross-functional composition",
+   "members": [
+    317
+   ]
+  },
+  {
+   "set_id": "GOV-265",
+   "normalized_title": "IT Steering Committee advisory role to senior management",
+   "members": [
+    318
+   ]
+  },
+  {
+   "set_id": "GOV-266",
+   "normalized_title": "IT Steering Committee monitoring of technology projects",
+   "members": [
+    319
+   ]
+  },
+  {
+   "set_id": "GOV-267",
+   "normalized_title": "Ensure IT procurement aligns with business plan",
+   "members": [
+    320
+   ]
+  },
+  {
+   "set_id": "GOV-268",
+   "normalized_title": "Ensure efficient IT operating environment",
+   "members": [
+    321
+   ]
+  },
+  {
+   "set_id": "GOV-269",
+   "normalized_title": "IT organizational structure commensurate with FI size and complexity",
+   "members": [
+    322
+   ]
+  },
+  {
+   "set_id": "GOV-270",
+   "normalized_title": "Formulate technology policy framework",
+   "members": [
+    323
+   ]
+  },
+  {
+   "set_id": "GOV-271",
+   "normalized_title": "BoD MIS for IT strategy oversight",
+   "members": [
+    324
+   ]
+  },
+  {
+   "set_id": "GOV-272",
+   "normalized_title": "Management MIS for IT governance and risk management",
+   "members": [
+    325
+   ]
+  },
+  {
+   "set_id": "GOV-273",
+   "normalized_title": "Engage board and senior management in cyber security governance",
+   "members": [
+    326
+   ]
+  },
+  {
+   "set_id": "GOV-274",
+   "normalized_title": "Establish Project Management Office (PMO)",
+   "members": [
+    328
+   ]
+  },
+  {
+   "set_id": "GOV-275",
+   "normalized_title": "Adopt full project life cycle methodology",
+   "members": [
+    329
+   ]
+  },
+  {
+   "set_id": "GOV-276",
+   "normalized_title": "Engage independent party for QA review of major technology projects",
+   "members": [
+    330
+   ]
+  },
+  {
+   "set_id": "GOV-277",
+   "normalized_title": "Establish project management standards",
+   "members": [
+    331
+   ]
+  },
+  {
+   "set_id": "GOV-278",
+   "normalized_title": "Define quality assurance standards",
+   "members": [
+    332
+   ]
+  },
+  {
+   "set_id": "GOV-279",
+   "normalized_title": "Formulate RFP and BRD for major IT acquisitions",
+   "members": [
+    333
+   ]
+  },
+  {
+   "set_id": "GOV-280",
+   "normalized_title": "Define roles and responsibilities for procurement stakeholders",
+   "members": [
+    334
+   ]
+  },
+  {
+   "set_id": "GOV-281",
+   "normalized_title": "Establish approval matrix for RFP and BRD",
+   "members": [
+    335
+   ]
+  },
+  {
+   "set_id": "GOV-282",
+   "normalized_title": "Review RFP and BRD for alignment with IT strategy",
+   "members": [
+    336
+   ]
+  },
+  {
+   "set_id": "GOV-283",
+   "normalized_title": "Ensure transparent and competitive procurement processes",
+   "members": [
+    337
+   ]
+  },
+  {
+   "set_id": "GOV-284",
+   "normalized_title": "Manage procurement by independent unit and IT Steering Committee",
+   "members": [
+    338
+   ]
+  },
+  {
+   "set_id": "GOV-285",
+   "normalized_title": "Form forum to monitor technology procurement",
+   "members": [
+    339
+   ]
+  },
+  {
+   "set_id": "GOV-286",
+   "normalized_title": "Formulate procedures on system development documentation",
+   "members": [
+    340
+   ]
+  },
+  {
+   "set_id": "GOV-287",
+   "normalized_title": "Maintain documentation for each project phase",
+   "members": [
+    341
+   ]
+  },
+  {
+   "set_id": "GOV-288",
+   "normalized_title": "Establish system documentation",
+   "members": [
+    342
+   ]
+  },
+  {
+   "set_id": "GOV-289",
+   "normalized_title": "Establish application documentation",
+   "members": [
+    343
+   ]
+  },
+  {
+   "set_id": "GOV-290",
+   "normalized_title": "Define roles for documentation change management",
+   "members": [
+    344
+   ]
+  },
+  {
+   "set_id": "GOV-291",
+   "normalized_title": "Conduct post-implementation review of critical projects",
+   "members": [
+    345
+   ]
+  },
+  {
+   "set_id": "GOV-292",
+   "normalized_title": "Assess project success by comparing planned vs actual outcomes",
+   "members": [
+    346
+   ]
+  },
+  {
+   "set_id": "GOV-293",
+   "normalized_title": "Record reasons when planned objectives do not materialize",
+   "members": [
+    347
+   ]
+  },
+  {
+   "set_id": "GOV-294",
+   "normalized_title": "Present post-implementation report to senior management",
+   "members": [
+    348
+   ]
+  },
+  {
+   "set_id": "GOV-295",
+   "normalized_title": "Internet Banking Security Framework",
+   "members": [
+    349
+   ]
+  },
+  {
+   "set_id": "GOV-296",
+   "normalized_title": "Security Objective: Accountability and Traceability",
+   "members": [
+    350
+   ]
+  },
+  {
+   "set_id": "GOV-297",
+   "normalized_title": "Management Review of Customer Awareness Programs",
+   "members": [
+    351
+   ]
+  },
+  {
+   "set_id": "GOV-298",
+   "normalized_title": "Security Logging and Monitoring",
+   "members": [
+    358
+   ]
+  },
+  {
+   "set_id": "GOV-299",
+   "normalized_title": "Administration and Implementation",
+   "members": [
+    361
+   ]
+  },
+  {
+   "set_id": "GOV-300",
+   "normalized_title": "Media Handling",
+   "members": [
+    363
+   ]
+  },
+  {
+   "set_id": "GOV-301",
+   "normalized_title": "Use of System Utilities",
+   "members": [
+    364
+   ]
+  },
+  {
+   "set_id": "GOV-302",
+   "normalized_title": "Clear Desk and Clear Screen Policy",
+   "members": [
+    365
+   ]
+  },
+  {
+   "set_id": "GOV-303",
+   "normalized_title": "Information Security Risk Treatment",
+   "members": [
+    368
+   ]
+  },
+  {
+   "set_id": "GOV-304",
+   "normalized_title": "Cyber Incident Response Planning",
+   "members": [
+    374
+   ]
+  },
+  {
+   "set_id": "GOV-305",
+   "normalized_title": "Penetration Testing",
+   "members": [
+    376
+   ]
+  },
+  {
+   "set_id": "GOV-306",
+   "normalized_title": "Secure Backup and Recovery",
+   "members": [
+    378
+   ]
+  },
+  {
+   "set_id": "GOV-307",
+   "normalized_title": "Security Management Process - Standard",
+   "members": [
+    379
+   ]
+  },
+  {
+   "set_id": "GOV-308",
+   "normalized_title": "Segregation of Duties",
+   "members": [
+    383
+   ]
+  },
+  {
+   "set_id": "GOV-309",
+   "normalized_title": "Management Responsibilities",
+   "members": [
+    384
+   ]
+  },
+  {
+   "set_id": "GOV-310",
+   "normalized_title": "Critical Infrastructure Role",
+   "members": [
+    389
+   ]
+  },
+  {
+   "set_id": "GOV-311",
+   "normalized_title": "Trained media spokesperson",
+   "members": [
+    392
+   ]
+  },
+  {
+   "set_id": "GOV-312",
+   "normalized_title": "BYOD policy for personal devices",
+   "members": [
+    393
+   ]
+  },
+  {
+   "set_id": "GOV-313",
+   "normalized_title": "Define security requirements for information assets",
+   "members": [
+    394
+   ]
+  },
+  {
+   "set_id": "GOV-314",
+   "normalized_title": "Define, approve, implement, and monitor payment systems standard",
+   "members": [
+    395
+   ]
+  },
+  {
+   "set_id": "GOV-315",
+   "normalized_title": "Define, approve, and implement electronic banking standards",
+   "members": [
+    396
+   ]
+  },
+  {
+   "set_id": "GOV-316",
+   "normalized_title": "Measure and evaluate effectiveness of electronic banking standards",
+   "members": [
+    397
+   ]
+  },
+  {
+   "set_id": "GOV-317",
+   "normalized_title": "Inform BoD on cyber security developments and threats",
+   "members": [
+    398
+   ]
+  },
+  {
+   "set_id": "GOV-318",
+   "normalized_title": "Independence of CISO from technology function",
+   "members": [
+    400
+   ]
+  },
+  {
+   "set_id": "GOV-319",
+   "normalized_title": "Develop information/cyber security management framework - identify and prioritize assets",
+   "members": [
+    401
+   ]
+  },
+  {
+   "set_id": "GOV-320",
+   "normalized_title": "IS framework to include security controls implementation",
+   "members": [
+    402
+   ]
+  },
+  {
+   "set_id": "GOV-321",
+   "normalized_title": "IS framework to include cyber security action plan",
+   "members": [
+    403
+   ]
+  },
+  {
+   "set_id": "GOV-322",
+   "normalized_title": "IS framework to include security requirements and testing",
+   "members": [
+    404
+   ]
+  },
+  {
+   "set_id": "GOV-323",
+   "normalized_title": "Formulate cyber security action plan",
+   "members": [
+    405
+   ]
+  },
+  {
+   "set_id": "GOV-324",
+   "normalized_title": "Apply technical controls commensurate with FI situation",
+   "members": [
+    406
+   ]
+  },
+  {
+   "set_id": "GOV-325",
+   "normalized_title": "Incorporate consistent approach for selecting security controls",
+   "members": [
+    407
+   ]
+  },
+  {
+   "set_id": "GOV-326",
+   "normalized_title": "Security Objective: Security and Integrity of Data and Systems",
+   "members": [
+    408
+   ]
+  },
+  {
+   "set_id": "GOV-327",
+   "normalized_title": "Security Controls Implementation",
+   "members": [
+    409
+   ]
+  },
+  {
+   "set_id": "GOV-328",
+   "normalized_title": "COSO Principle 5: Accountability for Internal Control",
+   "members": [
+    413
+   ]
+  },
+  {
+   "set_id": "GOV-329",
+   "normalized_title": "COSO Principle 13: Quality Information for Internal Control",
+   "members": [
+    414
+   ]
+  },
+  {
+   "set_id": "GOV-330",
+   "normalized_title": "COSO Principle 10: Selects and Develops Control Activities",
+   "members": [
+    417
+   ]
+  },
+  {
+   "set_id": "GOV-331",
+   "normalized_title": "COSO Principle 11: Selects and Develops General Controls over Technology",
+   "members": [
+    418
+   ]
+  },
+  {
+   "set_id": "GOV-332",
+   "normalized_title": "COSO Principle 12: Deploys Through Policies and Procedures",
+   "members": [
+    419
+   ]
+  }
+ ]
+}

@@ -1,0 +1,592 @@
+{
+"items": [
+{
+"i": 147,
+"domain": "Application & Software Security"
+},
+{
+"i": 148,
+"domain": "Cryptography"
+},
+{
+"i": 149,
+"domain": "Application & Software Security"
+},
+{
+"i": 150,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 151,
+"domain": "Network & Communications Security"
+},
+{
+"i": 152,
+"domain": "Asset Management"
+},
+{
+"i": 153,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 154,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 155,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 156,
+"domain": "Cryptography"
+},
+{
+"i": 157,
+"domain": "Cryptography"
+},
+{
+"i": 158,
+"domain": "Cryptography"
+},
+{
+"i": 159,
+"domain": "Cryptography"
+},
+{
+"i": 160,
+"domain": "Cryptography"
+},
+{
+"i": 161,
+"domain": "Cryptography"
+},
+{
+"i": 162,
+"domain": "Cryptography"
+},
+{
+"i": 163,
+"domain": "Cryptography"
+},
+{
+"i": 164,
+"domain": "Cryptography"
+},
+{
+"i": 165,
+"domain": "Cryptography"
+},
+{
+"i": 166,
+"domain": "Cryptography"
+},
+{
+"i": 167,
+"domain": "Cryptography"
+},
+{
+"i": 168,
+"domain": "Cryptography"
+},
+{
+"i": 169,
+"domain": "Cryptography"
+},
+{
+"i": 170,
+"domain": "Cryptography"
+},
+{
+"i": 171,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 172,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 173,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 174,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 175,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 176,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 177,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 178,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 179,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 180,
+"domain": "Risk Management"
+},
+{
+"i": 181,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 182,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 183,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 184,
+"domain": "Incident Management"
+},
+{
+"i": 185,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 186,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 187,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 188,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 189,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 190,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 191,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 192,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 193,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 194,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 195,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 196,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 197,
+"domain": "Incident Management"
+},
+{
+"i": 198,
+"domain": "Incident Management"
+},
+{
+"i": 199,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 200,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 201,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 202,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 203,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 204,
+"domain": "Application & Software Security"
+},
+{
+"i": 205,
+"domain": "Network & Communications Security"
+},
+{
+"i": 206,
+"domain": "Application & Software Security"
+},
+{
+"i": 207,
+"domain": "Application & Software Security"
+},
+{
+"i": 208,
+"domain": "Application & Software Security"
+},
+{
+"i": 209,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 210,
+"domain": "Application & Software Security"
+},
+{
+"i": 211,
+"domain": "Cryptography"
+},
+{
+"i": 212,
+"domain": "Cryptography"
+},
+{
+"i": 213,
+"domain": "Cryptography"
+},
+{
+"i": 214,
+"domain": "Access Control & Identity"
+},
+{
+"i": 215,
+"domain": "Access Control & Identity"
+},
+{
+"i": 216,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 217,
+"domain": "Incident Management"
+},
+{
+"i": 218,
+"domain": "Incident Management"
+},
+{
+"i": 219,
+"domain": "Awareness & Training"
+},
+{
+"i": 220,
+"domain": "Awareness & Training"
+},
+{
+"i": 221,
+"domain": "Awareness & Training"
+},
+{
+"i": 222,
+"domain": "Application & Software Security"
+},
+{
+"i": 223,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 224,
+"domain": "Network & Communications Security"
+},
+{
+"i": 225,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 226,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 227,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 228,
+"domain": "Asset Management"
+},
+{
+"i": 229,
+"domain": "Asset Management"
+},
+{
+"i": 230,
+"domain": "Asset Management"
+},
+{
+"i": 231,
+"domain": "Asset Management"
+},
+{
+"i": 232,
+"domain": "Third-Party / Supply Chain"
+},
+{
+"i": 233,
+"domain": "Governance, Leadership & Policy"
+},
+{
+"i": 234,
+"domain": "Governance, Leadership & Policy"
+},
+{
+"i": 235,
+"domain": "Governance, Leadership & Policy"
+},
+{
+"i": 236,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 237,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 238,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 239,
+"domain": "Risk Management"
+},
+{
+"i": 240,
+"domain": "Third-Party / Supply Chain"
+},
+{
+"i": 241,
+"domain": "Access Control & Identity"
+},
+{
+"i": 242,
+"domain": "Physical & Environmental Security"
+},
+{
+"i": 243,
+"domain": "Access Control & Identity"
+},
+{
+"i": 244,
+"domain": "Access Control & Identity"
+},
+{
+"i": 245,
+"domain": "Network & Communications Security"
+},
+{
+"i": 246,
+"domain": "Awareness & Training"
+},
+{
+"i": 247,
+"domain": "Awareness & Training"
+},
+{
+"i": 248,
+"domain": "Data Protection & Privacy"
+},
+{
+"i": 249,
+"domain": "Data Protection & Privacy"
+},
+{
+"i": 250,
+"domain": "Data Protection & Privacy"
+},
+{
+"i": 251,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 252,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 253,
+"domain": "Business Continuity & Resilience"
+},
+{
+"i": 254,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 255,
+"domain": "Operations & IT Service Management"
+},
+{
+"i": 256,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 257,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 258,
+"domain": "Network & Communications Security"
+},
+{
+"i": 259,
+"domain": "Asset Management"
+},
+{
+"i": 260,
+"domain": "Network & Communications Security"
+},
+{
+"i": 261,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 262,
+"domain": "Vulnerability & Threat Management"
+},
+{
+"i": 263,
+"domain": "Access Control & Identity"
+},
+{
+"i": 264,
+"domain": "Network & Communications Security"
+},
+{
+"i": 265,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 266,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 267,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 268,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 269,
+"domain": "Cryptography"
+},
+{
+"i": 270,
+"domain": "Network & Communications Security"
+},
+{
+"i": 271,
+"domain": "Network & Communications Security"
+},
+{
+"i": 272,
+"domain": "Physical & Environmental Security"
+},
+{
+"i": 273,
+"domain": "Cryptography"
+},
+{
+"i": 274,
+"domain": "Physical & Environmental Security"
+},
+{
+"i": 275,
+"domain": "Business Continuity & Resilience"
+},
+{
+"i": 276,
+"domain": "Physical & Environmental Security"
+},
+{
+"i": 277,
+"domain": "Network & Communications Security"
+},
+{
+"i": 278,
+"domain": "Network & Communications Security"
+},
+{
+"i": 279,
+"domain": "Network & Communications Security"
+},
+{
+"i": 280,
+"domain": "Network & Communications Security"
+},
+{
+"i": 281,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 282,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 283,
+"domain": "Physical & Environmental Security"
+},
+{
+"i": 284,
+"domain": "Configuration & Change Management"
+},
+{
+"i": 285,
+"domain": "Network & Communications Security"
+},
+{
+"i": 286,
+"domain": "Network & Communications Security"
+},
+{
+"i": 287,
+"domain": "Network & Communications Security"
+},
+{
+"i": 288,
+"domain": "Network & Communications Security"
+},
+{
+"i": 289,
+"domain": "Network & Communications Security"
+},
+{
+"i": 290,
+"domain": "Logging, Monitoring & Detection"
+},
+{
+"i": 291,
+"domain": "Network & Communications Security"
+},
+{
+"i": 292,
+"domain": "Network & Communications Security"
+},
+{
+"i": 293,
+"domain": "Business Continuity & Resilience"
+}
+]
+}

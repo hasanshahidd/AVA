@@ -1,0 +1,26 @@
+[
+ {
+  "i": 31,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Ongoing performance measurement of cloud security controls; no set matches this requirement"
+ },
+ {
+  "i": 32,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Narrow secure-disposal effectiveness assessment; no equivalent set"
+ },
+ {
+  "i": 45,
+  "decision": "join",
+  "set_id": "S017",
+  "reason": "Defining SLAs with providers matches the legally-binding SLA set"
+ },
+ {
+  "i": 63,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Broad ensure-provider-adherence statement; no set is the same specific requirement"
+ }
+]

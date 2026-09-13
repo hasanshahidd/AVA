@@ -1,0 +1,98 @@
+{
+ "set_id": "S001",
+ "di": 14,
+ "groups": [
+  {
+   "name": "Physical and environmental security policy (and procedures)",
+   "absorbs": [
+    "Physical and environmental security policy",
+    "Approved Physical and Environmental Security Policy document",
+    "Physical security policy and procedures",
+    "Physical security policy",
+    "Physical Access Policy",
+    "Physical Access Procedures",
+    "Environmental protection procedures",
+    "Physical & Environmental Security Policy"
+   ]
+  },
+  {
+   "name": "Policy review and distribution records",
+   "absorbs": [
+    "Policy review records",
+    "Policy review records",
+    "Policy Review & Distribution Records"
+   ]
+  },
+  {
+   "name": "Roles and responsibilities matrix",
+   "absorbs": [
+    "Roles and responsibilities matrix"
+   ]
+  },
+  {
+   "name": "User acknowledgement records",
+   "absorbs": [
+    "User acknowledgement records"
+   ]
+  },
+  {
+   "name": "Top management approval evidence",
+   "absorbs": [
+    "Top management approval evidence"
+   ]
+  },
+  {
+   "name": "Data center access control records / register / logs",
+   "absorbs": [
+    "Data center access control records",
+    "Data center access control logs",
+    "Data Centre Access Register"
+   ]
+  },
+  {
+   "name": "Environmental monitoring records",
+   "absorbs": [
+    "Environmental monitoring system records",
+    "Environmental Monitoring Logs"
+   ]
+  },
+  {
+   "name": "Sensitive systems physical isolation evidence",
+   "absorbs": [
+    "Sensitive systems physical isolation evidence"
+   ]
+  },
+  {
+   "name": "Tamper and theft prevention controls",
+   "absorbs": [
+    "Tamper and theft prevention controls"
+   ]
+  },
+  {
+   "name": "Hazardous material storage procedures",
+   "absorbs": [
+    "Hazardous material storage procedures"
+   ]
+  },
+  {
+   "name": "Physical security assessment / site risk assessment reports",
+   "absorbs": [
+    "Physical security assessment reports",
+    "Data Centre Site Risk Assessment"
+   ]
+  },
+  {
+   "name": "UPS/Generator maintenance records",
+   "absorbs": [
+    "UPS/Generator Maintenance Records"
+   ]
+  },
+  {
+   "name": "Data centre walkthrough photos",
+   "absorbs": [
+    "Data Centre Walkthrough Photos"
+   ]
+  }
+ ],
+ "excluded": []
+}

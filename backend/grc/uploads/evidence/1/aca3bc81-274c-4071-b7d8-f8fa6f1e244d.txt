@@ -1,0 +1,5 @@
+ACME CORP — ACCESS CONTROL POLICY v3.2
+
+Scope: all production systems.
+Policy: access is granted least-privilege, reviewed quarterly, MFA enforced for privileged and remote access. Approvals recorded in the ITSM tool.
+Owner: CISO. Review cadence: quarterly.

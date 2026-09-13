@@ -1,0 +1,59 @@
+{
+ "set_id": "S009",
+ "di": 16,
+ "groups": [
+  {
+   "name": "Privacy/PHI-PII training program curriculum",
+   "absorbs": [
+    "Privacy training program curriculum"
+   ]
+  },
+  {
+   "name": "Training completion/attendance records",
+   "absorbs": [
+    "Training completion records for all workforce members",
+    "Training attendance records with dates"
+   ]
+  },
+  {
+   "name": "New hire training timeline evidence",
+   "absorbs": [
+    "New hire training timeline evidence"
+   ]
+  },
+  {
+   "name": "Refresher/periodic training schedule and records",
+   "absorbs": [
+    "Refresher training schedule and records"
+   ]
+  },
+  {
+   "name": "Approved privacy awareness & training policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Privacy Protection Awareness and"
+   ]
+  },
+  {
+   "name": "Documented privacy awareness training procedure/work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Privacy Protection Awareness"
+   ]
+  },
+  {
+   "name": "Periodic review records with reviewer",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Privacy notice/statement published to data subjects with version history",
+   "reason": "Public privacy notice publication, not workforce training evidence"
+  },
+  {
+   "name": "Consent records, opt-out tracking, and data subject request logs",
+   "reason": "Data subject rights/consent operations, off-topic for training set"
+  }
+ ]
+}

@@ -1,0 +1,126 @@
+{
+  "results": [
+    {
+      "set_id": "GOV-029",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-030",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-031",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-032",
+      "verdict": "REVIEW",
+      "loose_members": [
+        {
+          "fw": "NIST Artificial Intelligence Risk Management Framework",
+          "cid": "GOVERN 1.3",
+          "why": "GOVERN 1.3 is about setting LEVELS of risk-management activity based on AI risk tolerance, not the management-system clause 6.1 'plan actions to address risks and opportunities'. Related but a different requirement; an ISO 6.1 risk/opportunity register and treatment plan would not by itself satisfy GOVERN 1.3's risk-tolerance-driven activity-level outcome."
+        }
+      ],
+      "offtopic_evidence": [
+        "AI risk tolerance statement with approval records"
+      ],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-033",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-034",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-035",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-036",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-037",
+      "verdict": "REVIEW",
+      "loose_members": [],
+      "offtopic_evidence": [
+        "AI risk tolerance statement with approval records"
+      ],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-038",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-039",
+      "verdict": "REVIEW",
+      "loose_members": [
+        {
+          "fw": "Qatar Central Bank Technology Risks Circular",
+          "cid": "1.2.4",
+          "why": "QCB 1.2.4 'Board-approved cyber strategy policy' is an org-level cyber STRATEGY, not a system-level System Security Plan (NIST PL-2) that documents the security controls for a specific system. Different scope and artifact; an SSP would not satisfy a board cyber-strategy requirement and vice versa."
+        }
+      ],
+      "offtopic_evidence": [
+        "System security plan / cyber strategy policy",
+        "Mapping of risks to mitigating measures"
+      ],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-040",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-041",
+      "verdict": "REVIEW",
+      "loose_members": [
+        {
+          "fw": "SBP Cloud Outsourcing Framework",
+          "cid": "1.4",
+          "why": "SBP 1.4 'RE Accountability and SBP Oversight Powers' is a regulated-entity accountability / regulator-oversight control for cloud outsourcing, not the third-party CONTINGENCY/exit-plan requirement of NIST GOVERN 6.2. Same evidence (contingency/incident plans) would not satisfy SBP's board-accountability and SBP information-power obligations."
+        }
+      ],
+      "offtopic_evidence": [
+        "Board resolution on cloud accountability",
+        "SBP information response log",
+        "Cloud outsourcing arrangement dossier",
+        "Independent certification to board",
+        "Community cloud readiness note"
+      ],
+      "should_merge": []
+    }
+  ]
+}

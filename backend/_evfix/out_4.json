@@ -1,0 +1,44 @@
+{
+ "set_id": "S025",
+ "di": 0,
+ "groups": [
+  {
+   "name": "Authorization process policy and procedure documentation",
+   "absorbs": [
+    "Approved policy and standard addressing Authorization Process",
+    "Documented procedure or work instruction implementing Authorization Process",
+    "Authorization process documentation"
+   ]
+  },
+  {
+   "name": "ATO (Authorization to Operate) tracking records",
+   "absorbs": [
+    "ATO tracking records"
+   ]
+  },
+  {
+   "name": "Risk-based authorization decision documentation",
+   "absorbs": [
+    "Risk-based decision documentation"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Access control matrix with role-to-permission mapping for relevant systems",
+   "reason": "Logical access-control artifact, not system authorization/ATO process evidence"
+  },
+  {
+   "name": "User access provisioning, modification, and review records",
+   "reason": "User access management evidence, off-topic for formal system authorization before operation"
+  },
+  {
+   "name": "Physical access logs (badge/biometric) and visitor register",
+   "reason": "Physical facility access evidence, off-topic for system authorization process"
+  },
+  {
+   "name": "CCTV deployment evidence and footage retention records",
+   "reason": "Physical surveillance evidence, off-topic for system authorization process"
+  }
+ ]
+}

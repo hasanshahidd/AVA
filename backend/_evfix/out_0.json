@@ -1,0 +1,105 @@
+{
+ "set_id": "S001",
+ "di": 0,
+ "groups": [
+  {
+   "name": "Information security / cybersecurity policy document",
+   "absorbs": [
+    "Security policies",
+    "Approved Information Security Policy Document document with management sign-off",
+    "Technology risk management policies and standards",
+    "Security planning policy",
+    "Overall Information Security Policy",
+    "Board-approved cyber security policy",
+    "Information security policy document",
+    "Information security policy document",
+    "Information Security Policy",
+    "Cybersecurity policy"
+   ]
+  },
+  {
+   "name": "Topic-specific / supporting procedures documentation",
+   "absorbs": [
+    "Procedures documentation",
+    "Planning procedures",
+    "Topic-Specific Policies Register"
+   ]
+  },
+  {
+   "name": "Policy review / update records",
+   "absorbs": [
+    "Policy review records",
+    "Annual review records of the Information Security Policy Document",
+    "Policy review and update records showing regular updates",
+    "Policy review records",
+    "Annual Policy Review Minutes"
+   ]
+  },
+  {
+   "name": "Management/board approval evidence",
+   "absorbs": [
+    "Management approval evidence",
+    "Policy Approval Record"
+   ]
+  },
+  {
+   "name": "Policy publication / distribution / communication records",
+   "absorbs": [
+    "Publication & Distribution Evidence",
+    "Policy communication records",
+    "Policy Communication Evidence",
+    "Policy distribution records"
+   ]
+  },
+  {
+   "name": "Personnel acknowledgement records",
+   "absorbs": [
+    "Personnel Acknowledgment Records",
+    "Policy Acknowledgement Log",
+    "Acknowledgment forms"
+   ]
+  },
+  {
+   "name": "Policy version control / change log",
+   "absorbs": [
+    "Policy version control log"
+   ]
+  },
+  {
+   "name": "Policy scope definition",
+   "absorbs": [
+    "Policy scope definition"
+   ]
+  },
+  {
+   "name": "Regulatory compliance mapping",
+   "absorbs": [
+    "Regulatory compliance mapping"
+   ]
+  },
+  {
+   "name": "Policy objectives documentation",
+   "absorbs": [
+    "Policy objectives documentation"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Physical access logs (badge/biometric) and visitor register",
+   "reason": "Physical access control evidence, off-topic for an information security policy document set"
+  },
+  {
+   "name": "CCTV deployment evidence and footage retention records",
+   "reason": "Physical surveillance evidence, off-topic for a policy document set"
+  },
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party/supplier management evidence, off-topic for a policy document set"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management evidence, off-topic for a policy document set"
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "set_id": "S009",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Data processor / business associate contracts (DPA, BAA, third-party agreements with security/audit clauses)",
+   "absorbs": [
+    "Data processing agreements",
+    "Contract provisions",
+    "BAA template meeting regulatory requirements",
+    "Executed BAAs with all business associates",
+    "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   ]
+  },
+  {
+   "name": "Processor / third-party risk assessments and ongoing monitoring",
+   "absorbs": [
+    "Processor assessments",
+    "Third-party risk assessment and ongoing monitoring records"
+   ]
+  },
+  {
+   "name": "BAA compliance tracking system",
+   "absorbs": [
+    "BAA compliance tracking system"
+   ]
+  },
+  {
+   "name": "Approved privacy policy and standard for contractors/processors",
+   "absorbs": [
+    "Approved policy and standard addressing Privacy Requirements"
+   ]
+  },
+  {
+   "name": "Documented procedure / work instruction implementing privacy requirements",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Privacy Requirements"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Privacy notice/statement published to data subjects with version history",
+   "reason": "Data-subject-facing privacy notice; about transparency to individuals, not binding processors by contract"
+  },
+  {
+   "name": "Consent records, opt-out tracking, and data subject request logs",
+   "reason": "Consent/DSR handling evidence; off-topic for processor contracting set"
+  }
+ ]
+}

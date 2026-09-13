@@ -1,0 +1,87 @@
+{
+ "set_id": "S008",
+ "di": 14,
+ "groups": [
+  {
+   "name": "Equipment siting guidelines/standards",
+   "absorbs": [
+    "Equipment siting guidelines",
+    "Equipment Siting Standards"
+   ]
+  },
+  {
+   "name": "Environmental risk assessment for equipment placement",
+   "absorbs": [
+    "Environmental risk assessment for equipment placement",
+    "Equipment Protection Risk Assessment",
+    "Protection assessments"
+   ]
+  },
+  {
+   "name": "Equipment placement / data center layout diagrams",
+   "absorbs": [
+    "Equipment placement plans/diagrams",
+    "Data Center Layout Diagram"
+   ]
+  },
+  {
+   "name": "Equipment siting and protection policy",
+   "absorbs": [
+    "Approved policy and standard addressing Equipment Siting and Protection"
+   ]
+  },
+  {
+   "name": "Equipment siting and protection procedure/work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Equipment Siting and"
+   ]
+  },
+  {
+   "name": "Physical access logs and visitor register",
+   "absorbs": [
+    "Physical access logs (badge/biometric) and visitor register"
+   ]
+  },
+  {
+   "name": "CCTV deployment and footage retention records",
+   "absorbs": [
+    "CCTV deployment evidence and footage retention records"
+   ]
+  },
+  {
+   "name": "Screen privacy measures",
+   "absorbs": [
+    "Screen Privacy Measures"
+   ]
+  },
+  {
+   "name": "Environmental controls for equipment",
+   "absorbs": [
+    "Equipment Environmental Controls",
+    "Environmental controls documentation"
+   ]
+  },
+  {
+   "name": "Rack security documentation",
+   "absorbs": [
+    "Rack Security Documentation"
+   ]
+  },
+  {
+   "name": "Physical security measures",
+   "absorbs": [
+    "Physical security measures"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Access control matrix with role-to-permission mapping for relevant systems",
+   "reason": "Logical/system access (RBAC) evidence, not physical equipment siting & protection"
+  },
+  {
+   "name": "User access provisioning, modification, and review records",
+   "reason": "Logical user-access lifecycle evidence, off-topic for physical equipment siting"
+  }
+ ]
+}

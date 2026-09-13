@@ -1,0 +1,89 @@
+{
+ "set_id": "S004",
+ "di": 15,
+ "groups": [
+  {
+   "name": "Asset return/recovery checklist",
+   "absorbs": [
+    "Asset Return Checklist",
+    "Asset recovery checklists"
+   ]
+  },
+  {
+   "name": "Asset return forms / completed leaver clearance forms",
+   "absorbs": [
+    "Completed Leaver Asset Return Forms",
+    "Signed clearance forms from departing personnel",
+    "Asset return forms"
+   ]
+  },
+  {
+   "name": "Offboarding workflow evidence",
+   "absorbs": [
+    "Offboarding Workflow Screenshot"
+   ]
+  },
+  {
+   "name": "Asset return reconciliation report",
+   "absorbs": [
+    "Leavers vs Returns Reconciliation Report",
+    "Asset inventory reconciliation reports"
+   ]
+  },
+  {
+   "name": "BYOD data wipe certificate",
+   "absorbs": [
+    "BYOD Data Wipe Certificate"
+   ]
+  },
+  {
+   "name": "Acknowledgement no information remains in departed's possession",
+   "absorbs": [
+    "Acknowledgement that no information remains in possession of departed"
+   ]
+  },
+  {
+   "name": "Return of assets policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Return of Assets"
+   ]
+  },
+  {
+   "name": "Return of assets procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Return of Assets",
+    "Asset return procedure"
+   ]
+  },
+  {
+   "name": "Return verification records",
+   "absorbs": [
+    "Return verification records"
+   ]
+  },
+  {
+   "name": "Outstanding asset tracking",
+   "absorbs": [
+    "Outstanding asset tracking"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party contract evidence, not asset return on termination"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management, off-topic for asset return"
+  },
+  {
+   "name": "Access termination workflow records with timing metrics against SLA",
+   "reason": "Access revocation/timing evidence, not physical/information asset return"
+  },
+  {
+   "name": "Session timeout, idle lockout, and re-authentication configuration evidence",
+   "reason": "Session/access control config, unrelated to asset return"
+  }
+ ]
+}

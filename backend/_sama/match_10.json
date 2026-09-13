@@ -1,0 +1,20 @@
+[
+ {
+  "i": 0,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Broad 'apply cybersecurity controls to assets' meta-control; no set is this generic requirement"
+ },
+ {
+  "i": 1,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Generic securing of storage devices; not specifically media lifecycle/disposal/sanitization sets"
+ },
+ {
+  "i": 23,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Generic 'implement defined security requirements'; no equivalent set heading"
+ }
+]

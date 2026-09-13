@@ -1,0 +1,92 @@
+{
+ "set_id": "S002",
+ "di": 4,
+ "groups": [
+  {
+   "name": "Access revocation / termination procedure documentation",
+   "absorbs": [
+    "Access revocation process documentation",
+    "Access revocation procedures",
+    "Offboarding procedures",
+    "Termination procedures",
+    "Termination access revocation checklist",
+    "Approved policy and standard addressing Removal of Access Rights",
+    "Documented procedure or work instruction implementing Removal of Access",
+    "Access revocation procedure",
+    "Access revocation procedure",
+    "Access termination procedure document"
+   ]
+  },
+  {
+   "name": "Termination access revocation / removal records",
+   "absorbs": [
+    "Termination access revocation records",
+    "Access revocation records",
+    "Access revocation records",
+    "Termination Revocation Records",
+    "Access revocation logs for terminated personnel",
+    "Access removal records",
+    "User access provisioning, modification, and review records"
+   ]
+  },
+  {
+   "name": "Access revocation timeliness metrics / verification",
+   "absorbs": [
+    "Access revocation timeliness metrics",
+    "Timeliness records for access removal on termination",
+    "Timeliness verification",
+    "Timeliness verification",
+    "Timeliness comparison of termination date vs. account disable date",
+    "Time-to-revoke metrics and audit logs"
+   ]
+  },
+  {
+   "name": "HR-to-IT termination notification / coordination records",
+   "absorbs": [
+    "HR termination notification to IT",
+    "Termination Procedure with HR-IT Integration",
+    "HR-IT coordination records"
+   ]
+  },
+  {
+   "name": "Account disablement audit logs / disabled-account audit trail",
+   "absorbs": [
+    "Account Disablement Audit Logs",
+    "Audit trail of disabled accounts",
+    "System access logs"
+   ]
+  },
+  {
+   "name": "Sample of terminated users verified as disabled",
+   "absorbs": [
+    "Sample of terminated users verified as disabled"
+   ]
+  },
+  {
+   "name": "Termination workflow records",
+   "absorbs": [
+    "Termination workflow records"
+   ]
+  },
+  {
+   "name": "Access control matrix with role-to-permission mapping",
+   "absorbs": [
+    "Access control matrix with role-to-permission mapping for relevant systems"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party/vendor contracting evidence, off-topic for user access revocation on termination"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management evidence, off-topic for user access revocation on termination"
+  },
+  {
+   "name": "Communication records with health sector regulator",
+   "reason": "Regulator notification/communication, off-topic for the access-revocation set heading"
+  }
+ ]
+}

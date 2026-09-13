@@ -1,0 +1,69 @@
+{
+ "set_id": "S007",
+ "di": 0,
+ "groups": [
+  {
+   "name": "ISMS / information security program documentation",
+   "absorbs": [
+    "ISMS documentation",
+    "Information Security Management System (ISMS) documentation",
+    "Information security program plan"
+   ]
+  },
+  {
+   "name": "ISO 27001 certification",
+   "absorbs": [
+    "ISO 27001 certification (if applicable)"
+   ]
+  },
+  {
+   "name": "Information security policies and standards",
+   "absorbs": [
+    "Security policy framework",
+    "Information security policies and standards",
+    "Approved policy and standard addressing Information Security Management Program"
+   ]
+  },
+  {
+   "name": "Security risk treatment plans and implementation evidence",
+   "absorbs": [
+    "Security risk treatment plans and implementation evidence"
+   ]
+  },
+  {
+   "name": "ISMS monitoring reports / security metrics dashboards and program reviews",
+   "absorbs": [
+    "ISMS monitoring reports and security metrics dashboards",
+    "Program review records"
+   ]
+  },
+  {
+   "name": "Documented procedure/work instruction implementing information security management",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Information Security Management"
+   ]
+  },
+  {
+   "name": "Program governance documentation",
+   "absorbs": [
+    "Program governance documentation"
+   ]
+  },
+  {
+   "name": "Security awareness communications to personnel",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Audit logging configuration evidence",
+   "reason": "Audit-logging control evidence, not about establishing the ISMS program/system."
+  },
+  {
+   "name": "Log review records and follow-up case documentation",
+   "reason": "Log-review operational evidence, off-topic for program establishment."
+  }
+ ]
+}

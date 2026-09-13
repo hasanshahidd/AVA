@@ -1,0 +1,44 @@
+[
+ {
+  "i": 18,
+  "decision": "join",
+  "set_id": "S007",
+  "reason": "KRIs to highlight risk exposure/trends matches the KRI metrics set"
+ },
+ {
+  "i": 36,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "S002 reserved for the closer risk-treatment control (i=49); mitigation strategy left standalone"
+ },
+ {
+  "i": 40,
+  "decision": "join",
+  "set_id": "S004",
+  "reason": "tracking shifts in risk appetite is the risk appetite/tolerance requirement"
+ },
+ {
+  "i": 46,
+  "decision": "join",
+  "set_id": "S006",
+  "reason": "central risk register matches maintain-a-risk-register set"
+ },
+ {
+  "i": 49,
+  "decision": "join",
+  "set_id": "S002",
+  "reason": "treatment via mitigation/transfer/acceptance equals risk treatment and mitigation set"
+ },
+ {
+  "i": 53,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "generic mitigate-negative-consequences; no clearly equivalent set (S002 taken)"
+ },
+ {
+  "i": 55,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "risk-aware culture has no cross-framework equivalent set"
+ }
+]

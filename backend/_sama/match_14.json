@@ -1,0 +1,14 @@
+[
+ {
+  "i": 29,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Meta-control on measuring/evaluating PE security process effectiveness; no cross-framework equivalent set"
+ },
+ {
+  "i": 30,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Process-effectiveness monitoring meta-control; S014 is about monitoring physical access, not process effectiveness"
+ }
+]

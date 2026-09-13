@@ -1,0 +1,61 @@
+/* Ava login — keyframes + animation classes (scoped by lg- prefix) */
+@keyframes lgFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes lgSweep { to { transform: rotate(360deg); } }
+@keyframes lgScan { 0% { transform: translateX(-22%); } 100% { transform: translateX(22%); } }
+@keyframes lgMarq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes lgBlip { 0%, 100% { opacity: .3; transform: scale(.75); } 50% { opacity: 1; transform: scale(1.2); } }
+@keyframes lgPing { 0% { transform: scale(.2); opacity: .55; } 70% { opacity: 0; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes lgWave { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(-34deg); } }
+@keyframes lgWaddle { 0%, 100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(4deg) translateY(-3px); } }
+@keyframes lgWalkOut { 0% { transform: translateX(0); opacity: 1; } 70% { opacity: 1; } 100% { transform: translateX(-64vw); opacity: 0; } }
+@keyframes lgStep { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
+@keyframes lgShow { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lgLift { 0% { transform: translateX(0); } 100% { transform: translateX(calc(100% + 160px)); } }
+@keyframes lgClimb { 0% { transform: translate(34px, 44px); } 100% { transform: translate(0, 0); } }
+@keyframes lgBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes lgGlow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+/* transform-only (animating `left` re-layouts every frame — the stutter) */
+@keyframes lgBeam { 0% { transform: translateX(-130px); } 100% { transform: translateX(82rem); } }
+
+.lg-fade { opacity: 0; animation: lgFadeUp .7s ease both; }
+.lg-logo-spin { transform-origin: center; animation: lgSweep 5s linear infinite; }
+.lg-sweep { animation: lgSweep 6s linear infinite; }
+.lg-scan { animation: lgScan 10s linear infinite; }
+.lg-marq { animation: lgMarq 26s linear infinite; }
+.lg-marq-slow { animation: lgMarq 40s linear infinite; }
+.lg-marq-chips { animation: lgMarq 24s linear infinite; }
+.lg-glow { animation: lgGlow 7s ease-in-out infinite; }
+.lg-beam { animation: lgBeam 6.5s linear infinite; }
+.lg-mask { -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); }
+.lg-blip { transform-box: fill-box; transform-origin: center; animation: lgBlip 3.2s ease-in-out infinite; }
+.lg-ping { transform-box: fill-box; transform-origin: center; animation: lgPing 4s ease-out infinite; }
+.lg-wave { transform-box: fill-box; transform-origin: 72% 86%; animation: lgWave .6s ease-in-out infinite; }
+/* Intro timeline (page.tsx stage machine mirrors these numbers):
+   0–1.6s     standing + wave (background mounts ~1.05s, hidden by curtain)
+   1.6–3.6s   white mascot walks off (2s)
+   3.75s      blue pusher appears
+   3.8–7.6s   curtain slides away (3.8s)
+   7.8–8.9s   peeker climbs up behind the card; bobs from 9s
+   ~9.3s      curtain unmounts */
+.lg-curtain { animation: lgLift 3.8s cubic-bezier(.5,.05,.55,.95) 3.8s forwards; }
+.lg-walkout { animation: lgWalkOut 2s cubic-bezier(.5,0,.75,1) 1.6s both; }
+.lg-waddle { transform-origin: bottom center; animation: lgWaddle .6s ease-in-out infinite; }
+.lg-step-a { transform-box: fill-box; transform-origin: 50% 0%; animation: lgStep .6s ease-in-out infinite; }
+.lg-step-b { transform-box: fill-box; transform-origin: 50% 0%; animation: lgStep .6s ease-in-out -.3s infinite; }
+.lg-pusher { animation: lgShow .15s linear 3.75s both; }
+.lg-peeker { animation: lgClimb 1.1s cubic-bezier(.3,.7,.35,1) 7.8s both; }
+.lg-peeker-static { animation: none; transform: none; }
+.lg-bob { animation: lgBob 3.6s ease-in-out 9s infinite; }
+.lg-bob-now { animation: lgBob 3.6s ease-in-out 1.2s infinite; }
+
+/* Smoothness: lift every continuously-animated element onto its own GPU
+   compositor layer. Without this the browser repaints the blurred glows,
+   conic sweep and marquees on the main thread each frame, which is what
+   makes the motion stutter ("breaking"). transform/opacity-only animations
+   on a promoted layer run off the main thread and stay smooth. */
+.lg-marq, .lg-marq-slow, .lg-marq-chips,
+.lg-sweep, .lg-scan, .lg-beam,
+.lg-curtain, .lg-walkout, .lg-pusher, .lg-peeker,
+.lg-waddle, .lg-blip, .lg-ping, .lg-wave,
+.lg-logo-spin { will-change: transform; }
+.lg-glow { will-change: opacity; transform: translateZ(0); }

@@ -1,0 +1,94 @@
+{
+ "set_id": "S001",
+ "di": 15,
+ "groups": [
+  {
+   "name": "Background screening / verification policy & procedures",
+   "absorbs": [
+    "Documented background verification process",
+    "Approved policy and standard addressing Screening",
+    "Documented procedure or work instruction implementing Screening",
+    "Background Screening Policy",
+    "Background check policy and procedures",
+    "Screening procedures",
+    "Personnel Screening Procedure",
+    "Background check policy",
+    "Personnel security policy alignment"
+   ]
+  },
+  {
+   "name": "Completed background check / verification records",
+   "absorbs": [
+    "Completed background verification records",
+    "Background verification records for personnel per role sensitivity",
+    "Background Check Records",
+    "Background Check Records",
+    "Records of completed background checks for IT personnel",
+    "Background check records",
+    "Screening records",
+    "Vetting/background check records"
+   ]
+  },
+  {
+   "name": "Role/risk-based screening criteria matrix",
+   "absorbs": [
+    "Background check criteria matrix by role/risk",
+    "Role-Based Screening Matrix"
+   ]
+  },
+  {
+   "name": "Screening vendor / background verification service agreements",
+   "absorbs": [
+    "Vendor agreements for background verification services",
+    "Screening Vendor Agreement",
+    "Screening Vendor Agreement"
+   ]
+  },
+  {
+   "name": "Periodic re-screening schedule and records",
+   "absorbs": [
+    "Periodic Re-Screening Records",
+    "Rescreening schedule and records"
+   ]
+  },
+  {
+   "name": "Screening tracker",
+   "absorbs": [
+    "Screening Tracker"
+   ]
+  },
+  {
+   "name": "Verification reports",
+   "absorbs": [
+    "Verification reports"
+   ]
+  },
+  {
+   "name": "Reference check documentation",
+   "absorbs": [
+    "Reference check documentation"
+   ]
+  },
+  {
+   "name": "Legal/regulatory constraints & mandate compliance for screening",
+   "absorbs": [
+    "Government mandate compliance evidence",
+    "Local Legal Constraints Documentation"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Data classification scheme",
+   "reason": "Data classification artifact, not background-screening evidence"
+  },
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party security contracting, not candidate/personnel screening"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Vendor risk management, not personnel background verification"
+  }
+ ]
+}

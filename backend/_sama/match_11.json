@@ -1,0 +1,50 @@
+[
+ {
+  "i": 5,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Monitoring controls broadly, not same as continuous-monitoring-program set"
+ },
+ {
+  "i": 35,
+  "decision": "join",
+  "set_id": "S015",
+  "reason": "Continuous monitoring of security state = continuous monitoring program"
+ },
+ {
+  "i": 47,
+  "decision": "join",
+  "set_id": "S010",
+  "reason": "Establish a SOC matches SOC/detection-roles set"
+ },
+ {
+  "i": 51,
+  "decision": "join",
+  "set_id": "S009",
+  "reason": "SIEM data gathering = centralize/correlate security event data"
+ },
+ {
+  "i": 57,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "SOC data assessment not clearly same as any single set"
+ },
+ {
+  "i": 58,
+  "decision": "join",
+  "set_id": "S018",
+  "reason": "Detect indicators of compromise matches IoC detection set"
+ },
+ {
+  "i": 59,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Disseminating SOC info to stakeholders has no equivalent set"
+ },
+ {
+  "i": 61,
+  "decision": "join",
+  "set_id": "S004",
+  "reason": "Monitor security data to detect threats/anomalies = monitor to detect attacks/anomalies"
+ }
+]

@@ -1,0 +1,133 @@
+{"sets": [
+  {"set_id": "GOV-022", "normalized_evidence": [
+    {"name": "Nonconformity and corrective action procedure", "absorbs": ["Nonconformity Management Procedure"], "sources": ["ISO/IEC 42001:2023 AI Management System 7.2"]},
+    {"name": "Nonconformity register and corrective action log", "absorbs": ["Nonconformity register", "Nonconformity & Corrective Action Log", "Corrective action plans and evidence of implementation"], "sources": ["ISO 22301:2019 Business Continuity Management System 10.1", "ISO/IEC 42001:2023 AI Management System 7.2"]},
+    {"name": "Root cause analysis records", "absorbs": ["Root cause analysis records", "Root Cause Analysis Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 10.1", "ISO/IEC 42001:2023 AI Management System 7.2"]},
+    {"name": "Effectiveness review records", "absorbs": ["Effectiveness review records", "Effectiveness Review Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 10.1", "ISO/IEC 42001:2023 AI Management System 7.2"]}
+  ]},
+  {"set_id": "GOV-023", "normalized_evidence": [
+    {"name": "Resource allocation and budget records", "absorbs": ["BCMS resource allocation records", "Budget allocation for BC activities", "AIMS Resource Plan", "Resource Allocation Approvals"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.1", "ISO/IEC 42001:2023 AI Management System 4.1"]},
+    {"name": "Resource gap analysis", "absorbs": ["Resource gap analysis"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.1"]},
+    {"name": "Resource utilization reports", "absorbs": ["Resource Utilization Reports"], "sources": ["ISO/IEC 42001:2023 AI Management System 4.1"]}
+  ]},
+  {"set_id": "GOV-024", "normalized_evidence": [
+    {"name": "Competence requirements matrix", "absorbs": ["Competence requirements matrix", "AI Competence Matrix", "Job Descriptions / Position Profiles"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.2", "ISO/IEC 42001:2023 AI Management System 4.2"]},
+    {"name": "Training records and certificates", "absorbs": ["Training records and certificates", "BC qualification records (e.g., CBCI, MBCI)", "Training Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.2", "ISO/IEC 42001:2023 AI Management System 4.2"]},
+    {"name": "Competence evaluation records", "absorbs": ["Competence evaluation records", "Competence Evaluation Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.2", "ISO/IEC 42001:2023 AI Management System 4.2"]}
+  ]},
+  {"set_id": "GOV-025", "normalized_evidence": [
+    {"name": "Awareness programme documentation", "absorbs": ["BC awareness programme documentation", "AI Awareness Programme", "Communication campaign materials", "Awareness Communication Artefacts"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.3", "ISO/IEC 42001:2023 AI Management System 4.3"]},
+    {"name": "Awareness training attendance records", "absorbs": ["Awareness training attendance records", "Awareness Training Attendance Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.3", "ISO/IEC 42001:2023 AI Management System 4.3"]}
+  ]},
+  {"set_id": "GOV-026", "normalized_evidence": [
+    {"name": "Documented information register and index", "absorbs": ["BCMS document register", "Documented information inventory", "AIMS Documented Information Index"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.1", "ISO/IEC 42001:2023 AI Management System 4.5"]},
+    {"name": "Document hierarchy and structure", "absorbs": ["Document hierarchy and structure"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.1"]},
+    {"name": "Documented information repository", "absorbs": ["Documented Information Repository"], "sources": ["ISO/IEC 42001:2023 AI Management System 4.5"]}
+  ]},
+  {"set_id": "GOV-027", "normalized_evidence": [
+    {"name": "Document control procedure", "absorbs": ["Document control procedure", "Document Control Procedure"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.2", "ISO/IEC 42001:2023 AI Management System 4.6"]},
+    {"name": "Document templates with version control", "absorbs": ["Document templates with version control", "Document Template Library"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.2", "ISO/IEC 42001:2023 AI Management System 4.6"]},
+    {"name": "Review and approval records", "absorbs": ["Review and approval records", "Review & Approval Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.2", "ISO/IEC 42001:2023 AI Management System 4.6"]}
+  ]},
+  {"set_id": "GOV-028", "normalized_evidence": [
+    {"name": "Document control policy and procedure", "absorbs": ["Document control procedure", "Document Control Policy"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.3", "ISO/IEC 42001:2023 AI Management System 4.7"]},
+    {"name": "Access control records for documents", "absorbs": ["Access control matrix for BC documents", "Access Control Records (DMS)"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.3", "ISO/IEC 42001:2023 AI Management System 4.7"]},
+    {"name": "Version control and distribution records", "absorbs": ["Version control records", "Document distribution records"], "sources": ["ISO 22301:2019 Business Continuity Management System 7.5.3"]},
+    {"name": "Retention and disposition schedule", "absorbs": ["Retention & Disposition Schedule"], "sources": ["ISO/IEC 42001:2023 AI Management System 4.7"]},
+    {"name": "External-origin document register", "absorbs": ["External-Origin Document Register"], "sources": ["ISO/IEC 42001:2023 AI Management System 4.7"]}
+  ]},
+  {"set_id": "GOV-029", "normalized_evidence": [
+    {"name": "Context analysis document", "absorbs": ["BCMS context analysis document", "AIMS Context Analysis Document"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.1", "ISO/IEC 42001:2023 AI Management System 1.1"]},
+    {"name": "PESTLE / environmental analysis", "absorbs": ["PESTLE or environmental analysis", "PESTLE / Context Analysis Worksheet"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.1", "ISO/IEC 42001:2023 AI Management System 1.1"]},
+    {"name": "Internal and external issue register", "absorbs": ["Internal and external issue register"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.1"]},
+    {"name": "AI roles determination record", "absorbs": ["AI Roles Determination Record"], "sources": ["ISO/IEC 42001:2023 AI Management System 1.1"]},
+    {"name": "AI systems inventory with intended purpose", "absorbs": ["AI Systems Inventory with Intended Purpose"], "sources": ["ISO/IEC 42001:2023 AI Management System 1.1"]}
+  ]},
+  {"set_id": "GOV-030", "normalized_evidence": [
+    {"name": "Interested parties register", "absorbs": ["Interested parties register", "Interested Parties Register"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.2.1", "ISO/IEC 42001:2023 AI Management System 1.2"]},
+    {"name": "Stakeholder requirements and analysis", "absorbs": ["Stakeholder analysis document", "Stakeholder Requirements Mapping"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.2.1", "ISO/IEC 42001:2023 AI Management System 1.2"]},
+    {"name": "Legal, regulatory and contractual requirements log", "absorbs": ["Legal and regulatory requirements log", "Contractual obligations inventory"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.2.1"]},
+    {"name": "Stakeholder engagement records", "absorbs": ["Stakeholder Engagement Records"], "sources": ["ISO/IEC 42001:2023 AI Management System 1.2"]}
+  ]},
+  {"set_id": "GOV-031", "normalized_evidence": [
+    {"name": "Management system scope statement", "absorbs": ["BCMS scope statement", "AIMS Scope Statement"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.3", "ISO/IEC 42001:2023 AI Management System 1.3"]},
+    {"name": "Scope boundary definition", "absorbs": ["Scope boundary definitions", "Inclusions and exclusions justification", "Scope Boundary Diagram"], "sources": ["ISO 22301:2019 Business Continuity Management System 4.3", "ISO/IEC 42001:2023 AI Management System 1.3"]},
+    {"name": "Scope approval record", "absorbs": ["Scope Approval Record"], "sources": ["ISO/IEC 42001:2023 AI Management System 1.3"]}
+  ]},
+  {"set_id": "GOV-032", "normalized_evidence": [
+    {"name": "Risk and opportunity register", "absorbs": ["BCMS risk register", "Opportunity assessment records"], "sources": ["ISO 22301:2019 Business Continuity Management System 6.1"]},
+    {"name": "Risk treatment plans", "absorbs": ["Risk treatment plans"], "sources": ["ISO 22301:2019 Business Continuity Management System 6.1"]},
+    {"name": "Effectiveness evaluation criteria", "absorbs": ["Effectiveness evaluation criteria"], "sources": ["ISO 22301:2019 Business Continuity Management System 6.1"]},
+    {"name": "Documented evidence demonstrating the outcome", "absorbs": ["Documented evidence demonstrating the outcome of GOVERN 1.3"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.3"]},
+    {"name": "Approved organizational policies and procedures", "absorbs": ["Approved organizational policies and procedures"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.3"]},
+    {"name": "AI risk tolerance statement with approval records", "absorbs": ["Documented organizational AI risk tolerance statement with approval records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.3"]},
+    {"name": "Periodic review records", "absorbs": ["Periodic review records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.3"]}
+  ]},
+  {"set_id": "GOV-033", "normalized_evidence": [
+    {"name": "Approved top-management policy document", "absorbs": ["Approved business continuity policy document", "Approved AI Policy"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.2", "ISO/IEC 42001:2023 AI Management System 2.2"]},
+    {"name": "Policy communication records", "absorbs": ["Policy communication records", "AI Policy Communication Records"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.2", "ISO/IEC 42001:2023 AI Management System 2.2"]},
+    {"name": "Policy review and approval evidence", "absorbs": ["Policy review and approval evidence"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.2"]},
+    {"name": "AI policy cross-reference matrix", "absorbs": ["AI Policy Cross-Reference Matrix"], "sources": ["ISO/IEC 42001:2023 AI Management System 2.2"]},
+    {"name": "External availability evidence", "absorbs": ["External Availability Evidence"], "sources": ["ISO/IEC 42001:2023 AI Management System 2.2"]}
+  ]},
+  {"set_id": "GOV-034", "normalized_evidence": [
+    {"name": "Organizational chart with reporting lines", "absorbs": ["Organizational chart for BCMS", "Organizational chart with reporting lines"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.3", "SOC 2 Type II CC1.3"]},
+    {"name": "Roles and responsibilities / RACI matrix", "absorbs": ["BCMS roles and responsibilities matrix", "RACI chart for BC activities", "RACI matrix for key security functions"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.3", "SOC 2 Type II CC1.3"]},
+    {"name": "Appointment letters or terms of reference", "absorbs": ["Appointment letters or terms of reference"], "sources": ["ISO 22301:2019 Business Continuity Management System 5.3"]},
+    {"name": "Job descriptions with defined authorities", "absorbs": ["Job descriptions with defined authorities and responsibilities"], "sources": ["SOC 2 Type II CC1.3"]},
+    {"name": "Segregation of duties matrix", "absorbs": ["Segregation of duties matrix"], "sources": ["SOC 2 Type II CC1.3"]}
+  ]},
+  {"set_id": "GOV-035", "normalized_evidence": [
+    {"name": "Documented AI policy", "absorbs": ["Documented AI Policy", "Approved organizational policies and procedures"], "sources": ["ISO/IEC 42001:2023 AI Management System 8.1", "NIST Artificial Intelligence Risk Management Framework GOVERN 1.2"]},
+    {"name": "AI policy approval records", "absorbs": ["AI Policy Approval Records"], "sources": ["ISO/IEC 42001:2023 AI Management System 8.1"]},
+    {"name": "Topic-specific sub-policies", "absorbs": ["Topic-Specific Sub-Policies"], "sources": ["ISO/IEC 42001:2023 AI Management System 8.1"]},
+    {"name": "Documented evidence demonstrating the outcome", "absorbs": ["Documented evidence demonstrating the outcome of GOVERN 1.2"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.2"]},
+    {"name": "Periodic review records", "absorbs": ["Periodic review records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.2"]},
+    {"name": "Implementation records and artifacts", "absorbs": ["Implementation records and artifacts evidencing this outcome within the AI"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.2"]}
+  ]},
+  {"set_id": "GOV-036", "normalized_evidence": [
+    {"name": "AI roles and responsibilities charter", "absorbs": ["AI Roles & Responsibilities Charter"], "sources": ["ISO/IEC 42001:2023 AI Management System 9.1"]},
+    {"name": "AI RACI matrix", "absorbs": ["AI RACI Matrix", "RACI matrix defining AI risk management roles"], "sources": ["ISO/IEC 42001:2023 AI Management System 9.1", "NIST Artificial Intelligence Risk Management Framework GOVERN 2.1"]},
+    {"name": "Role allocation communication", "absorbs": ["Role Allocation Communication"], "sources": ["ISO/IEC 42001:2023 AI Management System 9.1"]},
+    {"name": "Documented evidence demonstrating the outcome", "absorbs": ["Documented evidence demonstrating the outcome of GOVERN 2.1"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 2.1"]},
+    {"name": "Periodic review records", "absorbs": ["Periodic review records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 2.1"]},
+    {"name": "Implementation records and artifacts", "absorbs": ["Implementation records and artifacts evidencing this outcome within the AI"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 2.1"]}
+  ]},
+  {"set_id": "GOV-037", "normalized_evidence": [
+    {"name": "In-scope system inventory register", "absorbs": ["AI system inventory register with owners", "PCI DSS In-Scope Asset Inventory"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.6", "PCI Data Security Standard 12.5.1"]},
+    {"name": "Inventory update records", "absorbs": ["Inventory Update Records"], "sources": ["PCI Data Security Standard 12.5.1"]},
+    {"name": "CMDB integration evidence", "absorbs": ["CMDB Integration Evidence"], "sources": ["PCI Data Security Standard 12.5.1"]},
+    {"name": "Documented evidence demonstrating the outcome", "absorbs": ["Documented evidence demonstrating the outcome of GOVERN 1.6"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.6"]},
+    {"name": "AI risk tolerance statement with approval records", "absorbs": ["Documented organizational AI risk tolerance statement with approval records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.6"]},
+    {"name": "Periodic review records", "absorbs": ["Periodic review records"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 1.6"]}
+  ]},
+  {"set_id": "GOV-038", "normalized_evidence": [
+    {"name": "Acceptable use / rules of behavior policy", "absorbs": ["Rules of behavior document", "Acceptable use policy", "Acceptable Use Policy"], "sources": ["NIST SP 800-53 Rev 5 PL-4", "PCI Data Security Standard 12.2.1"]},
+    {"name": "User acknowledgment records", "absorbs": ["User acknowledgment records", "Distribution & Acknowledgment Records"], "sources": ["NIST SP 800-53 Rev 5 PL-4", "PCI Data Security Standard 12.2.1"]},
+    {"name": "Endpoint configuration enforcing acceptable use", "absorbs": ["Endpoint Configuration Enforcing AUP"], "sources": ["PCI Data Security Standard 12.2.1"]}
+  ]},
+  {"set_id": "GOV-039", "normalized_evidence": [
+    {"name": "System security plan / cyber strategy policy", "absorbs": ["System Security Plan (SSP)", "Board-approved cyber strategy policy"], "sources": ["NIST SP 800-53 Rev 5 PL-2", "Qatar Central Bank Technology Risks Circular 1.2.4"]},
+    {"name": "Plan review and update records", "absorbs": ["SSP review and update records"], "sources": ["NIST SP 800-53 Rev 5 PL-2"]},
+    {"name": "Plan approval documentation", "absorbs": ["SSP approval documentation"], "sources": ["NIST SP 800-53 Rev 5 PL-2"]},
+    {"name": "Mapping of risks to mitigating measures", "absorbs": ["Mapping of risks to mitigating measures"], "sources": ["Qatar Central Bank Technology Risks Circular 1.2.4"]}
+  ]},
+  {"set_id": "GOV-040", "normalized_evidence": [
+    {"name": "Reporting obligations register", "absorbs": ["Reporting Obligations Register"], "sources": ["ISO/IEC 42001:2023 AI Management System 15.4"]},
+    {"name": "External communication procedures", "absorbs": ["Customer communication procedures for security incidents", "External audit communication protocols", "Law Enforcement Information Handling Procedure"], "sources": ["SOC 2 Type II CC2.3", "ISO/IEC 42001:2023 AI Management System 15.4"]},
+    {"name": "Sample reports / notifications", "absorbs": ["Sample Reports / Notifications"], "sources": ["ISO/IEC 42001:2023 AI Management System 15.4"]},
+    {"name": "Service level agreements with security provisions", "absorbs": ["Service level agreements with security provisions"], "sources": ["SOC 2 Type II CC2.3"]},
+    {"name": "Public-facing security and privacy disclosures", "absorbs": ["Public-facing security and privacy disclosures"], "sources": ["SOC 2 Type II CC2.3"]}
+  ]},
+  {"set_id": "GOV-041", "normalized_evidence": [
+    {"name": "Third-party AI and data risk assessments", "absorbs": ["Third-party AI and data risk assessments"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 6.2"]},
+    {"name": "Incident response plan and incident register", "absorbs": ["Incident response plan and incident or error register"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 6.2"]},
+    {"name": "Documented evidence demonstrating the outcome", "absorbs": ["Documented evidence demonstrating the outcome of GOVERN 6.2"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 6.2"]},
+    {"name": "Implementation records and artifacts", "absorbs": ["Implementation records and artifacts evidencing this outcome within the AI"], "sources": ["NIST Artificial Intelligence Risk Management Framework GOVERN 6.2"]},
+    {"name": "Board resolution on cloud accountability", "absorbs": ["BoD Resolution — Cloud Accountability"], "sources": ["SBP Cloud Outsourcing Framework 1.4"]},
+    {"name": "SBP information response log", "absorbs": ["SBP Information Response Log"], "sources": ["SBP Cloud Outsourcing Framework 1.4"]},
+    {"name": "Cloud outsourcing arrangement dossier", "absorbs": ["CO Arrangement Dossier for SBP"], "sources": ["SBP Cloud Outsourcing Framework 1.4"]},
+    {"name": "Independent certification to board", "absorbs": ["IA Independent Certification to Board"], "sources": ["SBP Cloud Outsourcing Framework 1.4"]},
+    {"name": "Community cloud readiness note", "absorbs": ["Community Cloud Readiness Note"], "sources": ["SBP Cloud Outsourcing Framework 1.4"]}
+  ]}
+]}

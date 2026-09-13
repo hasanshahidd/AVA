@@ -1,0 +1,120 @@
+{
+ "set_id": "S002",
+ "di": 12,
+ "groups": [
+  {
+   "name": "Post-incident review reports/records",
+   "absorbs": [
+    "Post-incident review reports",
+    "Post-incident review records",
+    "Post-incident reviews",
+    "Post-incident review reports with lessons learned",
+    "Post-Incident Review Records",
+    "Post-Incident Review Reports",
+    "Post-incident review reports"
+   ]
+  },
+  {
+   "name": "Lessons learned documentation/reports",
+   "absorbs": [
+    "Lessons learned documentation",
+    "Lessons learned documentation per incident",
+    "Lessons learned documentation",
+    "Lessons learned documentation",
+    "Completed Lessons Learned Reports",
+    "Lessons learned reports"
+   ]
+  },
+  {
+   "name": "Lessons learned register/log",
+   "absorbs": [
+    "Lessons-Learned Register"
+   ]
+  },
+  {
+   "name": "Lessons learned report template",
+   "absorbs": [
+    "Lessons Learned Report Template"
+   ]
+  },
+  {
+   "name": "Lessons learned sharing/communication records",
+   "absorbs": [
+    "Lessons learned sharing records with stakeholders"
+   ]
+  },
+  {
+   "name": "Improvement action plans/tracking",
+   "absorbs": [
+    "Framework improvement action plans",
+    "Improvement actions",
+    "Improvement action tracking",
+    "Improvement Action Plans",
+    "Process improvement updates"
+   ]
+  },
+  {
+   "name": "Control improvement tracker",
+   "absorbs": [
+    "Control Improvement Tracker"
+   ]
+  },
+  {
+   "name": "Incident response plan updates from lessons learned",
+   "absorbs": [
+    "Plan updates",
+    "IRP Update History (Lessons-Learned Driven)"
+   ]
+  },
+  {
+   "name": "Root cause analysis documentation",
+   "absorbs": [
+    "Root cause analysis documentation"
+   ]
+  },
+  {
+   "name": "Incident knowledge base / known-error database",
+   "absorbs": [
+    "Knowledge database for incident diagnosis/response",
+    "Known error database or knowledge base"
+   ]
+  },
+  {
+   "name": "Incident documentation repository",
+   "absorbs": [
+    "Incident documentation repository"
+   ]
+  },
+  {
+   "name": "Incident metrics and trends report",
+   "absorbs": [
+    "Incident Metrics and Trends Report"
+   ]
+  },
+  {
+   "name": "Updated risk assessment entries",
+   "absorbs": [
+    "Updated Risk Assessment Entries"
+   ]
+  },
+  {
+   "name": "Security awareness content updates",
+   "absorbs": [
+    "Awareness Content Updates"
+   ]
+  },
+  {
+   "name": "External/industry event analysis",
+   "absorbs": [
+    "External Event Analysis Briefs",
+    "Industry Source Subscription Evidence"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Threat intelligence capability documentation",
+   "reason": "Threat intelligence capability is a separate program artifact, not post-incident review/lessons-learned evidence."
+  }
+ ]
+}

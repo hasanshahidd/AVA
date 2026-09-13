@@ -1,0 +1,74 @@
+{
+ "set_id": "S006",
+ "di": 0,
+ "groups": [
+  {
+   "name": "Annual policy review records",
+   "absorbs": [
+    "Annual review records of the Review of the Information",
+    "Annual Policy Review Records"
+   ]
+  },
+  {
+   "name": "Approved information security policy document",
+   "absorbs": [
+    "Approved Review of the Information Security Policy document"
+   ]
+  },
+  {
+   "name": "Policy review approval / sign-off records",
+   "absorbs": [
+    "Review Sign-off Records",
+    "Approval evidence for annual updates"
+   ]
+  },
+  {
+   "name": "Policy version / update history",
+   "absorbs": [
+    "Policy Update History",
+    "Version-history records",
+    "Policy version history"
+   ]
+  },
+  {
+   "name": "Policy review register",
+   "absorbs": [
+    "Policy review register"
+   ]
+  },
+  {
+   "name": "Policy review schedule",
+   "absorbs": [
+    "Policy review schedule"
+   ]
+  },
+  {
+   "name": "Policy review meeting minutes",
+   "absorbs": [
+    "Review meeting minutes"
+   ]
+  },
+  {
+   "name": "Policy change management records",
+   "absorbs": [
+    "Change management records"
+   ]
+  },
+  {
+   "name": "Awareness communications of policy",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Change management procedure with CAB approvals and back-out plans",
+   "reason": "Operational IT change-management (CAB/back-out), not periodic policy review evidence."
+  },
+  {
+   "name": "Change records (RFC) with risk classification",
+   "reason": "Operational IT change records (RFC), not policy review/update evidence."
+  }
+ ]
+}

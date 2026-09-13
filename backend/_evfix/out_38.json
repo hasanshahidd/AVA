@@ -1,0 +1,129 @@
+{
+ "set_id": "S001",
+ "di": 18,
+ "groups": [
+  {
+   "name": "Vulnerability management policy/process document",
+   "absorbs": [
+    "Vulnerability management process document",
+    "Vulnerability management policy",
+    "Approved policy and standard addressing Control of Technical Vulnerabilities",
+    "Vulnerability Management Policy",
+    "Vulnerability management policy",
+    "Vulnerability Management Procedure",
+    "Vulnerability management policy with remediation timelines"
+   ]
+  },
+  {
+   "name": "Documented vulnerability management procedure/work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Control of Technical"
+   ]
+  },
+  {
+   "name": "Vulnerability scanning reports",
+   "absorbs": [
+    "Vulnerability scan reports",
+    "Vulnerability scan reports",
+    "Vulnerability Scanning Reports",
+    "Vulnerability scanning reports"
+   ]
+  },
+  {
+   "name": "Vulnerability scanning reports with remediation tracking",
+   "absorbs": [
+    "Vulnerability scanning reports with remediation tracking and timing",
+    "Vulnerability scanning reports and remediation tracking"
+   ]
+  },
+  {
+   "name": "Remediation tracking",
+   "absorbs": [
+    "Remediation tracking",
+    "Remediation tracking",
+    "Remediation tracking",
+    "Remediation tracking",
+    "Vulnerability Remediation Tracker"
+   ]
+  },
+  {
+   "name": "Patch management records",
+   "absorbs": [
+    "Patching records",
+    "Patching records",
+    "Patch management records with deployment evidence and exception register",
+    "Patch Management Records",
+    "Patch management records",
+    "Patch management records and compliance metrics"
+   ]
+  },
+  {
+   "name": "Remediation SLA definitions",
+   "absorbs": [
+    "Remediation SLA definitions"
+   ]
+  },
+  {
+   "name": "Vulnerability SLA compliance report",
+   "absorbs": [
+    "Vulnerability SLA Compliance Report"
+   ]
+  },
+  {
+   "name": "Process / periodic review records",
+   "absorbs": [
+    "Process review records",
+    "Periodic review records with reviewer"
+   ]
+  },
+  {
+   "name": "Scan schedules",
+   "absorbs": [
+    "Scan schedules"
+   ]
+  },
+  {
+   "name": "Penetration test reports",
+   "absorbs": [
+    "Penetration Test Reports"
+   ]
+  },
+  {
+   "name": "Risk acceptance / exception records",
+   "absorbs": [
+    "Risk Acceptance Records"
+   ]
+  },
+  {
+   "name": "Vulnerability risk ranking methodology",
+   "absorbs": [
+    "Risk Ranking Methodology"
+   ]
+  },
+  {
+   "name": "Vulnerability tracking system records",
+   "absorbs": [
+    "Vulnerability Tracking System Records"
+   ]
+  },
+  {
+   "name": "Vulnerability intelligence source inventory",
+   "absorbs": [
+    "Vulnerability Intelligence Source Inventory"
+   ]
+  },
+  {
+   "name": "Coordinated vulnerability disclosure policy",
+   "absorbs": [
+    "Coordinated vulnerability disclosure policy"
+   ]
+  },
+  {
+   "name": "Awareness communications records",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": []
+}

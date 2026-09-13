@@ -1,0 +1,54 @@
+{
+ "set_id": "S007",
+ "di": 15,
+ "groups": [
+  {
+   "name": "Security/acceptable usage policy document",
+   "absorbs": [
+    "Acceptable Usage Policy document",
+    "Approved policy and standard addressing Management Responsibilities"
+   ]
+  },
+  {
+   "name": "Documented procedure / work instruction implementing the policy",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Management Responsibilities"
+   ]
+  },
+  {
+   "name": "Signed acceptable usage policy acknowledgements",
+   "absorbs": [
+    "Signed Acceptable Usage Policy acknowledgements"
+   ]
+  },
+  {
+   "name": "Personnel security briefing / awareness communications",
+   "absorbs": [
+    "Information security briefing records",
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Segregation of duties matrix",
+   "absorbs": [
+    "Segregation of duties matrix"
+   ]
+  },
+  {
+   "name": "Access provisioning records linked to signed policies",
+   "absorbs": [
+    "Access provisioning records linked to signed policies"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party/vendor contract evidence, off-topic for an internal HR personnel-security set"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management evidence, not personnel applying security policy"
+  }
+ ]
+}

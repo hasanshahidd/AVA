@@ -1,0 +1,96 @@
+{
+ "set_id": "S002",
+ "di": 0,
+ "groups": [
+  {
+   "name": "Information security roles & responsibilities definitions",
+   "absorbs": [
+    "Role assignments",
+    "Security role definitions",
+    "Responsibility assignments",
+    "Responsibility assignment records",
+    "Role definitions",
+    "Roles & Responsibilities Section in Policy",
+    "Security Responsibilities Appointment Letters"
+   ]
+  },
+  {
+   "name": "Security RACI / responsibility matrix",
+   "absorbs": [
+    "Security roles and responsibilities matrix",
+    "Information Security RACI Matrix",
+    "RACI matrix"
+   ]
+  },
+  {
+   "name": "Security governance structure / organisation chart",
+   "absorbs": [
+    "Governance structure documentation",
+    "Organization chart",
+    "Organisational Chart with Security Function"
+   ]
+  },
+  {
+   "name": "Security-role job descriptions",
+   "absorbs": [
+    "Job descriptions with security duties",
+    "Security Role Job Descriptions"
+   ]
+  },
+  {
+   "name": "Information security policy / standard",
+   "absorbs": [
+    "Approved policy and standard addressing Allocation of Information Security"
+   ]
+  },
+  {
+   "name": "Documented procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Allocation of Information"
+   ]
+  },
+  {
+   "name": "Security awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the",
+    "Awareness Evidence"
+   ]
+  },
+  {
+   "name": "Personnel acknowledgment records",
+   "absorbs": [
+    "Personnel Acknowledgment Records"
+   ]
+  },
+  {
+   "name": "Periodic review records",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  },
+  {
+   "name": "Management commitment evidence",
+   "absorbs": [
+    "Management commitment evidence"
+   ]
+  },
+  {
+   "name": "Signed NDAs",
+   "absorbs": [
+    "Signed NDAs"
+   ]
+  },
+  {
+   "name": "Partner / external agreements",
+   "absorbs": [
+    "Partner agreements"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Residual Risk Acceptance Records",
+   "reason": "Risk-acceptance artifact, off-topic for a roles & responsibilities allocation set."
+  }
+ ]
+}

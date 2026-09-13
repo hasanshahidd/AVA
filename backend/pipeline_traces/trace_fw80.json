@@ -1,0 +1,1400 @@
+{
+  "framework_id": 80,
+  "tenant_id": 1,
+  "started_epoch": 1782916557.4899182,
+  "no_chunking": true,
+  "steps": [
+    {
+      "phase": "read",
+      "percent": 8,
+      "message": "Found 110 controls, 220 evidence items and 22 artifacts in “NIST SP 800-171 Rev 2 (Protecting CUI)”.",
+      "elapsed_s": 0.06,
+      "new_controls": 110,
+      "evidence_in": 220,
+      "artifacts_in": 22,
+      "framework": "NIST SP 800-171 Rev 2 (Protecting CUI)"
+    },
+    {
+      "phase": "domains",
+      "percent": 22,
+      "message": "Merging the framework's domains into your existing domains…",
+      "elapsed_s": 0.09
+    },
+    {
+      "phase": "domains",
+      "percent": 42,
+      "message": "Mapped onto 15 existing domains — 0 new domains created.",
+      "elapsed_s": 19.15,
+      "domains_used": [
+        "Access Control & Identity",
+        "Application & Software Security",
+        "Audit & Assurance",
+        "Awareness & Training",
+        "Configuration & Change Management",
+        "Cryptography",
+        "Data Protection & Privacy",
+        "Governance, Leadership & Policy",
+        "Incident Management",
+        "Logging, Monitoring & Detection",
+        "Network & Communications Security",
+        "Operations & IT Service Management",
+        "Physical & Environmental Security",
+        "Risk Management",
+        "Vulnerability & Threat Management"
+      ],
+      "new_domains": []
+    },
+    {
+      "phase": "normalize",
+      "percent": 52,
+      "message": "Matching each control to sets in its domain…",
+      "elapsed_s": 19.16
+    },
+    {
+      "phase": "normalize",
+      "percent": 62,
+      "message": "74 candidate joins — verifying each is a genuine match…",
+      "elapsed_s": 118.41,
+      "would_join": 74,
+      "would_standalone": 36
+    },
+    {
+      "phase": "normalize",
+      "percent": 70,
+      "message": "55 controls join existing sets, 55 standalone (verification demoted 19 weak matches to their own set).",
+      "elapsed_s": 206.59,
+      "would_join": 55,
+      "would_standalone": 55,
+      "joins_verified_kept": 55,
+      "joins_demoted": 19,
+      "demoted_items": [
+        {
+          "control_id": "3.1.2",
+          "title": "Limit access to authorized transactions",
+          "was_set": "Restrict access to information on a need-to-know basis",
+          "reason": "Access to specific transactions differs"
+        },
+        {
+          "control_id": "3.1.6",
+          "title": "Use non-privileged accounts for non-security functions",
+          "was_set": "Apply the principle of least privilege when granting user access",
+          "reason": "Non-privileged accounts for different functions"
+        },
+        {
+          "control_id": "3.1.15",
+          "title": "Authorize remote privileged commands",
+          "was_set": "Restrict and manage the allocation and use of privileged access rights",
+          "reason": "different activities regarding privilege management"
+        },
+        {
+          "control_id": "3.1.20",
+          "title": "Control connections to external systems",
+          "was_set": "Control access to assets at teleworking sites",
+          "reason": "different activities regarding external systems"
+        },
+        {
+          "control_id": "3.5.5",
+          "title": "Prevent identifier reuse",
+          "was_set": "Disable or remove user accounts after a defined period of inactivity",
+          "reason": "Different activities regarding identifiers"
+        },
+        {
+          "control_id": "3.5.8",
+          "title": "Prohibit password reuse",
+          "was_set": "Password Management System",
+          "reason": "Different activities regarding password management"
+        },
+        {
+          "control_id": "3.5.9",
+          "title": "Allow temporary password with forced change",
+          "was_set": "Establish and enforce a password management policy with complexity requirements",
+          "reason": "Different activities regarding password management"
+        },
+        {
+          "control_id": "3.1.13",
+          "title": "Encrypt remote access sessions",
+          "was_set": "Encrypt sensitive data in transit",
+          "reason": "different focus on access vs data"
+        },
+        {
+          "control_id": "3.13.11",
+          "title": "Employ FIPS-validated cryptography",
+          "was_set": "Adopt cryptographic algorithms from well-established international standards with appropriate key length",
+          "reason": "different focus on standards vs validation"
+        },
+        {
+          "control_id": "3.12.3",
+          "title": "Monitor security controls continuously",
+          "was_set": "Monitor and evaluate the internal control environment including self-assessments",
+          "reason": "Continuous monitoring vs. evaluation"
+        },
+        {
+          "control_id": "3.7.3",
+          "title": "Sanitize equipment for off-site maintenance",
+          "was_set": "Controlled Maintenance",
+          "reason": "Different activities regarding maintenance processes"
+        },
+        {
+          "control_id": "3.10.2",
+          "title": "Protect and monitor the facility",
+          "was_set": "Protect facilities against external and environmental threats such as natural disasters",
+          "reason": "different focus on threats vs. monitoring"
+        },
+        {
+          "control_id": "3.10.5",
+          "title": "Manage physical access devices",
+          "was_set": "Physical Access Authorizations",
+          "reason": "different focus on management vs. authorization"
+        },
+        {
+          "control_id": "3.11.1",
+          "title": "Assess risk from operating systems with CUI",
+          "was_set": "Periodic Risk Assessment of Authentication Controls",
+          "reason": "Different focus on risk assessment types"
+        },
+        {
+          "control_id": "3.12.2",
+          "title": "Develop plans of action",
+          "was_set": "Establish and maintain a documented vulnerability management process/program",
+          "reason": "Different focus on action plans vs process"
+        },
+        {
+          "control_id": "3.14.5",
+          "title": "Perform periodic and real-time scans",
+          "was_set": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+          "reason": "Different focus on scanning methods"
+        },
+        {
+          "control_id": "3.13.4",
+          "title": "Prevent unauthorized shared-resource transfer",
+          "was_set": "Establish formal procedures for information exchange between systems",
+          "reason": "different activities regarding information transfer"
+        },
+        {
+          "control_id": "3.13.6",
+          "title": "Deny network traffic by default",
+          "was_set": "Implement network access control to detect and block unauthorized devices",
+          "reason": "different focus on traffic control"
+        },
+        {
+          "control_id": "3.13.14",
+          "title": "Control VoIP",
+          "was_set": "Manage and control networks to protect against threats",
+          "reason": "different focus on VoIP management"
+        }
+      ]
+    },
+    {
+      "phase": "build",
+      "percent": 80,
+      "message": "Cloning your library into a safe candidate and adding the framework…",
+      "elapsed_s": 206.59
+    },
+    {
+      "phase": "build",
+      "percent": 90,
+      "message": "Candidate library #71 built (your live library is untouched).",
+      "elapsed_s": 216.47,
+      "candidate_run_id": 71,
+      "would_join": 55,
+      "would_standalone": 55
+    },
+    {
+      "phase": "evidence",
+      "percent": 92,
+      "message": "Normalizing evidence — merging onto matched sets…",
+      "elapsed_s": 216.47
+    },
+    {
+      "phase": "evidence",
+      "percent": 96,
+      "message": "Merged 110 evidence items into 47 sets (0 already covered).",
+      "elapsed_s": 216.65,
+      "evidence_merged": 110,
+      "evidence_deduped": 0,
+      "sets_evidence_enriched": 47,
+      "evidence_generated": 0
+    },
+    {
+      "phase": "artifacts",
+      "percent": 98,
+      "message": "Normalizing artifacts against the unified catalog…",
+      "elapsed_s": 216.66
+    },
+    {
+      "phase": "artifacts",
+      "percent": 100,
+      "message": "12 new artifacts added, 10 deduped against existing frameworks.",
+      "elapsed_s": 216.69,
+      "artifacts_total": 22,
+      "artifacts_new": 12,
+      "artifacts_duplicate": 10
+    }
+  ],
+  "framework": "NIST SP 800-171 Rev 2 (Protecting CUI)",
+  "elapsed_s": 216.69,
+  "decisions": [
+    {
+      "control_id": "3.1.1",
+      "title": "Limit system access to authorized users",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Restrict access to information on a need-to-know basis"
+    },
+    {
+      "control_id": "3.1.2",
+      "title": "Limit access to authorized transactions",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.3",
+      "title": "Control the flow of CUI",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.4",
+      "title": "Separate duties of individuals",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Enforce segregation of duties for incompatible functions"
+    },
+    {
+      "control_id": "3.1.5",
+      "title": "Employ least privilege",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Apply the principle of least privilege when granting user access"
+    },
+    {
+      "control_id": "3.1.6",
+      "title": "Use non-privileged accounts for non-security functions",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.7",
+      "title": "Prevent non-privileged users running privileged functions",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Restrict and manage the allocation and use of privileged access rights"
+    },
+    {
+      "control_id": "3.1.8",
+      "title": "Limit unsuccessful logon attempts",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Enforce a limit on consecutive failed authentication attempts"
+    },
+    {
+      "control_id": "3.1.9",
+      "title": "Provide privacy and security notices",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.10",
+      "title": "Use session lock",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Automatically lock or terminate a session after a period of inactivity"
+    },
+    {
+      "control_id": "3.1.11",
+      "title": "Terminate user sessions",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Automatically lock or terminate a session after a period of inactivity"
+    },
+    {
+      "control_id": "3.1.12",
+      "title": "Monitor and control remote access",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and control remote access security requirements"
+    },
+    {
+      "control_id": "3.1.13",
+      "title": "Encrypt remote access sessions",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.14",
+      "title": "Route remote access via managed control points",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and control remote access security requirements"
+    },
+    {
+      "control_id": "3.1.15",
+      "title": "Authorize remote privileged commands",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.16",
+      "title": "Authorize wireless access",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and control remote access security requirements"
+    },
+    {
+      "control_id": "3.1.17",
+      "title": "Protect wireless access",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.18",
+      "title": "Control mobile device connection",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and control remote access security requirements"
+    },
+    {
+      "control_id": "3.1.19",
+      "title": "Encrypt CUI on mobile devices",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.20",
+      "title": "Control connections to external systems",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.21",
+      "title": "Limit portable storage on external systems",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.1.22",
+      "title": "Control CUI on public systems",
+      "framework_domain": "Access Control",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.2.1",
+      "title": "Security awareness of risks and policies",
+      "framework_domain": "Awareness and Training",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Ensure personnel are aware of the relevant policy and their contribution to its effectiveness"
+    },
+    {
+      "control_id": "3.2.2",
+      "title": "Train personnel for security duties",
+      "framework_domain": "Awareness and Training",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Provide role-appropriate training based on job function and responsibilities"
+    },
+    {
+      "control_id": "3.2.3",
+      "title": "Insider-threat awareness training",
+      "framework_domain": "Awareness and Training",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Train users on breach recognition and breach notification"
+    },
+    {
+      "control_id": "3.3.1",
+      "title": "Create and retain audit logs",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.2",
+      "title": "Trace actions to individual users",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.3",
+      "title": "Review and update logged events",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.4",
+      "title": "Alert on audit logging failure",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.5",
+      "title": "Correlate audit review and reporting",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.6",
+      "title": "Audit reduction and report generation",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.7",
+      "title": "Synchronize clocks for time stamps",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.3.8",
+      "title": "Protect audit information and tools",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Protection of Information Systems Audit Tools"
+    },
+    {
+      "control_id": "3.3.9",
+      "title": "Limit audit management to privileged users",
+      "framework_domain": "Audit and Accountability",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.4.1",
+      "title": "Maintain baseline configurations and inventories",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Maintain documented baseline configurations of information systems"
+    },
+    {
+      "control_id": "3.4.2",
+      "title": "Enforce security configuration settings",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a secure configuration process for enterprise assets and software"
+    },
+    {
+      "control_id": "3.4.3",
+      "title": "Track and log system changes",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Control configuration changes through formal change control procedures"
+    },
+    {
+      "control_id": "3.4.4",
+      "title": "Analyze security impact of changes",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Perform security impact and risk analysis of change requests before implementation"
+    },
+    {
+      "control_id": "3.4.5",
+      "title": "Enforce access restrictions for changes",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Access Restrictions for Change"
+    },
+    {
+      "control_id": "3.4.6",
+      "title": "Employ least functionality",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Configure systems for least functionality by disabling unnecessary services and ports"
+    },
+    {
+      "control_id": "3.4.7",
+      "title": "Restrict nonessential programs and services",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Configure systems for least functionality by disabling unnecessary services and ports"
+    },
+    {
+      "control_id": "3.4.8",
+      "title": "Apply allowlist/denylist for software",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.4.9",
+      "title": "Control user-installed software",
+      "framework_domain": "Configuration Management",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.5.1",
+      "title": "Identify users, processes, and devices",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Assign a unique identifier to each user for identification and accountability"
+    },
+    {
+      "control_id": "3.5.2",
+      "title": "Authenticate identities before access",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Uniquely identify and authenticate users before granting system access"
+    },
+    {
+      "control_id": "3.5.3",
+      "title": "Use multifactor authentication",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Require multi-factor authentication for application access"
+    },
+    {
+      "control_id": "3.5.4",
+      "title": "Employ replay-resistant authentication",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.5.5",
+      "title": "Prevent identifier reuse",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.5.6",
+      "title": "Disable inactive identifiers",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Disable or remove user accounts after a defined period of inactivity"
+    },
+    {
+      "control_id": "3.5.7",
+      "title": "Enforce password complexity",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and enforce a password management policy with complexity requirements"
+    },
+    {
+      "control_id": "3.5.8",
+      "title": "Prohibit password reuse",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.5.9",
+      "title": "Allow temporary password with forced change",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.5.10",
+      "title": "Protect stored and transmitted passwords",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Password Transmission Security"
+    },
+    {
+      "control_id": "3.5.11",
+      "title": "Obscure authentication feedback",
+      "framework_domain": "Identification and Authentication",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.6.1",
+      "title": "Establish incident-handling capability",
+      "framework_domain": "Incident Response",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain an incident response plan"
+    },
+    {
+      "control_id": "3.6.2",
+      "title": "Track, document, and report incidents",
+      "framework_domain": "Incident Response",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Track, record and monitor security incidents"
+    },
+    {
+      "control_id": "3.6.3",
+      "title": "Test incident response capability",
+      "framework_domain": "Incident Response",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Test and exercise the incident response plan periodically"
+    },
+    {
+      "control_id": "3.7.1",
+      "title": "Perform system maintenance",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Controlled Maintenance"
+    },
+    {
+      "control_id": "3.7.2",
+      "title": "Control maintenance tools and personnel",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Maintenance Tools"
+    },
+    {
+      "control_id": "3.7.3",
+      "title": "Sanitize equipment for off-site maintenance",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.7.4",
+      "title": "Check media for malicious code",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.7.5",
+      "title": "MFA for nonlocal maintenance",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Require multi-factor authentication for remote access"
+    },
+    {
+      "control_id": "3.7.6",
+      "title": "Supervise maintenance without authorization",
+      "framework_domain": "Maintenance",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.1",
+      "title": "Protect system media with CUI",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.2",
+      "title": "Limit access to CUI on media",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.3",
+      "title": "Sanitize or destroy media before disposal",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Securely dispose of data using non-retrievable methods"
+    },
+    {
+      "control_id": "3.8.4",
+      "title": "Mark media with CUI markings",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Establish information labelling procedures"
+    },
+    {
+      "control_id": "3.8.5",
+      "title": "Control media during transport",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.6",
+      "title": "Encrypt CUI on media in transport",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Encrypt sensitive data in transit"
+    },
+    {
+      "control_id": "3.8.7",
+      "title": "Control removable media use",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.8",
+      "title": "Prohibit ownerless portable storage",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.8.9",
+      "title": "Protect backup CUI confidentiality",
+      "framework_domain": "Media Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.9.1",
+      "title": "Screen individuals before access",
+      "framework_domain": "Personnel Security",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.9.2",
+      "title": "Protect CUI during personnel actions",
+      "framework_domain": "Personnel Security",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.10.1",
+      "title": "Limit physical access to systems",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.10.2",
+      "title": "Protect and monitor the facility",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.10.3",
+      "title": "Escort and monitor visitors",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Manage and authorize visitor access with escort and identification"
+    },
+    {
+      "control_id": "3.10.4",
+      "title": "Maintain physical access logs",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Maintain and review visitor access records to facilities"
+    },
+    {
+      "control_id": "3.10.5",
+      "title": "Manage physical access devices",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.10.6",
+      "title": "Safeguard CUI at alternate sites",
+      "framework_domain": "Physical Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.11.1",
+      "title": "Assess risk from operating systems with CUI",
+      "framework_domain": "Risk Assessment",
+      "reconciled_domain": "Risk Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.11.2",
+      "title": "Scan for vulnerabilities",
+      "framework_domain": "Risk Assessment",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Conduct regular vulnerability assessments/scans of IT systems"
+    },
+    {
+      "control_id": "3.11.3",
+      "title": "Remediate vulnerabilities by risk",
+      "framework_domain": "Risk Assessment",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Remediate Detected Vulnerabilities"
+    },
+    {
+      "control_id": "3.12.1",
+      "title": "Assess security controls periodically",
+      "framework_domain": "Security Assessment",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Perform periodic technical and nontechnical evaluation of security control effectiveness"
+    },
+    {
+      "control_id": "3.12.2",
+      "title": "Develop plans of action",
+      "framework_domain": "Security Assessment",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.12.3",
+      "title": "Monitor security controls continuously",
+      "framework_domain": "Security Assessment",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.12.4",
+      "title": "Maintain system security plans",
+      "framework_domain": "Security Assessment",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Establish a system/security plan describing the environment"
+    },
+    {
+      "control_id": "3.13.1",
+      "title": "Monitor and protect boundaries",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Manage and control networks to protect against threats"
+    },
+    {
+      "control_id": "3.13.2",
+      "title": "Employ secure architecture and engineering",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Apply secure design and engineering principles in system architecture"
+    },
+    {
+      "control_id": "3.13.3",
+      "title": "Separate user and management functionality",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.4",
+      "title": "Prevent unauthorized shared-resource transfer",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.5",
+      "title": "Isolate public-facing components",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Segregate networks into separate security zones"
+    },
+    {
+      "control_id": "3.13.6",
+      "title": "Deny network traffic by default",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.7",
+      "title": "Prevent split tunneling",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "No split-tunneling or dual-homing"
+    },
+    {
+      "control_id": "3.13.8",
+      "title": "Encrypt CUI in transmission",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Encrypt sensitive data in transit"
+    },
+    {
+      "control_id": "3.13.9",
+      "title": "Terminate network connections",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.10",
+      "title": "Manage cryptographic keys",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Establish cryptographic key management across the full key lifecycle"
+    },
+    {
+      "control_id": "3.13.11",
+      "title": "Employ FIPS-validated cryptography",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.12",
+      "title": "Prohibit remote activation of collaborative devices",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.13",
+      "title": "Control mobile code",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.14",
+      "title": "Control VoIP",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.13.15",
+      "title": "Protect session authenticity",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Protect authenticity of communication sessions against man-in-the-middle attacks"
+    },
+    {
+      "control_id": "3.13.16",
+      "title": "Protect CUI at rest",
+      "framework_domain": "System and Communications Protection",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.14.1",
+      "title": "Identify and correct system flaws",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Remediate Detected Vulnerabilities"
+    },
+    {
+      "control_id": "3.14.2",
+      "title": "Protect against malicious code",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Deploy and maintain anti-malware / malicious-code protection on all systems"
+    },
+    {
+      "control_id": "3.14.3",
+      "title": "Monitor security alerts and advisories",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Detect indicators of compromise and respond to threats"
+    },
+    {
+      "control_id": "3.14.4",
+      "title": "Update malicious code protection",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Deploy and maintain anti-malware / malicious-code protection on all systems"
+    },
+    {
+      "control_id": "3.14.5",
+      "title": "Perform periodic and real-time scans",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "3.14.6",
+      "title": "Monitor systems to detect attacks",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Monitor systems and networks to detect attacks and anomalies"
+    },
+    {
+      "control_id": "3.14.7",
+      "title": "Identify unauthorized system use",
+      "framework_domain": "System and Information Integrity",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    }
+  ],
+  "result": {
+    "candidate_run_id": 71,
+    "promoted": false,
+    "added_framework": "NIST SP 800-171 Rev 2 (Protecting CUI)",
+    "added_join": 55,
+    "added_standalone": 55,
+    "cloned_sets": 2332,
+    "cloned_standalone": 0,
+    "new_controls": 110,
+    "would_join": 55,
+    "would_standalone": 55,
+    "domains_used": [
+      "Access Control & Identity",
+      "Application & Software Security",
+      "Audit & Assurance",
+      "Awareness & Training",
+      "Configuration & Change Management",
+      "Cryptography",
+      "Data Protection & Privacy",
+      "Governance, Leadership & Policy",
+      "Incident Management",
+      "Logging, Monitoring & Detection",
+      "Network & Communications Security",
+      "Operations & IT Service Management",
+      "Physical & Environmental Security",
+      "Risk Management",
+      "Vulnerability & Threat Management"
+    ],
+    "new_domains": [],
+    "evidence_generated": 0,
+    "evidence_merged": 110,
+    "evidence_deduped": 0,
+    "sets_evidence_enriched": 47,
+    "artifacts_total": 22,
+    "artifacts_new": 12,
+    "artifacts_duplicate": 10,
+    "artifacts_new_sample": [
+      {
+        "artifact": "System Security Plan (SSP)",
+        "type": "Plan",
+        "control_ref": "3.12.4"
+      },
+      {
+        "artifact": "Plan of Action & Milestones (POA&M)",
+        "type": "Register",
+        "control_ref": "3.12.2"
+      },
+      {
+        "artifact": "MFA Configuration Evidence",
+        "type": "Configuration",
+        "control_ref": "3.5.3"
+      },
+      {
+        "artifact": "Remote Access / VPN Configuration",
+        "type": "Configuration",
+        "control_ref": "3.1.12"
+      },
+      {
+        "artifact": "Configuration Baselines",
+        "type": "Policy",
+        "control_ref": "3.4.1"
+      },
+      {
+        "artifact": "Least-Functionality / Ports & Services List",
+        "type": "Register",
+        "control_ref": "3.4.6"
+      },
+      {
+        "artifact": "Audit Logging Configuration",
+        "type": "Configuration",
+        "control_ref": "3.3.1"
+      },
+      {
+        "artifact": "Continuous Monitoring Records",
+        "type": "Record",
+        "control_ref": "3.12.3"
+      },
+      {
+        "artifact": "Media Sanitization / Destruction Records",
+        "type": "Record",
+        "control_ref": "3.8.3"
+      },
+      {
+        "artifact": "Physical Access Logs",
+        "type": "Log",
+        "control_ref": "3.10.4"
+      },
+      {
+        "artifact": "Personnel Screening & Termination Records",
+        "type": "Record",
+        "control_ref": "3.9.1"
+      },
+      {
+        "artifact": "Anti-Malware / Endpoint Protection Config",
+        "type": "Configuration",
+        "control_ref": "3.14.2"
+      }
+    ],
+    "artifacts_dup_sample": [
+      {
+        "artifact": "CUI Data Inventory & Flow Map",
+        "type": "Register",
+        "matches": "Data Inventory / Data Map",
+        "in_framework": "GDPR"
+      },
+      {
+        "artifact": "Access Control Policy",
+        "type": "Policy",
+        "matches": "Access Control Policy",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Account & Access Review Records",
+        "type": "Record",
+        "matches": "Access Review Records",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Change Management Records",
+        "type": "Record",
+        "matches": "Change Management Records",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Encryption & Key Management Standard",
+        "type": "Policy",
+        "matches": "Cryptography & Key Management Standard",
+        "in_framework": "SAMA Cyber Security Framework"
+      },
+      {
+        "artifact": "Network Boundary / Segmentation Diagram",
+        "type": "Diagram",
+        "matches": "Network Diagram",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Vulnerability Scan & Remediation Reports",
+        "type": "Report",
+        "matches": "Quarterly Internal Vulnerability Scan Reports",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Incident Response Plan",
+        "type": "Plan",
+        "matches": "Incident Response Plan",
+        "in_framework": "ARAMCO Cybersecurity Compliance Certification (CCC)"
+      },
+      {
+        "artifact": "Incident Response Test Records",
+        "type": "Record",
+        "matches": "Incident Response Test Records",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Security Awareness & Training Records",
+        "type": "Record",
+        "matches": "Security Awareness Training Records",
+        "in_framework": "PCI DSS v4.0.1"
+      }
+    ],
+    "joins_verified_kept": 55,
+    "joins_demoted": 19,
+    "demoted_items": [
+      {
+        "control_id": "3.1.2",
+        "title": "Limit access to authorized transactions",
+        "was_set": "Restrict access to information on a need-to-know basis",
+        "reason": "Access to specific transactions differs"
+      },
+      {
+        "control_id": "3.1.6",
+        "title": "Use non-privileged accounts for non-security functions",
+        "was_set": "Apply the principle of least privilege when granting user access",
+        "reason": "Non-privileged accounts for different functions"
+      },
+      {
+        "control_id": "3.1.15",
+        "title": "Authorize remote privileged commands",
+        "was_set": "Restrict and manage the allocation and use of privileged access rights",
+        "reason": "different activities regarding privilege management"
+      },
+      {
+        "control_id": "3.1.20",
+        "title": "Control connections to external systems",
+        "was_set": "Control access to assets at teleworking sites",
+        "reason": "different activities regarding external systems"
+      },
+      {
+        "control_id": "3.5.5",
+        "title": "Prevent identifier reuse",
+        "was_set": "Disable or remove user accounts after a defined period of inactivity",
+        "reason": "Different activities regarding identifiers"
+      },
+      {
+        "control_id": "3.5.8",
+        "title": "Prohibit password reuse",
+        "was_set": "Password Management System",
+        "reason": "Different activities regarding password management"
+      },
+      {
+        "control_id": "3.5.9",
+        "title": "Allow temporary password with forced change",
+        "was_set": "Establish and enforce a password management policy with complexity requirements",
+        "reason": "Different activities regarding password management"
+      },
+      {
+        "control_id": "3.1.13",
+        "title": "Encrypt remote access sessions",
+        "was_set": "Encrypt sensitive data in transit",
+        "reason": "different focus on access vs data"
+      },
+      {
+        "control_id": "3.13.11",
+        "title": "Employ FIPS-validated cryptography",
+        "was_set": "Adopt cryptographic algorithms from well-established international standards with appropriate key length",
+        "reason": "different focus on standards vs validation"
+      },
+      {
+        "control_id": "3.12.3",
+        "title": "Monitor security controls continuously",
+        "was_set": "Monitor and evaluate the internal control environment including self-assessments",
+        "reason": "Continuous monitoring vs. evaluation"
+      },
+      {
+        "control_id": "3.7.3",
+        "title": "Sanitize equipment for off-site maintenance",
+        "was_set": "Controlled Maintenance",
+        "reason": "Different activities regarding maintenance processes"
+      },
+      {
+        "control_id": "3.10.2",
+        "title": "Protect and monitor the facility",
+        "was_set": "Protect facilities against external and environmental threats such as natural disasters",
+        "reason": "different focus on threats vs. monitoring"
+      },
+      {
+        "control_id": "3.10.5",
+        "title": "Manage physical access devices",
+        "was_set": "Physical Access Authorizations",
+        "reason": "different focus on management vs. authorization"
+      },
+      {
+        "control_id": "3.11.1",
+        "title": "Assess risk from operating systems with CUI",
+        "was_set": "Periodic Risk Assessment of Authentication Controls",
+        "reason": "Different focus on risk assessment types"
+      },
+      {
+        "control_id": "3.12.2",
+        "title": "Develop plans of action",
+        "was_set": "Establish and maintain a documented vulnerability management process/program",
+        "reason": "Different focus on action plans vs process"
+      },
+      {
+        "control_id": "3.14.5",
+        "title": "Perform periodic and real-time scans",
+        "was_set": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+        "reason": "Different focus on scanning methods"
+      },
+      {
+        "control_id": "3.13.4",
+        "title": "Prevent unauthorized shared-resource transfer",
+        "was_set": "Establish formal procedures for information exchange between systems",
+        "reason": "different activities regarding information transfer"
+      },
+      {
+        "control_id": "3.13.6",
+        "title": "Deny network traffic by default",
+        "was_set": "Implement network access control to detect and block unauthorized devices",
+        "reason": "different focus on traffic control"
+      },
+      {
+        "control_id": "3.13.14",
+        "title": "Control VoIP",
+        "was_set": "Manage and control networks to protect against threats",
+        "reason": "different focus on VoIP management"
+      }
+    ],
+    "framework": "NIST SP 800-171 Rev 2 (Protecting CUI)"
+  },
+  "completed": true,
+  "total_seconds": 216.76
+}

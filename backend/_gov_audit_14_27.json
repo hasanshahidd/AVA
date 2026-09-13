@@ -1,0 +1,120 @@
+{
+  "results": [
+    {
+      "set_id": "GOV-015",
+      "verdict": "REVIEW",
+      "loose_members": [],
+      "offtopic_evidence": [
+        "Audit logging configuration evidence",
+        "Log review records and follow-up case documentation"
+      ],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-016",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-017",
+      "verdict": "REVIEW",
+      "loose_members": [
+        {
+          "fw": "HITRUST Common Security Framework",
+          "cid": "05.d",
+          "why": "Scope is authorization for information assets AND facilities; it pulls in physical/facility authorization, which is broader than the logical system-authorization theme of the set."
+        }
+      ],
+      "offtopic_evidence": [
+        "Physical access logs and visitor register",
+        "CCTV deployment and footage retention records"
+      ],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-018",
+      "verdict": "REVIEW",
+      "loose_members": [
+        {
+          "fw": "ISO/IEC 27001:2022",
+          "cid": "A.5.8",
+          "why": "A.5.8 is specifically 'information security IN project management' (embedding security gates into projects), a near-but-different requirement from establishing a generic IT/technology project-management framework. Same evidence (security gates, security sign-off) would not satisfy SBP/MAS generic PM-framework members and vice versa."
+        }
+      ],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-019",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-020",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-021",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-022",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-023",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-024",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-025",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-026",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-027",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    },
+    {
+      "set_id": "GOV-028",
+      "verdict": "ACCURATE",
+      "loose_members": [],
+      "offtopic_evidence": [],
+      "should_merge": []
+    }
+  ]
+}

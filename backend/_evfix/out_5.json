@@ -1,0 +1,87 @@
+{
+ "set_id": "S003",
+ "di": 1,
+ "groups": [
+  {
+   "name": "Technology/ICT risk management framework document",
+   "absorbs": [
+    "IT risk management policy and framework",
+    "ICT risk management framework documentation",
+    "Approved policy and standard addressing Risk Management Program Development",
+    "Technology risk management framework document",
+    "Approved tech risk management framework",
+    "Enterprise Risk Management Framework"
+   ]
+  },
+  {
+   "name": "Risk register with entries, owners, ratings and treatment plans",
+   "absorbs": [
+    "IT risk register with risk assessments and treatment plans",
+    "Risk register with entries, owners, ratings, and treatment plans",
+    "IT Risk Register"
+   ]
+  },
+  {
+   "name": "Risk assessment methodology and analysis reports",
+   "absorbs": [
+    "Risk analysis reports with likelihood and impact assessments",
+    "Risk assessment methodology documentation and approval records"
+   ]
+  },
+  {
+   "name": "Risk response actions and monitoring reports",
+   "absorbs": [
+    "Risk response actions and monitoring reports"
+   ]
+  },
+  {
+   "name": "Risk governance and management body responsibility documentation",
+   "absorbs": [
+    "Internal governance structure documentation",
+    "Management body responsibility assignments",
+    "Roles & responsibilities matrix"
+   ]
+  },
+  {
+   "name": "Board/management approval records for the risk framework",
+   "absorbs": [
+    "Board approval records for ICT risk framework"
+   ]
+  },
+  {
+   "name": "Documented procedure implementing the risk management program / ERM-IT integration",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Risk Management Program",
+    "ERM-IT Risk Integration Procedure"
+   ]
+  },
+  {
+   "name": "Evidence of framework implementation across the organisation",
+   "absorbs": [
+    "Evidence of framework implementation across the organisation"
+   ]
+  },
+  {
+   "name": "Integrated risk reports to the Board",
+   "absorbs": [
+    "Integrated Risk Reports to Board"
+   ]
+  },
+  {
+   "name": "Framework/plan update history",
+   "absorbs": [
+    "Plan update history"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Secure SDLC documentation with security checkpoints",
+   "reason": "SDLC/secure-development evidence, off-topic for an enterprise risk-management framework set"
+  },
+  {
+   "name": "Code review records and security testing results",
+   "reason": "Code review/security testing evidence, off-topic for an enterprise risk-management framework set"
+  }
+ ]
+}

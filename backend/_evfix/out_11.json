@@ -1,0 +1,70 @@
+{
+ "set_id": "S011",
+ "di": 4,
+ "groups": [
+  {
+   "name": "Information access restriction policy and procedures",
+   "absorbs": [
+    "Approved policy and standard addressing Information Access Restriction",
+    "Documented procedure or work instruction implementing Information Access Restriction"
+   ]
+  },
+  {
+   "name": "Role-based access control configuration / access control lists",
+   "absorbs": [
+    "Role-based access control (RBAC) configuration",
+    "Role-based access controls for transaction validation",
+    "Role-based access configurations for confidential systems",
+    "Data Access Restriction Configuration",
+    "Attribute-Based Access Control Configuration",
+    "Access control lists for confidential data repositories"
+   ]
+  },
+  {
+   "name": "Access control / role-to-permission matrix",
+   "absorbs": [
+    "Access control matrix with role-to-permission mapping for relevant systems",
+    "Application Access Control Matrix"
+   ]
+  },
+  {
+   "name": "User access provisioning and review records",
+   "absorbs": [
+    "User access provisioning, modification, and review records",
+    "Application Access Review Records",
+    "Periodic access review results for confidential information"
+   ]
+  },
+  {
+   "name": "Access request, justification and approval records",
+   "absorbs": [
+    "Access justification records",
+    "Confidential information access request and approval records"
+   ]
+  },
+  {
+   "name": "Need-to-know / least-privilege enforcement evidence",
+   "absorbs": [
+    "Need-to-know enforcement evidence",
+    "Least Privilege Assessment",
+    "Restricted access list for support staff"
+   ]
+  },
+  {
+   "name": "Access decision audit log",
+   "absorbs": [
+    "Access Decision Audit Log"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Physical access logs (badge/biometric) and visitor register",
+   "reason": "Physical/facility access control, not need-to-know information access restriction"
+  },
+  {
+   "name": "CCTV deployment evidence and footage retention records",
+   "reason": "Physical surveillance evidence, off-topic for logical information access restriction"
+  }
+ ]
+}

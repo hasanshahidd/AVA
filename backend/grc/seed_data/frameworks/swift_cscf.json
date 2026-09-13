@@ -1,0 +1,500 @@
+{
+ "metadata": {
+  "name": "SWIFT Customer Security Controls Framework",
+  "description": "The SWIFT Customer Security Controls Framework (CSCF) establishes mandatory and advisory security controls for all SWIFT users to secure their local SWIFT-related infrastructure and protect the wider SWIFT network from cyber threats.",
+  "version": "v2024",
+  "source_organization": "SWIFT (Society for Worldwide Interbank Financial Telecommunication)",
+  "effective_date": "2024-01-01",
+  "classification": "certification",
+  "framework_type": "certification",
+  "classification_confidence": 0.98,
+  "classification_reasoning": "The SWIFT CSCF is a certification framework requiring annual attestation and independent assessment. SWIFT users must attest compliance annually, with mandatory controls that must be implemented.",
+  "framework_purpose": "To establish mandatory security controls for SWIFT users to protect the global financial messaging network and reduce cyber fraud risks in financial transactions.",
+  "framework_scope": "All SWIFT users including banks, financial institutions, corporates, and service providers connected to the SWIFT network.",
+  "framework_objectives": [
+   "Secure the local SWIFT environment against cyber attacks",
+   "Protect credentials and prevent unauthorized access",
+   "Detect anomalous activity on systems and transactions",
+   "Respond to and contain cyber incidents effectively",
+   "Share threat intelligence with the SWIFT community"
+  ],
+  "target_audience": "CISOs, IT Security Teams, SWIFT Administrators, Compliance Officers, and Internal Auditors of SWIFT member institutions",
+  "certification_body": "SWIFT (Society for Worldwide Interbank Financial Telecommunication)",
+  "certification_validity_period": "1 year",
+  "certification_levels": [
+   "Architecture Type A1",
+   "Architecture Type A2",
+   "Architecture Type A3",
+   "Architecture Type A4",
+   "Architecture Type B"
+  ],
+  "certification_lifecycle": [
+   "Self-Assessment",
+   "Independent Assessment",
+   "Attestation Submission",
+   "Annual Re-attestation"
+  ],
+  "required_artifacts": [
+   "CSCF Compliance Report",
+   "Independent Assessment Report",
+   "Attestation Letter",
+   "Evidence Documentation"
+  ],
+  "regulatory_authority": null,
+  "compliance_deadline": null,
+  "penalty_for_non_compliance": "Non-compliance may result in removal from the SWIFT network, reputational damage, and increased scrutiny from regulators and counterparties.",
+  "adoption_approach": [
+   "Identify SWIFT architecture type and applicable controls",
+   "Conduct gap assessment against mandatory controls",
+   "Implement mandatory controls first, then advisory controls",
+   "Complete self-assessment using SWIFT's KYC-SA application",
+   "Engage independent assessor for validation",
+   "Submit attestation to SWIFT before deadline"
+  ],
+  "hierarchy_structure": {
+   "levels": [
+    "Control Objective",
+    "Control",
+    "Implementation Guideline"
+   ],
+   "numbering_pattern": "N.N"
+  },
+  "exported_at": "2026-01-28T14:00:00.000000",
+  "source_framework_id": null,
+  "total_controls": 32,
+  "repaired": "control ids/titles corrected against the published standard"
+ },
+ "controls": [
+  {
+   "control_id": "1.1",
+   "original_reference": "1.1",
+   "title": "SWIFT Environment Protection",
+   "description": "Ensure the protection of the user's local SWIFT infrastructure from potentially compromised elements of the general IT environment and external environment.",
+   "full_text": "The user's SWIFT infrastructure must be protected from potentially compromised elements of the general IT environment and external environment. This control ensures segregation of the SWIFT environment from the general IT environment through network segmentation, firewalls, and access controls.",
+   "domain": "Secure Your Environment",
+   "parent_section": "1",
+   "evidence_requirements": [
+    "Network diagrams showing SWIFT zone segregation",
+    "Firewall rules documentation",
+    "Jump server configuration",
+    "Access control lists"
+   ]
+  },
+  {
+   "control_id": "1.2",
+   "original_reference": "1.2",
+   "title": "Operating System Privileged Account Control",
+   "description": "Restrict and control the allocation and usage of administrator-level operating system accounts.",
+   "full_text": "Administrator-level operating system accounts must be restricted to personnel with a genuine business need, with controlled and monitored usage. Privileged access should be limited, logged, and regularly reviewed.",
+   "domain": "Secure Your Environment",
+   "parent_section": "1",
+   "evidence_requirements": [
+    "Privileged account inventory",
+    "Access request records",
+    "Periodic access review documentation",
+    "Privileged access management logs"
+   ]
+  },
+  {
+   "control_id": "1.3",
+   "original_reference": "1.3",
+   "title": "Virtualisation or Cloud Platform Protection",
+   "description": "Secure virtualisation or cloud platforms hosting SWIFT-related components to the same level as physical systems.",
+   "full_text": "Where virtualisation or cloud hosting is used for SWIFT-related components, the underlying platform must be secured to at least the same standard as physical SWIFT infrastructure. This includes protecting the hypervisor or cloud control plane, virtual switches, management interfaces, and the isolation between SWIFT and non-SWIFT workloads.",
+   "domain": "Secure Your Environment",
+   "parent_section": "1"
+  },
+  {
+   "control_id": "1.4",
+   "original_reference": "1.4",
+   "title": "Restriction of Internet Access",
+   "description": "Control and limit general internet access from operator PCs and systems within the secure zone.",
+   "full_text": "Operator PCs used to access SWIFT applications and systems within the secure zone must not have direct general internet access. Where internet access is required for business purposes it must be provided through a separate, physically or logically isolated system or a controlled and restricted egress path.",
+   "domain": "Secure Your Environment",
+   "parent_section": "1",
+   "evidence_requirements": [
+    "Proxy/firewall configuration blocking internet",
+    "Network architecture documentation",
+    "Evidence of separate browsing stations"
+   ]
+  },
+  {
+   "control_id": "1.5A",
+   "original_reference": "1.5A",
+   "title": "Customer Environment Protection",
+   "description": "Ensure the protection of the customer's connectivity infrastructure from the external environment and from potentially compromised elements of the general IT environment.",
+   "full_text": "The customer connectivity infrastructure operated by a service provider on behalf of its customers must be protected from the external environment and from potentially compromised elements of the general IT environment, using segmentation and access restrictions equivalent to those required for a user's own secure zone. This control is advisory and is directed at service providers.",
+   "domain": "Secure Your Environment",
+   "parent_section": "1"
+  },
+  {
+   "control_id": "2.1",
+   "original_reference": "2.1",
+   "title": "Internal Data Flow Security",
+   "description": "Ensure the confidentiality, integrity, and authenticity of application data flows between local SWIFT-related components.",
+   "full_text": "Data flowing between components within the local SWIFT infrastructure must be protected to ensure confidentiality, integrity, and authenticity. This includes implementing encryption, integrity checks, and authentication between SWIFT components.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Encryption configuration documentation",
+    "TLS/SSL certificate inventory",
+    "Data flow diagrams with encryption points"
+   ]
+  },
+  {
+   "control_id": "2.2",
+   "original_reference": "2.2",
+   "title": "Security Updates",
+   "description": "Minimise the occurrence of known technical vulnerabilities on operator PCs and within the local SWIFT infrastructure by ensuring vendor support, applying mandatory software updates, and applying timely security updates aligned to the assessed risk.",
+   "full_text": "Security updates must be applied in a timely manner to all SWIFT-related components including operating systems, database software, and application software. A patch management process must be established and followed, and components must remain within vendor support.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Patch management policy",
+    "Patch deployment records",
+    "Vulnerability assessment reports",
+    "SWIFT component version inventory"
+   ]
+  },
+  {
+   "control_id": "2.3",
+   "original_reference": "2.3",
+   "title": "System Hardening",
+   "description": "Reduce the cyber attack surface of SWIFT-related components by performing system hardening.",
+   "full_text": "All SWIFT-related systems must be hardened by disabling unnecessary services, removing unnecessary software, and configuring security settings according to vendor guidelines and industry best practices.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Hardening standards documentation",
+    "System configuration baselines",
+    "Hardening verification reports",
+    "Removed services documentation"
+   ]
+  },
+  {
+   "control_id": "2.4A",
+   "original_reference": "2.4A",
+   "title": "Back Office Data Flow Security",
+   "description": "Ensure the confidentiality, integrity, and mutual authenticity of data flows between local or remote SWIFT infrastructure components and the back office first hops they connect to.",
+   "full_text": "Data flowing between the SWIFT infrastructure and connected back-office applications or middleware must be protected. Connections should use encrypted channels and mutually authenticated interfaces.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2"
+  },
+  {
+   "control_id": "2.5A",
+   "original_reference": "2.5A",
+   "title": "External Transmission Data Protection",
+   "description": "Protect the confidentiality of SWIFT-related data transmitted and residing outside of the secure zone.",
+   "full_text": "SWIFT-related data transmitted to, or stored outside of, the secure zone - including data sent to external parties or service providers and data held on backup media - must be protected using encryption and secure transmission protocols.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "External transmission encryption evidence",
+    "Secure file transfer logs",
+    "Third-party connectivity agreements"
+   ]
+  },
+  {
+   "control_id": "2.6",
+   "original_reference": "2.6",
+   "title": "Operator Session Confidentiality and Integrity",
+   "description": "Protect the confidentiality and integrity of interactive operator sessions that connect to the local or remote SWIFT infrastructure.",
+   "full_text": "Operator sessions to SWIFT infrastructure must be protected using encrypted connections (for example RDP with NLA, or SSH), with session timeouts and re-authentication. Session data must be protected from eavesdropping and tampering.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Remote access encryption configuration",
+    "RDP/SSH security settings",
+    "Session encryption evidence"
+   ]
+  },
+  {
+   "control_id": "2.7",
+   "original_reference": "2.7",
+   "title": "Vulnerability Scanning",
+   "description": "Identify known vulnerabilities within the local SWIFT environment by implementing a regular vulnerability scanning process, and act upon the results.",
+   "full_text": "Regular vulnerability scans must be performed on all SWIFT-related systems to identify known vulnerabilities. Identified vulnerabilities must be assessed and remediated based on risk.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Vulnerability scan reports",
+    "Remediation tracking records",
+    "Scan schedule documentation",
+    "Risk acceptance records"
+   ]
+  },
+  {
+   "control_id": "2.8",
+   "original_reference": "2.8",
+   "title": "Critical Activity Outsourcing",
+   "description": "Ensure protection of the local SWIFT infrastructure from risks exposed by the outsourcing of critical activities.",
+   "full_text": "Where critical SWIFT-related activities are outsourced to a third party, the outsourcing arrangement must impose security controls on the provider that are at least equivalent to those the user would apply in-house, and the provider's compliance must be evidenced and periodically reviewed.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2"
+  },
+  {
+   "control_id": "2.9A",
+   "original_reference": "2.9A",
+   "title": "Transaction Business Controls",
+   "description": "Ensure outbound transaction activity within the expected bounds of normal business.",
+   "full_text": "Business controls must be implemented to restrict outbound transaction activity to the bounds of normal business, detect anomalous transaction activity, and prevent fraudulent payments. This includes verification processes, value and volume limits, business-hours restrictions, and dual authorisation.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Transaction verification procedures",
+    "Payment limit configurations",
+    "Dual authorization evidence",
+    "Anomaly detection rules"
+   ]
+  },
+  {
+   "control_id": "2.10",
+   "original_reference": "2.10",
+   "title": "Application Hardening",
+   "description": "Reduce the attack surface of SWIFT-related components by performing application hardening on the SWIFT-compliant messaging and communication interfaces and related applications.",
+   "full_text": "SWIFT-related applications must be hardened by configuring the security settings recommended by SWIFT and the vendor, disabling unnecessary features and interfaces, and restricting the accounts and functions available within the application.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "Application hardening checklists",
+    "Security configuration documentation",
+    "Feature enablement review"
+   ]
+  },
+  {
+   "control_id": "2.11A",
+   "original_reference": "2.11A",
+   "title": "RMA Business Controls",
+   "description": "Restrict transaction activity to validated and approved business counterparties.",
+   "full_text": "Relationship Management Application (RMA) authorisations must be actively managed so that transaction activity is restricted to validated and approved business counterparties. RMA records must be periodically reviewed and unused or unnecessary authorisations revoked.",
+   "domain": "Secure Your Environment",
+   "parent_section": "2",
+   "evidence_requirements": [
+    "RMA review records",
+    "Correspondent authorization documentation",
+    "RMA change management logs"
+   ]
+  },
+  {
+   "control_id": "3.1",
+   "original_reference": "3.1",
+   "title": "Physical Security",
+   "description": "Prevent unauthorised physical access to sensitive equipment, workplace environments, hosting sites, and storage.",
+   "full_text": "Physical access to SWIFT equipment, operator workplaces, hosting sites, and storage of sensitive material must be restricted to authorised personnel only. Physical security controls including access control, surveillance, visitor management, and environmental protection must be implemented.",
+   "domain": "Secure Your Environment",
+   "parent_section": "3",
+   "evidence_requirements": [
+    "Physical access control records",
+    "Data center access logs",
+    "Security camera evidence",
+    "Visitor management logs"
+   ]
+  },
+  {
+   "control_id": "4.1",
+   "original_reference": "4.1",
+   "title": "Password Policy",
+   "description": "Ensure passwords are sufficiently resistant against common password attacks by implementing and enforcing an effective password policy.",
+   "full_text": "All application and operating system accounts that access the SWIFT environment must enforce a password policy that meets or exceeds the CSCF parameters for length, complexity, change frequency, reuse restriction, and default-password replacement.",
+   "domain": "Know and Limit Access",
+   "parent_section": "4",
+   "evidence_requirements": [
+    "Password policy documentation",
+    "System password configuration",
+    "Password compliance reports"
+   ]
+  },
+  {
+   "control_id": "4.2",
+   "original_reference": "4.2",
+   "title": "Multi-Factor Authentication",
+   "description": "Prevent that a compromise of a single authentication factor allows access into the SWIFT systems, by implementing multi-factor authentication.",
+   "full_text": "Multi-factor authentication must be implemented for interactive operator access to SWIFT-related applications and to the operating systems hosting them, so that compromise of any single authentication factor does not by itself grant access. At least two independent factors must be required.",
+   "domain": "Know and Limit Access",
+   "parent_section": "4",
+   "evidence_requirements": [
+    "MFA configuration documentation",
+    "Token/device inventory",
+    "MFA enrollment records",
+    "Authentication logs"
+   ]
+  },
+  {
+   "control_id": "5.1",
+   "original_reference": "5.1",
+   "title": "Logical Access Control",
+   "description": "Enforce the security principles of need-to-know access, least privilege, and separation of duties for operator accounts.",
+   "full_text": "Accounts granting access to SWIFT-related components must be granted on a need-to-know basis with the least privilege required, and duties must be separated so that no single operator can both create and approve a transaction or both administer and audit the system. Accounts must be formally requested, approved, periodically reviewed, and revoked promptly on role change or departure.",
+   "domain": "Know and Limit Access",
+   "parent_section": "5"
+  },
+  {
+   "control_id": "5.2",
+   "original_reference": "5.2",
+   "title": "Token Management",
+   "description": "Ensure the proper management, tracking, and use of connected and disconnected hardware authentication or personal tokens (when tokens are used).",
+   "full_text": "Hardware authentication and personal tokens used with SWIFT-related systems must be inventoried, assigned to named individuals, physically protected when not in use, not left connected when unattended, and returned or destroyed when no longer required.",
+   "domain": "Know and Limit Access",
+   "parent_section": "5",
+   "evidence_requirements": [
+    "Token inventory",
+    "Token custody procedures",
+    "Key lifecycle documentation",
+    "Token destruction records"
+   ]
+  },
+  {
+   "control_id": "5.3A",
+   "original_reference": "5.3A",
+   "title": "Staff Screening Process",
+   "description": "To ensure the trustworthiness of staff operating the local SWIFT environment by performing regular staff screening.",
+   "full_text": "Staff with access to the local SWIFT environment should be screened before being granted access and re-screened periodically thereafter, to the extent permitted by local law. Screening should be proportionate to the sensitivity of the role.",
+   "domain": "Know and Limit Access",
+   "parent_section": "5"
+  },
+  {
+   "control_id": "5.4",
+   "original_reference": "5.4",
+   "title": "Physical and Logical Password Storage",
+   "description": "Protect physically and logically the repository of recorded passwords.",
+   "full_text": "Where passwords for SWIFT-related accounts are recorded - whether in a password vault, an encrypted file, or a sealed physical envelope - the repository must be protected both physically and logically, with access restricted to authorised custodians and any access recorded.",
+   "domain": "Know and Limit Access",
+   "parent_section": "5"
+  },
+  {
+   "control_id": "6.1",
+   "original_reference": "6.1",
+   "title": "Malware Protection",
+   "description": "Ensure that the local SWIFT infrastructure is protected against malware and act upon results.",
+   "full_text": "All SWIFT-related systems must be protected with anti-malware software. Malware signatures and engines must be kept current, scans performed regularly, and detections investigated and acted upon.",
+   "domain": "Detect and Respond",
+   "parent_section": "6",
+   "evidence_requirements": [
+    "Anti-malware deployment evidence",
+    "Definition update logs",
+    "Scan reports",
+    "Malware incident records"
+   ]
+  },
+  {
+   "control_id": "6.2",
+   "original_reference": "6.2",
+   "title": "Software Integrity",
+   "description": "Ensure the software integrity of the SWIFT-related components and act upon results.",
+   "full_text": "The integrity of SWIFT-related software must be verified using the integrity-checking mechanism provided by the vendor, at installation and at regular intervals thereafter. Unexpected results must be investigated and acted upon.",
+   "domain": "Detect and Respond",
+   "parent_section": "6",
+   "evidence_requirements": [
+    "Software integrity verification records",
+    "Hash/signature verification",
+    "Change control documentation",
+    "File integrity monitoring"
+   ]
+  },
+  {
+   "control_id": "6.3",
+   "original_reference": "6.3",
+   "title": "Database Integrity",
+   "description": "Ensure the integrity of the database records for the SWIFT messaging interface or the customer connector and act upon results.",
+   "full_text": "The integrity of the database records underpinning the SWIFT messaging interface or customer connector must be verified using the integrity-checking mechanism provided by the vendor, at regular intervals. Unexpected changes must be investigated and acted upon.",
+   "domain": "Detect and Respond",
+   "parent_section": "6",
+   "evidence_requirements": [
+    "Database access controls",
+    "Audit logging configuration",
+    "Integrity monitoring tools",
+    "Change detection records"
+   ]
+  },
+  {
+   "control_id": "6.4",
+   "original_reference": "6.4",
+   "title": "Logging and Monitoring",
+   "description": "Record security events and detect anomalous actions and operations within the local SWIFT environment.",
+   "full_text": "Security events on all SWIFT-related systems and applications must be logged, retained for a defined period sufficient to support investigation, protected against tampering and deletion, and reviewed or monitored so that anomalous actions and operations are detected.",
+   "domain": "Detect and Respond",
+   "parent_section": "6",
+   "evidence_requirements": [
+    "Logging configuration",
+    "Log retention policy",
+    "SIEM integration evidence",
+    "Log review records"
+   ]
+  },
+  {
+   "control_id": "6.5A",
+   "original_reference": "6.5A",
+   "title": "Intrusion Detection",
+   "description": "Detect and contain anomalous network activity into and within the local or remote SWIFT environment.",
+   "full_text": "Intrusion detection capability should be deployed to detect and contain anomalous network activity entering or occurring within the SWIFT environment. Alerts should be reviewed and responded to promptly.",
+   "domain": "Detect and Respond",
+   "parent_section": "6",
+   "evidence_requirements": [
+    "IDS/IPS deployment documentation",
+    "Alert configuration",
+    "Incident response records",
+    "Detection rule tuning records"
+   ]
+  },
+  {
+   "control_id": "7.1",
+   "original_reference": "7.1",
+   "title": "Cyber Incident Response Planning",
+   "description": "Ensure a consistent and effective approach for the management of cyber incidents.",
+   "full_text": "A cyber incident response plan covering SWIFT-related incidents must be documented, assigned to named roles, and exercised at least annually. It must define detection, escalation, containment, recovery, and the notification of SWIFT and relevant authorities.",
+   "domain": "Detect and Respond",
+   "parent_section": "7",
+   "evidence_requirements": [
+    "Incident response plan documentation",
+    "Tabletop exercise records",
+    "SWIFT escalation procedures",
+    "Communication templates"
+   ]
+  },
+  {
+   "control_id": "7.2",
+   "original_reference": "7.2",
+   "title": "Security Training and Awareness",
+   "description": "Ensure all staff are aware of and fulfil their security responsibilities by performing regular security training and awareness activities.",
+   "full_text": "Staff with a role in the SWIFT environment must receive security awareness training on appointment and at least annually thereafter, with role-specific training for operators and administrators covering SWIFT-related threats and their own security responsibilities.",
+   "domain": "Detect and Respond",
+   "parent_section": "7",
+   "evidence_requirements": [
+    "Training program documentation",
+    "Training completion records",
+    "Awareness campaign materials",
+    "Training effectiveness assessments"
+   ]
+  },
+  {
+   "control_id": "7.3A",
+   "original_reference": "7.3A",
+   "title": "Penetration Testing",
+   "description": "Validate the operational security configuration and identify security gaps by performing penetration testing.",
+   "full_text": "Penetration testing should be performed at least annually against the SWIFT-related infrastructure, covering the application, host, and network layers, to validate the operational security configuration and identify gaps. Findings should be tracked to remediation.",
+   "domain": "Detect and Respond",
+   "parent_section": "7",
+   "evidence_requirements": [
+    "Penetration test reports",
+    "Remediation tracking",
+    "Test scope documentation",
+    "Retesting evidence"
+   ]
+  },
+  {
+   "control_id": "7.4A",
+   "original_reference": "7.4A",
+   "title": "Scenario-based Risk Assessment",
+   "description": "Evaluate the risk and readiness of the organisation based on plausible cyber attack scenarios.",
+   "full_text": "A scenario-based risk assessment should be performed at least annually using plausible cyber attack scenarios against the SWIFT environment, to evaluate the organisation's exposure and readiness and to drive improvements to controls and response plans.",
+   "domain": "Detect and Respond",
+   "parent_section": "7",
+   "evidence_requirements": [
+    "Risk assessment reports",
+    "Threat scenario documentation",
+    "Risk treatment plans",
+    "Risk register updates"
+   ]
+  }
+ ]
+}

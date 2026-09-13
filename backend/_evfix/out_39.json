@@ -1,0 +1,62 @@
+{
+ "set_id": "S003",
+ "di": 18,
+ "groups": [
+  {
+   "name": "Threat intelligence procedure / programme documentation",
+   "absorbs": [
+    "Threat Intelligence Procedure",
+    "Cyber threat intelligence programme documentation",
+    "Threat Intelligence Gathering Procedure"
+   ]
+  },
+  {
+   "name": "Threat intelligence sources inventory / register",
+   "absorbs": [
+    "Threat Intelligence Sources Inventory",
+    "Threat Intelligence Source Register"
+   ]
+  },
+  {
+   "name": "Threat intelligence reports / analysis",
+   "absorbs": [
+    "Threat Landscape Report",
+    "Threat intelligence analysis reports",
+    "Threat Intelligence Reports",
+    "Threat reports"
+   ]
+  },
+  {
+   "name": "Threat intelligence platform dashboard",
+   "absorbs": [
+    "TI Platform Dashboard Screenshot"
+   ]
+  },
+  {
+   "name": "Indicator of compromise ingestion / attack indicator log",
+   "absorbs": [
+    "IOC Ingestion Log",
+    "Ecosystem Attack Indicator Log"
+   ]
+  },
+  {
+   "name": "Threat brief distribution record",
+   "absorbs": [
+    "Threat Brief Distribution Record"
+   ]
+  },
+  {
+   "name": "Threat intelligence feeds",
+   "absorbs": [
+    "Threat intelligence feeds"
+   ]
+  },
+  {
+   "name": "ISAC / threat-sharing membership",
+   "absorbs": [
+    "ISAC membership"
+   ]
+  }
+ ],
+ "excluded": []
+}

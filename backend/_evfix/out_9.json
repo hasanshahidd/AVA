@@ -1,0 +1,74 @@
+{
+ "set_id": "S014",
+ "di": 3,
+ "groups": [
+  {
+   "name": "Approved privacy monitoring/auditing policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Privacy Monitoring and Auditing"
+   ]
+  },
+  {
+   "name": "Documented privacy monitoring/auditing procedure",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Privacy Monitoring and"
+   ]
+  },
+  {
+   "name": "Audit logging configuration evidence",
+   "absorbs": [
+    "Audit logging configuration evidence"
+   ]
+  },
+  {
+   "name": "Log review records and follow-up case documentation",
+   "absorbs": [
+    "Log review records and follow-up case documentation"
+   ]
+  },
+  {
+   "name": "Audit plan, reports, and assessment records",
+   "absorbs": [
+    "Audit plan, reports with scope, findings, and remediation tracking",
+    "Compliance audit reports and assessment records"
+   ]
+  },
+  {
+   "name": "Published privacy notice/statement with version history",
+   "absorbs": [
+    "Privacy notice/statement published to data subjects with version history"
+   ]
+  },
+  {
+   "name": "Documented compliance monitoring and audit demonstrating compliance",
+   "absorbs": [
+    "Documented Compliance Monitoring and Audit demonstrating compliance"
+   ]
+  },
+  {
+   "name": "Organizational role/accountability artifacts (mandates, RACI, charters)",
+   "absorbs": [
+    "Organizational artifacts: role mandates, RACI, job descriptions, committee charters"
+   ]
+  },
+  {
+   "name": "Performance metrics/KPI dashboard with review records",
+   "absorbs": [
+    "Performance metrics/KPI dashboard with targets, measurements, and review records"
+   ]
+  },
+  {
+   "name": "Business intelligence dashboards, analytics register, and reports",
+   "absorbs": [
+    "Business intelligence artifacts: dashboards, analytics use-case register, and reports"
+   ]
+  },
+  {
+   "name": "Privacy artifacts",
+   "absorbs": [
+    "Privacy artifacts"
+   ]
+  }
+ ],
+ "excluded": []
+}

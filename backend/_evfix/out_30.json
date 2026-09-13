@@ -1,0 +1,140 @@
+{
+ "set_id": "S001",
+ "di": 16,
+ "groups": [
+  {
+   "name": "Training/awareness content and materials",
+   "absorbs": [
+    "Security awareness training materials",
+    "Awareness materials",
+    "Awareness materials",
+    "Awareness materials",
+    "Training materials",
+    "Awareness campaign materials",
+    "Training content and materials",
+    "Awareness Content Library",
+    "Training Content Library",
+    "Awareness Campaign Collateral"
+   ]
+  },
+  {
+   "name": "Role-specific/role-based training content",
+   "absorbs": [
+    "Role-Specific Awareness Content",
+    "Role-Based Training Records"
+   ]
+  },
+  {
+   "name": "Training program documentation / plan",
+   "absorbs": [
+    "Training program documentation",
+    "Training program documentation",
+    "Training program documentation",
+    "Training program documentation",
+    "Training program content and materials",
+    "IT security awareness training programme materials",
+    "ICT security awareness programme content",
+    "Cybersecurity training program and curriculum",
+    "Security awareness program documentation",
+    "Training program",
+    "Security Awareness Training Plan",
+    "Annual training schedule",
+    "Documented Information Security Training"
+   ]
+  },
+  {
+   "name": "Formal security awareness program",
+   "absorbs": [
+    "Formal Security Awareness Program"
+   ]
+  },
+  {
+   "name": "Training completion / attendance records",
+   "absorbs": [
+    "Training completion records",
+    "Training completion records",
+    "Training completion records",
+    "Training completion records",
+    "Training completion records",
+    "Training completion records and tracking",
+    "Training completion records for all staff",
+    "Training attendance records",
+    "Training attendance and completion records",
+    "Training attendance records with dates",
+    "Completion records",
+    "LMS Completion Report"
+   ]
+  },
+  {
+   "name": "Phishing simulation / awareness exercise results",
+   "absorbs": [
+    "Phishing simulation results",
+    "Phishing simulation and awareness exercise results",
+    "Phishing Simulation Results"
+   ]
+  },
+  {
+   "name": "Training effectiveness / awareness assessment results",
+   "absorbs": [
+    "Training effectiveness assessments",
+    "Training effectiveness assessments",
+    "Training effectiveness assessments",
+    "Assessment results measuring security awareness",
+    "Training Effectiveness Metrics"
+   ]
+  },
+  {
+   "name": "Awareness policy and procedure documentation",
+   "absorbs": [
+    "Cyber hygiene policy and practices documentation",
+    "Approved policy and standard addressing Information Security Awareness",
+    "Documented procedure or work instruction implementing Information Security Awareness"
+   ]
+  },
+  {
+   "name": "Awareness program review records",
+   "absorbs": [
+    "Program Review Records",
+    "Program review records"
+   ]
+  },
+  {
+   "name": "Senior management training evidence",
+   "absorbs": [
+    "Senior management training evidence"
+   ]
+  },
+  {
+   "name": "Specialized SOX training documentation",
+   "absorbs": [
+    "Specialized SOX training documentation"
+   ]
+  },
+  {
+   "name": "Non-compliance escalation evidence",
+   "absorbs": [
+    "Non-compliance escalation evidence"
+   ]
+  },
+  {
+   "name": "General compliance evidence",
+   "absorbs": [
+    "Evidence of compliance"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Third-party/vendor contract evidence, not awareness/training for system users"
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management evidence, off-topic for awareness training set"
+  },
+  {
+   "name": "NCA assessment/compliance records (conducted by NCA, not NDMO)",
+   "reason": "External regulator (NCA) assessment record, not training/awareness evidence"
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+{
+ "set_id": "S024",
+ "di": 5,
+ "groups": [
+  {
+   "name": "Accounting of disclosures policy and procedures",
+   "absorbs": [
+    "Accounting of disclosures procedures",
+    "Approved policy and standard addressing Accounting of Disclosures",
+    "Documented procedure or work instruction implementing Accounting of Disclosures"
+   ]
+  },
+  {
+   "name": "Disclosure tracking system and log",
+   "absorbs": [
+    "Disclosure tracking system and log"
+   ]
+  },
+  {
+   "name": "Disclosure request response records",
+   "absorbs": [
+    "Disclosure request response records"
+   ]
+  },
+  {
+   "name": "Six-year disclosure history maintenance evidence",
+   "absorbs": [
+    "Six-year disclosure history maintenance evidence"
+   ]
+  },
+  {
+   "name": "Awareness communications informing personnel of accounting of disclosures",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Periodic review records",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Executed agreements with required security clauses and signature records",
+   "reason": "Signed agreements/security-clause records are contract evidence, off-topic for maintaining an accounting of disclosures."
+  }
+ ]
+}

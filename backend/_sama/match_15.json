@@ -1,0 +1,26 @@
+[
+ {
+  "i": 24,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Meta-control: define cyber security requirements within HR processes; no set matches this generic requirement"
+ },
+ {
+  "i": 25,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Meta-control: implement defined cyber security requirements in HR processes; not equivalent to any specific set"
+ },
+ {
+  "i": 26,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Maturity/measurement meta-control on HR process effectiveness; no cross-framework equivalent"
+ },
+ {
+  "i": 27,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Monitoring meta-control on HR process effectiveness; no cross-framework equivalent"
+ }
+]

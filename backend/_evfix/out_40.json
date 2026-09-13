@@ -1,0 +1,141 @@
+{
+ "set_id": "S007",
+ "di": 18,
+ "groups": [
+  {
+   "name": "Anti-malware deployment / coverage inventory",
+   "absorbs": [
+    "Anti-malware deployment inventory",
+    "Anti-malware deployment",
+    "Anti-malware deployment",
+    "Anti-malware deployment",
+    "Anti-malware deployment coverage",
+    "Anti-malware deployment evidence",
+    "Anti-malware deployment evidence",
+    "Anti-malware controls inventory",
+    "Endpoint protection deployment records",
+    "Endpoint protection deployment records",
+    "Anti-Malware Coverage Report",
+    "System Component Inventory with AM Status",
+    "Anti-Malware/EDR Coverage Report",
+    "Endpoint protection coverage reports",
+    "Endpoint/network/user-level anti-malware controls inventory"
+   ]
+  },
+  {
+   "name": "Anti-malware solution / product documentation",
+   "absorbs": [
+    "Anti-malware solution documentation",
+    "Anti-malware solution documentation"
+   ]
+  },
+  {
+   "name": "Signature / definition update configuration and logs",
+   "absorbs": [
+    "Malware definition update records",
+    "Anti-malware signature update logs",
+    "Update configuration",
+    "Definition update configuration",
+    "Definition update logs",
+    "Update configuration",
+    "Signature/Definition Update Status"
+   ]
+  },
+  {
+   "name": "Malware scan reports",
+   "absorbs": [
+    "Malware scan reports",
+    "Scheduled scan reports",
+    "Scan reports",
+    "Periodic malware scanning reports",
+    "Scan reports",
+    "Scan reports",
+    "Scan reports"
+   ]
+  },
+  {
+   "name": "Malware detection / incident records and logs",
+   "absorbs": [
+    "Malware incident records",
+    "Malware incident records",
+    "Detection logs",
+    "Malware Detection and Response Log"
+   ]
+  },
+  {
+   "name": "Real-time / on-access protection configuration",
+   "absorbs": [
+    "Real-time protection configuration"
+   ]
+  },
+  {
+   "name": "Removable media scanning configuration",
+   "absorbs": [
+    "Removable media scanning configuration",
+    "Removable Media AV Scan Configuration"
+   ]
+  },
+  {
+   "name": "Auto-run disable evidence",
+   "absorbs": [
+    "Auto-run disable evidence"
+   ]
+  },
+  {
+   "name": "Anti-malware alert configuration",
+   "absorbs": [
+    "Anti-malware alert configuration"
+   ]
+  },
+  {
+   "name": "Malware awareness / user training records",
+   "absorbs": [
+    "Malware awareness training records",
+    "User Awareness Training - Malware Module",
+    "Training attendance records with dates"
+   ]
+  },
+  {
+   "name": "Pre-transmission / inbound scanning configuration",
+   "absorbs": [
+    "Pre-transmission scanning configuration"
+   ]
+  },
+  {
+   "name": "Endpoint agent configuration export",
+   "absorbs": [
+    "Endpoint Agent Configuration Export"
+   ]
+  },
+  {
+   "name": "Anti-malware exception list",
+   "absorbs": [
+    "Exception List per 5.2.3"
+   ]
+  },
+  {
+   "name": "Email anti-malware scanning report",
+   "absorbs": [
+    "Email Anti-Malware Scanning Report"
+   ]
+  },
+  {
+   "name": "Malware protection policy and procedure",
+   "absorbs": [
+    "Malware Protection Policy",
+    "Approved policy and standard addressing Controls Against Malicious Code",
+    "Documented procedure or work instruction implementing Controls Against Malicious"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Business Continuity Plan with RTO/RPO targets and recovery procedures",
+   "reason": "BCP/disaster-recovery artifact, not anti-malware protection evidence"
+  },
+  {
+   "name": "BCP test exercise records and post-test review documentation",
+   "reason": "BCP testing artifact, off-topic for anti-malware set"
+  }
+ ]
+}

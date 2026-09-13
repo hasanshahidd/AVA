@@ -1,0 +1,68 @@
+{
+ "set_id": "S018",
+ "di": 5,
+ "groups": [
+  {
+   "name": "Records protection policy / Records Management Policy",
+   "absorbs": [
+    "Approved policy and standard addressing Protection of Organizational Records",
+    "Records Management Policy"
+   ]
+  },
+  {
+   "name": "Records protection procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Protection of Organizational"
+   ]
+  },
+  {
+   "name": "Records retention schedule",
+   "absorbs": [
+    "Records retention schedule and protection mechanisms",
+    "Records Retention Schedule"
+   ]
+  },
+  {
+   "name": "Records protection controls documentation",
+   "absorbs": [
+    "Records Protection Controls Documentation"
+   ]
+  },
+  {
+   "name": "Awareness communications to personnel",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Periodic review records",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  },
+  {
+   "name": "Records destruction log",
+   "absorbs": [
+    "Records Destruction Log"
+   ]
+  },
+  {
+   "name": "Archive access logs",
+   "absorbs": [
+    "Archive Access Logs"
+   ]
+  },
+  {
+   "name": "Retention automation configuration",
+   "absorbs": [
+    "Retention Automation Configuration"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Executed agreements with required security clauses and signature records",
+   "reason": "Third-party/contract security clause evidence; not about protecting records from loss/destruction/falsification"
+  }
+ ]
+}

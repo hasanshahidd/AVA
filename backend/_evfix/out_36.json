@@ -1,0 +1,72 @@
+{
+ "set_id": "S012",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Third-party service agreements (with security clauses, SLAs, right-to-audit)",
+   "absorbs": [
+    "Third party services agreement templates",
+    "Third-party agreements with security clauses, SLAs, and right-to-audit",
+    "Right-to-audit clauses in agreements"
+   ]
+  },
+  {
+   "name": "Service level agreements",
+   "absorbs": [
+    "Service level agreements"
+   ]
+  },
+  {
+   "name": "Security requirements in service agreements/SLAs",
+   "absorbs": [
+    "Service-specific security requirements documentation",
+    "Security requirements in SLAs"
+   ]
+  },
+  {
+   "name": "SLA / service performance monitoring reports",
+   "absorbs": [
+    "SLA monitoring reports",
+    "Performance monitoring records",
+    "Service delivery reports"
+   ]
+  },
+  {
+   "name": "Third-party relationship management roles",
+   "absorbs": [
+    "Third party relationship management roles"
+   ]
+  },
+  {
+   "name": "Information access type documentation per third party",
+   "absorbs": [
+    "Information access type documentation per third party"
+   ]
+  },
+  {
+   "name": "Approved service delivery policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Service Delivery"
+   ]
+  },
+  {
+   "name": "Documented service delivery procedure/work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Service Delivery"
+   ]
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "absorbs": [
+    "Third-party risk assessment and ongoing monitoring records"
+   ]
+  },
+  {
+   "name": "Service delivery awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,76 @@
+{
+ "set_id": "S001",
+ "di": 2,
+ "groups": [
+  {
+   "name": "Legal/regulatory/compliance obligations register or matrix",
+   "absorbs": [
+    "Legal and Regulatory Obligations Register",
+    "Compliance Obligations Matrix",
+    "Legal & Regulatory Requirements Register",
+    "Regulatory Mapping Tool Output"
+   ]
+  },
+  {
+   "name": "Approved policy/standard on identification of applicable legislation",
+   "absorbs": [
+    "Approved policy and standard addressing Identification of Applicable Legislation"
+   ]
+  },
+  {
+   "name": "Documented procedure/work instruction for identifying applicable legislation",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Identification of Applicable"
+   ]
+  },
+  {
+   "name": "Executed agreements with required security clauses and signature records",
+   "absorbs": [
+    "Executed agreements with required security clauses and signature records"
+   ]
+  },
+  {
+   "name": "Awareness communications informing personnel of requirements",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Periodic/regulatory review records",
+   "absorbs": [
+    "Periodic review records with reviewer",
+    "Regulatory Review Records"
+   ]
+  },
+  {
+   "name": "Legal counsel advisory records",
+   "absorbs": [
+    "Legal Counsel Advisory Records"
+   ]
+  },
+  {
+   "name": "Horizon scanning report",
+   "absorbs": [
+    "Horizon Scanning Report"
+   ]
+  },
+  {
+   "name": "Compliance monitoring reports",
+   "absorbs": [
+    "Compliance Monitoring Reports"
+   ]
+  },
+  {
+   "name": "Compliance section of Business Impact Analysis",
+   "absorbs": [
+    "Compliance BIA Section"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Cryptographic Controls Legal Review",
+   "reason": "Specific to cryptographic controls legality, not the general identification/documentation of applicable legal requirements for this set."
+  }
+ ]
+}

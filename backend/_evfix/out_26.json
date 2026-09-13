@@ -1,0 +1,77 @@
+{
+ "set_id": "S012",
+ "di": 14,
+ "groups": [
+  {
+   "name": "Segregated delivery/loading area layout",
+   "absorbs": [
+    "Segregated delivery/loading area layout"
+   ]
+  },
+  {
+   "name": "Delivery and loading area access procedures",
+   "absorbs": [
+    "Access procedures for loading docks",
+    "Delivery area procedures"
+   ]
+  },
+  {
+   "name": "Loading dock security measures",
+   "absorbs": [
+    "Loading dock security measures"
+   ]
+  },
+  {
+   "name": "Inbound/outbound material inspection logs",
+   "absorbs": [
+    "Inbound/outbound material inspection logs"
+   ]
+  },
+  {
+   "name": "Material registration records",
+   "absorbs": [
+    "Material registration records"
+   ]
+  },
+  {
+   "name": "Public access policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Public Access"
+   ]
+  },
+  {
+   "name": "Public access implementing procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Public Access"
+   ]
+  },
+  {
+   "name": "Personnel awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Access point monitoring",
+   "absorbs": [
+    "Access point monitoring"
+   ]
+  },
+  {
+   "name": "Isolation control documentation",
+   "absorbs": [
+    "Isolation control documentation"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Access control matrix with role-to-permission mapping for relevant systems",
+   "reason": "Logical/system access control, not physical delivery-loading-area isolation"
+  },
+  {
+   "name": "User access provisioning, modification, and review records",
+   "reason": "Logical user-access lifecycle evidence, off-topic for physical loading-area control"
+  }
+ ]
+}

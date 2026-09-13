@@ -1,0 +1,3033 @@
+{
+ "10": {
+  "domain": "Asset Management",
+  "sama_controls": [
+   {
+    "i": 0,
+    "control_id": "1.3",
+    "title": "Apply cyber security controls to information assets",
+    "desc": "Organizations must implement cybersecurity controls to safeguard their information assets from threats and vulnerabilities."
+   },
+   {
+    "i": 1,
+    "control_id": "1.3",
+    "title": "Apply cyber security controls to information storage devices",
+    "desc": "Organizations must implement cybersecurity controls to secure information storage devices, such as hard disks and USB sticks, against unauthorized access or data breaches."
+   },
+   {
+    "i": 23,
+    "control_id": "3.3",
+    "title": "Implement security requirements for information assets",
+    "desc": "Organizations must ensure that the defined security requirements for information assets are put into practice."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Maintain a current inventory of information and IT assets",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "COBIT 2019",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SBP ETGRMF",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Securely dispose of or destroy assets, equipment and media when no longer required",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SAMA Cyber Security Framework",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Protect physical media during transit outside controlled areas",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Securely sanitize media prior to disposal or reuse",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Establish an information asset management or protection policy",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Define and enforce acceptable use rules for information assets",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Classify information assets according to sensitivity and value",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Establish handling procedures for information consistent with its classification",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "SABIC CyberTrust Guidelines",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Mark or label media to indicate classification and handling caveats",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Assign ownership for each information asset",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Maintain a software inventory and manage licensed software usage",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST Cybersecurity Framework"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Manage removable and storage media through its lifecycle",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "ISO/IEC 27001:2022"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Require management approval before moving media outside the facility",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Inventory AI systems and their computing resources",
+    "frameworks": [
+     "ISO/IEC 42001:2023 AI Management System",
+     "NIST Artificial Intelligence Risk Management Framework"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Restrict access to digital and non-digital media",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Inventory and risk-assess shadow IT and end-user computing",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SOX IT General Controls"
+    ]
+   }
+  ]
+ },
+ "0": {
+  "domain": "Governance, Leadership & Policy",
+  "sama_controls": [
+   {
+    "i": 2,
+    "control_id": "1.3",
+    "title": "Improve cyber security controls",
+    "desc": "Organizations must continuously improve their cybersecurity controls in alignment with the principles and objectives defined in the SAMA Cyber Security Framework."
+   },
+   {
+    "i": 3,
+    "control_id": "1.3",
+    "title": "Initiate cyber security controls",
+    "desc": "Ensure that foundational cyber security controls are established to protect the organization from cyber threats."
+   },
+   {
+    "i": 4,
+    "control_id": "1.3",
+    "title": "Maintain cyber security controls",
+    "desc": "Ensure that existing cyber security controls are regularly reviewed and updated to remain effective."
+   },
+   {
+    "i": 6,
+    "control_id": "1.3",
+    "title": "Provide direction for cyber security requirements for subsidiaries",
+    "desc": "Ensure that subsidiaries comply with the organization's cyber security requirements."
+   },
+   {
+    "i": 7,
+    "control_id": "1.5",
+    "title": "Mandate framework adoption by SAMA",
+    "desc": "Ensure compliance with the mandatory adoption of the SAMA Cyber Security Framework."
+   },
+   {
+    "i": 8,
+    "control_id": "1.5",
+    "title": "Update the framework periodically",
+    "desc": "Ensure that the framework is reviewed and updated periodically to address emerging threats and changes."
+   },
+   {
+    "i": 9,
+    "control_id": "1.8",
+    "title": "Review the framework periodically",
+    "desc": "Conduct regular reviews of the framework to ensure it remains effective and aligned with organizational and regulatory requirements."
+   },
+   {
+    "i": 10,
+    "control_id": "1.8",
+    "title": "Submit framework update requests formally",
+    "desc": "Member organizations should use a formal process to request updates to the framework when necessary."
+   },
+   {
+    "i": 11,
+    "control_id": "1.8",
+    "title": "Update the framework based on review outcomes",
+    "desc": "Make necessary updates to the framework based on findings from periodic reviews to address gaps or changes in requirements."
+   },
+   {
+    "i": 12,
+    "control_id": "2.3",
+    "title": "Perform self-assessment based on a questionnaire",
+    "desc": "Use a standardized questionnaire to guide the self-assessment process and ensure consistency."
+   },
+   {
+    "i": 14,
+    "control_id": "2.4",
+    "title": "Measure cyber security maturity level",
+    "desc": "Use a predefined model to measure and evaluate the organization's cybersecurity maturity level."
+   },
+   {
+    "i": 15,
+    "control_id": "2.4.1",
+    "title": "Ensure cyber security documentation includes 'why', 'what', and 'how'",
+    "desc": "Ensure that cyber security documentation provides clear reasoning, scope, and implementation details for controls."
+   },
+   {
+    "i": 16,
+    "control_id": "2.4.1",
+    "title": "Establish cyber security policies, standards, and procedures",
+    "desc": "Develop and maintain comprehensive cyber security policies, standards, and procedures to guide organizational practices."
+   },
+   {
+    "i": 19,
+    "control_id": "3.1.1",
+    "title": "Appoint a full-time senior manager (CISO) for cyber security",
+    "desc": "Ensure the appointment of a qualified, full-time CISO to oversee the organization's cyber security function."
+   },
+   {
+    "i": 20,
+    "control_id": "3.1.1",
+    "title": "Develop and approve a cyber security committee charter",
+    "desc": "Create and formally approve a charter that defines the purpose, structure, and responsibilities of the cyber security committee."
+   },
+   {
+    "i": 21,
+    "control_id": "3.1.1",
+    "title": "Ensure CISO has Saudi nationality and is qualified",
+    "desc": "Verify that the appointed CISO is a Saudi national and possesses the necessary qualifications for the role."
+   },
+   {
+    "i": 22,
+    "control_id": "3.1.1",
+    "title": "Ensure cyber security function is independent from IT",
+    "desc": "Establish a cyber security function that operates independently from the IT department to avoid conflicts of interest."
+   },
+   {
+    "i": 33,
+    "control_id": "Cyber security governance",
+    "title": "Provide strategic direction for cyber security",
+    "desc": "The organization should define and communicate a strategic plan for its cybersecurity initiatives."
+   },
+   {
+    "i": 34,
+    "control_id": "Cyber security governance",
+    "title": "Verify responsible use of enterprise resources",
+    "desc": "Ensure that enterprise resources, such as IT systems, data, and personnel, are utilized in a manner that aligns with organizational policies and objectives."
+   },
+   {
+    "i": 37,
+    "control_id": "Information security function",
+    "title": "Define information security roles and responsibilities",
+    "desc": "Clearly define and document roles and responsibilities for information security within the organization."
+   },
+   {
+    "i": 38,
+    "control_id": "Information security function",
+    "title": "Facilitate and monitor implementation of effective information security practices",
+    "desc": "Oversee and track the adoption of information security practices by operational teams to ensure effectiveness."
+   },
+   {
+    "i": 42,
+    "control_id": "Information security function",
+    "title": "Provide information security and risk management frameworks",
+    "desc": "Develop and provide structured frameworks for managing information security and associated risks."
+   },
+   {
+    "i": 43,
+    "control_id": "Information security function",
+    "title": "Set information security goals for implementation",
+    "desc": "Define clear and measurable goals for implementing information security initiatives."
+   },
+   {
+    "i": 44,
+    "control_id": "Information security function",
+    "title": "Support information security policies",
+    "desc": "Ensure that information security policies are supported, roles and responsibilities are defined, and goals are established."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Establish and maintain an approved information security policy document",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Define and allocate information security roles and responsibilities",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "NIST Cybersecurity Framework",
+     "PCI Data Security Standard",
+     "SABIC CyberTrust Guidelines",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Appoint a senior information security officer / CISO with defined authority",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Demonstrate top-management commitment and leadership for the security/management program",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 27001:2022",
+     "ISO/IEC 42001:2023 AI Management System",
+     "MAS Technology Risk Management Guidelines",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Board/management body oversight and accountability for cybersecurity risk",
+    "frameworks": [
+     "NIS2 Directive",
+     "NIST Artificial Intelligence Risk Management Framework",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF",
+     "SOC 2 Type II",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Periodically review and update the information security policy",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Establish an information security management program/system",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "COBIT 2019",
+     "HITRUST Common Security Framework",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Continually improve the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System",
+     "SABIC CyberTrust Guidelines",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Coordinate information security activities across organizational functions",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "Qatar Central Bank Technology Risks Circular",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Maintain contact with special interest groups and security forums",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Establish a board-approved security strategy",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Conduct periodic management review of the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Establish a senior committee/forum for security governance",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Provide resources for the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Determine internal and external communications for the management system",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Establish acceptable use policy for end-user technologies",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Segregation of duties / independence of the security function from IT",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Define and document roles, communication lines and structure",
+    "frameworks": [
+     "ISO/IEC 42001:2023 AI Management System",
+     "NIST Artificial Intelligence Risk Management Framework",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Commitment to competence of personnel",
+    "frameworks": [
+     "COBIT 2019",
+     "SBP ETGRMF",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Control of documented information / document management",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Maintain documented-information inventory for the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Understand the organization and its context",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Understand the needs and expectations of interested parties",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S024",
+    "heading": "Determine the scope of the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S025",
+    "heading": "Establish a formal system authorization process before operation",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S026",
+    "heading": "Define organizational mission and business processes / AI goals",
+    "frameworks": [
+     "NIST Artificial Intelligence Risk Management Framework",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S027",
+    "heading": "Establish a technology/IT governance framework",
+    "frameworks": [
+     "COBIT 2019",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S028",
+    "heading": "Develop an IT/technology strategy aligned with business strategy",
+    "frameworks": [
+     "COBIT 2019",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S029",
+    "heading": "Establish a system/security plan describing the environment",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S030",
+    "heading": "Establish responsible-use objectives and human oversight for AI systems",
+    "frameworks": [
+     "ISO/IEC 42001:2023 AI Management System",
+     "NIST Artificial Intelligence Risk Management Framework"
+    ]
+   },
+   {
+    "set_id": "S031",
+    "heading": "Maintain MIS/quality information for governance oversight",
+    "frameworks": [
+     "SBP ETGRMF",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S032",
+    "heading": "Establish board-approved cyber security function and framework",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S033",
+    "heading": "Formulate technology policy framework",
+    "frameworks": [
+     "SBP ETGRMF",
+     "SOX IT General Controls"
+    ]
+   }
+  ]
+ },
+ "11": {
+  "domain": "Logging, Monitoring & Detection",
+  "sama_controls": [
+   {
+    "i": 5,
+    "control_id": "1.3",
+    "title": "Monitor cyber security controls",
+    "desc": "Ensure that cyber security controls are continuously monitored to detect and respond to potential issues."
+   },
+   {
+    "i": 35,
+    "control_id": "Cyber security risk management",
+    "title": "Employ techniques for continuous monitoring of security state",
+    "desc": "Implement tools and processes to continuously monitor the security posture of the organization's information systems."
+   },
+   {
+    "i": 47,
+    "control_id": "N/A",
+    "title": "Establish a security operations center (SOC)",
+    "desc": "Set up a dedicated team and infrastructure to monitor, detect, and respond to security incidents in real-time."
+   },
+   {
+    "i": 51,
+    "control_id": "N/A",
+    "title": "Implement SIEM tools for security data gathering",
+    "desc": "Deploy SIEM tools to collect, analyze, and correlate security data for real-time monitoring and incident response."
+   },
+   {
+    "i": 57,
+    "control_id": "SOC description",
+    "title": "Assess security-related data in SOC",
+    "desc": "This control ensures that the SOC evaluates security-related data to identify potential threats or vulnerabilities."
+   },
+   {
+    "i": 58,
+    "control_id": "SOC description",
+    "title": "Detect indicators of compromise in SOC",
+    "desc": "This control ensures that the SOC is focused on identifying indicators of compromise to detect potential security incidents."
+   },
+   {
+    "i": 59,
+    "control_id": "SOC description",
+    "title": "Disseminate security-related information from SOC",
+    "desc": "This control ensures that the SOC shares security-related information with relevant stakeholders within the organization."
+   },
+   {
+    "i": 61,
+    "control_id": "SOC description",
+    "title": "Monitor security-related data in SOC",
+    "desc": "The Security Operations Center (SOC) must continuously monitor security-related data from all enterprise systems to detect potential threats or anomalies."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Establish a logging and monitoring policy and procedures",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "NIS2 Directive",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SBP ETGRMF",
+     "SOX IT General Controls",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Enable and identify auditable events and generate audit logs",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "ISO/IEC 42001:2023 AI Management System",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Monitor systems and networks to detect attacks and anomalies",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "NIS2 Directive",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Internet Banking Framework",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Synchronize system clocks to an approved time source",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Retain audit log history for a defined minimum period",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Internet Banking Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Review and analyze audit logs to detect anomalous activity",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Protect audit log information from unauthorized access and tampering",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "HITRUST Common Security Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Centralize and correlate security event data for analysis",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Establish detection roles, responsibilities and a SOC for monitoring",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Centralize and manage audit log collection and retention",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Deploy network intrusion detection and prevention techniques",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Configure automatic anti-malware signature updates",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Record required details and content in audit log records",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Establish a continuous monitoring strategy and program",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Establish a baseline of network operations and expected data flows",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Configure automatic anti-malware scanning of removable media",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Detect indicators of compromise and respond to threats",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Ensure adequate audit log storage capacity",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Address exceptions and anomalies identified during log review",
+    "frameworks": [
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Detect and protect personnel against phishing attacks",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Log and review administrator and operator privileged activities",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Configure system event monitoring with thresholds for early issue indication",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines"
+    ]
+   }
+  ]
+ },
+ "3": {
+  "domain": "Audit & Assurance",
+  "sama_controls": [
+   {
+    "i": 13,
+    "control_id": "2.3",
+    "title": "SAMA to review and audit self-assessments",
+    "desc": "SAMA will review and audit the self-assessments to verify compliance and assess the organization's cybersecurity maturity."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Independent review of information security at planned intervals",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Perform periodic technical and nontechnical evaluation of security control effectiveness",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "NIST SP 800-53 Rev 5",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Set risk-based IT audit frequency and audit cycle",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Plan and protect operational systems during audit testing to minimize disruption",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Monitor and evaluate the internal control environment including self-assessments",
+    "frameworks": [
+     "COBIT 2019",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Establish an independent quality assurance review of major technology projects",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Maintain an independent IT/technology audit function with a charter",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Conduct internal audits at planned intervals to verify management-system conformance",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Plan, establish and maintain a structured internal audit programme",
+    "frameworks": [
+     "ISO/IEC 42001:2023 AI Management System",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Maintain a risk assessment process to scope and frequency IT audits",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Perform application control audit focused on data integrity",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Grant right of access to auditors for verification at premises",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Identify control weaknesses and review management's remediation plans",
+    "frameworks": [
+     "SBP ETGRMF",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Monitor and audit privacy/PII protection controls and policy effectiveness",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "KSA National Data Management and Personal Data Protection Standards"
+    ]
+   }
+  ]
+ },
+ "2": {
+  "domain": "Compliance & Legal",
+  "sama_controls": [
+   {
+    "i": 17,
+    "control_id": "2.4.1",
+    "title": "Monitor compliance with cyber security documentation",
+    "desc": "Regularly monitor and assess adherence to established cyber security documentation to ensure compliance."
+   },
+   {
+    "i": 28,
+    "control_id": "3.3.12 Principle",
+    "title": "Measure and evaluate effectiveness of payment systems standard",
+    "desc": "Regularly assess the effectiveness of the payment systems cyber security standard."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Identify and document applicable legal, statutory, regulatory and contractual requirements",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Implement procedures to protect intellectual property rights",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Regularly review compliance with information security policies, rules and standards",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Monitor and evaluate adherence to established cyber security requirements",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Administrative fines for infringement of data protection / cybersecurity obligations",
+    "frameworks": [
+     "General Data Protection Regulation",
+     "NIS2 Directive"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Submit annual compliance report to the competent regulator",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   }
+  ]
+ },
+ "1": {
+  "domain": "Risk Management",
+  "sama_controls": [
+   {
+    "i": 18,
+    "control_id": "2.4.2",
+    "title": "Use KRIs for trend reporting and improvement identification",
+    "desc": "Leverage KRIs to identify trends and areas for improvement in cyber security practices."
+   },
+   {
+    "i": 36,
+    "control_id": "Cyber security risk management",
+    "title": "Implement a risk mitigation strategy",
+    "desc": "Develop and execute a strategy to reduce identified risks to an acceptable level."
+   },
+   {
+    "i": 40,
+    "control_id": "Information security function",
+    "title": "Identify shifts in the organization's implicit information risk appetite",
+    "desc": "Monitor and document changes in the organization's tolerance for information security risks."
+   },
+   {
+    "i": 46,
+    "control_id": "N/A",
+    "title": "Establish a risk register",
+    "desc": "Maintain a centralized repository to document, track, and manage identified risks and their mitigation plans."
+   },
+   {
+    "i": 49,
+    "control_id": "N/A",
+    "title": "Implement risk treatment processes",
+    "desc": "Develop and implement strategies to address identified risks, including mitigation, transfer, or acceptance."
+   },
+   {
+    "i": 53,
+    "control_id": "N/A",
+    "title": "Mitigate negative consequences of risks",
+    "desc": "This control ensures that risks with negative consequences are addressed through appropriate mitigation strategies to reduce their impact."
+   },
+   {
+    "i": 55,
+    "control_id": "N/A",
+    "title": "Promote a risk-aware culture",
+    "desc": "This control ensures that the organization fosters a culture where employees are aware of and take responsibility for managing risks."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Conduct a security risk assessment to identify threats, vulnerabilities, likelihood and impact",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SBP Internet Banking Framework",
+     "SOX IT General Controls",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Define and implement risk treatment and mitigation measures for identified risks",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Establish and maintain an enterprise technology/ICT risk management framework",
+    "frameworks": [
+     "COBIT 2019",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Define and document the organization's risk appetite and tolerance",
+    "frameworks": [
+     "COBIT 2019",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Artificial Intelligence Risk Management Framework",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Periodically test and monitor the effectiveness of risk management controls",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Maintain a risk register and report significant risks to management",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Define technology risk metrics and key risk indicators to highlight exposure",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Obtain insurance cover for insurable risks as a risk-transfer measure",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Assess residual risk and obtain senior management acceptance",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Analyze and quantify the potential business impact of identified risks",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Categorize and rank systems and data by security impact or sensitivity",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Respond to and remediate findings from assessments, audits and monitoring",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Perform scenario-based risk assessment against specific threat scenarios",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Conduct a privacy or data protection impact assessment for high-risk processing",
+    "frameworks": [
+     "General Data Protection Regulation",
+     "HITRUST Common Security Framework"
+    ]
+   }
+  ]
+ },
+ "15": {
+  "domain": "Human Resources Security",
+  "sama_controls": [
+   {
+    "i": 24,
+    "control_id": "3.3.1",
+    "title": "Define cyber security requirements in HR processes",
+    "desc": "HR processes should define specific cyber security requirements relevant to their operations."
+   },
+   {
+    "i": 25,
+    "control_id": "3.3.1",
+    "title": "Implement cyber security requirements in HR processes",
+    "desc": "HR processes should ensure that defined cyber security requirements are implemented effectively."
+   },
+   {
+    "i": 26,
+    "control_id": "3.3.1",
+    "title": "Measure and evaluate HR process effectiveness",
+    "desc": "Organizations should periodically assess the effectiveness of HR processes in meeting cyber security requirements."
+   },
+   {
+    "i": 27,
+    "control_id": "3.3.1",
+    "title": "Monitor effectiveness of HR processes",
+    "desc": "Organizations should monitor the ongoing effectiveness of HR processes in meeting cyber security requirements."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Conduct background verification and screening checks on candidates, contractors and third parties prior to access",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Establish and enforce a formal disciplinary or sanction process for security policy violations",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Define employment terms, conditions and confidentiality clauses covering information security responsibilities",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Recover and return all organizational assets upon termination or change of employment",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Define and assign information security responsibilities for employment termination or change of role",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Develop and disseminate a personnel/HR security policy aligned to the information security policy",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Management shall require personnel to apply security in accordance with established policies and procedures",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Review and reassign access rights when personnel are transferred or change roles",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Disable system access and retrieve security property upon personnel termination",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Incorporate information security responsibilities into roles and job descriptions",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   }
+  ]
+ },
+ "14": {
+  "domain": "Physical & Environmental Security",
+  "sama_controls": [
+   {
+    "i": 29,
+    "control_id": "3.3.2",
+    "title": "Measure and evaluate physical security process effectiveness",
+    "desc": "Regularly assess the performance of physical security measures to ensure they meet objectives and identify areas for improvement."
+   },
+   {
+    "i": 30,
+    "control_id": "3.3.2",
+    "title": "Monitor effectiveness of physical security process",
+    "desc": "Continuously monitor physical security measures to detect and respond to potential weaknesses or breaches."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Establish a physical and environmental security policy",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Enforce physical entry controls so only authorized personnel access secure areas",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "SAMA Cyber Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Define and use a physical security perimeter to protect facilities",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Secure offices, rooms, and facilities with physical security measures",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Protect power and telecommunications cabling from interception or damage",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Qatar Central Bank Technology Risks Circular",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Protect facilities against external and environmental threats such as natural disasters",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Define security measures for working in secure areas",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Site and protect equipment to reduce environmental threats and unauthorized access",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "SABIC CyberTrust Guidelines"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Protect equipment from disruptions in supporting utilities",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Maintain equipment correctly to ensure continued availability and integrity",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Adopt and enforce a clear desk and clear screen policy",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Control public access, delivery, and loading areas isolated from processing facilities",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Apply security to equipment and assets located off-premises",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Monitor physical access and premises for unauthorized activity",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "NIST SP 800-53 Rev 5",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Maintain and review visitor access records to facilities",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Restrict physical access to data centers and server rooms to authorized personnel",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Employ fire detection and suppression systems",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Restrict and log physical access to systems, segments and data sites",
+    "frameworks": [
+     "NIST Cybersecurity Framework",
+     "SOC 2 Type II",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Protect unattended user equipment",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Manage and authorize visitor access with escort and identification",
+    "frameworks": [
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Maintain temperature, humidity, and environmental monitoring of facilities",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Control facility access by role and validate access based on function",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "HIPAA Security & Privacy Rule"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Implement a facility security plan to safeguard against tampering and theft",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S024",
+    "heading": "Provide backup power via UPS and generators",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S025",
+    "heading": "Protect secure areas with appropriate control measures",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S026",
+    "heading": "Authorize and manage personnel physical access to sensitive systems",
+    "frameworks": [
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   }
+  ]
+ },
+ "17": {
+  "domain": "Third-Party / Supply Chain",
+  "sama_controls": [
+   {
+    "i": 31,
+    "control_id": "3.4.3",
+    "title": "Measure and evaluate cloud security controls",
+    "desc": "Assess the performance of cloud security controls to ensure they meet objectives and identify areas for improvement."
+   },
+   {
+    "i": 32,
+    "control_id": "Control Considerations 6",
+    "title": "Measure and evaluate third-party secure disposal effectiveness",
+    "desc": "Assess the effectiveness of third-party secure disposal processes to ensure compliance and adequacy."
+   },
+   {
+    "i": 45,
+    "control_id": "N/A",
+    "title": "Define service level agreements (SLAs)",
+    "desc": "Establish SLAs with service providers to define responsibilities and set clear expectations."
+   },
+   {
+    "i": 63,
+    "control_id": "Vendor management",
+    "title": "Ensure third-party providers adhere to security standards",
+    "desc": "Organizations must ensure that third-party providers comply with the same security standards and requirements as the organization itself."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Continuously monitor third-party services and compliance",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "HITRUST Common Security Framework",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Include security requirements in third-party agreements and contracts",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Establish a third-party / supplier risk management program",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "NIS2 Directive",
+     "NIST Artificial Intelligence Risk Management Framework",
+     "SAMA Cyber Security Framework",
+     "SOC 2 Type II",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Perform due diligence before engaging a third-party provider",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Supervise and review outsourced software development",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Assess and review the security practices of suppliers",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Include right-of-access, inspection and audit clauses in third-party contracts",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Supply Chain Risk Management",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Bind data processors / business associates by contract",
+    "frameworks": [
+     "General Data Protection Regulation",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Manage subcontractor and fourth-party compliance and approval",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Define a supply-chain security strategy and protective controls",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Manage third-party service delivery",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Manage changes to third-party services",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Maintain an inventory or register of third-party service providers",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Establish vendor evaluation and selection criteria",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Host outsourced data and services within the required jurisdiction",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Establish legally binding SLAs and minimum agreement coverage with providers",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Define exit strategy and termination rights to avoid vendor lock-in",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Identify information security risks arising from external parties",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Conduct provider selection and feasibility analysis",
+    "frameworks": [
+     "SBP Cloud Outsourcing Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Evaluate the outsourcing policy and comply with outsourcing guidelines",
+    "frameworks": [
+     "SAMA Cyber Security Framework",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Obtain independent assurance (ISAE/SOC) reports from providers",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Restrict and monitor service-provider access to systems and data",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S024",
+    "heading": "Make external parties aware of and acknowledge security requirements",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S025",
+    "heading": "Approve a cloud computing policy",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S026",
+    "heading": "Perform a cybersecurity risk assessment and due diligence for cloud services",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S027",
+    "heading": "Obtain regulator approval before using a cloud service provider",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S028",
+    "heading": "Obtain regulator approval before material outsourcing",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SAMA Cyber Security Framework"
+    ]
+   },
+   {
+    "set_id": "S029",
+    "heading": "Require approval and compliance for sub-contracting arrangements",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S030",
+    "heading": "Manage risks in technology outsourcing arrangements",
+    "frameworks": [
+     "SBP ETGRMF",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S031",
+    "heading": "Establish source code escrow for vendor-developed applications",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   }
+  ]
+ },
+ "18": {
+  "domain": "Vulnerability & Threat Management",
+  "sama_controls": [
+   {
+    "i": 39,
+    "control_id": "Information security function",
+    "title": "Identify known and emerging information security issues",
+    "desc": "Continuously identify and document both existing and emerging security threats to the organization."
+   },
+   {
+    "i": 48,
+    "control_id": "N/A",
+    "title": "Implement red-teaming exercises",
+    "desc": "Conduct simulated attacks to test the organization's ability to detect, respond to, and recover from security incidents."
+   },
+   {
+    "i": 50,
+    "control_id": "N/A",
+    "title": "Implement sandboxing for controlled execution",
+    "desc": "Use sandboxing to isolate and analyze potentially malicious software in a controlled environment."
+   },
+   {
+    "i": 52,
+    "control_id": "N/A",
+    "title": "Implement vulnerability management practices",
+    "desc": "Establish a process to regularly identify, assess, and remediate vulnerabilities in the organization's systems and applications."
+   },
+   {
+    "i": 54,
+    "control_id": "N/A",
+    "title": "Perform security testing of information systems",
+    "desc": "This control ensures that security testing is conducted to evaluate the effectiveness of safeguards protecting information systems."
+   },
+   {
+    "i": 62,
+    "control_id": "Threat landscape",
+    "title": "Provide an overview of threats and trends",
+    "desc": "Organizations must maintain an up-to-date overview of current and emerging threats and trends to inform risk management strategies."
+   },
+   {
+    "i": 64,
+    "control_id": "Vulnerability management",
+    "title": "Identify vulnerabilities",
+    "desc": "Organizations must identify vulnerabilities in their systems, applications, and networks to address potential risks."
+   },
+   {
+    "i": 65,
+    "control_id": "Vulnerability management",
+    "title": "Mitigate vulnerabilities",
+    "desc": "Organizations must implement measures to mitigate identified vulnerabilities and reduce associated risks."
+   },
+   {
+    "i": 66,
+    "control_id": "Vulnerability management",
+    "title": "Remediate vulnerabilities",
+    "desc": "Organizations must remediate vulnerabilities by applying fixes or patches to eliminate risks."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Establish and maintain a documented vulnerability management process/program",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "CIS Critical Security Controls v8",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "NIS2 Directive",
+     "NIST Cybersecurity Framework",
+     "PCI Data Security Standard",
+     "SABIC CyberTrust Guidelines",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Conduct regular vulnerability assessments/scans of IT systems",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "PCI Data Security Standard",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Collect and analyze cyber threat intelligence",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Conduct penetration testing of systems",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Remediate and correct identified vulnerabilities and test findings",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Participate in cyber threat information sharing arrangements",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Establish and maintain a penetration testing program and methodology",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Deploy gateway and email-level anti-malware and content filtering",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Perform external penetration testing",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Perform internal penetration testing",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Perform vulnerability scans of externally-exposed assets",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Apply flaw remediation and security patching of technical vulnerabilities",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Conduct adversarial / red-team threat-led penetration testing",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Real-time fraud monitoring of transactions",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Maintain inventory of software components for vulnerability tracking",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard"
+    ]
+   }
+  ]
+ },
+ "16": {
+  "domain": "Awareness & Training",
+  "sama_controls": [
+   {
+    "i": 41,
+    "control_id": "Information security function",
+    "title": "Provide guidance and training on information security and risk management",
+    "desc": "Deliver training and guidance to employees on information security and risk management to ensure awareness and compliance."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Provide literacy/awareness training to system users at a defined frequency",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "SABIC CyberTrust Guidelines",
+     "SAMA Cyber Security Framework",
+     "SOX IT General Controls",
+     "SWIFT Customer Security Controls Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Determine and ensure the competence of persons whose work affects the management system",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System",
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Provide secure coding / security training to software developers",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Ensure personnel are aware of the relevant policy and their contribution to its effectiveness",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "ISO/IEC 42001:2023 AI Management System"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Require completion of training prior to granting system access",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Develop and maintain an awareness and training policy",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Define minimum topic coverage for the training program curriculum",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Train users on breach recognition and breach notification",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "DOH Policy on the Abu Dhabi Health Information Exchange"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Train workforce on privacy and PHI/PII handling policies and procedures",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Undertake ongoing multi-channel customer cyber awareness activities",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Develop or modify the security awareness and training program",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HIPAA Security & Privacy Rule"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Review and update the security awareness program at least annually",
+    "frameworks": [
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Provide security awareness training upon hire and annually (induction plus refresher)",
+    "frameworks": [
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Provide role-appropriate training based on job function and responsibilities",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Provide additional specialized training to privileged-access personnel",
+    "frameworks": [
+     "NIST Cybersecurity Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Establish a cyber security awareness program",
+    "frameworks": [
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   }
+  ]
+ },
+ "13": {
+  "domain": "Business Continuity & Resilience",
+  "sama_controls": [
+   {
+    "i": 56,
+    "control_id": "N/A",
+    "title": "Recover to effective operational posture",
+    "desc": "This control ensures that the organization can recover operations effectively within a timeframe that supports its mission."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Develop and document the business continuity plan",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "SABIC CyberTrust Guidelines",
+     "SBP ETGRMF",
+     "SOC 2 Type II",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Establish backup policies and procedures",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Digital Operational Resilience Act",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Test and exercise business continuity and disaster recovery plans",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "NIS2 Directive",
+     "SBP ETGRMF",
+     "SOC 2 Type II",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Develop and maintain a disaster recovery plan",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "HIPAA Security & Privacy Rule",
+     "KSA National Data Management and Personal Data Protection Standards",
+     "MAS Technology Risk Management Guidelines",
+     "SABIC CyberTrust Guidelines",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Conduct a business impact analysis of disruption impacts",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "HIPAA Security & Privacy Rule",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Test backup restoration and recoverability",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Internet Banking Framework",
+     "SOX IT General Controls"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Establish and maintain a business continuity management program",
+    "frameworks": [
+     "COBIT 2019",
+     "HITRUST Common Security Framework",
+     "ISO 22301:2019 Business Continuity Management System",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Establish an ICT and information systems continuity policy",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "Digital Operational Resilience Act",
+     "NIST SP 800-53 Rev 5",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Perform regular automated backups of systems and data",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "HIPAA Security & Privacy Rule",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Implement redundancy and fault tolerance for processing facilities",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Establish a digital resilience and contingency testing programme",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "NIST SP 800-53 Rev 5",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Establish a geographically separated alternate processing site",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Recover and reconstitute systems after disruption",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "NIST Cybersecurity Framework",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Assess and participate in service provider disaster recovery testing",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Maintain segregated or isolated backup and recovery data",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Protect backup and recovery data with security controls",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Establish emergency and crisis response procedures",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Identify disruption threat and contingency scenarios",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Establish crisis communication and warning procedures",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Establish offsite alternate storage for backup data",
+    "frameworks": [
+     "HIPAA Security & Privacy Rule",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Establish recovery time and recovery point objectives",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Incorporate lessons learned to improve recovery plans",
+    "frameworks": [
+     "NIST Cybersecurity Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Ensure cloud provider services meet business continuity requirements",
+    "frameworks": [
+     "SAMA Cyber Security Framework",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S024",
+    "heading": "Monitor and measure business continuity performance and resilience indicators",
+    "frameworks": [
+     "ISO 22301:2019 Business Continuity Management System",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S025",
+    "heading": "Establish and maintain a data recovery process",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST Cybersecurity Framework"
+    ]
+   },
+   {
+    "set_id": "S026",
+    "heading": "Develop and maintain disaster recovery and business continuity plans together",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "SBP ETGRMF"
+    ]
+   }
+  ]
+ },
+ "12": {
+  "domain": "Incident Management",
+  "sama_controls": [
+   {
+    "i": 60,
+    "control_id": "SOC description",
+    "title": "Investigate indicators of compromise in SOC",
+    "desc": "This control ensures that the SOC investigates indicators of compromise to determine the nature and scope of potential security incidents."
+   }
+  ],
+  "existing_sets": [
+   {
+    "set_id": "S001",
+    "heading": "Establish and maintain an incident response plan",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "ISO 22301:2019 Business Continuity Management System",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SABIC CyberTrust Guidelines",
+     "SOC 2 Type II",
+     "SOX IT General Controls",
+     "SWIFT Customer Security Controls Framework"
+    ]
+   },
+   {
+    "set_id": "S002",
+    "heading": "Conduct post-incident reviews and capture lessons learned",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "ISO/IEC 27001:2022",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S003",
+    "heading": "Report security incidents/breaches to the competent regulatory authority",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP Cloud Outsourcing Framework",
+     "SBP ETGRMF",
+     "SBP Internet Banking Framework"
+    ]
+   },
+   {
+    "set_id": "S004",
+    "heading": "Develop incident management policy and procedures",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "NIST SP 800-53 Rev 5",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S005",
+    "heading": "Test and exercise the incident response plan periodically",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S006",
+    "heading": "Notify customers or service recipients of incidents affecting them",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines",
+     "NIS2 Directive",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S007",
+    "heading": "Report information security events through appropriate channels",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S008",
+    "heading": "Designate personnel or a team to manage incident handling",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "PCI Data Security Standard",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S009",
+    "heading": "Classify incidents and define severity thresholds",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "CIS Critical Security Controls v8",
+     "Digital Operational Resilience Act",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S010",
+    "heading": "Investigate security incidents to identify cause and deficiencies",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S011",
+    "heading": "Collect and preserve incident evidence for legal proceedings",
+    "frameworks": [
+     "HITRUST Common Security Framework",
+     "ISO/IEC 27001:2022",
+     "Qatar Central Bank Technology Risks Circular",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S012",
+    "heading": "Notify affected individuals or data subjects of a data breach",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "General Data Protection Regulation",
+     "HIPAA Security & Privacy Rule",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S013",
+    "heading": "Maintain situational awareness and share threat/incident information",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "Digital Operational Resilience Act",
+     "NIST Artificial Intelligence Risk Management Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S014",
+    "heading": "Assign incident response roles and responsibilities",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S015",
+    "heading": "Track, record and monitor security incidents",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "NIST SP 800-53 Rev 5",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S016",
+    "heading": "Conduct problem management to resolve root causes of incidents",
+    "frameworks": [
+     "COBIT 2019",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S017",
+    "heading": "Notify the supervisory authority of a personal data breach",
+    "frameworks": [
+     "General Data Protection Regulation",
+     "HIPAA Security & Privacy Rule",
+     "KSA National Data Management and Personal Data Protection Standards"
+    ]
+   },
+   {
+    "set_id": "S018",
+    "heading": "Maintain contacts with relevant authorities",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "HITRUST Common Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S019",
+    "heading": "Report observed or suspected security weaknesses",
+    "frameworks": [
+     "Abu Dhabi Healthcare Information and Cyber Security Standard",
+     "HITRUST Common Security Framework",
+     "Sri Lanka Baseline Security Standard"
+    ]
+   },
+   {
+    "set_id": "S020",
+    "heading": "Maintain a crisis communication plan for stakeholder disclosure",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S021",
+    "heading": "Execute the incident response plan during an incident",
+    "frameworks": [
+     "COBIT 2019",
+     "NIST Cybersecurity Framework"
+    ]
+   },
+   {
+    "set_id": "S022",
+    "heading": "Provide incident response training to designated personnel",
+    "frameworks": [
+     "NIST SP 800-53 Rev 5",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S023",
+    "heading": "Conduct routine incident response exercises involving stakeholders",
+    "frameworks": [
+     "CIS Critical Security Controls v8",
+     "MAS Technology Risk Management Guidelines"
+    ]
+   },
+   {
+    "set_id": "S024",
+    "heading": "Detect incidents via early warning indicators and monitoring alerts",
+    "frameworks": [
+     "Digital Operational Resilience Act",
+     "PCI Data Security Standard"
+    ]
+   },
+   {
+    "set_id": "S025",
+    "heading": "Implement incident handling with containment, eradication and recovery",
+    "frameworks": [
+     "NIS2 Directive",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S026",
+    "heading": "Mitigate security incidents and apply improvements from lessons",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST Cybersecurity Framework"
+    ]
+   },
+   {
+    "set_id": "S027",
+    "heading": "Establish a data breach management process",
+    "frameworks": [
+     "DOH Policy on the Abu Dhabi Health Information Exchange",
+     "KSA National Data Management and Personal Data Protection Standards"
+    ]
+   },
+   {
+    "set_id": "S028",
+    "heading": "Assess and decide whether security events are incidents",
+    "frameworks": [
+     "ISO/IEC 27001:2022",
+     "SOC 2 Type II"
+    ]
+   },
+   {
+    "set_id": "S029",
+    "heading": "Manage incident-related public relations and media communications",
+    "frameworks": [
+     "NIST Cybersecurity Framework",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   },
+   {
+    "set_id": "S030",
+    "heading": "Provide a service or help desk for technology support",
+    "frameworks": [
+     "Qatar Central Bank Technology Risks Circular",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S031",
+    "heading": "Provide an incident response assistance and support resource",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "NIST SP 800-53 Rev 5"
+    ]
+   },
+   {
+    "set_id": "S032",
+    "heading": "Escalate suspicious activity and major incidents to senior management",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "SBP ETGRMF"
+    ]
+   },
+   {
+    "set_id": "S033",
+    "heading": "Communicate AI incidents and errors to affected users and actors",
+    "frameworks": [
+     "ISO/IEC 42001:2023 AI Management System",
+     "NIST Artificial Intelligence Risk Management Framework"
+    ]
+   },
+   {
+    "set_id": "S034",
+    "heading": "Notify the contracting principal of incidents within a fixed deadline",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "SABIC CyberTrust Guidelines"
+    ]
+   },
+   {
+    "set_id": "S035",
+    "heading": "Cooperate with the contracting principal's incident response teams",
+    "frameworks": [
+     "ARAMCO Cybersecurity Compliance Certification",
+     "SBP Cloud Outsourcing Framework"
+    ]
+   },
+   {
+    "set_id": "S036",
+    "heading": "Investigate fraudulent or suspicious transactions",
+    "frameworks": [
+     "MAS Technology Risk Management Guidelines",
+     "Qatar Central Bank Technology Risks Circular"
+    ]
+   }
+  ]
+ }
+}

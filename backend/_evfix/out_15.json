@@ -1,0 +1,93 @@
+{
+ "set_id": "S004",
+ "di": 5,
+ "groups": [
+  {
+   "name": "Privacy notice / Notice of Privacy Practices document",
+   "absorbs": [
+    "Current Notice of Privacy Practices document",
+    "Privacy notice/statement published to data subjects with version history",
+    "Privacy notice/policy",
+    "Privacy notice/policy published on website and applications",
+    "Documented Privacy Notice and Consent Management demonstrating compliance"
+   ]
+  },
+  {
+   "name": "Privacy notice publication / website posting",
+   "absorbs": [
+    "Website posting of NPP"
+   ]
+  },
+  {
+   "name": "Privacy notice distribution / delivery and communication to data subjects",
+   "absorbs": [
+    "Distribution and acknowledgment records",
+    "Notice delivery mechanisms",
+    "Evidence of notice communication to data subjects"
+   ]
+  },
+  {
+   "name": "Privacy notice revision / update and version history records",
+   "absorbs": [
+    "NPP revision history",
+    "Privacy notice update records",
+    "Privacy notice update and version history records"
+   ]
+  },
+  {
+   "name": "Privacy policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Privacy Notice"
+   ]
+  },
+  {
+   "name": "Documented privacy notice procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Privacy Notice",
+    "Documented procedures"
+   ]
+  },
+  {
+   "name": "Consent records, opt-out tracking, and data subject request logs",
+   "absorbs": [
+    "Consent records, opt-out tracking, and data subject request logs"
+   ]
+  },
+  {
+   "name": "Privacy notice awareness communications to personnel",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Periodic review records of the privacy notice",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  },
+  {
+   "name": "Privacy notice accessibility and language review records",
+   "absorbs": [
+    "Privacy notice accessibility and language review records"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Approved Data Management and Personal Data Protection Strategy/Plan",
+   "reason": "Org-wide data protection strategy/plan, not privacy-notice evidence for this set"
+  },
+  {
+   "name": "Organizational artifacts: role mandates, RACI, job descriptions, committee charters",
+   "reason": "Governance/role artifacts, off-topic for providing a privacy notice"
+  },
+  {
+   "name": "Compliance audit reports and assessment records",
+   "reason": "General compliance audit evidence, not specific to the privacy notice"
+  },
+  {
+   "name": "Data lifecycle records covering retention schedules",
+   "reason": "Data retention lifecycle records, off-topic for privacy-notice provision"
+  }
+ ]
+}

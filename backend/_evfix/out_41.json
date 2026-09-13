@@ -1,0 +1,94 @@
+{
+ "set_id": "S001",
+ "di": 19,
+ "groups": [
+  {
+   "name": "Capacity management policy/standard",
+   "absorbs": [
+    "Capacity management policy",
+    "Approved policy and standard addressing Capacity Management"
+   ]
+  },
+  {
+   "name": "Capacity management procedure/work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Capacity Management"
+   ]
+  },
+  {
+   "name": "Capacity management/planning plan and documentation",
+   "absorbs": [
+    "Capacity management plan",
+    "Capacity Management Plan",
+    "Capacity planning documentation",
+    "Capacity plan with forecasts"
+   ]
+  },
+  {
+   "name": "Capacity monitoring/utilization reports and dashboards",
+   "absorbs": [
+    "System resource monitoring dashboards",
+    "Capacity monitoring reports",
+    "Capacity monitoring reports",
+    "Capacity Monitoring Dashboard",
+    "Resource utilization metrics"
+   ]
+  },
+  {
+   "name": "Capacity forecasts and trend/planning reports",
+   "absorbs": [
+    "Capacity management reports and forecasts",
+    "Capacity planning and monitoring records with thresholds and forecasts",
+    "Capacity forecasts",
+    "Capacity Trend Report"
+   ]
+  },
+  {
+   "name": "Capacity thresholds, alerts and escalation configuration",
+   "absorbs": [
+    "Capacity threshold and escalation matrix",
+    "Capacity Alert Configuration"
+   ]
+  },
+  {
+   "name": "Capacity incident log",
+   "absorbs": [
+    "Capacity Incident Log"
+   ]
+  },
+  {
+   "name": "Scaling test results",
+   "absorbs": [
+    "Scaling Test Results"
+   ]
+  },
+  {
+   "name": "Decommissioning records for unused systems",
+   "absorbs": [
+    "Decommissioning records for unused systems"
+   ]
+  },
+  {
+   "name": "Database optimization and archival records",
+   "absorbs": [
+    "Database optimization and archival records"
+   ]
+  },
+  {
+   "name": "Capacity management awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Risk register with entries, owners, ratings, and treatment plans",
+   "reason": "Generic risk-register evidence, not specific to capacity management."
+  },
+  {
+   "name": "Risk assessment methodology documentation and approval records",
+   "reason": "Generic risk-assessment methodology evidence, off-topic for capacity management."
+  }
+ ]
+}

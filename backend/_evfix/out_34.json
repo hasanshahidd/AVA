@@ -1,0 +1,102 @@
+{
+ "set_id": "S005",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Outsourced / third-party development agreement",
+   "absorbs": [
+    "Outsourced development agreements with required clauses",
+    "Third-party agreements with security clauses, SLAs, and right-to-audit",
+    "Outsourcing agreements",
+    "Outsourced Development Agreement"
+   ]
+  },
+  {
+   "name": "Right-to-audit clause in agreements",
+   "absorbs": [
+    "Right-to-audit clauses in agreements"
+   ]
+  },
+  {
+   "name": "Vendor source code review reports",
+   "absorbs": [
+    "Source code review reports",
+    "Code Review of Vendor Deliverables"
+   ]
+  },
+  {
+   "name": "Outsourced software development policy / standard",
+   "absorbs": [
+    "Secure coding policy",
+    "Approved policy and standard addressing Outsourced Software Development"
+   ]
+  },
+  {
+   "name": "Outsourced software development procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Outsourced Software Development"
+   ]
+  },
+  {
+   "name": "Quality assurance documentation / vendor quality reports",
+   "absorbs": [
+    "Quality assurance process documentation",
+    "Vendor Quality Reports"
+   ]
+  },
+  {
+   "name": "Vendor supervision and ongoing risk monitoring records",
+   "absorbs": [
+    "Vendor supervision records",
+    "Third-party risk assessment and ongoing monitoring records"
+   ]
+  },
+  {
+   "name": "Vendor secure SDLC assessment",
+   "absorbs": [
+    "Vendor Secure SDLC Assessment"
+   ]
+  },
+  {
+   "name": "Vendor security test results",
+   "absorbs": [
+    "Vendor Security Test Results"
+   ]
+  },
+  {
+   "name": "Source code escrow agreement",
+   "absorbs": [
+    "Source Code Escrow Agreement"
+   ]
+  },
+  {
+   "name": "IP / confidentiality clauses and code ownership documentation",
+   "absorbs": [
+    "IP and Confidentiality Clauses",
+    "Code ownership documentation"
+   ]
+  },
+  {
+   "name": "Software licensing documentation",
+   "absorbs": [
+    "Licensing documentation"
+   ]
+  },
+  {
+   "name": "Staff rotation / termination records for outsourced work",
+   "absorbs": [
+    "Staff rotation/termination records for outsourced work"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Audit logging configuration evidence",
+   "reason": "Audit-logging configuration is a general logging control, not evidence of supervising/reviewing outsourced development."
+  },
+  {
+   "name": "Log review records and follow-up case documentation",
+   "reason": "Operational log-review evidence, off-topic for oversight of outsourced software development."
+  }
+ ]
+}

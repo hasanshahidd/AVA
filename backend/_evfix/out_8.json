@@ -1,0 +1,74 @@
+{
+ "set_id": "S001",
+ "di": 3,
+ "groups": [
+  {
+   "name": "Policy and standard for independent review of information security",
+   "absorbs": [
+    "Approved policy and standard addressing Independent Review of Information"
+   ]
+  },
+  {
+   "name": "Documented procedure / work instruction for independent review",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Independent Review of"
+   ]
+  },
+  {
+   "name": "Internal audit charter",
+   "absorbs": [
+    "Internal audit charter"
+   ]
+  },
+  {
+   "name": "Internal audit programme / review schedule",
+   "absorbs": [
+    "Review schedules",
+    "Internal Audit Programme"
+   ]
+  },
+  {
+   "name": "Audit reports (internal, independent, and external)",
+   "absorbs": [
+    "Independent audit reports",
+    "Internal Audit Reports",
+    "External Review Reports"
+   ]
+  },
+  {
+   "name": "Audit findings, remediation and corrective actions",
+   "absorbs": [
+    "Audit findings and remediation",
+    "Corrective Action Register"
+   ]
+  },
+  {
+   "name": "Management review of audit findings",
+   "absorbs": [
+    "Management Review of Audit Findings"
+   ]
+  },
+  {
+   "name": "Auditor independence and competence evidence",
+   "absorbs": [
+    "Auditor Independence and Competence Evidence"
+   ]
+  },
+  {
+   "name": "Awareness communications to personnel",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Change management procedure with CAB approvals and back-out plans",
+   "reason": "Change management evidence, off-topic for independent review of information security"
+  },
+  {
+   "name": "Change records (RFC) with risk classification",
+   "reason": "Change management RFC evidence, off-topic for independent review of information security"
+  }
+ ]
+}

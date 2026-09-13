@@ -1,0 +1,81 @@
+{
+ "set_id": "S005",
+ "di": 13,
+ "groups": [
+  {
+   "name": "Business impact analysis report",
+   "absorbs": [
+    "Business impact analysis report",
+    "BIA Report",
+    "Business impact analysis documentation",
+    "Data criticality analysis report"
+   ]
+  },
+  {
+   "name": "BIA methodology and process documentation",
+   "absorbs": [
+    "BIA methodology document",
+    "BIA process documentation"
+   ]
+  },
+  {
+   "name": "Critical function / business function assessment and prioritization",
+   "absorbs": [
+    "Critical function identification",
+    "Business Function Assessment",
+    "Application criticality classification",
+    "Recovery priority classification"
+   ]
+  },
+  {
+   "name": "ICT disruption impact assessment",
+   "absorbs": [
+    "ICT disruption impact assessment"
+   ]
+  },
+  {
+   "name": "Activity / interdependency dependency mapping",
+   "absorbs": [
+    "Activity dependency mapping",
+    "Interdependency Map"
+   ]
+  },
+  {
+   "name": "Workflow analysis",
+   "absorbs": [
+    "Workflow Analysis"
+   ]
+  },
+  {
+   "name": "BIA approval records",
+   "absorbs": [
+    "BIA approval records"
+   ]
+  },
+  {
+   "name": "Business continuity policy and procedure",
+   "absorbs": [
+    "Approved policy and standard addressing Business Continuity and Risk",
+    "Documented procedure or work instruction implementing Business Continuity and"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Risk register with entries, owners, ratings, and treatment plans",
+   "reason": "Risk register is risk-treatment evidence, not a business impact analysis artifact."
+  },
+  {
+   "name": "Risk assessment methodology documentation and approval records",
+   "reason": "Risk assessment methodology is distinct from BIA methodology; off-topic for a BIA set."
+  },
+  {
+   "name": "Business Continuity Plan with RTO/RPO targets and recovery procedures",
+   "reason": "BCP is a downstream recovery-planning artifact, not the impact analysis itself."
+  },
+  {
+   "name": "BCP test exercise records and post-test review documentation",
+   "reason": "BCP testing evidence, not business impact analysis."
+  }
+ ]
+}

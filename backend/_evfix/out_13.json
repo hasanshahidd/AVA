@@ -1,0 +1,85 @@
+{
+ "set_id": "S016",
+ "di": 4,
+ "groups": [
+  {
+   "name": "Access authorization policy",
+   "absorbs": [
+    "Access authorization policy and procedures",
+    "Least Privilege Access Policy"
+   ]
+  },
+  {
+   "name": "Access request, approval and change authorization records",
+   "absorbs": [
+    "Access request and approval forms",
+    "Access Change Authorization Records",
+    "Privileged Access Request Records"
+   ]
+  },
+  {
+   "name": "Authorization verification / receipt workflow records",
+   "absorbs": [
+    "Authorization receipt and verification workflow records"
+   ]
+  },
+  {
+   "name": "Authorized user list and access provisioning records",
+   "absorbs": [
+    "Authorized User list receipt and access provisioning log",
+    "Access grant correlation with Healthcare Facility authorization",
+    "Access Provisioning Workflow Screenshots"
+   ]
+  },
+  {
+   "name": "Minimum necessary / least-privilege determination records",
+   "absorbs": [
+    "Minimum necessary determination records"
+   ]
+  },
+  {
+   "name": "Role-Based Access Matrix",
+   "absorbs": [
+    "Role-Based Access Matrix"
+   ]
+  },
+  {
+   "name": "Periodic access review reports",
+   "absorbs": [
+    "Periodic Access Review Reports",
+    "Periodic Access Review Report"
+   ]
+  },
+  {
+   "name": "Risk-ranked access review schedule",
+   "absorbs": [
+    "Risk-Ranked Review Schedule"
+   ]
+  },
+  {
+   "name": "Segregation of duties conflict analysis",
+   "absorbs": [
+    "SoD Conflict Analysis"
+   ]
+  },
+  {
+   "name": "Access modification log",
+   "absorbs": [
+    "Access Modification Log"
+   ]
+  },
+  {
+   "name": "Access removal SLA report",
+   "absorbs": [
+    "Access Removal SLA Report"
+   ]
+  },
+  {
+   "name": "Access exception register",
+   "absorbs": [
+    "Exception Register for Access"
+   ]
+  }
+ ],
+ "excluded": []
+}

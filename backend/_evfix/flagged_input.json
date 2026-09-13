@@ -1,0 +1,5907 @@
+[
+ {
+  "di": 0,
+  "domain": "Governance, Leadership & Policy",
+  "set_id": "S001",
+  "heading": "Establish and maintain an approved information security policy document",
+  "members": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.3",
+    "title": "Security Policies and Procedures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "title": "Information Security Policy Document"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.2.1",
+    "title": "Technology Risk Policies and Standards"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PL-1",
+    "title": "Policy and Procedures"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.1",
+    "title": "Establish, Publish, Maintain, and Disseminate an Overall Information Security Policy"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.4",
+    "title": "Board-approved cyber security policy"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.1",
+    "title": "Information Security Policy"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.1",
+    "title": "Development of Information Security Policy Document"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "title": "Policies for Information Security"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-1",
+    "title": "Organizational Cybersecurity Policy"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.3",
+    "name": "Security policies"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.3",
+    "name": "Procedures documentation"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.3",
+    "name": "Policy review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "Approved Information Security Policy Document document with management sign-off"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "Annual review records of the Information Security Policy Document"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "Physical access logs (badge/biometric) and visitor register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "CCTV deployment evidence and footage retention records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.a",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.2.1",
+    "name": "Technology risk management policies and standards"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.2.1",
+    "name": "Policy review and update records showing regular updates"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PL-1",
+    "name": "Security planning policy"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PL-1",
+    "name": "Planning procedures"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PL-1",
+    "name": "Policy review records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.1",
+    "name": "Overall Information Security Policy"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.1",
+    "name": "Publication & Distribution Evidence"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.1",
+    "name": "Personnel Acknowledgment Records"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.4",
+    "name": "Board-approved cyber security policy"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.4",
+    "name": "Policy version control log"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.1",
+    "name": "Information security policy document"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.1",
+    "name": "Management approval evidence"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.1",
+    "name": "Policy communication records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.1",
+    "name": "Information security policy document"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.1",
+    "name": "Policy scope definition"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.1",
+    "name": "Regulatory compliance mapping"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.1",
+    "name": "Policy objectives documentation"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Information Security Policy"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Topic-Specific Policies Register"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Policy Approval Record"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Policy Acknowledgement Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Policy Communication Evidence"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.1",
+    "name": "Annual Policy Review Minutes"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-1",
+    "name": "Cybersecurity policy"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-1",
+    "name": "Policy distribution records"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-1",
+    "name": "Acknowledgment forms"
+   }
+  ]
+ },
+ {
+  "di": 0,
+  "domain": "Governance, Leadership & Policy",
+  "set_id": "S002",
+  "heading": "Define and allocate information security roles and responsibilities",
+  "members": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.2",
+    "title": "Security Governance Structure"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.c",
+    "title": "Allocation of Information Security Responsibilities"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.3",
+    "title": "Define Information Security Roles and Responsibilities for All Personnel"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.2",
+    "title": "Security Roles and Responsibilities"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.5",
+    "title": "Allocation of Information Security Responsibilities"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "title": "Information Security Roles and Responsibilities"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-2",
+    "title": "Cybersecurity Roles Coordination"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.2",
+    "name": "Governance structure documentation"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.2",
+    "name": "Role assignments"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.2",
+    "name": "Management commitment evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.c",
+    "name": "Approved policy and standard addressing Allocation of Information Security"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.c",
+    "name": "Documented procedure or work instruction implementing Allocation of Information"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.c",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.c",
+    "name": "Periodic review records with reviewer"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.3",
+    "name": "Roles & Responsibilities Section in Policy"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.3",
+    "name": "Personnel Acknowledgment Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.3",
+    "name": "Awareness Evidence"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.2",
+    "name": "Security role definitions"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.2",
+    "name": "Responsibility assignments"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.2",
+    "name": "Organization chart"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.5",
+    "name": "Security roles and responsibilities matrix"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.5",
+    "name": "Job descriptions with security duties"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.5",
+    "name": "Signed NDAs"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.5",
+    "name": "Responsibility assignment records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "name": "Information Security RACI Matrix"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "name": "Security Role Job Descriptions"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "name": "Organisational Chart with Security Function"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "name": "Residual Risk Acceptance Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.2",
+    "name": "Security Responsibilities Appointment Letters"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-2",
+    "name": "RACI matrix"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-2",
+    "name": "Role definitions"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.GV-2",
+    "name": "Partner agreements"
+   }
+  ]
+ },
+ {
+  "di": 0,
+  "domain": "Governance, Leadership & Policy",
+  "set_id": "S006",
+  "heading": "Periodically review and update the information security policy",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "title": "Review of the Information Security Policy"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.2",
+    "title": "Review and Update the Information Security Policy"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.7",
+    "title": "Annual review of policies, standards and procedures"
+   },
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "1.5",
+    "title": "Adopt and implement the framework"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.2",
+    "title": "Policy Review"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "name": "Approved Review of the Information Security Policy document"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "name": "Annual review records of the Review of the Information"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "name": "Change management procedure with CAB approvals and back-out plans"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "name": "Change records (RFC) with risk classification"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "04.b",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.2",
+    "name": "Annual Policy Review Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.2",
+    "name": "Policy Update History"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.1.2",
+    "name": "Review Sign-off Records"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.7",
+    "name": "Policy review register"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.7",
+    "name": "Version-history records"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "1.1.7",
+    "name": "Approval evidence for annual updates"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.2",
+    "name": "Policy review schedule"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.2",
+    "name": "Review meeting minutes"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.2",
+    "name": "Policy version history"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "2.2",
+    "name": "Change management records"
+   }
+  ]
+ },
+ {
+  "di": 0,
+  "domain": "Governance, Leadership & Policy",
+  "set_id": "S007",
+  "heading": "Establish an information security management program/system",
+  "members": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.1",
+    "title": "Information Security Management System"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO13",
+    "title": "Managed Security"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "title": "Information Security Management Program"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-1",
+    "title": "Information Security Program Plan"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.1",
+    "name": "ISMS documentation"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.1",
+    "name": "ISO 27001 certification (if applicable)"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.1",
+    "name": "Security policy framework"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO13",
+    "name": "Information Security Management System (ISMS) documentation"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO13",
+    "name": "Information security policies and standards"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO13",
+    "name": "Security risk treatment plans and implementation evidence"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO13",
+    "name": "ISMS monitoring reports and security metrics dashboards"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "name": "Approved policy and standard addressing Information Security Management Program"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "name": "Documented procedure or work instruction implementing Information Security Management"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "name": "Audit logging configuration evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "name": "Log review records and follow-up case documentation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "00.a",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-1",
+    "name": "Information security program plan"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-1",
+    "name": "Program governance documentation"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-1",
+    "name": "Program review records"
+   }
+  ]
+ },
+ {
+  "di": 0,
+  "domain": "Governance, Leadership & Policy",
+  "set_id": "S025",
+  "heading": "Establish a formal system authorization process before operation",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "title": "Authorization Process for Information Assets and Facilities"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-10",
+    "title": "Authorization Process"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "Approved policy and standard addressing Authorization Process"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "Documented procedure or work instruction implementing Authorization Process"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "Physical access logs (badge/biometric) and visitor register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.d",
+    "name": "CCTV deployment evidence and footage retention records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-10",
+    "name": "Authorization process documentation"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-10",
+    "name": "ATO tracking records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PM-10",
+    "name": "Risk-based decision documentation"
+   }
+  ]
+ },
+ {
+  "di": 1,
+  "domain": "Risk Management",
+  "set_id": "S003",
+  "heading": "Establish and maintain an enterprise technology/ICT risk management framework",
+  "members": [
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO12",
+    "title": "Managed Risk"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-5.1",
+    "title": "ICT Risk Management Framework"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "title": "Risk Management Program Development"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "4.1.1",
+    "title": "Technology Risk Management Framework"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "5.1.1",
+    "title": "Technology risk management framework"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "1.4.1.d",
+    "title": "Integrate technology risks with enterprise risk management"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO12",
+    "name": "IT risk management policy and framework"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO12",
+    "name": "IT risk register with risk assessments and treatment plans"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO12",
+    "name": "Risk analysis reports with likelihood and impact assessments"
+   },
+   {
+    "fw": "COBIT 2019",
+    "cid": "APO12",
+    "name": "Risk response actions and monitoring reports"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-5.1",
+    "name": "ICT risk management framework documentation"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-5.1",
+    "name": "Board approval records for ICT risk framework"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-5.1",
+    "name": "Internal governance structure documentation"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-5.1",
+    "name": "Management body responsibility assignments"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Approved policy and standard addressing Risk Management Program Development"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Documented procedure or work instruction implementing Risk Management Program"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Risk register with entries, owners, ratings, and treatment plans"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Risk assessment methodology documentation and approval records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Secure SDLC documentation with security checkpoints"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "03.a",
+    "name": "Code review records and security testing results"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "4.1.1",
+    "name": "Technology risk management framework document"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "4.1.1",
+    "name": "Evidence of framework implementation across the organisation"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "5.1.1",
+    "name": "Approved tech risk management framework"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "5.1.1",
+    "name": "Roles & responsibilities matrix"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "5.1.1",
+    "name": "Plan update history"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "1.4.1.d",
+    "name": "Enterprise Risk Management Framework"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "1.4.1.d",
+    "name": "IT Risk Register"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "1.4.1.d",
+    "name": "ERM-IT Risk Integration Procedure"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "1.4.1.d",
+    "name": "Integrated Risk Reports to Board"
+   }
+  ]
+ },
+ {
+  "di": 1,
+  "domain": "Risk Management",
+  "set_id": "S014",
+  "heading": "Conduct a privacy or data protection impact assessment for high-risk processing",
+  "members": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 35",
+    "title": "Data Protection Impact Assessment"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "title": "Privacy and Impact Assessment"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 35",
+    "name": "DPIA methodology"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 35",
+    "name": "Completed DPIAs"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 35",
+    "name": "Risk mitigation measures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Approved policy and standard addressing Privacy and Impact Assessment"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Documented procedure or work instruction implementing Privacy and Impact"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Privacy notice/statement published to data subjects with version history"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Consent records, opt-out tracking, and data subject request logs"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.q",
+    "name": "Periodic review records with reviewer"
+   }
+  ]
+ },
+ {
+  "di": 2,
+  "domain": "Compliance & Legal",
+  "set_id": "S001",
+  "heading": "Identify and document applicable legal, statutory, regulatory and contractual requirements",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "title": "Identification of Applicable Legislation"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "title": "Legal, Statutory, Regulatory, and Contractual Requirements"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.c",
+    "title": "Identify legal and regulatory requirements for business functions"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "name": "Approved policy and standard addressing Identification of Applicable Legislation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "name": "Documented procedure or work instruction implementing Identification of Applicable"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "name": "Executed agreements with required security clauses and signature records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.a",
+    "name": "Periodic review records with reviewer"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Legal and Regulatory Obligations Register"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Compliance Obligations Matrix"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Legal Counsel Advisory Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Horizon Scanning Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Cryptographic Controls Legal Review"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.31",
+    "name": "Compliance Monitoring Reports"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.c",
+    "name": "Legal & Regulatory Requirements Register"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.c",
+    "name": "Compliance BIA Section"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.c",
+    "name": "Regulatory Review Records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.c",
+    "name": "Regulatory Mapping Tool Output"
+   }
+  ]
+ },
+ {
+  "di": 3,
+  "domain": "Audit & Assurance",
+  "set_id": "S001",
+  "heading": "Independent review of information security at planned intervals",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "title": "Independent Review of Information Security"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.8",
+    "title": "Independent Review of Information Security"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "title": "Independent Review of Information Security"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "name": "Approved policy and standard addressing Independent Review of Information"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "name": "Documented procedure or work instruction implementing Independent Review of"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "name": "Change management procedure with CAB approvals and back-out plans"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "name": "Change records (RFC) with risk classification"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.h",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.8",
+    "name": "Independent audit reports"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.8",
+    "name": "Review schedules"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.8",
+    "name": "Audit findings and remediation"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "1.8",
+    "name": "Internal audit charter"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "Internal Audit Programme"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "Internal Audit Reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "Auditor Independence and Competence Evidence"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "Management Review of Audit Findings"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "Corrective Action Register"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.35",
+    "name": "External Review Reports"
+   }
+  ]
+ },
+ {
+  "di": 3,
+  "domain": "Audit & Assurance",
+  "set_id": "S014",
+  "heading": "Monitor and audit privacy/PII protection controls and policy effectiveness",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "title": "Privacy Monitoring and Auditing"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "title": "Compliance Monitoring and Audit"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Approved policy and standard addressing Privacy Monitoring and Auditing"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Documented procedure or work instruction implementing Privacy Monitoring and"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Audit logging configuration evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Log review records and follow-up case documentation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Audit plan, reports with scope, findings, and remediation tracking"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.s",
+    "name": "Privacy notice/statement published to data subjects with version history"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Documented Compliance Monitoring and Audit demonstrating compliance"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Organizational artifacts: role mandates, RACI, job descriptions, committee charters"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Compliance audit reports and assessment records"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Performance metrics/KPI dashboard with targets, measurements, and review records"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Business intelligence artifacts: dashboards, analytics use-case register, and reports"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.4",
+    "name": "Privacy artifacts"
+   }
+  ]
+ },
+ {
+  "di": 4,
+  "domain": "Access Control & Identity",
+  "set_id": "S002",
+  "heading": "Revoke user access promptly upon termination or role change",
+  "members": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.2",
+    "title": "Establish an Access Revoking Process"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.7",
+    "title": "Access Revocation"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "4.5",
+    "title": "Personnel Offboarding"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "3.4",
+    "title": "Access Revocation"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "APD-04",
+    "title": "User Access Termination / De-provisioning"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.2.5",
+    "title": "Immediately Revoke Access for Terminated Users"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "title": "Removal of Access Rights"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.3",
+    "title": "Removal of Access Rights"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.9",
+    "title": "Revocation of Access Rights"
+   },
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "3.3.1.3.e.1",
+    "title": "Revoke access rights post-employment"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.6",
+    "title": "Healthcare Facility — Timely Termination of Access on Workforce Exit"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.2",
+    "name": "Access revocation process documentation"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.2",
+    "name": "Termination access revocation records"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.2",
+    "name": "Access revocation timeliness metrics"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.7",
+    "name": "Access revocation procedures"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.7",
+    "name": "Timeliness records for access removal on termination"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "4.5",
+    "name": "Offboarding procedures"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "4.5",
+    "name": "Access revocation records"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "4.5",
+    "name": "Timeliness verification"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "3.4",
+    "name": "Termination procedures"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "3.4",
+    "name": "Access revocation records"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "3.4",
+    "name": "Timeliness verification"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "APD-04",
+    "name": "Termination access revocation checklist"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "APD-04",
+    "name": "HR termination notification to IT"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "APD-04",
+    "name": "Timeliness comparison of termination date vs. account disable date"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "APD-04",
+    "name": "Sample of terminated users verified as disabled"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.2.5",
+    "name": "Termination Procedure with HR-IT Integration"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.2.5",
+    "name": "Termination Revocation Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.2.5",
+    "name": "Account Disablement Audit Logs"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "Approved policy and standard addressing Removal of Access Rights"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "Documented procedure or work instruction implementing Removal of Access"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.i",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.3",
+    "name": "Access revocation procedure"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.3",
+    "name": "Access revocation logs for terminated personnel"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.3",
+    "name": "Communication records with health sector regulator"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.3",
+    "name": "Audit trail of disabled accounts"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.9",
+    "name": "Access revocation procedure"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.9",
+    "name": "Access removal records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.9",
+    "name": "System access logs"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.9",
+    "name": "HR-IT coordination records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.6",
+    "name": "Access termination procedure document"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.6",
+    "name": "Termination workflow records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.6",
+    "name": "Time-to-revoke metrics and audit logs"
+   }
+  ]
+ },
+ {
+  "di": 4,
+  "domain": "Access Control & Identity",
+  "set_id": "S011",
+  "heading": "Restrict access to information on a need-to-know basis",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "title": "Information Access Restriction"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 7.1",
+    "title": "Information Access Restriction"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "title": "Information Access Restriction"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "10.3.6",
+    "title": "Access controls limiting info access to required employees"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "C1.3",
+    "title": "Access Restrictions for Confidential Information"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "Approved policy and standard addressing Information Access Restriction"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "Documented procedure or work instruction implementing Information Access Restriction"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "Physical access logs (badge/biometric) and visitor register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.v",
+    "name": "CCTV deployment evidence and footage retention records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 7.1",
+    "name": "Role-based access control (RBAC) configuration"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 7.1",
+    "name": "Access justification records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 7.1",
+    "name": "Need-to-know enforcement evidence"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 7.1",
+    "name": "Restricted access list for support staff"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Application Access Control Matrix"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Data Access Restriction Configuration"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Least Privilege Assessment"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Application Access Review Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Access Decision Audit Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.3",
+    "name": "Attribute-Based Access Control Configuration"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "10.3.6",
+    "name": "Role-based access controls for transaction validation"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "C1.3",
+    "name": "Access control lists for confidential data repositories"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "C1.3",
+    "name": "Periodic access review results for confidential information"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "C1.3",
+    "name": "Role-based access configurations for confidential systems"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "C1.3",
+    "name": "Confidential information access request and approval records"
+   }
+  ]
+ },
+ {
+  "di": 4,
+  "domain": "Access Control & Identity",
+  "set_id": "S012",
+  "heading": "Require multi-factor authentication for application access",
+  "members": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.3",
+    "title": "Require MFA for Externally-Exposed Applications"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.5",
+    "title": "Multi-Factor Authentication"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.j",
+    "title": "Multi-Factor Authentication and Secure Communication"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "3.3",
+    "title": "Multi-factor Authentication"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.4.2",
+    "title": "Implement MFA for All Non-Console Access into CDE"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.3",
+    "name": "MFA configuration for external applications"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.3",
+    "name": "MFA coverage report"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "6.3",
+    "name": "MFA enrollment records"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.5",
+    "name": "MFA implementation documentation"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "9.1.5",
+    "name": "MFA coverage assessment for sensitive systems"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.j",
+    "name": "MFA implementation policy and deployment records"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.j",
+    "name": "MFA coverage assessment for critical systems"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.j",
+    "name": "Secured communications solution documentation"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.j",
+    "name": "Emergency communication system testing records"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "3.3",
+    "name": "MFA configuration documentation"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "3.3",
+    "name": "Token/device inventory"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "3.3",
+    "name": "MFA enrollment records"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "3.3",
+    "name": "Authentication logs"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.4.2",
+    "name": "MFA Configuration for All CDE Non-Console Access"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.4.2",
+    "name": "Authentication Logs"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.4.2",
+    "name": "MFA Bypass Exception Documentation"
+   }
+  ]
+ },
+ {
+  "di": 4,
+  "domain": "Access Control & Identity",
+  "set_id": "S016",
+  "heading": "Authorize and grant access to data based on documented access-authorization policies",
+  "members": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(4)(ii)(B)",
+    "title": "Access Authorization"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.2.1",
+    "title": "ADHIE — Provide Access on Authorization Indication"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "title": "Access Rights Management"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "title": "Access Rights"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(4)(ii)(B)",
+    "name": "Access authorization policy and procedures"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(4)(ii)(B)",
+    "name": "Access request and approval forms"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(4)(ii)(B)",
+    "name": "Minimum necessary determination records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.2.1",
+    "name": "Authorization receipt and verification workflow records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.2.1",
+    "name": "Authorized User list receipt and access provisioning log"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.2.1",
+    "name": "Access grant correlation with Healthcare Facility authorization"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "Least Privilege Access Policy"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "Role-Based Access Matrix"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "Periodic Access Review Reports"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "Access Change Authorization Records"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "Risk-Ranked Review Schedule"
+   },
+   {
+    "fw": "SBP Internet Banking Framework",
+    "cid": "2.2.2(a)",
+    "name": "SoD Conflict Analysis"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Access Provisioning Workflow Screenshots"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Periodic Access Review Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Access Modification Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Access Removal SLA Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Privileged Access Request Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.18",
+    "name": "Exception Register for Access"
+   }
+  ]
+ },
+ {
+  "di": 4,
+  "domain": "Access Control & Identity",
+  "set_id": "S022",
+  "heading": "Establish and document a user identification and authentication policy",
+  "members": [
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.1.1",
+    "title": "Document Security Policies for User Identification and Authentication"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "IA-1",
+    "title": "Policy and Procedures"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "title": "Authentication and access control"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.1.1",
+    "name": "Authentication Policy"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.1.1",
+    "name": "Authentication Procedures"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "8.1.1",
+    "name": "Policy Review & Distribution Records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "IA-1",
+    "name": "I&A policy document"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "IA-1",
+    "name": "Authentication procedures"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "IA-1",
+    "name": "Policy review records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "name": "Authentication & Access Control Policy"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "name": "Acceptable Use Policy (AUP)"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "name": "AUP Acknowledgement Records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "name": "MFA Implementation Configuration"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.4",
+    "name": "Segregation of Duties Register"
+   }
+  ]
+ },
+ {
+  "di": 5,
+  "domain": "Data Protection & Privacy",
+  "set_id": "S004",
+  "heading": "Provide a privacy notice to data subjects",
+  "members": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.520",
+    "title": "Notice of Privacy Practices"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "title": "Privacy Notice"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PT-5",
+    "title": "Privacy Notice"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "P1.1",
+    "title": "Privacy Notice"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "title": "Privacy Notice and Consent Management"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.520",
+    "name": "Current Notice of Privacy Practices document"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.520",
+    "name": "Distribution and acknowledgment records"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.520",
+    "name": "Website posting of NPP"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.520",
+    "name": "NPP revision history"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Approved policy and standard addressing Privacy Notice"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Documented procedure or work instruction implementing Privacy Notice"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Privacy notice/statement published to data subjects with version history"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Consent records, opt-out tracking, and data subject request logs"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.a",
+    "name": "Periodic review records with reviewer"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PT-5",
+    "name": "Privacy notice/policy"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PT-5",
+    "name": "Notice delivery mechanisms"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PT-5",
+    "name": "Privacy notice update records"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "P1.1",
+    "name": "Privacy notice/policy published on website and applications"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "P1.1",
+    "name": "Privacy notice update and version history records"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "P1.1",
+    "name": "Evidence of notice communication to data subjects"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "P1.1",
+    "name": "Privacy notice accessibility and language review records"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Documented Privacy Notice and Consent Management demonstrating compliance"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Approved Data Management and Personal Data Protection Strategy/Plan"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Documented procedures"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Organizational artifacts: role mandates, RACI, job descriptions, committee charters"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Compliance audit reports and assessment records"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "PDP.4.1",
+    "name": "Data lifecycle records covering retention schedules"
+   }
+  ]
+ },
+ {
+  "di": 5,
+  "domain": "Data Protection & Privacy",
+  "set_id": "S018",
+  "heading": "Protect records from loss, destruction, and falsification",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "title": "Protection of Organizational Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "title": "Protection of Records"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Approved policy and standard addressing Protection of Organizational Records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Documented procedure or work instruction implementing Protection of Organizational"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Executed agreements with required security clauses and signature records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Records retention schedule and protection mechanisms"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "06.c",
+    "name": "Periodic review records with reviewer"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Records Management Policy"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Records Retention Schedule"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Records Protection Controls Documentation"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Records Destruction Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Archive Access Logs"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.33",
+    "name": "Retention Automation Configuration"
+   }
+  ]
+ },
+ {
+  "di": 5,
+  "domain": "Data Protection & Privacy",
+  "set_id": "S019",
+  "heading": "Limit collection and processing to the minimum necessary data",
+  "members": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 5(1)(c)",
+    "title": "Data Minimisation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "title": "Data Minimization"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 5(1)(c)",
+    "name": "Data inventory"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 5(1)(c)",
+    "name": "Necessity assessments"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 5(1)(c)",
+    "name": "Data field justification"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "name": "Approved policy and standard addressing Data Minimization"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "name": "Documented procedure or work instruction implementing Data Minimization"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.j",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   }
+  ]
+ },
+ {
+  "di": 5,
+  "domain": "Data Protection & Privacy",
+  "set_id": "S024",
+  "heading": "Maintain an accounting of disclosures of personal data",
+  "members": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.528",
+    "title": "Accounting of Disclosures of Protected Health Information"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "title": "Accounting of Disclosures"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.528",
+    "name": "Disclosure tracking system and log"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.528",
+    "name": "Accounting of disclosures procedures"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.528",
+    "name": "Disclosure request response records"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.528",
+    "name": "Six-year disclosure history maintenance evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "name": "Approved policy and standard addressing Accounting of Disclosures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "name": "Documented procedure or work instruction implementing Accounting of Disclosures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "name": "Executed agreements with required security clauses and signature records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.c",
+    "name": "Periodic review records with reviewer"
+   }
+  ]
+ },
+ {
+  "di": 7,
+  "domain": "Network & Communications Security",
+  "set_id": "S019",
+  "heading": "Control remote diagnostic and configuration ports",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 5.4",
+    "title": "Remote Diagnostic and Configuration Protection"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "title": "Remote Diagnostic and Configuration Port Protection"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 5.4",
+    "name": "Diagnostic/configuration port whitelist"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 5.4",
+    "name": "Disabled services/utilities documentation"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 5.4",
+    "name": "Authorized workstation list for remote diagnostics"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "AC 5.4",
+    "name": "Remote diagnostic access logs"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "Approved policy and standard addressing Remote Diagnostic and Configuration"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "Documented procedure or work instruction implementing Remote Diagnostic and"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "Network architecture diagram showing segmentation, firewalls, and trust zones"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "Network device configuration baselines and ruleset review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "Physical access logs (badge/biometric) and visitor register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "01.l",
+    "name": "CCTV deployment evidence and footage retention records"
+   }
+  ]
+ },
+ {
+  "di": 11,
+  "domain": "Logging, Monitoring & Detection",
+  "set_id": "S002",
+  "heading": "Enable and identify auditable events and generate audit logs",
+  "members": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "8.2",
+    "title": "Collect Audit Logs"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.2.1",
+    "title": "Enable Audit Logs for All System Components and Cardholder Data"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-2",
+    "title": "Event Logging"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "title": "Audit Logging"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "title": "Audit Logging"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.312(b)",
+    "title": "Audit Controls"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.4",
+    "title": "Logging enabled with integrity protection"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "title": "Logging"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "CC7.6",
+    "title": "Security Event Logging"
+   },
+   {
+    "fw": "ISO/IEC 42001:2023 AI Management System",
+    "cid": "13.7",
+    "title": "AI System Recording of Event Logs"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "8.2",
+    "name": "Log collection configuration"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "8.2",
+    "name": "Centralized logging architecture documentation"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "8.2",
+    "name": "Log collection coverage reports"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.2.1",
+    "name": "Audit Log Enablement Configuration"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.2.1",
+    "name": "System Component Logging Coverage Map"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.2.1",
+    "name": "SIEM Source Inventory"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.2.1",
+    "name": "Sample Live Audit Logs"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-2",
+    "name": "Auditable events list"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-2",
+    "name": "Audit logging configuration"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-2",
+    "name": "Event logging rationale documentation"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "name": "Audit logging configuration per system/application"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "name": "Log content standards documentation"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "name": "Log retention policy and configuration"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "name": "Log review schedules and records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 6.2",
+    "name": "Log tamper protection evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "Approved policy and standard addressing Audit Logging"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "Documented procedure or work instruction implementing Audit Logging"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "Audit logging configuration evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.aa",
+    "name": "Log review records and follow-up case documentation"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.312(b)",
+    "name": "Audit logging configuration documentation"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.312(b)",
+    "name": "Audit log samples from ePHI systems"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.312(b)",
+    "name": "Audit log review procedures and reports"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.312(b)",
+    "name": "Log retention policy and evidence"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.4",
+    "name": "Logging configuration baselines"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.4",
+    "name": "Log access controls"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.4",
+    "name": "Log integrity monitoring (e.g. hash/WORM/SIEM)"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Logging Policy and Standards"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Log Source Inventory"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "SIEM Ingestion Dashboard"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Log Protection Configuration"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Privileged Activity Log Review Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Log Retention Configuration"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.15",
+    "name": "Log Anomaly Alerting Configuration"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "CC7.6",
+    "name": "Logging policy with defined security events to capture"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "CC7.6",
+    "name": "Log integrity protection mechanisms (write-once storage, checksums)"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "CC7.6",
+    "name": "Log retention configuration and compliance evidence"
+   },
+   {
+    "fw": "SOC 2 Type II",
+    "cid": "CC7.6",
+    "name": "Log review procedures and sample review records"
+   },
+   {
+    "fw": "ISO/IEC 42001:2023 AI Management System",
+    "cid": "13.7",
+    "name": "AI Event Logging Standard"
+   },
+   {
+    "fw": "ISO/IEC 42001:2023 AI Management System",
+    "cid": "13.7",
+    "name": "Event Log Samples"
+   },
+   {
+    "fw": "ISO/IEC 42001:2023 AI Management System",
+    "cid": "13.7",
+    "name": "Log Retention Policy"
+   }
+  ]
+ },
+ {
+  "di": 11,
+  "domain": "Logging, Monitoring & Detection",
+  "set_id": "S008",
+  "heading": "Protect audit log information from unauthorized access and tampering",
+  "members": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-9",
+    "title": "Protection of Audit Information"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.3.2",
+    "title": "Protect Audit Log Files from Unauthorized Modification"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "title": "Protection of Log Information"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "6.1.3.13",
+    "title": "ADHIE — Log Files Tamper-Proof"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.14",
+    "title": "Classification and access controls for security logs"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-9",
+    "name": "Audit log access controls"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-9",
+    "name": "Log integrity verification mechanisms"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AU-9",
+    "name": "Privileged access to audit tools documentation"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.3.2",
+    "name": "Log Tamper-Protection Configuration"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.3.2",
+    "name": "Log Modification Access Control"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "10.3.2",
+    "name": "Tamper-Detection Test Evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "name": "Approved policy and standard addressing Protection of Log Information"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "name": "Documented procedure or work instruction implementing Protection of Log"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.ac",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "6.1.3.13",
+    "name": "Log immutability mechanism documentation"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "6.1.3.13",
+    "name": "Log content scoping policy"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "6.1.3.13",
+    "name": "Tamper-detection alerting configuration"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.14",
+    "name": "Log classification scheme"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.4.14",
+    "name": "ACLs/IAM on log stores"
+   }
+  ]
+ },
+ {
+  "di": 12,
+  "domain": "Incident Management",
+  "set_id": "S002",
+  "heading": "Conduct post-incident reviews and capture lessons learned",
+  "members": [
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-13.1",
+    "title": "ICT Lessons Learned and Post-Incident Reviews"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "IM 2.6",
+    "title": "Learning from Information Security Incident"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "8.6",
+    "title": "Lessons Learned"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "17.8",
+    "title": "Conduct Post-Incident Reviews"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "7.8.2",
+    "title": "Incident Lessons Learned"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "RS.IM-1",
+    "title": "Lessons Learned"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.10.6",
+    "title": "Evolve Incident Response Plan Based on Lessons Learned"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "title": "Learning from Information Security Incidents"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.d",
+    "title": "Identify key lessons from cyber events"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.2.12",
+    "title": "Documentation of lessons learned"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-13.1",
+    "name": "Threat intelligence capability documentation"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-13.1",
+    "name": "Post-incident review reports"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-13.1",
+    "name": "Lessons learned documentation"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-13.1",
+    "name": "Framework improvement action plans"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "IM 2.6",
+    "name": "Lessons learned documentation per incident"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "IM 2.6",
+    "name": "Knowledge database for incident diagnosis/response"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "IM 2.6",
+    "name": "Lessons learned sharing records with stakeholders"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "8.6",
+    "name": "Post-incident review records"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "8.6",
+    "name": "Improvement actions"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "8.6",
+    "name": "Lessons learned documentation"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "17.8",
+    "name": "Post-incident review reports"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "17.8",
+    "name": "Root cause analysis documentation"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "17.8",
+    "name": "Improvement action tracking"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "7.8.2",
+    "name": "Post-incident review reports with lessons learned"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "7.8.2",
+    "name": "Known error database or knowledge base"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "RS.IM-1",
+    "name": "Post-incident reviews"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "RS.IM-1",
+    "name": "Lessons learned documentation"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "RS.IM-1",
+    "name": "Plan updates"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.10.6",
+    "name": "Post-Incident Review Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.10.6",
+    "name": "IRP Update History (Lessons-Learned Driven)"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.10.6",
+    "name": "Industry Source Subscription Evidence"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Lessons Learned Report Template"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Completed Lessons Learned Reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Incident Metrics and Trends Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Control Improvement Tracker"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Updated Risk Assessment Entries"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.27",
+    "name": "Awareness Content Updates"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.d",
+    "name": "Lessons-Learned Register"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.d",
+    "name": "Post-Incident Review Reports"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.d",
+    "name": "Improvement Action Plans"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.d",
+    "name": "External Event Analysis Briefs"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.2.12",
+    "name": "Incident documentation repository"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.2.12",
+    "name": "Lessons learned reports"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.2.12",
+    "name": "Process improvement updates"
+   }
+  ]
+ },
+ {
+  "di": 13,
+  "domain": "Business Continuity & Resilience",
+  "set_id": "S005",
+  "heading": "Conduct a business impact analysis of disruption impacts",
+  "members": [
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-11.2",
+    "title": "Business Impact Analysis of ICT Disruptions"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "title": "Business Continuity and Risk Assessment"
+   },
+   {
+    "fw": "ISO 22301:2019 Business Continuity Management System",
+    "cid": "8.2.1",
+    "title": "Business Impact Analysis - General"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.a",
+    "title": "Assess and prioritize all business functions including interdependencies"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(7)(ii)(E)",
+    "title": "Applications and Data Criticality Analysis"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-11.2",
+    "name": "Business impact analysis report"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-11.2",
+    "name": "Critical function identification"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-11.2",
+    "name": "ICT disruption impact assessment"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-11.2",
+    "name": "Recovery priority classification"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "Approved policy and standard addressing Business Continuity and Risk"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "Documented procedure or work instruction implementing Business Continuity and"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "Risk register with entries, owners, ratings, and treatment plans"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "Risk assessment methodology documentation and approval records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "Business Continuity Plan with RTO/RPO targets and recovery procedures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "12.b",
+    "name": "BCP test exercise records and post-test review documentation"
+   },
+   {
+    "fw": "ISO 22301:2019 Business Continuity Management System",
+    "cid": "8.2.1",
+    "name": "BIA methodology document"
+   },
+   {
+    "fw": "ISO 22301:2019 Business Continuity Management System",
+    "cid": "8.2.1",
+    "name": "BIA process documentation"
+   },
+   {
+    "fw": "ISO 22301:2019 Business Continuity Management System",
+    "cid": "8.2.1",
+    "name": "Activity dependency mapping"
+   },
+   {
+    "fw": "ISO 22301:2019 Business Continuity Management System",
+    "cid": "8.2.1",
+    "name": "BIA approval records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.a",
+    "name": "Business Function Assessment"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.a",
+    "name": "Workflow Analysis"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.a",
+    "name": "BIA Report"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "5.2.1.a",
+    "name": "Interdependency Map"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(7)(ii)(E)",
+    "name": "Application criticality classification"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(7)(ii)(E)",
+    "name": "Data criticality analysis report"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.308(a)(7)(ii)(E)",
+    "name": "Business impact analysis documentation"
+   }
+  ]
+ },
+ {
+  "di": 14,
+  "domain": "Physical & Environmental Security",
+  "set_id": "S001",
+  "heading": "Establish a physical and environmental security policy",
+  "members": [
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.7",
+    "title": "Healthcare Facility — Physical and Environmental Security"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "title": "Physical and Environmental Security Policy"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.PHY.1",
+    "title": "Physical and Environmental Security"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PE-1",
+    "title": "Policy and Procedures"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "9.1.1",
+    "title": "Document Security Policies for Physical Access"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "title": "Physical and environmental protection"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.7",
+    "name": "Physical and environmental security policy"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.7",
+    "name": "Data center access control records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.7",
+    "name": "Sensitive systems physical isolation evidence"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.3.10.7",
+    "name": "Tamper and theft prevention controls"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "Approved Physical and Environmental Security Policy document"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "Policy review records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "Hazardous material storage procedures"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "Roles and responsibilities matrix"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "User acknowledgement records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 1.1",
+    "name": "Top management approval evidence"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.PHY.1",
+    "name": "Physical security policy and procedures"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.PHY.1",
+    "name": "Data center access control logs"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.PHY.1",
+    "name": "Environmental monitoring system records"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.PHY.1",
+    "name": "Physical security assessment reports"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PE-1",
+    "name": "Physical security policy"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PE-1",
+    "name": "Environmental protection procedures"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PE-1",
+    "name": "Policy review records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "9.1.1",
+    "name": "Physical Access Policy"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "9.1.1",
+    "name": "Physical Access Procedures"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "9.1.1",
+    "name": "Policy Review & Distribution Records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "Physical & Environmental Security Policy"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "Data Centre Access Register"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "Environmental Monitoring Logs"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "UPS/Generator Maintenance Records"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "Data Centre Site Risk Assessment"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.4.2",
+    "name": "Data Centre Walkthrough Photos"
+   }
+  ]
+ },
+ {
+  "di": 14,
+  "domain": "Physical & Environmental Security",
+  "set_id": "S008",
+  "heading": "Site and protect equipment to reduce environmental threats and unauthorized access",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 3.1",
+    "title": "Equipment Siting and Protection"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "title": "Equipment Siting and Protection"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "title": "Equipment Siting and Protection"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "5.2",
+    "title": "Equipment Protection"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 3.1",
+    "name": "Equipment siting guidelines"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 3.1",
+    "name": "Environmental risk assessment for equipment placement"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 3.1",
+    "name": "Equipment placement plans/diagrams"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "Approved policy and standard addressing Equipment Siting and Protection"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "Documented procedure or work instruction implementing Equipment Siting and"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "Physical access logs (badge/biometric) and visitor register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.g",
+    "name": "CCTV deployment evidence and footage retention records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Equipment Siting Standards"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Data Center Layout Diagram"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Screen Privacy Measures"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Equipment Environmental Controls"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Rack Security Documentation"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.7.8",
+    "name": "Equipment Protection Risk Assessment"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "5.2",
+    "name": "Environmental controls documentation"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "5.2",
+    "name": "Physical security measures"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "5.2",
+    "name": "Protection assessments"
+   }
+  ]
+ },
+ {
+  "di": 14,
+  "domain": "Physical & Environmental Security",
+  "set_id": "S012",
+  "heading": "Control public access, delivery, and loading areas isolated from processing facilities",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 2.10",
+    "title": "Deliver and Loading Areas"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "title": "Public Access, Delivery, and Loading Areas"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "8.6",
+    "title": "Public Access, Delivery and Loading Areas"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 2.10",
+    "name": "Segregated delivery/loading area layout"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 2.10",
+    "name": "Access procedures for loading docks"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 2.10",
+    "name": "Inbound/outbound material inspection logs"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "PE 2.10",
+    "name": "Material registration records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "name": "Approved policy and standard addressing Public Access"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "name": "Documented procedure or work instruction implementing Public Access"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "name": "Access control matrix with role-to-permission mapping for relevant systems"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "name": "User access provisioning, modification, and review records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "08.f",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "8.6",
+    "name": "Delivery area procedures"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "8.6",
+    "name": "Loading dock security measures"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "8.6",
+    "name": "Access point monitoring"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "8.6",
+    "name": "Isolation control documentation"
+   }
+  ]
+ },
+ {
+  "di": 15,
+  "domain": "Human Resources Security",
+  "set_id": "S001",
+  "heading": "Conduct background verification and screening checks on candidates, contractors and third parties prior to access",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "title": "Background Verification Check"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "title": "Screening"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "title": "Screening"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.5.2",
+    "title": "Personnel Background Checks"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PS-3",
+    "title": "Personnel Screening"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.7.1",
+    "title": "Screen Potential CDE Personnel Prior to Hire"
+   },
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "3.3.1.3.d",
+    "title": "Conduct screening and background checks"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.2",
+    "title": "Security Screening"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.10.3.3",
+    "title": "Personnel security vetting for system users"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "name": "Documented background verification process"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "name": "Background check criteria matrix by role/risk"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "name": "Completed background verification records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "name": "Vendor agreements for background verification services"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 2.1",
+    "name": "Government mandate compliance evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Approved policy and standard addressing Screening"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Documented procedure or work instruction implementing Screening"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Data classification scheme"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.b",
+    "name": "Background verification records for personnel per role sensitivity"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Background Screening Policy"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Background Check Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Screening Vendor Agreement"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Screening Tracker"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Role-Based Screening Matrix"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.1",
+    "name": "Periodic Re-Screening Records"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.5.2",
+    "name": "Background check policy and procedures"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.5.2",
+    "name": "Records of completed background checks for IT personnel"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PS-3",
+    "name": "Background check records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PS-3",
+    "name": "Screening procedures"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "PS-3",
+    "name": "Rescreening schedule and records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.7.1",
+    "name": "Personnel Screening Procedure"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.7.1",
+    "name": "Background Check Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.7.1",
+    "name": "Local Legal Constraints Documentation"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.7.1",
+    "name": "Screening Vendor Agreement"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.2",
+    "name": "Background check policy"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.2",
+    "name": "Screening records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.2",
+    "name": "Verification reports"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.2",
+    "name": "Reference check documentation"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.10.3.3",
+    "name": "Vetting/background check records"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.10.3.3",
+    "name": "Personnel security policy alignment"
+   }
+  ]
+ },
+ {
+  "di": 15,
+  "domain": "Human Resources Security",
+  "set_id": "S004",
+  "heading": "Recover and return all organizational assets upon termination or change of employment",
+  "members": [
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "3.3.1.3.e.2",
+    "title": "Ensure return of assigned information assets post-employment"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "title": "Return of Assets"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.2",
+    "title": "Return of Assets"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "title": "Return of Assets"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.8",
+    "title": "Return of Information Assets"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "name": "Asset Return Checklist"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "name": "Completed Leaver Asset Return Forms"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "name": "Offboarding Workflow Screenshot"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "name": "Leavers vs Returns Reconciliation Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.11",
+    "name": "BYOD Data Wipe Certificate"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.2",
+    "name": "Asset recovery checklists"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.2",
+    "name": "Signed clearance forms from departing personnel"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.2",
+    "name": "Acknowledgement that no information remains in possession of departed"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 4.2",
+    "name": "Asset inventory reconciliation reports"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Approved policy and standard addressing Return of Assets"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Documented procedure or work instruction implementing Return of Assets"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Access termination workflow records with timing metrics against SLA"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.h",
+    "name": "Session timeout, idle lockout, and re-authentication configuration evidence"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.8",
+    "name": "Asset return procedure"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.8",
+    "name": "Asset return forms"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.8",
+    "name": "Return verification records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.8",
+    "name": "Outstanding asset tracking"
+   }
+  ]
+ },
+ {
+  "di": 15,
+  "domain": "Human Resources Security",
+  "set_id": "S007",
+  "heading": "Management shall require personnel to apply security in accordance with established policies and procedures",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "title": "Compliance to Organizational Policies and Procedures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "title": "Management Responsibilities"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "name": "Acceptable Usage Policy document"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "name": "Signed Acceptable Usage Policy acknowledgements"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "name": "Information security briefing records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "name": "Segregation of duties matrix"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "HR 3.1",
+    "name": "Access provisioning records linked to signed policies"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "name": "Approved policy and standard addressing Management Responsibilities"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "name": "Documented procedure or work instruction implementing Management Responsibilities"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.d",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   }
+  ]
+ },
+ {
+  "di": 16,
+  "domain": "Awareness & Training",
+  "set_id": "S001",
+  "heading": "Provide literacy/awareness training to system users at a defined frequency",
+  "members": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AT-2",
+    "title": "Literacy Training and Awareness"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.4",
+    "title": "Security Awareness and Training"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.3",
+    "title": "Security Awareness Training"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "5.2",
+    "title": "Security Training and Awareness"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-14.1",
+    "title": "ICT Security Awareness and Training"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "ELC-04",
+    "title": "IT Security Awareness and Training"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.6.1",
+    "title": "IT Security Awareness Training"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.g",
+    "title": "Basic Cyber Hygiene Practices and Cybersecurity Training"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.6.1",
+    "title": "Implement a Formal Security Awareness Program"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.5",
+    "title": "Information Security Awareness, Education and Training"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "14.1",
+    "title": "Establish and Maintain a Security Awareness Program"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.AT-1",
+    "title": "Security Awareness Training"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "title": "Information Security Awareness, Education, and Training"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "title": "Information Security Awareness, Education, and Training"
+   },
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "3.3.1.3.b",
+    "title": "Provide cyber security awareness training to staff"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "DS.6",
+    "title": "Information Security Training, Awareness and Communication"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AT-2",
+    "name": "Security awareness training materials"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AT-2",
+    "name": "Training completion records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AT-2",
+    "name": "Phishing simulation results"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "AT-2",
+    "name": "Annual training schedule"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.4",
+    "name": "Training program documentation"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.4",
+    "name": "Training completion records"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "1.4",
+    "name": "Awareness materials"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.3",
+    "name": "Training program documentation"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.3",
+    "name": "Training completion records"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "1.3",
+    "name": "Training materials"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "5.2",
+    "name": "Training program documentation"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "5.2",
+    "name": "Training completion records"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "5.2",
+    "name": "Awareness campaign materials"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "5.2",
+    "name": "Training effectiveness assessments"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-14.1",
+    "name": "ICT security awareness programme content"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-14.1",
+    "name": "Training attendance records"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-14.1",
+    "name": "Senior management training evidence"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-14.1",
+    "name": "Training effectiveness assessments"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "ELC-04",
+    "name": "Training program content and materials"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "ELC-04",
+    "name": "Training completion records and tracking"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "ELC-04",
+    "name": "Specialized SOX training documentation"
+   },
+   {
+    "fw": "SOX IT General Controls",
+    "cid": "ELC-04",
+    "name": "Non-compliance escalation evidence"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.6.1",
+    "name": "IT security awareness training programme materials"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.6.1",
+    "name": "Training completion records for all staff"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.6.1",
+    "name": "Assessment results measuring security awareness"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.g",
+    "name": "Cyber hygiene policy and practices documentation"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.g",
+    "name": "Cybersecurity training program and curriculum"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.g",
+    "name": "Training attendance and completion records"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.g",
+    "name": "Phishing simulation and awareness exercise results"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.6.1",
+    "name": "Formal Security Awareness Program"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.6.1",
+    "name": "Awareness Content Library"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.6.1",
+    "name": "Role-Specific Awareness Content"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.6.1",
+    "name": "Program Review Records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.5",
+    "name": "Training program documentation"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.5",
+    "name": "Training completion records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.5",
+    "name": "Awareness materials"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "5.5",
+    "name": "Training effectiveness assessments"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "14.1",
+    "name": "Security awareness program documentation"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "14.1",
+    "name": "Training content and materials"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "14.1",
+    "name": "Program review records"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.AT-1",
+    "name": "Training program"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.AT-1",
+    "name": "Completion records"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.AT-1",
+    "name": "Awareness materials"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "name": "Approved policy and standard addressing Information Security Awareness"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "name": "Documented procedure or work instruction implementing Information Security Awareness"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "name": "Training attendance records with dates"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "02.e",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Security Awareness Training Plan"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "LMS Completion Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Training Content Library"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Phishing Simulation Results"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Role-Based Training Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Awareness Campaign Collateral"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.6.3",
+    "name": "Training Effectiveness Metrics"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "DS.6",
+    "name": "Documented Information Security Training"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "DS.6",
+    "name": "Evidence of compliance"
+   },
+   {
+    "fw": "KSA National Data Management and Personal Data Protection Standards",
+    "cid": "DS.6",
+    "name": "NCA assessment/compliance records (conducted by NCA, not NDMO)"
+   }
+  ]
+ },
+ {
+  "di": 16,
+  "domain": "Awareness & Training",
+  "set_id": "S009",
+  "heading": "Train workforce on privacy and PHI/PII handling policies and procedures",
+  "members": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.530(c)",
+    "title": "Privacy Training"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "title": "Privacy Protection Awareness and Training"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.530(c)",
+    "name": "Privacy training program curriculum"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.530(c)",
+    "name": "Training completion records for all workforce members"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.530(c)",
+    "name": "New hire training timeline evidence"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.530(c)",
+    "name": "Refresher training schedule and records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Approved policy and standard addressing Privacy Protection Awareness and"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Documented procedure or work instruction implementing Privacy Protection Awareness"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Training attendance records with dates"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Privacy notice/statement published to data subjects with version history"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Consent records, opt-out tracking, and data subject request logs"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.t",
+    "name": "Periodic review records with reviewer"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S001",
+  "heading": "Continuously monitor third-party services and compliance",
+  "members": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.6",
+    "title": "Monitor Service Providers"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.4.3",
+    "title": "Third Party Ongoing Monitoring"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "title": "Monitoring and Review of Third-Party Services"
+   },
+   {
+    "fw": "SBP Cloud Outsourcing Framework",
+    "cid": "4.2",
+    "title": "Ongoing CSP Compliance Monitoring"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "9.10.1.8",
+    "title": "Continuous monitoring of 3P reports and SLA audits"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "title": "Monitoring and Review of Third Party Services"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.4",
+    "title": "Monitoring and Review of Third Party Services"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.4",
+    "title": "Monitor TPSPs' PCI DSS Compliance Status at Least Annually"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.6",
+    "name": "Service provider monitoring procedures"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.6",
+    "name": "Monitoring reports"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.6",
+    "name": "SLA compliance tracking"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.4.3",
+    "name": "Third party monitoring reports and assessments"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "3.4.3",
+    "name": "Service level agreements with security requirements"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "name": "Third party compliance monitoring records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "name": "Third party service performance reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "name": "Third party audit reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "name": "Incident records related to third parties"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.2",
+    "name": "Third party risk assessments"
+   },
+   {
+    "fw": "SBP Cloud Outsourcing Framework",
+    "cid": "4.2",
+    "name": "CSP Compliance Monitoring Register"
+   },
+   {
+    "fw": "SBP Cloud Outsourcing Framework",
+    "cid": "4.2",
+    "name": "Periodic Compliance Review Reports"
+   },
+   {
+    "fw": "SBP Cloud Outsourcing Framework",
+    "cid": "4.2",
+    "name": "Contractual Obligation Tracker"
+   },
+   {
+    "fw": "SBP Cloud Outsourcing Framework",
+    "cid": "4.2",
+    "name": "Regulatory Change Impact Log"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "9.10.1.8",
+    "name": "SLA monitoring reports"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "9.10.1.8",
+    "name": "Vendor performance audits"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Approved policy and standard addressing Monitoring and Review of"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Documented procedure or work instruction implementing Monitoring and Review"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Audit logging configuration evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Log review records and follow-up case documentation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Audit plan, reports with scope, findings, and remediation tracking"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.f",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.4",
+    "name": "Third party audit reports"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.4",
+    "name": "Service review records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.4",
+    "name": "Compliance verification records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.4",
+    "name": "Performance monitoring reports"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.4",
+    "name": "TPSP Compliance Monitoring Program"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.4",
+    "name": "TPSP AOC Repository"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.4",
+    "name": "Compliance Monitoring Tracker"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.4",
+    "name": "Non-Compliance Escalation Records"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S002",
+  "heading": "Include security requirements in third-party agreements and contracts",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "title": "Addressing Security in Third Party Agreements"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.4",
+    "title": "Ensure Service Provider Contracts Include Security Requirements"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "4.1.3",
+    "title": "Confidentiality, cyber security and right-to-audit clauses"
+   },
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "Control Considerations.4.a.3",
+    "title": "Ensure contract includes cyber security requirements"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-30.1",
+    "title": "Key Contractual Provisions for ICT Services"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.2",
+    "title": "Maintain Written Agreements with TPSPs"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "title": "Addressing Information Security Within Supplier Agreements"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "name": "Approved policy and standard addressing Addressing Security in Third"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "name": "Documented procedure or work instruction implementing Addressing Security in"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.k",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.4",
+    "name": "Contract security requirements checklist"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.4",
+    "name": "Sample contract clauses"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "15.4",
+    "name": "Contract review records"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "4.1.3",
+    "name": "Sample vendor contracts with required clauses"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "4.1.3",
+    "name": "Contract clause checklist"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-30.1",
+    "name": "Contract review checklists covering required provisions"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-30.1",
+    "name": "Service description documentation"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-30.1",
+    "name": "Data processing location inventories"
+   },
+   {
+    "fw": "Digital Operational Resilience Act",
+    "cid": "DORA-30.1",
+    "name": "SLA documentation"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.2",
+    "name": "Sample Executed TPSP Agreements"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.2",
+    "name": "Agreement Repository"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "12.8.2",
+    "name": "Agreement Maintenance Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "name": "Supplier Contract Security Clause Library"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "name": "Signed Supplier Agreements"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "name": "Supplier NDAs"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "name": "Right-to-Audit Clause Evidence"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.20",
+    "name": "Contract Compliance Tracker"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S005",
+  "heading": "Supervise and review outsourced software development",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "title": "Outsourced Software Development"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "title": "Outsourced Software Development"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.11",
+    "title": "Outsourced Software Development"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "title": "Outsourced Development"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Secure coding policy"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Quality assurance process documentation"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Outsourced development agreements with required clauses"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Right-to-audit clauses in agreements"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Source code review reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "SA 6.1",
+    "name": "Staff rotation/termination records for outsourced work"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Approved policy and standard addressing Outsourced Software Development"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Documented procedure or work instruction implementing Outsourced Software Development"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Audit logging configuration evidence"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Log review records and follow-up case documentation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.l",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.11",
+    "name": "Outsourcing agreements"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.11",
+    "name": "Licensing documentation"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.11",
+    "name": "Vendor supervision records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.11",
+    "name": "Code ownership documentation"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Outsourced Development Agreement"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Vendor Secure SDLC Assessment"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Code Review of Vendor Deliverables"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Vendor Security Test Results"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Source Code Escrow Agreement"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "Vendor Quality Reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.30",
+    "name": "IP and Confidentiality Clauses"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S009",
+  "heading": "Bind data processors / business associates by contract",
+  "members": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 28",
+    "title": "Processor Obligations"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.314(a)(1)",
+    "title": "Business Associate Contracts or Other Arrangements - Standard"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "title": "Privacy Requirements for Contractors and Processors"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 28",
+    "name": "Data processing agreements"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 28",
+    "name": "Processor assessments"
+   },
+   {
+    "fw": "General Data Protection Regulation",
+    "cid": "Article 28",
+    "name": "Contract provisions"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.314(a)(1)",
+    "name": "BAA template meeting regulatory requirements"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.314(a)(1)",
+    "name": "Executed BAAs with all business associates"
+   },
+   {
+    "fw": "HIPAA Security & Privacy Rule",
+    "cid": "§164.314(a)(1)",
+    "name": "BAA compliance tracking system"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Approved policy and standard addressing Privacy Requirements"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Documented procedure or work instruction implementing Privacy Requirements"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Privacy notice/statement published to data subjects with version history"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "13.r",
+    "name": "Consent records, opt-out tracking, and data subject request logs"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S012",
+  "heading": "Manage third-party service delivery",
+  "members": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "title": "Third-Party Service Delivery"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "title": "Service Delivery"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.3",
+    "title": "Service Delivery"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "Third party services agreement templates"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "Service-specific security requirements documentation"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "SLA monitoring reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "Right-to-audit clauses in agreements"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "Third party relationship management roles"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "TP 2.1",
+    "name": "Information access type documentation per third party"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "name": "Approved policy and standard addressing Service Delivery"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "name": "Documented procedure or work instruction implementing Service Delivery"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.e",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.3",
+    "name": "Service level agreements"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.3",
+    "name": "Security requirements in SLAs"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.3",
+    "name": "Performance monitoring records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.3",
+    "name": "Service delivery reports"
+   }
+  ]
+ },
+ {
+  "di": 17,
+  "domain": "Third-Party / Supply Chain",
+  "set_id": "S019",
+  "heading": "Identify information security risks arising from external parties",
+  "members": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "title": "Identification of Risks Related to External Parties"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.1",
+    "title": "Identification of Risk Related to Third Parties"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "name": "Approved policy and standard addressing Identification of Risks Related"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "name": "Documented procedure or work instruction implementing Identification of Risks"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "name": "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "name": "Third-party risk assessment and ongoing monitoring records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "05.i",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.1",
+    "name": "Third party risk assessment procedure"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.1",
+    "name": "Vendor risk assessments"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.1",
+    "name": "Third party inventory"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "3.1",
+    "name": "Risk mitigation controls documentation"
+   }
+  ]
+ },
+ {
+  "di": 18,
+  "domain": "Vulnerability & Threat Management",
+  "set_id": "S001",
+  "heading": "Establish and maintain a documented vulnerability management process/program",
+  "members": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "7.1",
+    "title": "Establish and Maintain a Vulnerability Management Process"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.IP-12",
+    "title": "Vulnerability Management Plan"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.3",
+    "title": "Vulnerability Management"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.4",
+    "title": "Vulnerability Management"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "title": "Control of Technical Vulnerabilities"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "title": "Management of Technical Vulnerabilities"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.12",
+    "title": "Technical Vulnerability Management"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "6.3.1",
+    "title": "Identify and Manage Security Vulnerabilities"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.e.2",
+    "title": "Vulnerability Handling and Disclosure"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "7.1",
+    "name": "Vulnerability management process document"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "7.1",
+    "name": "Remediation SLA definitions"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "7.1",
+    "name": "Process review records"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.IP-12",
+    "name": "Vulnerability management policy"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.IP-12",
+    "name": "Scan schedules"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "PR.IP-12",
+    "name": "Remediation tracking"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.3",
+    "name": "Vulnerability scan reports"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.3",
+    "name": "Remediation tracking"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.3",
+    "name": "Patching records"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.4",
+    "name": "Vulnerability scan reports"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.4",
+    "name": "Remediation tracking"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.4",
+    "name": "Patching records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Approved policy and standard addressing Control of Technical Vulnerabilities"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Documented procedure or work instruction implementing Control of Technical"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Vulnerability scanning reports with remediation tracking and timing"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Patch management records with deployment evidence and exception register"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "10.m",
+    "name": "Periodic review records with reviewer"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Vulnerability Management Policy"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Vulnerability Scanning Reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Patch Management Records"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Vulnerability Remediation Tracker"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Penetration Test Reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Vulnerability SLA Compliance Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.8",
+    "name": "Risk Acceptance Records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.12",
+    "name": "Vulnerability management policy"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.12",
+    "name": "Vulnerability scanning reports"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.12",
+    "name": "Patch management records"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "13.12",
+    "name": "Remediation tracking"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "6.3.1",
+    "name": "Vulnerability Management Procedure"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "6.3.1",
+    "name": "Risk Ranking Methodology"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "6.3.1",
+    "name": "Vulnerability Tracking System Records"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "6.3.1",
+    "name": "Vulnerability Intelligence Source Inventory"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.e.2",
+    "name": "Vulnerability management policy with remediation timelines"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.e.2",
+    "name": "Vulnerability scanning reports and remediation tracking"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.e.2",
+    "name": "Coordinated vulnerability disclosure policy"
+   },
+   {
+    "fw": "NIS2 Directive",
+    "cid": "NIS2-21.2.e.2",
+    "name": "Patch management records and compliance metrics"
+   }
+  ]
+ },
+ {
+  "di": 18,
+  "domain": "Vulnerability & Threat Management",
+  "set_id": "S003",
+  "heading": "Collect and analyze cyber threat intelligence",
+  "members": [
+   {
+    "fw": "SAMA Cyber Security Framework",
+    "cid": "Threat landscape",
+    "title": "Collect information on threats in a specific domain"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "title": "Threat Intelligence"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "12.1.1",
+    "title": "Cyber Threat Intelligence"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.a",
+    "title": "Gather and interpret cyber threat intelligence"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.RA-2",
+    "title": "Threat Intelligence"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "Threat Intelligence Procedure"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "Threat Intelligence Sources Inventory"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "Threat Landscape Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "TI Platform Dashboard Screenshot"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "IOC Ingestion Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.5.7",
+    "name": "Threat Brief Distribution Record"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "12.1.1",
+    "name": "Cyber threat intelligence programme documentation"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "12.1.1",
+    "name": "Threat intelligence analysis reports"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.a",
+    "name": "Threat Intelligence Gathering Procedure"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.a",
+    "name": "Threat Intelligence Source Register"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.a",
+    "name": "Threat Intelligence Reports"
+   },
+   {
+    "fw": "SBP ETGRMF",
+    "cid": "2.9.a",
+    "name": "Ecosystem Attack Indicator Log"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.RA-2",
+    "name": "Threat intelligence feeds"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.RA-2",
+    "name": "ISAC membership"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "ID.RA-2",
+    "name": "Threat reports"
+   }
+  ]
+ },
+ {
+  "di": 18,
+  "domain": "Vulnerability & Threat Management",
+  "set_id": "S007",
+  "heading": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+  "members": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "SI-3",
+    "title": "Malicious Code Protection"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "title": "Controls Against Malware"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.2",
+    "title": "Malware Protection"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.4.1.4",
+    "title": "Healthcare Facility — Prevent Malicious Software Introduction"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "10.1",
+    "title": "Deploy and Maintain Anti-Malware Software"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "5.2.1",
+    "title": "Deploy Anti-Malware on All Applicable System Components"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "7.2",
+    "title": "Malware Protection"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "DE.CM-4",
+    "title": "Malicious Code Detection"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "title": "Protection Against Malware"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.2",
+    "title": "Malware Protection"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "11.3.3",
+    "title": "Endpoint Protection"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "9.4.5.1",
+    "title": "Anti-malware controls at host, network and user level"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "title": "Controls Against Malicious Code"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "SI-3",
+    "name": "Anti-malware solution documentation"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "SI-3",
+    "name": "Malware definition update records"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "SI-3",
+    "name": "Malware scan reports"
+   },
+   {
+    "fw": "NIST SP 800-53 Rev 5",
+    "cid": "SI-3",
+    "name": "Malware incident records"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Anti-malware deployment inventory"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Anti-malware signature update logs"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Real-time protection configuration"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Scheduled scan reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Removable media scanning configuration"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Auto-run disable evidence"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Anti-malware alert configuration"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 4.1",
+    "name": "Malware awareness training records"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.2",
+    "name": "Anti-malware deployment"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.2",
+    "name": "Update configuration"
+   },
+   {
+    "fw": "ARAMCO Cybersecurity Compliance Certification",
+    "cid": "7.2",
+    "name": "Scan reports"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.4.1.4",
+    "name": "Anti-malware controls inventory"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.4.1.4",
+    "name": "Endpoint protection deployment records"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.4.1.4",
+    "name": "Pre-transmission scanning configuration"
+   },
+   {
+    "fw": "DOH Policy on the Abu Dhabi Health Information Exchange",
+    "cid": "4.4.1.4",
+    "name": "Periodic malware scanning reports"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "10.1",
+    "name": "Anti-malware deployment coverage"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "10.1",
+    "name": "Definition update configuration"
+   },
+   {
+    "fw": "CIS Critical Security Controls v8",
+    "cid": "10.1",
+    "name": "Anti-malware solution documentation"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "5.2.1",
+    "name": "Anti-Malware Coverage Report"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "5.2.1",
+    "name": "System Component Inventory with AM Status"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "5.2.1",
+    "name": "Exception List per 5.2.3"
+   },
+   {
+    "fw": "PCI Data Security Standard",
+    "cid": "5.2.1",
+    "name": "Endpoint Agent Configuration Export"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "7.2",
+    "name": "Anti-malware deployment evidence"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "7.2",
+    "name": "Definition update logs"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "7.2",
+    "name": "Scan reports"
+   },
+   {
+    "fw": "SWIFT Customer Security Controls Framework",
+    "cid": "7.2",
+    "name": "Malware incident records"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "DE.CM-4",
+    "name": "Anti-malware deployment"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "DE.CM-4",
+    "name": "Detection logs"
+   },
+   {
+    "fw": "NIST Cybersecurity Framework",
+    "cid": "DE.CM-4",
+    "name": "Scan reports"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Malware Protection Policy"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Anti-Malware/EDR Coverage Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Signature/Definition Update Status"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Malware Detection and Response Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Email Anti-Malware Scanning Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "User Awareness Training - Malware Module"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.7",
+    "name": "Removable Media AV Scan Configuration"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.2",
+    "name": "Anti-malware deployment"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.2",
+    "name": "Update configuration"
+   },
+   {
+    "fw": "SABIC CyberTrust Guidelines",
+    "cid": "6.2",
+    "name": "Scan reports"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "11.3.3",
+    "name": "Endpoint protection deployment records"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "11.3.3",
+    "name": "Endpoint protection coverage reports"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "9.4.5.1",
+    "name": "Endpoint/network/user-level anti-malware controls inventory"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "Approved policy and standard addressing Controls Against Malicious Code"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "Documented procedure or work instruction implementing Controls Against Malicious"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "Training attendance records with dates"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "Business Continuity Plan with RTO/RPO targets and recovery procedures"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "BCP test exercise records and post-test review documentation"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.j",
+    "name": "Anti-malware deployment evidence"
+   }
+  ]
+ },
+ {
+  "di": 19,
+  "domain": "Operations & IT Service Management",
+  "set_id": "S001",
+  "heading": "Capacity management: monitor resource utilization and plan for future capacity requirements",
+  "members": [
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "8.1.3",
+    "title": "Capacity Management"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "title": "Capacity Management"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "title": "Capacity Management"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.5.1",
+    "title": "Capacity management policy"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "6.7",
+    "title": "Capacity Management"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "title": "Capacity Management"
+   }
+  ],
+  "raw_evidence": [
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "8.1.3",
+    "name": "System resource monitoring dashboards"
+   },
+   {
+    "fw": "MAS Technology Risk Management Guidelines",
+    "cid": "8.1.3",
+    "name": "Capacity management reports and forecasts"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "name": "Capacity management plan"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "name": "Capacity monitoring reports"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "name": "Capacity threshold and escalation matrix"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "name": "Decommissioning records for unused systems"
+   },
+   {
+    "fw": "Abu Dhabi Healthcare Information and Cyber Security Standard",
+    "cid": "OM 3.1",
+    "name": "Database optimization and archival records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Approved policy and standard addressing Capacity Management"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Documented procedure or work instruction implementing Capacity Management"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Risk register with entries, owners, ratings, and treatment plans"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Risk assessment methodology documentation and approval records"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Capacity planning and monitoring records with thresholds and forecasts"
+   },
+   {
+    "fw": "HITRUST Common Security Framework",
+    "cid": "09.h",
+    "name": "Awareness communications demonstrating that personnel are informed of the"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.5.1",
+    "name": "Capacity management policy"
+   },
+   {
+    "fw": "Qatar Central Bank Technology Risks Circular",
+    "cid": "8.5.1",
+    "name": "Capacity plan with forecasts"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "6.7",
+    "name": "Capacity monitoring reports"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "6.7",
+    "name": "Capacity planning documentation"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "6.7",
+    "name": "Resource utilization metrics"
+   },
+   {
+    "fw": "Sri Lanka Baseline Security Standard",
+    "cid": "6.7",
+    "name": "Capacity forecasts"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Capacity Management Plan"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Capacity Monitoring Dashboard"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Capacity Trend Report"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Capacity Alert Configuration"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Capacity Incident Log"
+   },
+   {
+    "fw": "ISO/IEC 27001:2022",
+    "cid": "A.8.6",
+    "name": "Scaling Test Results"
+   }
+  ]
+ }
+]

@@ -1,0 +1,2183 @@
+{
+  "framework_id": 77,
+  "tenant_id": 1,
+  "started_epoch": 1782911450.022586,
+  "no_chunking": true,
+  "steps": [
+    {
+      "phase": "read",
+      "percent": 8,
+      "message": "Found 197 controls, 394 evidence items and 20 artifacts in “CSA Cloud Controls Matrix (CCM) v4.0”.",
+      "elapsed_s": 0.1,
+      "new_controls": 197,
+      "evidence_in": 394,
+      "artifacts_in": 20,
+      "framework": "CSA Cloud Controls Matrix (CCM) v4.0"
+    },
+    {
+      "phase": "domains",
+      "percent": 22,
+      "message": "Merging the framework's domains into your existing domains…",
+      "elapsed_s": 0.1
+    },
+    {
+      "phase": "domains",
+      "percent": 42,
+      "message": "Mapped onto 20 existing domains — 0 new domains created.",
+      "elapsed_s": 32.13,
+      "domains_used": [
+        "Access Control & Identity",
+        "Application & Software Security",
+        "Asset Management",
+        "Audit & Assurance",
+        "Awareness & Training",
+        "Business Continuity & Resilience",
+        "Compliance & Legal",
+        "Configuration & Change Management",
+        "Cryptography",
+        "Data Protection & Privacy",
+        "Governance, Leadership & Policy",
+        "Human Resources Security",
+        "Incident Management",
+        "Logging, Monitoring & Detection",
+        "Network & Communications Security",
+        "Operations & IT Service Management",
+        "Physical & Environmental Security",
+        "Risk Management",
+        "Third-Party / Supply Chain",
+        "Vulnerability & Threat Management"
+      ],
+      "new_domains": []
+    },
+    {
+      "phase": "normalize",
+      "percent": 52,
+      "message": "Matching each control to sets in its domain…",
+      "elapsed_s": 32.13
+    },
+    {
+      "phase": "normalize",
+      "percent": 62,
+      "message": "148 candidate joins — verifying each is a genuine match…",
+      "elapsed_s": 94.64,
+      "would_join": 148,
+      "would_standalone": 49
+    },
+    {
+      "phase": "normalize",
+      "percent": 70,
+      "message": "122 controls join existing sets, 75 standalone (verification demoted 26 weak matches to their own set).",
+      "elapsed_s": 167.18,
+      "would_join": 122,
+      "would_standalone": 75,
+      "joins_verified_kept": 122,
+      "joins_demoted": 26,
+      "demoted_items": [
+        {
+          "control_id": "CEK-09",
+          "title": "Encryption and Key Management Audit",
+          "was_set": "Perform periodic technical and nontechnical evaluation of security control effectiveness",
+          "reason": "Different focus on encryption audits"
+        },
+        {
+          "control_id": "HRS-10",
+          "title": "Non-Disclosure Agreements",
+          "was_set": "Implement procedures to protect intellectual property rights",
+          "reason": "Different focus on confidentiality vs. rights"
+        },
+        {
+          "control_id": "HRS-13",
+          "title": "Compliance User Responsibility",
+          "was_set": "Regularly review compliance with information security policies, rules and standards",
+          "reason": "Different activities: communication vs. review"
+        },
+        {
+          "control_id": "IVS-01",
+          "title": "Infrastructure and Virtualization Security Policy and Procedures",
+          "was_set": "Establish information systems acquisition, development and maintenance policy",
+          "reason": "Different focus: infrastructure vs. acquisition"
+        },
+        {
+          "control_id": "TVM-04",
+          "title": "Detection Updates",
+          "was_set": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+          "reason": "different activities: detection vs. deployment"
+        },
+        {
+          "control_id": "BCR-02",
+          "title": "Risk Assessment and Impact Analysis",
+          "was_set": "Conduct a security risk assessment to identify threats, vulnerabilities, likelihood and impact",
+          "reason": "different focus on cloud vs security"
+        },
+        {
+          "control_id": "CEK-08",
+          "title": "CSC Key Management Capability",
+          "was_set": "Manage cryptographic keys at a cloud service provider for outsourced workloads",
+          "reason": "different context of key management"
+        },
+        {
+          "control_id": "DSP-14",
+          "title": "Disclosure Notification",
+          "was_set": "Disclosure to Third Parties",
+          "reason": "Different activities regarding disclosure notification"
+        },
+        {
+          "control_id": "DCS-01",
+          "title": "Off-Site Equipment Disposal Policy and Procedures",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding equipment disposal"
+        },
+        {
+          "control_id": "DCS-02",
+          "title": "Off-Site Transfer Authorization Policy and Procedures",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding transfer control"
+        },
+        {
+          "control_id": "UEM-01",
+          "title": "Endpoint Devices Policy and Procedures",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding endpoint management"
+        },
+        {
+          "control_id": "UEM-05",
+          "title": "Endpoint Management",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding endpoint management"
+        },
+        {
+          "control_id": "UEM-12",
+          "title": "Remote Locate",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding endpoint location"
+        },
+        {
+          "control_id": "UEM-13",
+          "title": "Remote Wipe",
+          "was_set": "Documented operating procedures for information processing facilities",
+          "reason": "Different activities regarding endpoint wiping"
+        },
+        {
+          "control_id": "DCS-13",
+          "title": "Environmental Systems",
+          "was_set": "DC Environmental Monitoring",
+          "reason": "Different focus on environmental controls"
+        },
+        {
+          "control_id": "DCS-05",
+          "title": "Assets Classification",
+          "was_set": "Classify information assets according to sensitivity and value",
+          "reason": "Different focus on asset types"
+        },
+        {
+          "control_id": "DCS-06",
+          "title": "Assets Cataloguing and Tracking",
+          "was_set": "Maintain a current inventory of information and IT assets",
+          "reason": "Different focus on asset types"
+        },
+        {
+          "control_id": "DCS-08",
+          "title": "Equipment Identification",
+          "was_set": "Maintain a current inventory of information and IT assets",
+          "reason": "Different focus on asset types"
+        },
+        {
+          "control_id": "HRS-05",
+          "title": "Asset Returns",
+          "was_set": "Accountability",
+          "reason": "Different activities regarding asset management"
+        },
+        {
+          "control_id": "DCS-11",
+          "title": "Unauthorized Access Response Training",
+          "was_set": "Train Workforce Members on Data Handling Best Practices",
+          "reason": "Different focus on access response"
+        },
+        {
+          "control_id": "HRS-09",
+          "title": "Personnel Roles and Responsibilities",
+          "was_set": "Define and assign information security responsibilities for employment termination or change of role",
+          "reason": "Different focus on termination responsibilities"
+        },
+        {
+          "control_id": "IAM-09",
+          "title": "Segregation of Privileged Access Roles",
+          "was_set": "Enforce segregation of duties for incompatible functions",
+          "reason": "different focus on privileged roles"
+        },
+        {
+          "control_id": "LOG-07",
+          "title": "Logging Scope",
+          "was_set": "Establish a logging and monitoring policy and procedures",
+          "reason": "scope definition differs from policy"
+        },
+        {
+          "control_id": "LOG-11",
+          "title": "Transaction/Activity Logging",
+          "was_set": "Log Sensitive Data Access",
+          "reason": "different focus on transaction vs sensitive data"
+        },
+        {
+          "control_id": "LOG-12",
+          "title": "Access Control Logs",
+          "was_set": "Log Sensitive Data Access",
+          "reason": "different focus on access control vs sensitive data"
+        },
+        {
+          "control_id": "STA-02",
+          "title": "SSRM Supply Chain",
+          "was_set": "Define a supply-chain security strategy and protective controls",
+          "reason": "different activities in strategy vs application"
+        }
+      ]
+    },
+    {
+      "phase": "build",
+      "percent": 80,
+      "message": "Cloning your library into a safe candidate and adding the framework…",
+      "elapsed_s": 167.18
+    },
+    {
+      "phase": "build",
+      "percent": 90,
+      "message": "Candidate library #68 built (your live library is untouched).",
+      "elapsed_s": 177.31,
+      "candidate_run_id": 68,
+      "would_join": 122,
+      "would_standalone": 75
+    },
+    {
+      "phase": "evidence",
+      "percent": 92,
+      "message": "Normalizing evidence — merging onto matched sets…",
+      "elapsed_s": 177.32
+    },
+    {
+      "phase": "evidence",
+      "percent": 96,
+      "message": "Merged 244 evidence items into 108 sets (0 already covered).",
+      "elapsed_s": 177.68,
+      "evidence_merged": 244,
+      "evidence_deduped": 0,
+      "sets_evidence_enriched": 108,
+      "evidence_generated": 0
+    },
+    {
+      "phase": "artifacts",
+      "percent": 98,
+      "message": "Normalizing artifacts against the unified catalog…",
+      "elapsed_s": 177.69
+    },
+    {
+      "phase": "artifacts",
+      "percent": 100,
+      "message": "7 new artifacts added, 13 deduped against existing frameworks.",
+      "elapsed_s": 177.72,
+      "artifacts_total": 20,
+      "artifacts_new": 7,
+      "artifacts_duplicate": 13
+    }
+  ],
+  "framework": "CSA Cloud Controls Matrix (CCM) v4.0",
+  "elapsed_s": 177.72,
+  "decisions": [
+    {
+      "control_id": "A&A-01",
+      "title": "Audit and Assurance Policy and Procedures",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Plan, establish and maintain a structured internal audit programme"
+    },
+    {
+      "control_id": "A&A-02",
+      "title": "Independent Assessments",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Independent review of information security at planned intervals"
+    },
+    {
+      "control_id": "A&A-03",
+      "title": "Risk-Based Planning Assessment",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Maintain a risk assessment process to scope and frequency IT audits"
+    },
+    {
+      "control_id": "A&A-04",
+      "title": "Requirements Compliance",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "joined",
+      "joined_set": "Legal and Regulatory Requirements"
+    },
+    {
+      "control_id": "A&A-05",
+      "title": "Audit Management Process",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Plan, establish and maintain a structured internal audit programme"
+    },
+    {
+      "control_id": "A&A-06",
+      "title": "Remediation of Audit Findings",
+      "framework_domain": "Audit & Assurance",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "joined",
+      "joined_set": "Monitor implementation of corrective actions"
+    },
+    {
+      "control_id": "AIS-01",
+      "title": "Application and Interface Security Policy and Procedures",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Establish and apply a secure system development life cycle"
+    },
+    {
+      "control_id": "AIS-02",
+      "title": "Application Security Baseline Requirements",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Establish and apply secure coding standards and practices"
+    },
+    {
+      "control_id": "AIS-03",
+      "title": "Application Security Metrics",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "AIS-04",
+      "title": "Secure Application Design and Development",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Establish and apply a secure system development life cycle"
+    },
+    {
+      "control_id": "AIS-05",
+      "title": "Automated Application Security Testing",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Perform application security testing using static and dynamic analysis tools"
+    },
+    {
+      "control_id": "AIS-06",
+      "title": "Automated Secure Application Deployment",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "joined",
+      "joined_set": "Establish and apply a secure system development life cycle"
+    },
+    {
+      "control_id": "AIS-07",
+      "title": "Application Vulnerability Remediation",
+      "framework_domain": "Application & Interface Security",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Remediate Detected Vulnerabilities"
+    },
+    {
+      "control_id": "BCR-01",
+      "title": "Business Continuity Management Policy and Procedures",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a business continuity management program"
+    },
+    {
+      "control_id": "BCR-02",
+      "title": "Risk Assessment and Impact Analysis",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Risk Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "BCR-03",
+      "title": "Business Continuity Strategy",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Business Continuity Objectives and Plans to Achieve Them"
+    },
+    {
+      "control_id": "BCR-04",
+      "title": "Business Continuity Planning",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Develop and document the business continuity plan"
+    },
+    {
+      "control_id": "BCR-05",
+      "title": "Documentation",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "BCR-06",
+      "title": "Business Continuity Exercises",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Test and exercise business continuity and disaster recovery plans"
+    },
+    {
+      "control_id": "BCR-07",
+      "title": "Communication",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Establish crisis communication and warning procedures"
+    },
+    {
+      "control_id": "BCR-08",
+      "title": "Backup",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Backup and Recovery"
+    },
+    {
+      "control_id": "BCR-09",
+      "title": "Disaster Response Plan",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Develop and maintain a disaster recovery plan"
+    },
+    {
+      "control_id": "BCR-10",
+      "title": "Response Plan Exercise",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Test and exercise business continuity and disaster recovery plans"
+    },
+    {
+      "control_id": "BCR-11",
+      "title": "Equipment Redundancy",
+      "framework_domain": "Business Continuity Management & Operational Resilience",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "joined",
+      "joined_set": "Implement redundancy and fault tolerance for processing facilities"
+    },
+    {
+      "control_id": "CCC-01",
+      "title": "Change Management Policy and Procedures",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a formal change management policy and process for IT systems"
+    },
+    {
+      "control_id": "CCC-02",
+      "title": "Quality Testing",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Change Testing"
+    },
+    {
+      "control_id": "CCC-03",
+      "title": "Change Management Technology",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Change Management"
+    },
+    {
+      "control_id": "CCC-04",
+      "title": "Unauthorized Change Protection",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Detect and resolve unauthorized changes via monitoring and incident management"
+    },
+    {
+      "control_id": "CCC-05",
+      "title": "Change Agreements",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Change Management"
+    },
+    {
+      "control_id": "CCC-06",
+      "title": "Change Management Baseline",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Maintain documented baseline configurations of information systems"
+    },
+    {
+      "control_id": "CCC-07",
+      "title": "Detection of Baseline Deviation",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Verify configuration compliance and remediate deviations against standards"
+    },
+    {
+      "control_id": "CCC-08",
+      "title": "Exception Management",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CCC-09",
+      "title": "Change Restoration",
+      "framework_domain": "Change Control & Configuration Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Establish a rollback plan to revert changes if problems occur during or after deployment"
+    },
+    {
+      "control_id": "CEK-01",
+      "title": "Encryption and Key Management Policy and Procedures",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Establish a policy and rules governing the use of cryptographic controls"
+    },
+    {
+      "control_id": "CEK-02",
+      "title": "CEK Roles and Responsibilities",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Require Key Custodians to Acknowledge Responsibilities"
+    },
+    {
+      "control_id": "CEK-03",
+      "title": "Data Encryption",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-04",
+      "title": "Encryption Algorithm",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Adopt cryptographic algorithms from well-established international standards with appropriate key length"
+    },
+    {
+      "control_id": "CEK-05",
+      "title": "Encryption Change",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Implement Key Management for Cryptographic Key Changes at End of Cryptoperiod"
+    },
+    {
+      "control_id": "CEK-06",
+      "title": "Encryption Change Cost Benefit Analysis",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-07",
+      "title": "Encryption Risk Management",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-08",
+      "title": "CSC Key Management Capability",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-09",
+      "title": "Encryption and Key Management Audit",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-10",
+      "title": "Key Generation",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Key Generation Security"
+    },
+    {
+      "control_id": "CEK-11",
+      "title": "Key Purpose",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-12",
+      "title": "Key Rotation",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-13",
+      "title": "Key Revocation",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-14",
+      "title": "Key Destruction",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Key Destruction"
+    },
+    {
+      "control_id": "CEK-15",
+      "title": "Key Activation",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-16",
+      "title": "Key Suspension",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-17",
+      "title": "Key Deactivation",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-18",
+      "title": "Key Archival",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-19",
+      "title": "Key Compromise",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Compromised Key Response"
+    },
+    {
+      "control_id": "CEK-20",
+      "title": "Key Recovery",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "CEK-21",
+      "title": "Key Inventory Management",
+      "framework_domain": "Cryptography, Encryption & Key Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-01",
+      "title": "Off-Site Equipment Disposal Policy and Procedures",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-02",
+      "title": "Off-Site Transfer Authorization Policy and Procedures",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-03",
+      "title": "Secure Area Policy and Procedures",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Establish a physical and environmental security policy"
+    },
+    {
+      "control_id": "DCS-04",
+      "title": "Secure Media Transportation Policy and Procedures",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-05",
+      "title": "Assets Classification",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Asset Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-06",
+      "title": "Assets Cataloguing and Tracking",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Asset Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-07",
+      "title": "Controlled Access Points",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Control facility access by role and validate access based on function"
+    },
+    {
+      "control_id": "DCS-08",
+      "title": "Equipment Identification",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Asset Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-09",
+      "title": "Secure Area Authorization",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Authorize and manage personnel physical access to sensitive systems"
+    },
+    {
+      "control_id": "DCS-10",
+      "title": "Surveillance System",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Security systems and surveillance to monitor and record DC activities"
+    },
+    {
+      "control_id": "DCS-11",
+      "title": "Unauthorized Access Response Training",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-12",
+      "title": "Cabling Security",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Protect power and telecommunications cabling from interception or damage"
+    },
+    {
+      "control_id": "DCS-13",
+      "title": "Environmental Systems",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DCS-14",
+      "title": "Secure Utilities",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Protect equipment from disruptions in supporting utilities"
+    },
+    {
+      "control_id": "DCS-15",
+      "title": "Equipment Location",
+      "framework_domain": "Datacenter Security",
+      "reconciled_domain": "Physical & Environmental Security",
+      "disposition": "joined",
+      "joined_set": "Site and protect equipment to reduce environmental threats and unauthorized access"
+    },
+    {
+      "control_id": "DSP-01",
+      "title": "Security and Privacy Policy and Procedures",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-02",
+      "title": "Secure Disposal",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Securely dispose of data using non-retrievable methods"
+    },
+    {
+      "control_id": "DSP-03",
+      "title": "Data Inventory",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a data inventory of sensitive data"
+    },
+    {
+      "control_id": "DSP-04",
+      "title": "Data Classification",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a data classification scheme"
+    },
+    {
+      "control_id": "DSP-05",
+      "title": "Data Flow Documentation",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Document Data Flows"
+    },
+    {
+      "control_id": "DSP-06",
+      "title": "Data Ownership and Stewardship",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-07",
+      "title": "Data Protection by Design and Default",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Data Protection by Design and Default"
+    },
+    {
+      "control_id": "DSP-08",
+      "title": "Data Privacy by Design and Default",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Data Protection by Design and Default"
+    },
+    {
+      "control_id": "DSP-09",
+      "title": "Data Protection Impact Assessment",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-10",
+      "title": "Sensitive Data Protection",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-11",
+      "title": "Disclosure of Data Sub-Processors",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-12",
+      "title": "Limitation of Purpose in Personal Data Processing",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Process personal data only for specified legitimate purposes"
+    },
+    {
+      "control_id": "DSP-13",
+      "title": "Personal Data Sub-Processing",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-14",
+      "title": "Disclosure Notification",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-15",
+      "title": "Data Location",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "DSP-16",
+      "title": "Data Retention and Deletion",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Retain data only as long as necessary under a retention policy"
+    },
+    {
+      "control_id": "DSP-17",
+      "title": "Sensitive Data Transfer",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Encrypt sensitive data transmitted to external parties"
+    },
+    {
+      "control_id": "DSP-18",
+      "title": "Personal Data Access, Reversal, Rectification and Deletion",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Provide data subjects the right to access their personal data"
+    },
+    {
+      "control_id": "DSP-19",
+      "title": "Data Portability",
+      "framework_domain": "Data Security & Privacy Lifecycle Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Right to Data Portability"
+    },
+    {
+      "control_id": "GRC-01",
+      "title": "Governance Program Policy and Procedures",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain an approved information security policy document"
+    },
+    {
+      "control_id": "GRC-02",
+      "title": "Risk Management Program",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Risk Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain an enterprise technology/ICT risk management framework"
+    },
+    {
+      "control_id": "GRC-03",
+      "title": "Organizational Policy Reviews",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Periodically review and update the information security policy"
+    },
+    {
+      "control_id": "GRC-04",
+      "title": "Policy Exception Process",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "GRC-05",
+      "title": "Information Security Program",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Establish an information security management program/system"
+    },
+    {
+      "control_id": "GRC-06",
+      "title": "Governance Responsibility Model",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Define and allocate information security roles and responsibilities"
+    },
+    {
+      "control_id": "GRC-07",
+      "title": "Information System Regulatory Mapping",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "joined",
+      "joined_set": "Legal and Regulatory Requirements"
+    },
+    {
+      "control_id": "GRC-08",
+      "title": "Special Interest Groups",
+      "framework_domain": "Governance, Risk Management & Compliance",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-01",
+      "title": "Background Screening Policy and Procedures",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "joined",
+      "joined_set": "Conduct background verification and screening checks on candidates, contractors and third parties prior to access"
+    },
+    {
+      "control_id": "HRS-02",
+      "title": "Acceptable Use of Technology Policy and Procedures",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Establish acceptable use policy for end-user technologies"
+    },
+    {
+      "control_id": "HRS-03",
+      "title": "Clean Desk Policy and Procedures",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-04",
+      "title": "Remote and Home Working Policy and Procedures",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-05",
+      "title": "Asset Returns",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Asset Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-06",
+      "title": "Employment Termination",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Revoke user access promptly upon termination or role change"
+    },
+    {
+      "control_id": "HRS-07",
+      "title": "Employment Agreement Process",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "joined",
+      "joined_set": "Incorporate information security responsibilities into roles and job descriptions"
+    },
+    {
+      "control_id": "HRS-08",
+      "title": "Employment Agreement Content",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "joined",
+      "joined_set": "Define employment terms, conditions and confidentiality clauses covering information security responsibilities"
+    },
+    {
+      "control_id": "HRS-09",
+      "title": "Personnel Roles and Responsibilities",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Human Resources Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-10",
+      "title": "Non-Disclosure Agreements",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "HRS-11",
+      "title": "Security Awareness Training",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Provide security awareness training upon hire and annually (induction plus refresher)"
+    },
+    {
+      "control_id": "HRS-12",
+      "title": "Personal and Sensitive Data Awareness and Training",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Train Workforce Members on Data Handling Best Practices"
+    },
+    {
+      "control_id": "HRS-13",
+      "title": "Compliance User Responsibility",
+      "framework_domain": "Human Resources",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IAM-01",
+      "title": "Identity and Access Management Policy and Procedures",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish, document, and maintain an access control policy"
+    },
+    {
+      "control_id": "IAM-02",
+      "title": "Strong Password Policy and Procedures",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and enforce a password management policy with complexity requirements"
+    },
+    {
+      "control_id": "IAM-03",
+      "title": "Identity Inventory",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and Maintain an Inventory of Accounts"
+    },
+    {
+      "control_id": "IAM-04",
+      "title": "Separation of Duties",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Enforce segregation of duties for incompatible functions"
+    },
+    {
+      "control_id": "IAM-05",
+      "title": "Least Privilege",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Apply the principle of least privilege when granting user access"
+    },
+    {
+      "control_id": "IAM-06",
+      "title": "User Access Provisioning",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish a formal user registration and access-provisioning process"
+    },
+    {
+      "control_id": "IAM-07",
+      "title": "User Access Changes and Revocation",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Revoke user access promptly upon termination or role change"
+    },
+    {
+      "control_id": "IAM-08",
+      "title": "User Access Review",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Conduct periodic reviews of user access rights"
+    },
+    {
+      "control_id": "IAM-09",
+      "title": "Segregation of Privileged Access Roles",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IAM-10",
+      "title": "Management of Privileged Access Roles",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Restrict and manage the allocation and use of privileged access rights"
+    },
+    {
+      "control_id": "IAM-11",
+      "title": "CSCs Approval for Agreed Privileged Access Roles",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Require documented approval of access privileges by authorized personnel before granting"
+    },
+    {
+      "control_id": "IAM-12",
+      "title": "Safeguard Logs Integrity",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Protect audit log information from unauthorized access and tampering"
+    },
+    {
+      "control_id": "IAM-13",
+      "title": "Uniquely Identifiable Users",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Assign a unique identifier to each user for identification and accountability"
+    },
+    {
+      "control_id": "IAM-14",
+      "title": "Strong Authentication",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Require multi-factor authentication for application access"
+    },
+    {
+      "control_id": "IAM-15",
+      "title": "Passwords Management",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Establish and enforce a password management policy with complexity requirements"
+    },
+    {
+      "control_id": "IAM-16",
+      "title": "Authorization Mechanisms",
+      "framework_domain": "Identity & Access Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Authorize and grant access to data based on documented access-authorization policies"
+    },
+    {
+      "control_id": "IPY-01",
+      "title": "Interoperability and Portability Policy and Procedures",
+      "framework_domain": "Interoperability & Portability",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IPY-02",
+      "title": "Application Interface Availability",
+      "framework_domain": "Interoperability & Portability",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IPY-03",
+      "title": "Secure Interoperability and Portability Management",
+      "framework_domain": "Interoperability & Portability",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IPY-04",
+      "title": "Data Portability Contractual Obligations",
+      "framework_domain": "Interoperability & Portability",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IVS-01",
+      "title": "Infrastructure and Virtualization Security Policy and Procedures",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IVS-02",
+      "title": "Capacity and Resource Planning",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IVS-03",
+      "title": "Network Security",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Manage and control networks to protect against threats"
+    },
+    {
+      "control_id": "IVS-04",
+      "title": "OS Hardening and Base Controls",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "ADHIE — Server Hardening to Industry Standards"
+    },
+    {
+      "control_id": "IVS-05",
+      "title": "Production and Non-Production Environments",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Separate development, test, and production environments"
+    },
+    {
+      "control_id": "IVS-06",
+      "title": "Segmentation and Segregation",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Segregate networks into separate security zones"
+    },
+    {
+      "control_id": "IVS-07",
+      "title": "Migration to Cloud Environments",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "IVS-08",
+      "title": "Network Architecture Documentation",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Maintain an accurate network architecture diagram"
+    },
+    {
+      "control_id": "IVS-09",
+      "title": "Network Defense",
+      "framework_domain": "Infrastructure & Virtualization Security",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Deploy network intrusion prevention/detection systems"
+    },
+    {
+      "control_id": "LOG-01",
+      "title": "Logging and Monitoring Policy and Procedures",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Establish a logging and monitoring policy and procedures"
+    },
+    {
+      "control_id": "LOG-02",
+      "title": "Audit Logs Protection",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Protect audit log information from unauthorized access and tampering"
+    },
+    {
+      "control_id": "LOG-03",
+      "title": "Security Monitoring and Alerting",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Detection and Monitoring of Security Events"
+    },
+    {
+      "control_id": "LOG-04",
+      "title": "Audit Logs Access and Accountability",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Restricted access to logs with review and backup"
+    },
+    {
+      "control_id": "LOG-05",
+      "title": "Audit Logs Monitoring and Response",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Address exceptions and anomalies identified during log review"
+    },
+    {
+      "control_id": "LOG-06",
+      "title": "Clock Synchronization",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "LOG-07",
+      "title": "Logging Scope",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "LOG-08",
+      "title": "Log Records",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Record required details and content in audit log records"
+    },
+    {
+      "control_id": "LOG-09",
+      "title": "Log Protection",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "joined",
+      "joined_set": "Protect audit log information from unauthorized access and tampering"
+    },
+    {
+      "control_id": "LOG-10",
+      "title": "Encryption Monitoring and Reporting",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Cryptographic Monitoring"
+    },
+    {
+      "control_id": "LOG-11",
+      "title": "Transaction/Activity Logging",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "LOG-12",
+      "title": "Access Control Logs",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Logging, Monitoring & Detection",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "LOG-13",
+      "title": "Failures and Anomalies Reporting",
+      "framework_domain": "Logging & Monitoring",
+      "reconciled_domain": "Incident Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "SEF-01",
+      "title": "Security Incident Management Policy and Procedures",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Develop incident management policy and procedures"
+    },
+    {
+      "control_id": "SEF-02",
+      "title": "Service Management Policy and Procedures",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "SEF-03",
+      "title": "Incident Response Plans",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain an incident response plan"
+    },
+    {
+      "control_id": "SEF-04",
+      "title": "Incident Response Testing",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Test and exercise the incident response plan periodically"
+    },
+    {
+      "control_id": "SEF-05",
+      "title": "Incident Response Metrics",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "SEF-06",
+      "title": "Event Triage Processes",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Assess and decide whether security events are incidents"
+    },
+    {
+      "control_id": "SEF-07",
+      "title": "Security Breach Notification",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Notify affected individuals or data subjects of a data breach"
+    },
+    {
+      "control_id": "SEF-08",
+      "title": "Points of Contact Maintenance",
+      "framework_domain": "Security Incident Management, E-Discovery & Cloud Forensics",
+      "reconciled_domain": "Incident Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-01",
+      "title": "SSRM Policy and Procedures",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-02",
+      "title": "SSRM Supply Chain",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-03",
+      "title": "SSRM Guidance",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Provide direction for cyber security requirements for customers"
+    },
+    {
+      "control_id": "STA-04",
+      "title": "SSRM Control Ownership",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-05",
+      "title": "SSRM Documentation Review",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-06",
+      "title": "SSRM Control Implementation",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Implement and monitor cloud security controls"
+    },
+    {
+      "control_id": "STA-07",
+      "title": "Supply Chain Inventory",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Maintain an inventory or register of third-party service providers"
+    },
+    {
+      "control_id": "STA-08",
+      "title": "Supply Chain Risk Management",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Supply Chain Risk Management"
+    },
+    {
+      "control_id": "STA-09",
+      "title": "Primary Service and Contractual Agreement",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Include security requirements in third-party agreements and contracts"
+    },
+    {
+      "control_id": "STA-10",
+      "title": "Supply Chain Agreement Review",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-11",
+      "title": "Internal Compliance Testing",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-12",
+      "title": "Supply Chain Service Agreement Compliance",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Continuously monitor third-party services and compliance"
+    },
+    {
+      "control_id": "STA-13",
+      "title": "Supply Chain Governance Review",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "STA-14",
+      "title": "Supply Chain Data Security Assessment",
+      "framework_domain": "Supply Chain Management, Transparency & Accountability",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "TVM-01",
+      "title": "Threat and Vulnerability Management Policy and Procedures",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a documented vulnerability management process/program"
+    },
+    {
+      "control_id": "TVM-02",
+      "title": "Malware Protection Policy and Procedures",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Deploy and maintain anti-malware / malicious-code protection on all systems"
+    },
+    {
+      "control_id": "TVM-03",
+      "title": "Vulnerability Remediation Schedule",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Remediate Detected Vulnerabilities"
+    },
+    {
+      "control_id": "TVM-04",
+      "title": "Detection Updates",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "TVM-05",
+      "title": "External Library Vulnerabilities",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Remediate Detected Vulnerabilities"
+    },
+    {
+      "control_id": "TVM-06",
+      "title": "Penetration Testing",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Establish and maintain a penetration testing program and methodology"
+    },
+    {
+      "control_id": "TVM-07",
+      "title": "Vulnerability Identification",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Identify vulnerabilities"
+    },
+    {
+      "control_id": "TVM-08",
+      "title": "Vulnerability Prioritization",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Prioritize high-risk threat and vulnerability pairings"
+    },
+    {
+      "control_id": "TVM-09",
+      "title": "Vulnerability Management Reporting",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "TVM-10",
+      "title": "Vulnerability Management Metrics",
+      "framework_domain": "Threat & Vulnerability Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-01",
+      "title": "Endpoint Devices Policy and Procedures",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-02",
+      "title": "Application and Service Approval",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Application & Software Security",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-03",
+      "title": "Compatibility",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-04",
+      "title": "Endpoint Inventory",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Asset Management",
+      "disposition": "joined",
+      "joined_set": "Maintain a current inventory of information and IT assets"
+    },
+    {
+      "control_id": "UEM-05",
+      "title": "Endpoint Management",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-06",
+      "title": "Automatic Lock Screen",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Access Control & Identity",
+      "disposition": "joined",
+      "joined_set": "Automatically lock or terminate a session after a period of inactivity"
+    },
+    {
+      "control_id": "UEM-07",
+      "title": "Operating Systems",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "joined",
+      "joined_set": "Regular updates and patching of all products"
+    },
+    {
+      "control_id": "UEM-08",
+      "title": "Storage Encryption",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Cryptography",
+      "disposition": "joined",
+      "joined_set": "Encrypt confidential data on end-user devices and endpoints"
+    },
+    {
+      "control_id": "UEM-09",
+      "title": "Anti-Malware Detection and Prevention",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Vulnerability & Threat Management",
+      "disposition": "joined",
+      "joined_set": "Deploy and maintain anti-malware / malicious-code protection on all systems"
+    },
+    {
+      "control_id": "UEM-10",
+      "title": "Software Firewall",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Network & Communications Security",
+      "disposition": "joined",
+      "joined_set": "Implement and Manage a Firewall on End-User Devices"
+    },
+    {
+      "control_id": "UEM-11",
+      "title": "Data Loss Prevention",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Data Protection & Privacy",
+      "disposition": "joined",
+      "joined_set": "Deploy data loss and leakage prevention controls"
+    },
+    {
+      "control_id": "UEM-12",
+      "title": "Remote Locate",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-13",
+      "title": "Remote Wipe",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "UEM-14",
+      "title": "Third-Party Endpoint Security Posture",
+      "framework_domain": "Universal Endpoint Management",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "joined",
+      "joined_set": "Assess and review the security practices of suppliers"
+    }
+  ],
+  "result": {
+    "candidate_run_id": 68,
+    "promoted": false,
+    "added_framework": "CSA Cloud Controls Matrix (CCM) v4.0",
+    "added_join": 122,
+    "added_standalone": 75,
+    "cloned_sets": 2332,
+    "cloned_standalone": 0,
+    "new_controls": 197,
+    "would_join": 122,
+    "would_standalone": 75,
+    "domains_used": [
+      "Access Control & Identity",
+      "Application & Software Security",
+      "Asset Management",
+      "Audit & Assurance",
+      "Awareness & Training",
+      "Business Continuity & Resilience",
+      "Compliance & Legal",
+      "Configuration & Change Management",
+      "Cryptography",
+      "Data Protection & Privacy",
+      "Governance, Leadership & Policy",
+      "Human Resources Security",
+      "Incident Management",
+      "Logging, Monitoring & Detection",
+      "Network & Communications Security",
+      "Operations & IT Service Management",
+      "Physical & Environmental Security",
+      "Risk Management",
+      "Third-Party / Supply Chain",
+      "Vulnerability & Threat Management"
+    ],
+    "new_domains": [],
+    "evidence_generated": 0,
+    "evidence_merged": 244,
+    "evidence_deduped": 0,
+    "sets_evidence_enriched": 108,
+    "artifacts_total": 20,
+    "artifacts_new": 7,
+    "artifacts_duplicate": 13,
+    "artifacts_new_sample": [
+      {
+        "artifact": "Privileged Access Register",
+        "type": "Register",
+        "control_ref": "IAM-10"
+      },
+      {
+        "artifact": "MFA / Strong Authentication Configuration",
+        "type": "Configuration",
+        "control_ref": "IAM-14"
+      },
+      {
+        "artifact": "Data Classification & Inventory",
+        "type": "Register",
+        "control_ref": "DSP-03"
+      },
+      {
+        "artifact": "Key Inventory & Rotation Records",
+        "type": "Register",
+        "control_ref": "CEK-21"
+      },
+      {
+        "artifact": "Secure Baseline / Hardening Standards",
+        "type": "Policy",
+        "control_ref": "IVS-04"
+      },
+      {
+        "artifact": "Logging & Monitoring Standard",
+        "type": "Policy",
+        "control_ref": "LOG-01"
+      },
+      {
+        "artifact": "Third-Party / CSP Assessment Records",
+        "type": "Report",
+        "control_ref": "STA-08"
+      }
+    ],
+    "artifacts_dup_sample": [
+      {
+        "artifact": "Cloud Security Governance Charter",
+        "type": "Policy",
+        "matches": "Cyber Security Governance Charter",
+        "in_framework": "SAMA Cyber Security Framework"
+      },
+      {
+        "artifact": "Cloud Risk Management Program",
+        "type": "Plan",
+        "matches": "Risk Management Program Document",
+        "in_framework": "HITRUST CSF"
+      },
+      {
+        "artifact": "Shared Responsibility Matrix (SSRM)",
+        "type": "Matrix",
+        "matches": "Shared Responsibility Matrix",
+        "in_framework": "SBP Cloud Outsourcing Framework"
+      },
+      {
+        "artifact": "Identity & Access Management Policy",
+        "type": "Policy",
+        "matches": "Identity & Access Management Policy",
+        "in_framework": "SAMA Cyber Security Framework"
+      },
+      {
+        "artifact": "Encryption & Key Management Standard",
+        "type": "Policy",
+        "matches": "Cryptography & Key Management Standard",
+        "in_framework": "SAMA Cyber Security Framework"
+      },
+      {
+        "artifact": "Data Protection Impact Assessment",
+        "type": "Report",
+        "matches": "Data Protection Impact Assessment (DPIA)",
+        "in_framework": "GDPR"
+      },
+      {
+        "artifact": "Network Architecture & Segmentation Diagram",
+        "type": "Diagram",
+        "matches": "Network Diagram",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Change Management Records",
+        "type": "Record",
+        "matches": "Change Management Records",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Vulnerability Scan & Remediation Reports",
+        "type": "Report",
+        "matches": "Quarterly Internal Vulnerability Scan Reports",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Penetration Test Report",
+        "type": "Report",
+        "matches": "Penetration Test Report (Annual)",
+        "in_framework": "SOC 2"
+      },
+      {
+        "artifact": "Cloud Incident Response Plan",
+        "type": "Plan",
+        "matches": "Incident Response Plan (PCI)",
+        "in_framework": "PCI DSS v4.0.1"
+      },
+      {
+        "artifact": "Business Continuity & DR Plan",
+        "type": "Plan",
+        "matches": "Business Continuity & DR Plan",
+        "in_framework": "Qatar Central Bank Technology Risks Circular"
+      },
+      {
+        "artifact": "Backup & Restore Test Records",
+        "type": "Record",
+        "matches": "Backup Records & Test Results",
+        "in_framework": "ISO/IEC 27001:2022"
+      }
+    ],
+    "joins_verified_kept": 122,
+    "joins_demoted": 26,
+    "demoted_items": [
+      {
+        "control_id": "CEK-09",
+        "title": "Encryption and Key Management Audit",
+        "was_set": "Perform periodic technical and nontechnical evaluation of security control effectiveness",
+        "reason": "Different focus on encryption audits"
+      },
+      {
+        "control_id": "HRS-10",
+        "title": "Non-Disclosure Agreements",
+        "was_set": "Implement procedures to protect intellectual property rights",
+        "reason": "Different focus on confidentiality vs. rights"
+      },
+      {
+        "control_id": "HRS-13",
+        "title": "Compliance User Responsibility",
+        "was_set": "Regularly review compliance with information security policies, rules and standards",
+        "reason": "Different activities: communication vs. review"
+      },
+      {
+        "control_id": "IVS-01",
+        "title": "Infrastructure and Virtualization Security Policy and Procedures",
+        "was_set": "Establish information systems acquisition, development and maintenance policy",
+        "reason": "Different focus: infrastructure vs. acquisition"
+      },
+      {
+        "control_id": "TVM-04",
+        "title": "Detection Updates",
+        "was_set": "Deploy and maintain anti-malware / malicious-code protection on all systems",
+        "reason": "different activities: detection vs. deployment"
+      },
+      {
+        "control_id": "BCR-02",
+        "title": "Risk Assessment and Impact Analysis",
+        "was_set": "Conduct a security risk assessment to identify threats, vulnerabilities, likelihood and impact",
+        "reason": "different focus on cloud vs security"
+      },
+      {
+        "control_id": "CEK-08",
+        "title": "CSC Key Management Capability",
+        "was_set": "Manage cryptographic keys at a cloud service provider for outsourced workloads",
+        "reason": "different context of key management"
+      },
+      {
+        "control_id": "DSP-14",
+        "title": "Disclosure Notification",
+        "was_set": "Disclosure to Third Parties",
+        "reason": "Different activities regarding disclosure notification"
+      },
+      {
+        "control_id": "DCS-01",
+        "title": "Off-Site Equipment Disposal Policy and Procedures",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding equipment disposal"
+      },
+      {
+        "control_id": "DCS-02",
+        "title": "Off-Site Transfer Authorization Policy and Procedures",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding transfer control"
+      },
+      {
+        "control_id": "UEM-01",
+        "title": "Endpoint Devices Policy and Procedures",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding endpoint management"
+      },
+      {
+        "control_id": "UEM-05",
+        "title": "Endpoint Management",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding endpoint management"
+      },
+      {
+        "control_id": "UEM-12",
+        "title": "Remote Locate",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding endpoint location"
+      },
+      {
+        "control_id": "UEM-13",
+        "title": "Remote Wipe",
+        "was_set": "Documented operating procedures for information processing facilities",
+        "reason": "Different activities regarding endpoint wiping"
+      },
+      {
+        "control_id": "DCS-13",
+        "title": "Environmental Systems",
+        "was_set": "DC Environmental Monitoring",
+        "reason": "Different focus on environmental controls"
+      },
+      {
+        "control_id": "DCS-05",
+        "title": "Assets Classification",
+        "was_set": "Classify information assets according to sensitivity and value",
+        "reason": "Different focus on asset types"
+      },
+      {
+        "control_id": "DCS-06",
+        "title": "Assets Cataloguing and Tracking",
+        "was_set": "Maintain a current inventory of information and IT assets",
+        "reason": "Different focus on asset types"
+      },
+      {
+        "control_id": "DCS-08",
+        "title": "Equipment Identification",
+        "was_set": "Maintain a current inventory of information and IT assets",
+        "reason": "Different focus on asset types"
+      },
+      {
+        "control_id": "HRS-05",
+        "title": "Asset Returns",
+        "was_set": "Accountability",
+        "reason": "Different activities regarding asset management"
+      },
+      {
+        "control_id": "DCS-11",
+        "title": "Unauthorized Access Response Training",
+        "was_set": "Train Workforce Members on Data Handling Best Practices",
+        "reason": "Different focus on access response"
+      },
+      {
+        "control_id": "HRS-09",
+        "title": "Personnel Roles and Responsibilities",
+        "was_set": "Define and assign information security responsibilities for employment termination or change of role",
+        "reason": "Different focus on termination responsibilities"
+      },
+      {
+        "control_id": "IAM-09",
+        "title": "Segregation of Privileged Access Roles",
+        "was_set": "Enforce segregation of duties for incompatible functions",
+        "reason": "different focus on privileged roles"
+      },
+      {
+        "control_id": "LOG-07",
+        "title": "Logging Scope",
+        "was_set": "Establish a logging and monitoring policy and procedures",
+        "reason": "scope definition differs from policy"
+      },
+      {
+        "control_id": "LOG-11",
+        "title": "Transaction/Activity Logging",
+        "was_set": "Log Sensitive Data Access",
+        "reason": "different focus on transaction vs sensitive data"
+      },
+      {
+        "control_id": "LOG-12",
+        "title": "Access Control Logs",
+        "was_set": "Log Sensitive Data Access",
+        "reason": "different focus on access control vs sensitive data"
+      },
+      {
+        "control_id": "STA-02",
+        "title": "SSRM Supply Chain",
+        "was_set": "Define a supply-chain security strategy and protective controls",
+        "reason": "different activities in strategy vs application"
+      }
+    ],
+    "framework": "CSA Cloud Controls Matrix (CCM) v4.0"
+  },
+  "completed": true,
+  "total_seconds": 177.89
+}

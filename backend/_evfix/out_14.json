@@ -1,0 +1,53 @@
+{
+ "set_id": "S022",
+ "di": 4,
+ "groups": [
+  {
+   "name": "Identification & Authentication Policy",
+   "absorbs": [
+    "Authentication Policy",
+    "I&A policy document",
+    "Authentication & Access Control Policy"
+   ]
+  },
+  {
+   "name": "Authentication Procedures",
+   "absorbs": [
+    "Authentication Procedures",
+    "Authentication procedures"
+   ]
+  },
+  {
+   "name": "Policy Review & Distribution Records",
+   "absorbs": [
+    "Policy Review & Distribution Records",
+    "Policy review records"
+   ]
+  },
+  {
+   "name": "Acceptable Use Policy (AUP)",
+   "absorbs": [
+    "Acceptable Use Policy (AUP)"
+   ]
+  },
+  {
+   "name": "AUP Acknowledgement Records",
+   "absorbs": [
+    "AUP Acknowledgement Records"
+   ]
+  },
+  {
+   "name": "MFA Implementation Configuration",
+   "absorbs": [
+    "MFA Implementation Configuration"
+   ]
+  },
+  {
+   "name": "Segregation of Duties Register",
+   "absorbs": [
+    "Segregation of Duties Register"
+   ]
+  }
+ ],
+ "excluded": []
+}

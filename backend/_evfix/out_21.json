@@ -1,0 +1,82 @@
+{
+ "set_id": "S008",
+ "di": 11,
+ "groups": [
+  {
+   "name": "Audit log access controls / ACLs on log stores",
+   "absorbs": [
+    "Audit log access controls",
+    "Log Modification Access Control",
+    "ACLs/IAM on log stores"
+   ]
+  },
+  {
+   "name": "Log integrity / immutability mechanism documentation",
+   "absorbs": [
+    "Log integrity verification mechanisms",
+    "Log immutability mechanism documentation"
+   ]
+  },
+  {
+   "name": "Privileged access to audit tools documentation",
+   "absorbs": [
+    "Privileged access to audit tools documentation"
+   ]
+  },
+  {
+   "name": "Log tamper-protection configuration",
+   "absorbs": [
+    "Log Tamper-Protection Configuration"
+   ]
+  },
+  {
+   "name": "Tamper-detection test evidence",
+   "absorbs": [
+    "Tamper-Detection Test Evidence"
+   ]
+  },
+  {
+   "name": "Tamper-detection alerting configuration",
+   "absorbs": [
+    "Tamper-detection alerting configuration"
+   ]
+  },
+  {
+   "name": "Approved policy/standard for protection of log information",
+   "absorbs": [
+    "Approved policy and standard addressing Protection of Log Information"
+   ]
+  },
+  {
+   "name": "Documented procedure for protection of logs",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Protection of Log"
+   ]
+  },
+  {
+   "name": "Access control matrix (role-to-permission mapping)",
+   "absorbs": [
+    "Access control matrix with role-to-permission mapping for relevant systems"
+   ]
+  },
+  {
+   "name": "User access provisioning, modification, and review records",
+   "absorbs": [
+    "User access provisioning, modification, and review records"
+   ]
+  },
+  {
+   "name": "Log classification scheme / content scoping policy",
+   "absorbs": [
+    "Log classification scheme",
+    "Log content scoping policy"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Awareness communications demonstrating that personnel are informed of the",
+   "reason": "Security-awareness communication evidence, not log-protection access/tamper control for this set heading."
+  }
+ ]
+}

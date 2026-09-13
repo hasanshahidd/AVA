@@ -1,0 +1,51 @@
+{
+ "set_id": "S019",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Approved third-party risk identification policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Identification of Risks Related"
+   ]
+  },
+  {
+   "name": "Documented third-party risk assessment procedure",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Identification of Risks",
+    "Third party risk assessment procedure"
+   ]
+  },
+  {
+   "name": "Third-party/vendor risk assessment and monitoring records",
+   "absorbs": [
+    "Third-party risk assessment and ongoing monitoring records",
+    "Vendor risk assessments"
+   ]
+  },
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "absorbs": [
+    "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   ]
+  },
+  {
+   "name": "Awareness communications on third-party risks",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  },
+  {
+   "name": "Third party inventory",
+   "absorbs": [
+    "Third party inventory"
+   ]
+  },
+  {
+   "name": "Risk mitigation controls documentation",
+   "absorbs": [
+    "Risk mitigation controls documentation"
+   ]
+  }
+ ],
+ "excluded": []
+}

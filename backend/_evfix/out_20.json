@@ -1,0 +1,116 @@
+{
+ "set_id": "S002",
+ "di": 11,
+ "groups": [
+  {
+   "name": "Audit logging enablement / configuration",
+   "absorbs": [
+    "Log collection configuration",
+    "Audit Log Enablement Configuration",
+    "Audit logging configuration",
+    "Audit logging configuration per system/application",
+    "Audit logging configuration evidence",
+    "Audit logging configuration documentation",
+    "Logging configuration baselines"
+   ]
+  },
+  {
+   "name": "Centralized logging / SIEM source inventory & dashboards",
+   "absorbs": [
+    "Centralized logging architecture documentation",
+    "SIEM Source Inventory",
+    "Log Source Inventory",
+    "SIEM Ingestion Dashboard"
+   ]
+  },
+  {
+   "name": "Logging coverage map / reports",
+   "absorbs": [
+    "Log collection coverage reports",
+    "System Component Logging Coverage Map"
+   ]
+  },
+  {
+   "name": "Auditable events list / log content standards",
+   "absorbs": [
+    "Auditable events list",
+    "Event logging rationale documentation",
+    "Log content standards documentation",
+    "AI Event Logging Standard"
+   ]
+  },
+  {
+   "name": "Sample / live audit logs",
+   "absorbs": [
+    "Sample Live Audit Logs",
+    "Audit log samples from ePHI systems",
+    "Event Log Samples"
+   ]
+  },
+  {
+   "name": "Logging policy and standards",
+   "absorbs": [
+    "Approved policy and standard addressing Audit Logging",
+    "Logging Policy and Standards",
+    "Logging policy with defined security events to capture"
+   ]
+  },
+  {
+   "name": "Audit logging procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Audit Logging"
+   ]
+  },
+  {
+   "name": "Log retention policy & configuration",
+   "absorbs": [
+    "Log retention policy and configuration",
+    "Log retention policy and evidence",
+    "Log retention configuration and compliance evidence",
+    "Log Retention Configuration",
+    "Log Retention Policy"
+   ]
+  },
+  {
+   "name": "Log review records, schedules & procedures",
+   "absorbs": [
+    "Log review schedules and records",
+    "Log review records and follow-up case documentation",
+    "Audit log review procedures and reports",
+    "Privileged Activity Log Review Records",
+    "Log review procedures and sample review records"
+   ]
+  },
+  {
+   "name": "Log integrity / tamper protection",
+   "absorbs": [
+    "Log tamper protection evidence",
+    "Log integrity monitoring (e.g. hash/WORM/SIEM)",
+    "Log Protection Configuration",
+    "Log integrity protection mechanisms (write-once storage, checksums)"
+   ]
+  },
+  {
+   "name": "Log access controls",
+   "absorbs": [
+    "Log access controls"
+   ]
+  },
+  {
+   "name": "Log anomaly alerting configuration",
+   "absorbs": [
+    "Log Anomaly Alerting Configuration"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Access control matrix with role-to-permission mapping for relevant systems",
+   "reason": "Access-control artifact, not audit-log enablement/generation evidence"
+  },
+  {
+   "name": "User access provisioning, modification, and review records",
+   "reason": "Access provisioning/review artifact, belongs to access-control set not audit logging"
+  }
+ ]
+}

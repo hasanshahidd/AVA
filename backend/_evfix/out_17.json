@@ -1,0 +1,52 @@
+{
+ "set_id": "S019",
+ "di": 5,
+ "groups": [
+  {
+   "name": "Data inventory / mapping",
+   "absorbs": [
+    "Data inventory"
+   ]
+  },
+  {
+   "name": "Necessity assessments for data collection",
+   "absorbs": [
+    "Necessity assessments"
+   ]
+  },
+  {
+   "name": "Per-field data justification records",
+   "absorbs": [
+    "Data field justification"
+   ]
+  },
+  {
+   "name": "Approved data minimization policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Data Minimization"
+   ]
+  },
+  {
+   "name": "Documented data minimization procedure / work instruction",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Data Minimization"
+   ]
+  },
+  {
+   "name": "Data minimization awareness communications to personnel",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Third-party agreements with security clauses, SLAs, and right-to-audit",
+   "reason": "Vendor contract/security-clause evidence; off-topic for a data-minimization (minimum-necessary collection) control set."
+  },
+  {
+   "name": "Third-party risk assessment and ongoing monitoring records",
+   "reason": "Third-party risk management evidence; not about limiting collection to minimum necessary data."
+  }
+ ]
+}

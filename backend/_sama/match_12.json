@@ -1,0 +1,8 @@
+[
+ {
+  "i": 60,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "SOC triage/investigation of IoCs to scope incidents; not the same as root-cause investigation (S010) or monitoring-based detection (S024)"
+ }
+]

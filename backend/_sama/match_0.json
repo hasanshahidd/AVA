@@ -1,0 +1,146 @@
+[
+ {
+  "i": 2,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "SAMA-specific continual improvement of its own framework controls; improvement set already has SAMA"
+ },
+ {
+  "i": 3,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Establish foundational controls is SAMA framework-management meta, no clear cross-framework equivalent"
+ },
+ {
+  "i": 4,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Maintain/review controls is SAMA meta-control, not same as any single set"
+ },
+ {
+  "i": 6,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Subsidiary cyber direction is SAMA-specific, no equivalent set"
+ },
+ {
+  "i": 7,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Mandatory SAMA framework adoption is regulator-specific, no equivalent"
+ },
+ {
+  "i": 8,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Periodic framework update is SAMA framework-management meta"
+ },
+ {
+  "i": 9,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Reviewing the SAMA framework itself; policy-review set already contains SAMA"
+ },
+ {
+  "i": 10,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Formal framework update-request process is SAMA-specific governance, no equivalent"
+ },
+ {
+  "i": 11,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Update framework from review outcomes is SAMA meta-control"
+ },
+ {
+  "i": 12,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Questionnaire-based self-assessment is SAMA-specific, no cross-framework set"
+ },
+ {
+  "i": 14,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Maturity-level measurement is SAMA-specific, no equivalent set"
+ },
+ {
+  "i": 15,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Why/what/how documentation structure is SAMA-specific, no equivalent"
+ },
+ {
+  "i": 16,
+  "decision": "join",
+  "set_id": "S001",
+  "reason": "Establish policies/standards/procedures = approved information security policy document set"
+ },
+ {
+  "i": 19,
+  "decision": "join",
+  "set_id": "S003",
+  "reason": "Appoint full-time CISO = appoint senior information security officer/CISO set"
+ },
+ {
+  "i": 20,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Committee charter approval; governance-committee set already contains SAMA"
+ },
+ {
+  "i": 21,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Saudi-nationality CISO qualification is SAMA-specific eligibility, not the generic CISO-appointment requirement"
+ },
+ {
+  "i": 22,
+  "decision": "join",
+  "set_id": "S017",
+  "reason": "Cyber function independent from IT = segregation/independence of security function from IT set"
+ },
+ {
+  "i": 33,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Strategic direction; board-approved strategy set already contains SAMA"
+ },
+ {
+  "i": 34,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Responsible use of enterprise resources doesn't match acceptable-use end-user set; no clear equivalent"
+ },
+ {
+  "i": 37,
+  "decision": "join",
+  "set_id": "S002",
+  "reason": "Define infosec roles/responsibilities = define and allocate information security roles set"
+ },
+ {
+  "i": 38,
+  "decision": "join",
+  "set_id": "S009",
+  "reason": "Facilitate/monitor implementation across teams = coordinate information security activities across functions"
+ },
+ {
+  "i": 42,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Provide infosec and risk-management frameworks is broad SAMA function duty, no precise equivalent set"
+ },
+ {
+  "i": 43,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Set measurable infosec goals is SAMA function duty, no precise cross-framework set"
+ },
+ {
+  "i": 44,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Support infosec policies/roles/goals is a broad composite duty, no single matching set"
+ }
+]

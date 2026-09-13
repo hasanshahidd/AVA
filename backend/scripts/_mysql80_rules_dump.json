@@ -1,0 +1,776 @@
+[
+  {
+    "rule_id": "1.1",
+    "title": "Place Databases on Non-System Partitions",
+    "audit": "Execute the following steps to assess this recommendation:\n\u2022 Obtain the location of the datadir and other MySQL database files by executing\nthe following SQL statement:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables\nWHERE (VARIABLE_NAME LIKE '%dir' or VARIABLE_NAME LIKE '%file') and\n(VARIABLE_NAME NOT LIKE '%core%'\nAND VARIABLE_NAME <> 'local_infile' AND VARIABLE_NAME <>\n'relay_log_info_file') order by\nVARIABLE_NAME;\n\u2022 Using the value returned for the datadir, and other results from the above\nquery, execute the following in a system terminal:\ndf -h <directory>\nThe output returned from the df command above should not include root (/),\n/var, or /usr.\nInternal Only - General",
+    "description": "It is generally accepted that host operating systems should include different filesystem\npartitions for different purposes. One set of filesystems is typically called system\npartitions, and these are generally reserved for host system/application operation. The\nother set of filesystems is typically called \"non-system partitions\", and such locations\nare generally reserved for storing data.",
+    "rationale": "Moving the database off the system partition will reduce the probability of denial of\nservice caused by exhaustion of available disk space to the operating system.",
+    "remediation": "Perform the following steps to remediate this setting for the datadir:\n1. Backup the database.\n2. Choose a non-system partition new location for MySQL data.\n3. Stop mysqld using a command like: service mysql stop.\n4. Copy the data using a command like: cp -rp<datadir Value> <new\nlocation>.\n5. Set the datadir location to the new location in the MySQL configuration file.\n6. Start mysqld using a command like:\nservice mysql start\nNote: On some Linux distributions you may need to additionally modify\napparmor settings. For example, on a Ubuntu 14.04.1 system edit the file\n/etc/apparmor.d/usr.sbin.mysqld so that the datadir access is\nappropriate. The original might look like this:\n# Allow data dir access\n/var/lib/mysql/ r,\n/var/lib/mysql/** rwk,\nAlter those two paths to be the new location you chose above. For example, if\nthat new location were /media/mysql, then the\n/etc/apparmor.d/usr.sbin.mysqld file should include something like this:\n# Allow data dir access\n/media/mysql/ r,\n/media/mysql/** rwk,",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.2",
+    "title": "Use Dedicated Least Privileged Account for MySQL Daemon/Service (Automated)",
+    "audit": "Execute the following command at a terminal prompt to assess this recommendation:\nps -ef | egrep \"^mysql.*$\"\nIf no lines are returned, then this is a fail.\nNote: It is assumed that the MySQL user is mysql. Additionally, you may consider\nrunning sudo -l as the MySQL user or to check the sudoers file.",
+    "description": "As with any service installed on a host, it can be provided with its own user context.\nProviding a dedicated user to the service provides the ability to precisely constrain the\nservice within the larger host context.",
+    "rationale": "Utilizing a least privilege account for MySQL to execute as needed may reduce the\nimpact of a MySQL-born vulnerability. A restricted account will be unable to access\nresources unrelated to MySQL, such as operating system configurations.",
+    "remediation": "Create a user which is only used for running MySQL and directly related processes.\nThis user must not have administrative rights to the system. Additionally, it's best to\navoid providing shell access to such an account.\nShell access can be removed using the following command at a terminal prompt:\n/usr/sbin/groupadd -g 27 -o -r mysql >/dev/null 2>&1 || :\n/usr/sbin/useradd -M -N -g mysql -o -r -d /var/lib/mysql -s /bin/false \\\n-c \"MySQL Server\" -u 27 mysql >/dev/null 2>&1 || :",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.3",
+    "title": "Disable MySQL Command History",
+    "audit": "Execute the following commands to assess this recommendation:\nfind /home -name \".mysql_history\"\nfind /root -name \".mysql_history\"\nFor MySQL Shell\nls -d .??*/* | egrep history | grep mysql\nFor each file returned determine whether that file is symbolically linked to /dev/null.",
+    "description": "On Linux/UNIX, the MySQL client and MySQL Shell log statements executed\ninteractively to a history file. The default MySQL Client file is named .mysql_history in\nthe user's home directory. The files are split by language and named history.sql,\nhistory.js and history.py. Most interactive commands run in the MySQL client\napplication are saved to a history file. The MySQL command history should be disabled.\nBy default, the MySQL Shell does not save history between sessions.",
+    "rationale": "Disabling the MySQL Client and MySQL Shell command history reduces the probability\nof exposing sensitive information, such as passwords, encryption keys, or other\nsensitive data or information.",
+    "remediation": "For MySQL Client perform the following steps to remediate this setting:\n1. Remove .mysql_history if it exists.\n2. Use either of the techniques below to prevent it from being created again:\no Set the MYSQL_HISTFILE environment variable to /dev/null. This will\nneed to be placed in the shell's startup script.\no Create $HOME/.mysql_history as a symbolic to /dev/null.\n> ln -s /dev/null $HOME/.mysql_history\nAnother way to prevent history from being recorded is to use --batch option.\nFor MySQL Shell perform the following steps to remediate this setting:\n1. Remove $HOME/.mysqlsh/history.* if files exists.\n2. Use either of the techniques below to prevent it from being created again:\nInternal Only - General\no Start shell and list show options using \\option -l\no Set to no history using the command \\option --persist\nhistory.autoSave=1",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.4",
+    "title": "Verify That the MYSQL_PWD Environment Variable is Not in Use (Automated)",
+    "audit": "To assess this recommendation, use the /proc filesystem to determine if MYSQL_PWD is\ncurrently set for any process:\ngrep MYSQL_PWD /proc/*/environ\nThis may return one entry for the process which is executing the grep command.",
+    "description": "MySQL can read a default database password from an environment variable called\nMYSQL_PWD. Avoiding use of this environment variable can better safeguard the\nconfidentiality of MySQL credentials.",
+    "rationale": "Using the MYSQL_PWD environment variable implies MySQL credentials are stored as\nclear text.",
+    "remediation": "Check which users and/or scripts are setting MYSQL_PWD and change them to use a\nmore secure method.\nFor unattended logins you should consider\n1. MySQL Configuration Editor\n2. Different authentication methods (e.g., X509 certificate verification)\n3. Use MySQL Enterprise LDAP plugin with Kerberos or SASL tokens.",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.5",
+    "title": "Ensure Interactive Login is Disabled",
+    "audit": "Execute the following command to assess this recommendation:\ngetent passwd mysql | egrep \"^.*[\\/bin\\/false|\\/sbin\\/nologin]$\"\nLack of output implies a fail.",
+    "description": "When created, the MySQL user may have interactive access to the operating system,\nwhich means that the MySQL user could login to the host as any other user would.",
+    "rationale": "Preventing the MySQL user from logging in interactively may reduce the impact of a\ncompromised MySQL account. There is also more accountability, as accessing the\noperating system where the MySQL server lies will require the user's own account.\nInteractive access by the MySQL user is unnecessary and should be disabled.",
+    "remediation": "Execute one of the following commands in a terminal:\nusermod -s /bin/false mysql\nOr\nusermod -s /sbin/nologin mysql\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.6",
+    "title": "Verify That 'MYSQL_PWD' is Not Set in Users' Profiles",
+    "audit": "To assess this recommendation, check if MYSQL_PWD is set in login scripts using the\nfollowing command:\ngrep MYSQL_PWD /home/*/.{bashrc,profile,bash_profile}",
+    "description": "MySQL can read a default database password from an environment variable called\nMYSQL_PWD.",
+    "rationale": "Use of the MYSQL_PWD environment variable implies MySQL credentials are stored as\nclear text. Avoiding use of this environment variable may increase assurance that the\nconfidentiality of MySQL credentials is preserved.",
+    "remediation": "Check which users and/or scripts are setting MYSQL_PWD and change them to use a\nmore secure method.",
+    "hollow": true
+  },
+  {
+    "rule_id": "1.7",
+    "title": "Ensure MySQL is Run Under a Sandbox Environment",
+    "audit": "Perform the following steps for each mySQL instance to assess this recommendation:\n1. Execute the following SQL statement to determine the value of chroot\ncat /etc/mysql | egrep '(?<=^chroot=).+$'\nThe returned value should specify a valid path which differs from the datadir.\nNo results implies 'chroot' is not in use.\n2. Perform the following to check systemd:\nsystemctl status <mysqld>.service\nIf something other than (root) is listed beside the PID, e.g. Main PID: <PID>\n(root), this is a pass. No results implies mysql is not managed by systemd.\n3. Perform the following to determine if Docker is installed and a MySQL container\nis in use:\n1. To check for docker installation, execute this command:\n$ docker -v\nInternal Only - General\nIf a message stating the version of docker which is installed proceed to the\nnext steps, otherwise no further action is needed as docker must be\ninstalled for mysql to be run in docker.\n2. To check if a mysql image exists in docker run this command:\n$ sudo docker images\nREPOSITORY TAG IMAGE ID CREATED SIZE\nmysql latest 2fe463762680 1 week ago 514MB\nmysql/mysql-server latest 1504607f1ce7 2 weeks ago 401MB\nIf a mysql image is listed proceed to the next steps, otherwise no further\naction is needed as a mysql image is required for mysql to be run in\ndocker.\n3. Check if a mysql container is running:\n$ sudo docker ps\nCONTAINER ID IMAGE COMMAND CREATED STATUS PORTS\nNAMES\n0fc229e3df77 mysql \"docker\u2026\" 1 hour ago Up 1 hour\n0.0.0.0:3306->3306/tcp, mysql-server\n:::3306-\n>3306/tcp,\n33060/tcp\nIf a mysql container is listed then mysql is running in docker and this is a\npass.\nIf MySQL does not use chroot, systemd, or docker, this is a fail.",
+    "description": "Use of the chroot() system call at startup, Systemd with settings to achieve isolation, or\ndocker will put MySQL in a Sandbox environment.",
+    "rationale": "Running MySQL in a Sandbox environment may reduce the impact of a MySQL-born\nvulnerability by making portions of the file system inaccessible to the MySQL instance.",
+    "remediation": "Perform one of the following steps to remediate this setting:\n\u2022 Configure MySQL to use chroot:\n1. Choose a non-system partition <chroot location> for MySQL\n2. Add chroot=<chroot_location> to the my.cnf option file\n\u2022 Configure MySQL to run under systemd:\n1. If mysql is managed by systemd and running, stop the service:\n$ sudo systemctl stop <mysqld>.service\n2. If a mysql user and group do not already exist, create them:\n$ sudo groupadd mysql\n$ sudo useradd -r -g mysql -s /bin/false mysql\n3. Set the oenwership of the base director:\nInternal Only - General\n$ sudo chown -R mysql:mysql /usr/local/mysql/\n4. Create or modify the <mysqld>.service file in /lib/systemd/system to\ninclude the following entries, if not already present:\n[Unit]\nDescription=MySQL Server\n[Install]\nWantedBy=multi-user.target\n[Service]\nUser=mysql\nGroup=mysql\n5. If mysql was not already already managed by systemd execute this\ncommand:\n$ sudo systemctl daemon-reload\n6. Start the MySQL server:\n$ sudo systemctl start <mysqld>.service\n7. If you would like mysql to automatically run at startup execute this\ncommand:\n$ sudo systemctl enable <mysqld>.service\n\u2022 Follow documentation in the references for standing up MySQL in a Docker\ncontainer.",
+    "hollow": true
+  },
+  {
+    "rule_id": "10.1",
+    "title": "Ensure All Group Replication Traffic is Secured",
+    "audit": "Using MySQL InnoDB Cluster admin api: Run shell\nmysql-js> var cluster = dba.getCluster()\nmysql-js> cluster.status()\n{\n\"clusterName\": \"testCluster\",\n\"defaultReplicaSet\": {\n\"name\": \"default\",\n\"primary\": \"localhost:3320\",\n\"ssl\": \"REQUIRED\",\n\"status\": \"OK\",\nssl should not be DISABLED.\nRun the following statement from mysql client:\nselect @@group_replication_ssl_mode;\nIf DISABLED communication is not secure it is a finding.\nREQUIRED, VERIFY_CA, or VERIFY_IDENTITY - indicate SSL is required.",
+    "description": "MySQL Group communication connections and distributed recovery connections can be\nsecured using SSL.",
+    "rationale": "SSL encryption ensures data cannot be seen over the network for Group Replication.",
+    "remediation": "Edit my.cnf and set group_replication_ssl_mode, for example:\ngroup_replication_ssl_mode=REQUIRED\nAcceptable values are:\n\u2022 REQUIRED - Establish a secure connection if the server supports secure\nconnections.\n\u2022 VERIFY_CA - Like REQUIRED, but additionally verify the server TLS certificate\nagainst the configured Certificate Authority (CA) certificates.\nInternal Only - General\n\u2022 VERIFY_IDENTITY - Like VERIFY_CA, but additionally verify that the server\ncertificate matches the host to which the connection is being established.",
+    "hollow": true
+  },
+  {
+    "rule_id": "10.2",
+    "title": "Allowlist Approved Servers Belonging to a MySQL InnoDB Cluster (Manual)",
+    "audit": "Open MySQL Shell and execute the following command to crate the allowlist of servers.\nThis list is comma separated list, surrounded by quotes. For example:\n\u2022 From 8.0.22 on:\nselect @@group_replication_ip_allowlist\n\u2022 Prior to 8.0.22:\nselect @@group_replication_ip_whitelist;\nThe result set from the above statement should be the IPv4, IPv6, or host names\nallowed to join the MySQL InnoDB Cluster (Group).",
+    "description": "Optionally, specify an allowlist of approved servers that belong to the MySQL InnoDB\nCluster.",
+    "rationale": "When using MySQL InnoDB Cluster by specifying the allowlist explicitly, you can\nincrease the security of your cluster as only servers in the allowlist are allowed to\nconnect to the cluster.",
+    "remediation": "Example - to configure a cluster to only accept connections from servers at addresses\n203.0.113.0/24 and 198.51.100.110. The whitelist can also include host names,\nwhich are resolved only when a connection request is made by another server.\n\u2022 From 8.0.22:\nmysql-js> cluster.addInstance(\"icadmin@ic-3:3306\", {ipAllowlist:\n\"203.0.113.0/24, 198.51.100.110\"})\n\u2022 Prior to 8.0.22:\nInternal Only - General\nmysql-js> cluster.addInstance(\"icadmin@ic-3:3306\", {ipWhitelist:\n\"203.0.113.0/24, 198.51.100.110\"})",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.1.1",
+    "title": "Backup Policy in Place",
+    "audit": "Check with crontab -l if there is a backup schedule.",
+    "description": "A backup policy should be in place.",
+    "rationale": "Backing up MySQL databases, including mysql, will help ensure the availability of data\nin the event of an incident. Without backups, it might be hard to recover from an\nincident.",
+    "remediation": "Create a backup policy and backup schedule.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.1.2",
+    "title": "Verify Backups are Good",
+    "audit": "Check reports of backup validation tests.",
+    "description": "Backups should be validated on a regular basis.",
+    "rationale": "Verifying that backups are occurring appropriately will help ensure data availability in\nthe event of an incident. Without a well-tested backup, it might be hard to recover from\nan incident if the backup procedure contains errors or doesn't include all required data.",
+    "remediation": "Implement regular backup checks and document each check.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.1.4",
+    "title": "The Backups Should be Properly Secured",
+    "audit": "Check who has access to the backup files.\n\u2022 Are the files world-readable (e.g., rw-r--r-)\no Are they stored in a world readable directory?\n\u2022 Is the group MySQL and/or backup specific?\no If not: the file and directory must not be group readable\n\u2022 Are the backups stored offsite?\no Who has access to the backups?\n\u2022 Are the backups encrypted?\no Where is the encryption key stored?\no Does the encryption key consist of a guessable password?\nIf you are running the MySQL Enterprise Backup verify that the backup uses --\nencrypt.\nFor example:\n$ mysqlbackup --defaults-file=/home/dbadmin/my.cnf --backup-\nimage=/home/admin/backups/my.mbi \\\n--backup-dir=/home/admin/backup-tmp --encrypt-password backup-to-image\nIf --encrypt-password is not included the backup is not encrypted and this is a fail.\nMysqlbackup includes encryption, secure backup of keys, and support for secured\narchival storage.\nInternal Only - General",
+    "description": "The backup files will contain all data in the databases. Filesystem permissions and/or\nencryption should be used to prevent unauthorized users from gaining access to the\nbackups.",
+    "rationale": "Backups should be considered sensitive information. If an unauthorized user can\naccess backups, then they have access to all data in the database. This is true for\nunencrypted backups and for encrypted backups if the encryption key is stored along\nwith the backup.",
+    "remediation": "Implement encryption, properly restrict filesystem permissions, protect and backup\nencryption keys.\nFor example, if you run MySQL Enterprise Backup include --encrypt-password\n$ mysqlbackup --defaults-file=/home/dbadmin/my.cnf --backup-\nimage=/home/admin/backups/my.mbi \\\n--backup-dir=/home/admin/backup-tmp --encrypt-password backup-to-image\nMysqlbackup includes not just the database data, but also provides for secure backup\nof keys, and support for secured archival storage.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.1.6",
+    "title": "Disaster Recovery (DR) Plan",
+    "audit": "Check if there is a disaster recovery plan.",
+    "description": "A disaster recovery plan should be created.\nMySQL Cluster (group replication), MySQL Replica Sets (asynchronous replication) or\nboth may be used.\nA replica in a different data center and offsite backups may be used. There should be\ninformation regarding the Recovery Time Objective (RTO), i.e., how long recovery will\ntake, and if the recovery site has the same capacity. Additionally, delayed replicas can\nbe a valuable part of a DR plan. Network (default) and at rest encryption should be used\nto protect data.",
+    "rationale": "A disaster recovery strategy should be planned and formalized. Without a well-tested\ndisaster recovery plan, it might not be possible to recover in time.",
+    "remediation": "Create a disaster recovery plan.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.1.7",
+    "title": "Backup of Configuration and Related Files",
+    "audit": "Check if these files are in use and are saved in the backup.\n\u2022 Edited Configuration files (my.cnf and included files)\n\u2022 SET PERSIST Configuration file (mysqld-auto.cnf)\n\u2022 Files related to Key Management and Keyring (KMIP, other Key Management\nServices)\n\u2022 Audit Log Files (if not handled by other methods)\n\u2022 SSL files (certificates, keys)\n\u2022 User Defined Functions (UDFs)\n\u2022 Source code for customizations",
+    "description": "It is important to include configuration, log, key, certificates, and customized files in\nbackups.",
+    "rationale": "Including all configuration, log, key, certificates, and customized files in any backup will\nensure the backup can fully restore an instance.",
+    "remediation": "Add any omitted files to the backup.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.10",
+    "title": "Use Dual Passwords to Enable Higher Frequency Password Rotation (Manual)",
+    "audit": "To determine which users currently have dual passwords, run the following command:\nSELECT user, host FROM mysql.user WHERE length(user_attributes-\n>\"$.additional_password\")>0;\nIf an account has a dual password and the process of password rotation has completed,\nthis is a fail.",
+    "description": "Dual passwords act as a tool to encourage password rotations in cases where a\nsynchronized password change is not viable. By having a time delta to have old and\nnew passwords in place, the process of replacing old passwords with new passwords\nwithin applications is simplified.",
+    "rationale": "Too often passwords used by applications are not changed regularly because of the\ndifficulty in timing for propagating the new password, keeping the applications\nconnected, and connection failures due to race conditions. If it is difficult to perform a\nsynchronized change you can optionally use dual passwords to simplify the task of\npassword rotation.",
+    "remediation": "To set dual passwords execute the following ALTER command:\nALTER USER '<user>'@'<hostname>'\nIDENTIFIED BY '<new_password>'\nRETAIN CURRENT PASSWORD;\nOnce the new password has been distributed DISCARD the old password using ALTER:\nALTER USER '<user>'@'<hostname>'\nDISCARD OLD PASSWORD;\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.11",
+    "title": "Lock Out Accounts if Not Currently in Use",
+    "audit": "Review the locked status of accounts:\nselect user, host, account_locked from mysql.user;\nAccounts not in use and MySQL Reserved accounts should show as locked (Y).",
+    "description": "If users with accounts will not be using their account for some time, to reduce the risk of\nattacks or inappropriate account usage or if suspicions exist that an account might be\nunder attack, disabling the account will secure it and once it's ready to resume use it\ncan easily be re-enabled.",
+    "rationale": "Only have active accounts that will be used.",
+    "remediation": "To lock accounts - example:\nALTER USER 'jeffrey'@'localhost' ACCOUNT LOCK;\nTo unlock accounts - example\nALTER USER 'jeffrey'@'localhost' ACCOUNT UNLOCK;\nNote: Works for CREATE as well. It is good practice to LOCK an account if created ahead\nof time.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.12",
+    "title": "Ensure AES Encryption Mode for AES_ENCRYPT/AES_DECRYPT is Configured Correctly (Automated)",
+    "audit": "Run the following statement:\nselect @@block_encryption_mode;\nA value other than aes-256-* is a fail.\nWhere * is one of the following - ECB, CBC, CFB1, CFB8, CFB128, OFB",
+    "description": "A block encryption mode with a Cipher Block Chaining (CBC) mode value and key\nlength of 256 is recommended when using the AES_ENCRYPT() and AES_DECRYPT()\nfunctions for encryption.",
+    "rationale": "The default for backward compatibility on upgraded MySQL databases is aes-128-ecb.\nUsing 128-bit keys does not provide sufficient security. Regardless of whether breaking\nthe lowest level is beyond existing technology, larger key sizes are needed to better\nprotect data and satisfy regulations.",
+    "remediation": "Add the following lines to the MySQL server's /etc/my.cnf:\nFor example, if Block Encryption Mode for aes-256 CBC\nblock_encryption_mode=aes-256-cbc\nOr, run the following command:\nset persist block_encryption_mode='aes-256-cbc';\nRestart the server for this change to take effect.\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.13",
+    "title": "Ensure Socket Peer-Credential Authentication is Used Appropriately (Manual)",
+    "audit": "To assess this recommendation run the following:\nSELECT PLUGIN_NAME, PLUGIN_STATUS\nFROM INFORMATION_SCHEMA.PLUGINS\nWHERE PLUGIN_NAME LIKE 'auth%';\nTo determine users who can use auth socket:\nselect user, host, plugin from mysql.user where plugin = 'auth_socket';\nIf this is enabled and the organization does not allow use of this feature, this is a fail.\nIf host is not the localhost or an unauthorized user is listed, this is a fail.",
+    "description": "The server-side auth_socket authentication plugin, authenticates clients that connect\nto the MySQL server from the local host through the Unix socket file. Users\nauthenticated by the auth_socket need not specify a password when connecting to the\nserver. However, users authenticated by the auth_socket plugin are restricted from\nconnecting remotely; they can only connect from the local host through the Unix socket\nfile. This method is only suitable in situations where the server administrator OS\naccount access is restricted.",
+    "rationale": "This method may be desirable in specific cases, including:\n\u2022 The Linux system where MySQL is running is dedicated to the MySQL server\nand only the MySQL DBA and OS Admin have access.\n\u2022 When control over user authentication is centralized in the operating system.\n\u2022 It is desirable that audit trails in the database and operating system can use the\nsame user names.\n\u2022 For certain other narrow installation use cases auth_socket may be desirable.\n\u2022 Only local connections for a user.",
+    "remediation": "Add these options under the [mysqld] option group in the MySQL /etc/my.cnf:\nplugin-load-add=auth_socket.so\nauth_socket=FORCE_PLUS_PERMANENT\nFor example:\nFor an OS user which can login to MySQL using auth_socket:\nCREATE USER '<user>'@'<localhost>' IDENTIFIED WITH auth_socket;\nThe user can then login using:\nmysql -u <user>",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.14",
+    "title": "Ensure MySQL is Bound to an IP Address",
+    "audit": "Run the following statement:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables\nWHERE VARIABLE_NAME = 'bind_address';\nNo rows returned implies a fail.",
+    "description": "By default, the MySQL server accepts TCP/IP connections from MySQL user accounts\non all server host IPv6 and IPv4 interfaces. You can make this configuration more\nrestrictive by setting the bind_address configuration option to a specific IPv4 or IPv6\naddress so that the server only accepts TCP/IP connections on that address.",
+    "rationale": "Limiting the IP address provides additional controls and restrictions on how client\napplications can connect to MySQL. If not configured to a specific IP all IPs for this\nserver can be used to connect to MySQL.",
+    "remediation": "For example, to have the MySQL server only accept connections on a specific IPv4\naddress, add an entry similar to this under the [mysqld] option group in the MySQL\n/etc/my.cnf:\nbind_address=192.0.2.24\nIn this case, clients can connect to the server using --host=192.0.2.24. Connections\non other server host addresses are not permitted.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.15",
+    "title": "Limit Accepted Transport Layer Security (TLS) Versions",
+    "audit": "To list the versions of TLS the server accepts, run the following statement:\nselect @@tls_version;\nIf the list includes TLSv1 and/or TLSv1.1, this is a fail.\nTo view current connections and the version of SSL in use run:\nselect * from performance_schema.status_by_thread where VARIABLE_NAME like\n'ssl_version';\nIf the list includes, TLSv1 and/or TLSv1.1, this is a fail.\nMySQL negotiates to the highest version of TLS, if connections are using older TLS\nversions, those clients will need to be upgraded to newer MySQL Connectors or\ncommunity drivers that support newer versions of TLS.",
+    "description": "MySQL supports multiple protocols of TLS. The higher the version the stronger the\nsecurity and/or better the performance.",
+    "rationale": "Requiring clients attempting to connect to MySQL to use higher versions of TLS to\nbetter protect data in transit.",
+    "remediation": "Set the version(s) of TLS you wish to accept in mysql.conf specify TLS and Ciphers.\nFor example to only accept TLS 1.3 set tls_version in my.conf:\ntls_version=TLSv1.3\nIf TLS 1.3 is not supported on the Operating System then set to TLS 1.2:\ntls_version=TLSv1.2\nInternal Only - General\nNote: with this setting, only clients that support the specified TLS version(s) are able to\nestablish an encrypted connection to the server.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.16",
+    "title": "Require Client-Side Certificates (X.509)",
+    "audit": "Run the following statement\nselect user, host, ssl_type from mysql.user where user not in\n('mysql.infoschema', 'mysql.session', 'mysql.sys');\nIf ssl_type returns X509 or SSL, client-side certificate details must be provided to\nconnect.",
+    "description": "Client-side certificates may be used as proof of identity as well as to encrypt data in\ntransit.",
+    "rationale": "Requiring client-side certificates provides additional validation of a user's identity, thus\nincreasing the level of security, while also providing strong encryption.",
+    "remediation": "Create or Alter users using the REQUIRE X509.\nFor example:\nCREATE USER 'newuser2'@'%' IDENTIFIED BY <password> require x509;\nFor accounts created with a REQUIRE X509 clause, clients must specify at least --ssl-\ncert and --ssl-key. In addition, --ssl-ca (or --ssl-capath) is recommended so\nthat the public certificate provided by the server can be verified.\nFor example:\nmysql --ssl-ca=ca.pem \\\n--ssl-cert=client-cert.pem \\\n--ssl-key=client-key.pem",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.17",
+    "title": "Ensure Only Approved Ciphers are Used",
+    "audit": "Run the following statement:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables\nWHERE VARIABLE_NAME IN ('ssl_cipher', 'tls_ciphersuites');\nIf ssl_cipher is not set to ECDHE-ECDSA-AES128-GCM-SHA256 or tls_ciphersuites\nis not set to TLS_AES_256_GCM_SHA384, this is a fail.",
+    "description": "MySQL supports multiple encryption ciphers. Ciphers can vary in strength, speed and\noverhead.",
+    "rationale": "Requiring clients attempting to connect to MySQL to use strong ciphers protects data in\ntransit.",
+    "remediation": "Set ssl_cipher and tls_ciphersuites in the mysql.conf to an approved cipher\nsuite:\ntls_ciphersuites='TLS_AES_256_GCM_SHA384'\nssl_cipher='ECDHE-ECDSA-AES128-GCM-SHA256'\nOr\nExecute the following commands:\nset persist ssl_cipher='ECDHE-ECDSA-AES128-GCM-SHA256';\nset persist tls_ciphersuites='TLS_AES_256_GCM_SHA384';",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.18",
+    "title": "Implement Connection Delays to Limit Failed Login Attempts",
+    "audit": "Determine if the plugins for delaying connections are installed.\nSELECT PLUGIN_NAME, PLUGIN_STATUS\nFROM INFORMATION_SCHEMA.PLUGINS\nWHERE PLUGIN_NAME LIKE 'connection%';\nTwo rows should be returned showing ACTIVE status.\nCONNECTION_CONTROL | ACTIVE\nCONNECTION_CONTROL_FAILED_LOGIN_ATTEMPTS | ACTIVE\nIf both plugins are not active, this is a fail.\nNext assess the setting for the connection controls by running\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE\n'connection_control%';\nTime doubling throttling (in minutes) between each retry (0, 1, 2, 4, 8, etc.) with a\npermanent account lockout (IT reset required) after 12 retries.\nIf connection_control_failed_connections_threshold is less than 5 (attempts),\nthis is a fail.\nIf connection_control_min_connection_delay is less than 60000 (ms - 1 minute),\nthis is a fail.\nMax delay connection_control_max_connection_delay is 0 or less than 1920000\n(ms, 32 minutes) a, this is a fail.\nFinally, assess the failed login attempts.\nInternal Only - General\nselect host, user, JSON_EXTRACT(user_attributes,\n'$.Password_locking.failed_login_attempts') as failed_login_attempts from\nmysql.user;\nIf failed login attempts is less than 12 this is a fail.",
+    "description": "MySQL Server can enable administrators to introduce an increasing delay in server\nresponse to clients after a certain number of consecutive failed connection attempts.",
+    "rationale": "Delaying connection attempts provides a deterrent that slows down brute force attacks\nthat attempt to access MySQL user accounts.",
+    "remediation": "Add the following lines to my.cnf:\n[mysqld]\nplugin-load-add=connection_control.so\nconnection-control=FORCE_PLUS_PERMANENT\nconnection-control-failed-login-attempts=FORCE_PLUS_PERMANENT\nconnection_control_failed_connections_threshold=5\nconnection_control_min_connection_delay=60000\nconnection_control_max_connection_delay=1920000\nDelays are in milliseconds for server response to failed connection attempt.\n\u2022 60000 (ms - 1 minute)\n\u2022 1920000 (ms, 32 minutes)\nFor each user set\nALTER USER <user> FAILED_LOGIN_ATTEMPTS 12;",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.19",
+    "title": "Ensure FIPS 140-2 OpenSSL Cryptography Is Used",
+    "audit": "For MySQL to support FIPS mode, these system requirements must be satisfied:\n1. MySQL must be compiled with an OpenSSL version that is certified for use with\nFIPS. Currently OpenSSL 3.0 is certified, but OpenSSL 1.1.1 is not. Binary\ndistributions for recent versions of MySQL are compiled using OpenSSL 3.0 on\nsome platforms, which means they are not certified for FIPS. This means you\nhave the following options, depending on system and MySQL configuration:\no Use a system that has OpenSSL 3.0 and the required FIPS object\nmodule. In this case, you can enable FIPS mode for MySQL if you use a\nbinary distribution compiled using OpenSSL 3.0, or compile MySQL from\nsource using OpenSSL 3.0. For general information about upgrading to\nOpenSSL 3.0, see OpenSSL 3.0 Migration Guide\nInternal Only - General\no Use a system that has OpenSSL 1.1.1 or higher. In this case, you can\ninstall MySQL using binary packages, and you can use the TLS v1.3\nprotocol and ciphersuites, in addition to other already supported TLS\nprotocols. However, you cannot enable FIPS mode for MySQL.\no Use a system that has OpenSSL 1.0.2 and the required FIPS Object\nModule. In this case, you can enable FIPS mode for MySQL if you use a\nbinary distribution compiled using OpenSSL 1.0.2, or compile MySQL from\nsource using OpenSSL 1.0.2. In this case, you cannot use the TLS v1.3\nprotocol or ciphersuites, which require OpenSSL 1.1.1 or 3.0. In addition,\nyou should be aware that OpenSSL 1.0.2 reached end of life status in\n2019, and that all operating platforms embedding OpenSSL 1.1.1 reach\ntheir end of life in 2024.\n2. At runtime, the OpenSSL library and OpenSSL FIPS Object Module must be\navailable as shared (dynamically linked) objects.\nIf FIPS mode is required, it is recommended to use an operating platforms that includes\nit; if it does, you can (and should) use it. If your platform does not include FIPS, you\nhave two options:\n\u2022 Migrate to a platform which has FIPS OpenSSL support.\n\u2022 Build the OpenSSL library and FIPS object module from source, using the\ninstructions from the fips_module manpage see FIPS Overview.\nYour version of mysql should be a version linked to the certified Operating Systems\nOpenSSL. Run - ldd on your mysqld executable.\nIf the libssl library is linked to and openssl library listed originates from within MySQL's\ninstalled lib directory. That is not a FIPS certified OpenSSL. This can happen on\nWindows, MacOS and if MySQL is installed via a generic linux tar.\nFor Linuxes where MySQL references the Operating systems OpenSSL certified library\nchecking for FIPS depends on OpenSSL version.\nFor OpenSSL prior to 3.0\nTo determine whether MySQL is running on a system with FIPS mode enabled, check\nthe value of the ssl_fips_mode server system variable using an SQL statement such\nas\nSHOW VARIABLES LIKE '%fips%'\nor\nSELECT @@ssl_fips_mode\nIf the value of this variable is 1 (ON) or 2 (STRICT), FIPS mode is enabled for\nOpenSSL; if it is 0 (OFF), FIPS mode is not available.\nFor OpenSSL 3.0 and higher Check the Operating system to see that FIPS mode is\nenabled. For example on Oracle Linux 9 to verify that FIPS mode is enabled, run the\nfollowing command after Oracle Linux 9 has been installed:\nInternal Only - General\nAs the system administrator:\n1. Run the following to see if FIPS is enabled:\nfips-mode-setup -check\nIf FIPS mode is enabled is not displayed, then the system is not FIPS enabled\nand this is a fail.\n2. Run the following (your results and version may vary):\n# openssl version\nOpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)\nOpenSSL should show a 3.0 version.\n3. Check to see if OpenSSL configuration has enabled the FIPS provider.\nopenssl list -provider If FIPS is not listed as a provider - OpenSSL is not in FIPS mode.\n4. Test - for example Try a non-FIPS TLS connection\n# mysql -u root -p --host=localhost --protocol=TCP --ssl-mode=REQUIRED\n--tls-version=TLSv1.3 --tls-ciphersuites=TLS_CHACHA20_POLY1305_SHA256\nEnter password:\nERROR 2026 (HY000): SSL connection error: error:0A0000B5:SSL\nroutines::no ciphers available\nIf this succeeds you are NOT in FIPS mode\nNext connect and run\nmysql> select md5(8);show warnings;\n+----------------------------------+\n| md5(8) |\n+----------------------------------+\n| 00000000000000000000000000000000 |\n+----------------------------------+",
+    "description": "Install, configure, and use OpenSSL on a platform that has a NIST certified FIPS 140-2\ninstallation of OpenSSL. This provides MySQL instances the ability to generate and\nvalidate cryptographic hashes to protect unclassified information requiring confidentiality\nand cryptographic protection, in accordance with the data owner's requirements.",
+    "rationale": "Federal Information Processing Standards 140-2 (FIPS 140-2) describes a security\nstandard that can be required by Federal (US Government) agencies for cryptographic\nmodules used to protect sensitive or valuable information. To be considered acceptable\nfor such Federal use, a cryptographic module must be certified for FIPS 140-2. If a\nsystem intended to protect sensitive data lacks the proper FIPS 140-2 certificate,\nFederal agencies cannot purchase it.\nProducts such as OpenSSL can be used in FIPS mode, although the OpenSSL library\nitself is not validated for FIPS. Instead, the OpenSSL library is used with the OpenSSL\nFIPS Object Module to enable OpenSSL-based applications to operate in FIPS mode.\nFor general information about FIPS and its implementation in OpenSSL, these\nreferences may be helpful:\n\u2022 National Institute of Standards and Technology FIPS PUB 140-2\n\u2022 OpenSSL FIPS 140-2 Security Policy\n\u2022 fips_module manual page",
+    "remediation": "",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.2.1",
+    "title": "Ensure Binary and Relay Logs are Encrypted",
+    "audit": "To audit this setting, run the following command:\nSELECT VARIABLE_NAME, VARIABLE_VALUE, 'BINLOG - At Rest Encryption' as Note\nFROM performance_schema.global_variables where variable_name =\n'binlog_encryption';\nEnsure it is set to ON.",
+    "description": "The binlog_encryption system variable may be used to configure encryption of the\nbinary and relay logs. This may be configured to ON even if binary logging is not enabled\nin order to encrypt relay log files.",
+    "rationale": "The database, and thus the binary and relay logs, may contain sensitive information.\nEncrypting the binary and relay logs protects all data stored in these logs from internal\nand external threats.",
+    "remediation": "To remediate misconfiguration, run this command:\nSET GLOBAL binlog_encryption=ON;\nIf you receive the error message below, you need to install keyring. For instructions see\nSection 6.4.4, \"The MySQL Keyring\" in the MySQL documentation.\nERROR 3794 (HY000): Unable to recover binlog encryption master key, please\ncheck if keyring plugin is loaded.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.3",
+    "title": "Dedicate the Machine Running MySQL",
+    "audit": "Verify there are no other roles enabled for the underlying operating system and that no\nadditional applications or services unrelated to the proper operation of the MySQL\nserver software are installed.",
+    "description": "It is recommended that MySQL Server software be installed on a dedicated server. This\narchitectural consideration affords flexibility in that the database server can be placed\non a separate zone allowing access only from particular hosts and over particular\nprotocols.",
+    "rationale": "The attack surface is reduced on a server with only the underlying operating system,\nMySQL server software, and any security or operational tooling that may be additionally\ninstalled. A smaller attack surface reduces the probability of the data within MySQL\nbeing compromised.",
+    "remediation": "Remove excess applications or services and/or remove unnecessary roles from the\nunderlying operating system.\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.4",
+    "title": "Do Not Specify Passwords in the Command Line",
+    "audit": "Check the process or task list if the password is visible.\nCheck the shell or command history if the password is visible.",
+    "description": "When a command is executed on the command line, for example mysql -u admin -p\npassword or mysqlsh -u admin -p password, the password may be visible in the\nuser's shell/command history or in the process list.",
+    "rationale": "If the password is visible in the process list or user's shell/command history, an attacker\nwill be able to access the MySQL database using the stolen credentials.",
+    "remediation": "MySQL Client:\nUse -p without password and then enter the password when prompted, use a properly\nsecured .my.cnf file, or store authentication information in encrypted format in\n.mylogin.cnf.\nInternal Only - General\nMySQL Shell:\nUse without password and then enter the password when prompted, store\nauthentication information in encrypted format in .mylogin.cnf, enter shell then\nauthenticate using \\connect command (Note: this also ensures the username is not\nexposed on the command), or use mysqlsh pluggable password store, e.g., a keychain.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.5",
+    "title": "Do Not Reuse Usernames",
+    "audit": "Each user (excluding mysql reserved users) should be linked to one of these:\n\u2022 system accounts\n\u2022 a person\n\u2022 an application\nTo list users (and exclude mysql reserved users):\nSELECT host, user, plugin,\nIF(plugin = 'mysql_native_password',\n'WEAK SHA1', 'STRONG SHA2') AS HASHTYPE\nFROM mysql.user WHERE user NOT IN\n('mysql.infoschema', 'mysql.session', 'mysql.sys') AND\nplugin NOT LIKE 'auth%' AND plugin <> 'mysql_no_login' AND\nLENGTH(authentication_string) > 0\nORDER BY plugin;",
+    "description": "Database user accounts should not be reused for multiple applications or users.",
+    "rationale": "Utilizing unique database accounts across applications will reduce the impact of a\ncompromised MySQL account. If a user is reused, then a compromise of this user will\ncompromise multiple parts of the system and/or application.",
+    "remediation": "Add/Remove users so that each user is only used for one specific purpose.\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.6",
+    "title": "Ensure Non-Default, Unique Cryptographic Material is in Use",
+    "audit": "Review all cryptographic material. If it is default, used for other MySQL instances and/or\nfor purposes other than MySQL then this is a finding.\nReview the server certificate by running:\ncd <data_dir and/or ssl_cert>\nsudo openssl x509 -in server-cert.pem -subject -noout | grep\nAuto_Generated_Server_Certificate\nThe output for the auto generated pem will look something like:\nsubject= /CN=MySQL_Server_8.0.21_Auto_Generated_Server_Certificate\nIf no rows return, the check is a pass since the certificate is not MySQL auto-generated.",
+    "description": "The cryptographic material used by MySQL, such as digital certificates and encryption\nkeys, should be used only for MySQL and only for one instance. Default cryptographic\nmaterial should not be used since it is not unique to the instance.",
+    "rationale": "If a cryptographic material is used on multiple MySQL instances and/or systems, then a\ncompromise of one may lead to the network traffic of all servers being compromised\nthat use the same cryptographic material. If an attacker gains access to shared\ncryptographic material, including default material, the attacker can reuse that material to\nimpersonate the MySQL server or otherwise compromise its operations.",
+    "remediation": "Generate new certificates, keys, and other cryptographic material as needed for each\naffected MySQL instance.",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.7",
+    "title": "Ensure 'password_lifetime' is Less Than or Equal to '365'",
+    "audit": "The global password lifetime is set using default_password_lifetime. If the value of\ndefault_password_lifetime is greater than 0, it indicates the permitted password\nlifetime.\nExecute the following command to check the global password lifetime:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables where VARIABLE_NAME like\n'default_password_lifetime';\nA value greater than 365 implies a fail.\nWhen the global password lifetime is less than or equal to 365, or not configured, each\nuser account shall be checked by executing the following command:\nSELECT user, host, password_lifetime from mysql.user where password_lifetime\n= 0 OR password_lifetime > 365;\nA lack of results implies compliance.\nNote: A value of 0 implies the password never expires.",
+    "description": "Password expiration provides users with a unique time bounded password lifetime.",
+    "rationale": "Allows additional security factors pertinent to a specific user to provide further password\nsecurity; predetermined by varying security needs and usability requirements in a\nsystem or organization.",
+    "remediation": "To configure the global password lifetime to 365 by executing the following command:\nset persist default_password_lifetime = 365;\nAlternatively, configure the password lifetime for each user returned by the audit\nprocedure by executing the following command:\nALTER USER '<username>'@'<localhost>' PASSWORD EXPIRE INTERVAL 365 DAY;\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.8",
+    "title": "Ensure Password Resets Require Strong Passwords",
+    "audit": "To assess this recommendation run the following statement:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables where VARIABLE_NAME in\n('password_history', 'password_reuse_interval');\nA value of 0 indicates that NO policy is defined for the associated variable.\nThe password_history variable indicates the number of subsequent account\npassword changes that must occur before the password can be reused. The\npassword_history should be greater than or equal to 5, thus attempts to use any of\nthe prior five, or more, passwords for this account will be denied.\nThe password_reuse_interval defines the global policy for controlling reuse of\nprevious passwords based on time elapsed. For an account password used previously,\nthis variable indicates the number of days that must pass before the password can be\nreused.\nPassword should not be reused over the period of a year. The value of\npassword_reuse_interval should be greater than or equal to 365.",
+    "description": "Disabling password reuse, enforcing password strength, and denying reuse can be\nimplemented to prevent successful usage of stolen or previously guessed passwords by\nmalicious users.\nRestricted accounts using passwords on the basis of the number of password changes\nand length ensure a password cannot be chosen from a specified number of the most\nrecent passwords.",
+    "rationale": "Repeated use of old passwords can increase risk of a compromise. This may lead to\naccess by malicious users who have discovered a user's prior password(s).",
+    "remediation": "Set a global policy that passwords may not be reused for a minimum of five password\nchanges:\nInternal Only - General\nSET PERSIST password_history = 5;\nSet a global policy that passwords have a lifetime to approximately one year (in days)\nSET PERSIST password_reuse_interval = 365;",
+    "hollow": true
+  },
+  {
+    "rule_id": "2.9",
+    "title": "Require Current Password for Password Reset",
+    "audit": "Run the following statement:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables where VARIABLE_NAME in\n('password_require_current');\nThe return value should be ON.",
+    "description": "Require the current password for password reset.",
+    "rationale": "Requiring a prior password for password reset enables DBAs to prevent users from\nchanging a password without proving that they know the current password. Such\nchanges could otherwise occur, for example, if one user walks away from a terminal\nsession temporarily without logging out, and a malicious user uses the session to\nchange the original user's MySQL password. This can have unfortunate consequences;\nthe most problematic being the malicious user can access MySQL with the user's\nchanged credentials.",
+    "remediation": "Set the value to ON\nSET PERSIST password_require_current=ON;",
+    "hollow": true
+  },
+  {
+    "rule_id": "3.1",
+    "title": "Ensure 'datadir' Has Appropriate Permissions",
+    "audit": "Perform the following steps to assess this recommendation:\n\u2022 Execute the following SQL statement to determine the Value of datadir\n\u2022 show variables where variable_name = 'datadir';\nOr\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables\nWHERE VARIABLE_NAME LIKE 'datadir';\n\u2022 Execute the following command at a terminal prompt\n\u2022 sudo ls -ld <datadir> | grep \"drwxr-x---.*mysql.*mysql\"\nLack of output implies a fail.",
+    "description": "The data directory is the location of the MySQL databases.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL database. If someone other than the MySQL user is allowed to\nread files from the data directory, it may be possible to read data from the mysql.user\ntable which contains passwords. Additionally, the ability to create files can lead to denial\nof service, or might otherwise allow someone to gain access to specific data by\nmanually creating a file with a view definition.",
+    "remediation": "Execute the following commands at a terminal prompt:\nchmod 750 <datadir>\nchown mysql:mysql <datadir>",
+    "hollow": false
+  },
+  {
+    "rule_id": "3.10",
+    "title": "Secure MySQL Keyring",
+    "audit": "Perform the following steps applicable to the plugin in use to assess this\nrecommendation:\nKeyring File Plugin (Least Secure - for pre-production testing)\n1. Find the keyring_file_data value (<keyring_file_data_path>) by executing\nthe following statement:\ngrep -Po '(?<=^keyring_file_data=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for <keyring_file_data_path>\nKeyring Encrypted File Plugin\n1. Find the keyring_encrypted_file_data value\n(<keyring_encrypted_file_data_path>) by executing the following\nstatement:\ngrep -Po '(?<=^keyring_encrypted_file_data=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for\n<keyring_encrypted_file_data_path>\n3. Verify a secure method for provisioning the passphrase for the\nkeyring_encrypted_file_data is in place.\nInternal Only - General\nKeyring OKV / KMIP compatible Plugin\n1. Find the keyring_okv value (<keyring_okv_path>) by executing the following\nstatement:\ngrep -Po '(?<=^keyring_okv=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for <keyring_okv_path>\nKeyring Oracle Cloud Infrastructure (OCI) Vault\n1. Find the keyring_oci_key_file value (<keyring_oci_key_file>) by\nexecuting the following statement:\ngrep -Po '(?<=^keyring_oci_key_file=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for <keyring_oci_key_file>\nKeyring Hashicorp Vault Plugin\n1. Find the keyring_hashicorp_store_path value\n(<keyring_hashicorp_store_path>) by executing the following statement:\ngrep -Po '(?<=^keyring_hashicorp_store_path=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for\n<keyring_hashicorp_store_path>\nAWS Key Management Service\n1. Find the keyring_aws_conf_file and keyring_aws_data_file values by\nexecuting the following statement:\ngrep -Po '(?<=^keyring_aws.*=).+$' /etc/mysql/my.cnf\n2. Verify permissions are 750 for mysql:mysql for keyring_aws_conf_file and\nkeyring_aws_data_file\nAdditionally, if no keyring plugin or keyring file plugin is configured, this is a fail.",
+    "description": "When configured to use a Keyring plugin, internal MySQL components and plugins may\nsecurely store sensitive information for later retrieval. Associated files for the selected\nkeyring type should have proper permissions.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of internal MySQL component and plugin information.",
+    "remediation": "If no keyring plugin or keyring file plugin is configured, instructions for configuring a\nkeyring plugin or keyring file plugin may found at:\nInternal Only - General\n\u2022 KMIP - https://dev.mysql.com/doc/refman/8.0/en/keyring-okv-\nplugin.html#keyring-okv-configuration\n\u2022 OCI Vault - https://dev.mysql.com/doc/refman/8.0/en/keyring-oci-plugin.html\n\u2022 Hashicorp - https://dev.mysql.com/doc/refman/8.0/en/keyring-hashicorp-\nplugin.html#keyring-hashicorp-plugin-configuration\n\u2022 AWS - https://dev.mysql.com/doc/refman/8.0/en/keyring-aws-\nplugin.html#keyring-aws-plugin-configuration\nExecute the following command for each Keyring file location requiring corrected\npermissions:\nchmod 750 <keyring file>\nchown mysql:mysql <keyring file>",
+    "hollow": false
+  },
+  {
+    "rule_id": "3.2",
+    "title": "Ensure 'log_bin_basename' Files Have Appropriate Permissions (Automated)",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Execute the following SQL statement to determine the Value of\nlog_bin_basename:\nshow variables like 'log_bin_basename';\n2. Execute the following command at a terminal prompt to list all non-compliant\nlog_bin_basename.* file permissions:\nls -l | egrep '^-(?![r|w]{2}-[r|w]{2}----\n.*mysql\\s*mysql).*<log_bin_basename>.*$'\nInternal Only - General\nLack of output implies compliance.",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log (which can be encrypted), error log, slow query log, relay log, general\nlog, and in the enterprise edition, the audit log (which can be encrypted). Because these\nare files on the host operating system, they are subject to the permissions and\nownership structure provided by the host and may be accessible by users other than the\nMySQL user. Additionally, using secure key management and at rest MySQL encryption\ncan further protect data from OS users.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL logs.",
+    "remediation": "Execute the following command for each log file location requiring corrected\npermissions and ownership:\nchmod 660 <log file>\nchown mysql:mysql <log file>",
+    "hollow": true
+  },
+  {
+    "rule_id": "3.3",
+    "title": "Ensure 'log_error' Has Appropriate Permissions",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Execute the following SQL statement to determine the Value of log_error:\nshow variables like 'log_error';\n2. Execute the following command at a terminal prompt to list all non-compliant\n<log_error>.* file permissions:\nls -l /usr/local/mysql/data/mysqld.local.err | grep '^-rw-------\n.*mysql.*mysql.*$'\nLack of output implies a fail.\nInternal Only - General",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log (which can be encrypted), error log, slow query log, relay log, general\nlog, and in the enterprise edition, the audit log (which can be encrypted). Because these\nare files on the host operating system, they are subject to the permissions and\nownership structure provided by the host and may be accessible by users other than the\nMySQL user. Additionally, using secure key management and at rest MySQL encryption\ncan further protect data from OS users.\nMuch of the information about the state of MySQL exists in MySQL, the MySQL\nperformance_schema or informations_schema. In cases where the information you\nneed is within a running MySQL, use these methods as they are more secure as they\ndo not require OS login and access.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL logs.",
+    "remediation": "Execute the following command for each log file location requiring corrected\npermissions and ownership:\nchmod 600 <log file>\nchown mysql:mysql <log file>",
+    "hollow": false
+  },
+  {
+    "rule_id": "3.4",
+    "title": "Ensure 'slow_query_log' Has Appropriate Permissions",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Execute the following SQL statement to determine the Value of\nslow_query_log:\nshow variables like 'slow_query_log';\nBest for the slow query log to be disabled indicated by OFF.\nInternal Only - General\n2. Execute the following SQL statement to determine the location of\nslow_query_log_file:\nshow variables like 'slow_query_log_file';\n3. Execute the following command at a terminal prompt to list non-compliant\n<slow_query_log_file>.* file permissions:\nls -l | egrep '^-(?![r|w]{2}-[r|w]{2}----\n.*mysql\\s*mysql).*<slow_query_log_file>.*$'\nIf the slow query log is enabled, lack of output implies compliance.\nIf the slow query log is disabled, remove any old slow query log files.",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log (which can be encrypted), error log, slow query log, relay log, general\nlog, and in the enterprise edition, the audit log (which can be encrypted). Because these\nare files on the host operating system, they are subject to the permissions and\nownership structure provided by the host and may be accessible by users other than the\nMySQL user. Additionally, using secure key management and at rest MySQL encryption\ncan further protect data from OS users.\nMuch of the information about the state of MySQL exists in MySQL, the MySQL\nperformance_schema or informations_schema. If you can get the information you\nneed from within MySQL that is more secure as it does not require OS access. If you\nare not going to use log files it is best to first disable (don't enable) and remove any\nprior logs.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL logs.",
+    "remediation": "Set slow query log to OFF (instead use SYS schema views or query\nPerformance_Schema)\nSET PERSIST slow_query_log = OFF;\nIf slow query is enabled, execute the following command to correct permissions and\nownership:\nchmod 660 <log file>\nchown mysql:mysql <log file>",
+    "hollow": true
+  },
+  {
+    "rule_id": "3.5",
+    "title": "Ensure 'relay_log_basename' Files Have Appropriate Permissions (Automated)",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Execute the following SQL statement to determine the Value of\nrelay_log_basename:\nshow variables like 'relay_log_basename';\n2. Execute the following command at a terminal prompt to list non-compliant\n<relay_log_basename>.* file permissions:\nls -l | egrep '^-(?![r|w]{2}-[r|w]{2}----\n.*mysql\\s*mysql).*<relay_log_basename>.*$'\nLack of output implies compliance.\nInternal Only - General",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log (which can be encrypted), error log, slow query log, relay log (which\ncan be encrypted), general log, and in the enterprise edition, the audit log (which can be\nencrypted). Because these are files on the host operating system, they are subject to\nthe permissions and ownership structure provided by the host and may be accessible\nby users other than the MySQL user. Additionally, using secure key management and at\nrest MySQL encryption can further protect data from OS users.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL logs.",
+    "remediation": "Execute the following command for each log file location requiring corrected\npermissions and ownership:\nchmod 660 <log file>\nchown mysql:mysql <log file>",
+    "hollow": true
+  },
+  {
+    "rule_id": "3.6",
+    "title": "Ensure 'general_log_file' Has Appropriate Permissions",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Execute the following SQL statement to determine the Values of general_log\nand general_log_file:\nselect @@general_log, @@general_log_file;\nWith a general_log value of 0 or OFF, indicates the log is disabled. If 1 or ON it is\nenabled.\n2. Whether the value is 0, OFF, 1 or ON execute the following command at a terminal\nprompt to list non-compliant <general_log_file>.* file permissions:\nInternal Only - General\nls -l <general_log_file>\nIf general_log is 0 or OFF (disabled) and the log file exists, remove the old general log\nfile.\nIf general_log is 1 or ON (enabled) review the permissions\nls -l <general_log_file> grep '^-rw-------.*mysql.*mysql'\nLack of output implies compliance.",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log (which can be encrypted), error log, slow query log, relay log (which\ncan be encrypted), general log, and in the enterprise edition, the audit log (which can be\nencrypted). Because these are files on the host operating system, they are subject to\nthe permissions and ownership structure provided by the host and may be accessible\nby users other than the MySQL user. Additionally, using secure key management and at\nrest MySQL encryption can further protect data from OS users.\nMuch of the information about the state of MySQL exists in MySQL, the MySQL\nperformance_schema or informations_schema. If you can get the information you\nneed from within MySQL that is more secure as it does not require OS access. If you\nare not going to use log files it is best to first disable (don't enable) and remove any\nprior logs.",
+    "rationale": "Limiting the accessibility, or existence, of these log files will protect the confidentiality,\nintegrity, and availability of the MySQL logs.",
+    "remediation": "If you can, use MySQL SYS, PERFORMANCE_SCHEMA, or MySQL Auditing as these are\nmore secure options.\nBy default the general_log is disabled (0 or OFF). It's most secure to disable the\ngeneral_log.\nTo disable the general_log_file:\nSET PERSIST @@GENERAL_LOG=OFF;\nIf you must use general_log then assure the permissions are correct. Execute the\nfollowing command for each log file location requiring corrected permissions and\nownership:\nchmod 600 <general_log_file>\nchown mysql:mysql <general_log_file>",
+    "hollow": false
+  },
+  {
+    "rule_id": "3.7",
+    "title": "Ensure SSL Key Files Have Appropriate Permissions",
+    "audit": "Perform the following steps to assess this recommendation:\n1. Locate the SSL keys and certs in use by executing the following SQL statement.\nTo show all ssl variables:\nSELECT * FROM performance_schema.global_variables\nWHERE\nREGEXP_LIKE(VARIABLE_NAME,'^.*ssl_(ca|capath|cert|crl|crlpath|key)$')\nAND VARIABLE_VALUE <> '';\nInternal Only - General\nNote: Any mysqlx_% values that are null default to the classic protocols\nequivalent value.\n2. Execute the following commands at a terminal prompt to list non-compliant\n<ssl_file> file permissions:\nls -l <ssl_file> | egrep \"^-(?!r-{8}.*mysql\\s*mysql).*$\"\nLack of output implies compliance",
+    "description": "When configured to use SSL/TLS, MySQL relies on Secure Sockets Layer (SSL) key\nfiles, which are stored on the host's filesystem. These SSL key files are subject to the\nhost's permissions and ownership structure.\nMySQL 8.0 provides ways to create the SSL certificate, SSL key files and RSA key-pair\nfiles required to support encrypted connections using SSL and secure password\nexchange using RSA over unencrypted connections, if those files are missing the server\nwill attempt to autogenerate these files at startup if compiled with OpenSSL.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL database and the communication with the client.\nIf the contents of the SSL key file are known to an attacker, he or she might\nimpersonate the server. This can be used for a man-in-the-middle attack.\nDepending on the SSL cipher suite, the key might also be used to decipher previously\ncaptured network traffic.",
+    "remediation": "Execute the following commands at a terminal prompt to remediate these settings using\nthe Value from the audit procedure:\nchown mysql:mysql <ssl_file>\nchmod 400 <ssl_file>",
+    "hollow": true
+  },
+  {
+    "rule_id": "3.8",
+    "title": "Ensure Plugin Directory Has Appropriate Permissions",
+    "audit": "To assess this recommendation, execute the following SQL statement to discover the\nValue of plugin_dir:\nshow variables where variable_name = 'plugin_dir';\nThen, execute the following command at a terminal prompt (using the discovered\nplugin_dir Value) to determine the permissions and ownership.\nls -ld <plugin_dir Value> | grep \"dr-xr-x---\\|dr-xr-xr--\" | grep \"plugin\"\nLack of output implies a fail.\nNote: Permissions are intended to be either 550 or 554.",
+    "description": "The plugin directory is the location of the MySQL plugins. Plugins are storage engines\nor user defined functions (UDFs).",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL database. If someone can modify plugins then these plugins\nmight be loaded when the server starts and the code will get executed.",
+    "remediation": "To remediate these settings, execute the following commands at a terminal prompt\nusing the plugin_dir Value from the audit procedure. MySQL server must not be\nallowed to write to this location.\nchmod 550 <plugin_dir Value> #(or use 554)\nchown mysql:mysql <plugin_dir Value>",
+    "hollow": false
+  },
+  {
+    "rule_id": "3.9",
+    "title": "Ensure 'audit_log_file' Has Appropriate Permissions",
+    "audit": "To assess this recommendation, execute the following SQL statement to discover the\naudit_log_file value:\nshow global variables where variable_name='audit_log_file';\nIf no value is returned, auditing is not installed, and this is a fail.\nNote: If you see the audit file name but no path, the default path will be the path\nassigned to the datadir variable.\nThen, execute the following command at a terminal prompt (using the discovered\naudit_log_file value):\nls -l <audit_log_file> | egrep \"^-([rw-]{2}-){2}---[ \\t]*[0-9][ \\t]*mysql[\n\\t]*mysql.*$\"\nNo results implies a fail.",
+    "description": "MySQL can operate using a variety of log files, each used for different purposes. These\nare the binary log, error log, slow query log, relay log, audit log and general log.\nBecause these are files on the host operating system, they are subject to the\npermissions and ownership structure provided by the host and may be accessible by\nusers other than the MySQL user.",
+    "rationale": "Limiting the accessibility of these objects will protect the confidentiality, integrity, and\navailability of the MySQL logs.",
+    "remediation": "Execute the following commands for the audit_log_file discovered in the audit\nprocedure:\nInternal Only - General\nchmod 660 <audit_log_file>\nchown mysql:mysql <audit_log_file>",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.1",
+    "title": "Ensure the Latest Security Patches are Applied",
+    "audit": "Execute the following SQL statement to identify the MySQL server version:\nSHOW VARIABLES WHERE Variable_name LIKE \"version\";\nNow compare the version with the security announcements from Oracle and/or the OS if\nthe OS packages are used.",
+    "description": "Periodically, updates to MySQL server are released to resolve bugs, mitigate\nvulnerabilities, and provide new features. It is recommended that MySQL installations\nare up to date with the latest security updates.",
+    "rationale": "Maintaining currency with MySQL patches will help reduce risk associated with known\nvulnerabilities present in the MySQL server.\nWithout the latest security patches MySQL might have known vulnerabilities which\ncould be used by an attacker to gain access.",
+    "remediation": "Install the latest patches for your version or upgrade to the latest version.",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.10",
+    "title": "Use MySQL TDE for At-Rest Data Encryption",
+    "audit": "Check for the types of at-rest encryption enabled.\nSELECT VARIABLE_NAME, VARIABLE_VALUE, 'AT REST ENCRYPTION' as Note,\nIF(VARIABLE_VALUE = 'AES', 'Encrypted', 'Not Encrypted') as IsEncrypted\nFROM performance_schema.global_variables where\nvariable_name in ('audit_log_encryption', 'binlog_encryption',\n'innodb_redo_log_encrypt', 'innodb_undo_log_encrypt',\n'table_encryption_privilege_check');\nOFF or NONE indicate at-rest encryption is not enabled.\nTo check which tables or tablespaces are not encrypted\nSELECT\nINNODB_TABLESPACES.NAME,\nINNODB_TABLESPACES.ENCRYPTION\nFROM information_schema.INNODB_TABLESPACES\nWHERE NAME NOT IN ('innodb_temporary','sys/sys_config');\nIf any tables or tablespaces show encryption as N and are therefore not encrypted, this\nis a fail.\nBackup data should be encrypted at rest as well. If you are running the MySQL\nEnterprise Backup verify that the backup uses --encrypt.\nFor example:\n$ mysqlbackup --defaults-file=/home/dbadmin/my.cnf --backup-\nimage=/home/admin/backups/my.mbi \\\n--backup-dir=/home/admin/backup-tmp --encrypt-password backup-to-image\nIf --encrypt-password is not included the backup is not encrypted, this is a fail.\nInternal Only - General",
+    "description": "Transparent Data Encryption (TDE) at-rest encryption protects your critical data by\nenabling data-at-rest encryption in the database. It protects the privacy of your\ninformation, prevents data breaches and helps meet regulatory requirements.",
+    "rationale": "File system based encryption does a good job of protecting against data theft on\ndevices unable to limit physical access. It does not, however, protect against users who\nhave or gain access to the operating system, backups, over the network copies, etc.\nEncrypting data from mysqld adds an additional layer of data protection.",
+    "remediation": "Edit my.cnf:\n# AUDIT LOG\nsudo vi /etc/my.cnf\n[mysqld]\naudit-log=FORCE_PLUS_PERMANENT\naudit-log-format=JSON\naudit-log-encryption=AES\nExecute these commands:\n#### Table Encryption\n>set persist table_encryption_privilege_check=ON;\n#### BINLOG\n>set persist binlog_encryption=ON;\n##### REDO and UNDO\n>set persist innodb_redo_log_encrypt=ON;\n>set persist innodb_undo_log_encrypt=ON;\n# DO NOT USE GENERAL LOG OR SLOW LOGS - USE AUDIT AND PERFORMANCE_SCHEMA.\n>SET PERSIST general_log = 'OFF';\nRun ALTER to enable encryption (Note: This will lock the table as table is encrypted).\n# TABLESPACES, TABLES\nALTER TABLESPACE <tablespacename> ENCRYPTION = 'Y';\n// if innodb file per table (indicated by schemaname/tablename in report)\nALTER TABLE <tablename> ENCRYPTION = 'Y';\n#Encrypt the system tablespace\nALTER TABLESPACE mysql ENCRYPTION = 'Y';\nRun MySQL Enterprise Backup with encryption.\nFor example:\n$ mysqlbackup --defaults-file=/home/dbadmin/my.cnf --backup-\nimage=/home/admin/backups/my.mbi \\\n--backup-dir=/home/admin/backup-tmp --encrypt-password backup-to-image",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.2",
+    "title": "Ensure Example or Test Databases are Not Installed on Production Servers (Automated)",
+    "audit": "Execute the following SQL statement to determine if the test database is present:\nSELECT * FROM information_schema.SCHEMATA where SCHEMA_NAME not in\n('mysql','information_schema', 'sys', 'performance_schema');\nIf this is a production system, and a database name includes an example database this\nis a finding.\nCommon example database names are:\n\u2022 employees\n\u2022 world\n\u2022 world_x\n\u2022 sakila\n\u2022 airportdb\n\u2022 menagerie",
+    "description": "The default MySQL installation does not contain any example or test databases.\nHowever, it is a good idea to review for common example databases and ensure they\nhave been removed from production systems.",
+    "rationale": "Dropping example databases will reduce the attack surface of the MySQL server.",
+    "remediation": "Execute the following SQL statement to drop an example database:\nDROP DATABASE <database name>;",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.3",
+    "title": "Ensure 'allow-suspicious-udfs' is Set to 'OFF'",
+    "audit": "Perform the following to determine if the recommended state is in place:\n\u2022 Ensure --allow-suspicious-udfs is not specified in the the mysqld start up\ncommand line.\n\u2022 Ensure allow-suspicious-udfs is set to OFF in the MySQL configuration:\nmy_print_defaults mysqld | grep allow-suspicious-udfs\nNo results returned is a pass.",
+    "description": "This option prevents attaching arbitrary shared library functions as user-defined\nfunctions by checking for at least one corresponding method named _init, _deinit,\n_reset, _clear, or _add.",
+    "rationale": "Preventing shared libraries that do not contain user-defined functions from loading will\nreduce the attack surface of the server.",
+    "remediation": "Perform the following to establish the recommended state:\n\u2022 Remove --allow-suspicious-udfs from the mysqld start up command line.\n\u2022 Remove allow-suspicious-udfs from the MySQL option file.",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.4",
+    "title": "Harden Usage for 'local_infile' on MySQL Clients",
+    "audit": "Check the version of MySQL clients and connectors. For example:\n$ mysqlsh --version\n$ mysql --version\nThe version should be 8.0.21 or higher.\nFor connectors inspect the library in use.\nMost connectors provide functions which return version information.\nFor C - libmysqlclient has:\nconst char *mysql_get_client_info(void)\nIf clients have not been upgraded to 8.0.21 check the value of local_infile.\nExecute the following SQL statement:\nSHOW VARIABLES WHERE Variable_name = 'local_infile';\nIf clients are older than 8.0.21 or if local_infile is not in use, ensure the value\nreturned is 0.",
+    "description": "The local_infile parameter dictates whether files located on the MySQL client's\ncomputer can be loaded or selected via LOAD DATA INFILE or SELECT local_file.",
+    "rationale": "For MySQL client programs and connectors prior to 8.0.21, disabling local_infile\nreduces an attacker's ability to read sensitive files off the affected server via an SQL\ninjection vulnerability.",
+    "remediation": "Upgrade all MySQL clients and connectors to 8.0.21 or higher.\nIn the case where using local_infile is needed, the following changes further harden\nsecurity:\nInternal Only - General\nOn client side, secure by:\nLimiting the location from where data can be read using --load-data-local-dir.\nmysql --local-infile=0 --load-data-local-dir=/my/local/data\nAdding TLS connection to assure server identity by requiring verification.\nmysql --local-infile=0 --load-data-local-dir=/my/local/data --ssl-\nmode=VERIFY_IDENTITY\nIf local_infile is not in use or if clients are not upgraded - add the following line to\nthe [mysqld] section of the MySQL configuration file and restart the MySQL service:\nlocal-infile=0",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.5",
+    "title": "Ensure 'mysqld' is Not Started With '--skip-grant-tables'",
+    "audit": "Perform the following to determine if the recommended state is in place:\n\u2022 Open the MySQL configuration (e.g., my.cnf) file and search for skip-grant-\ntables\n\u2022 Ensure skip-grant-tables is set to FALSE",
+    "description": "This option causes mysqld to start without using the privilege system.",
+    "rationale": "If this option is used, all clients of the affected server will have unrestricted access to all\ndatabases.",
+    "remediation": "Perform the following to establish the recommended state:\n\u2022 Open the MySQL configuration (e.g., my.cnf) file and set:\nskip-grant-tables = FALSE",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.6",
+    "title": "Ensure Symbolic Links are Disabled",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSHOW variables LIKE 'have_symlink';\nEnsure the Value returned is DISABLED.",
+    "description": "The symbolic-links and skip-symbolic-links options for MySQL determine\nwhether symbolic link support is available. When use of symbolic links is enabled, they\nhave different effects depending on the host platform. When symbolic links are disabled,\nthen symbolic links stored in files or entries in tables are not used by the database.",
+    "rationale": "Prevents symbolic links from being used for database files. This is especially important\nwhen MySQL is executing as root as arbitrary files may be overwritten. The symbolic-\nlinks option might allow someone to direct actions by the MySQL server to other files\nand/or directories.",
+    "remediation": "Perform the following actions to remediate this setting:\n\u2022 Open the MySQL configuration file (my.cnf)\n\u2022 Locate skip-symbolic-links in the configuration\n\u2022 Set the skip-symbolic-links to YES\nNote: If skip-symbolic-links does not exist, add it to the configuration file in the\nmysqld section.",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.7",
+    "title": "Ensure the 'daemon_memcached' Plugin is Disabled",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSELECT * FROM information_schema.plugins WHERE\nPLUGIN_NAME='daemon_memcached';\nEnsure that no rows are returned.",
+    "description": "The InnoDB memcached Plugin allows users to access data stored in InnoDB with the\nmemcached protocol.",
+    "rationale": "By default, the plugin doesn't do authentication, which means that anyone with access\nto the TCP/IP port of the plugin can access and modify the data. However, not all data\nis exposed by default.",
+    "remediation": "To remediate this setting, issue the following command in the MySQL command-line\nclient:\nuninstall plugin daemon_memcached;\nThis uninstalls the memcached plugin from the MySQL server.",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.8",
+    "title": "Ensure the 'secure_file_priv' is Configured Correctly",
+    "audit": "Execute the following SQL statement and ensure one row is returned:\nSHOW GLOBAL VARIABLES WHERE Variable_name = 'secure_file_priv';\nThe Value should either contain NULL (thus is disabled entirely) or a valid path. If set to\nan empty string this is a fail.",
+    "description": "The secure_file_priv option restricts to paths used by LOAD DATA INFILE or\nSELECT local_file. It is recommended that this option be set to a file system location\nthat contains only resources expected to be loaded by MySQL. Even better, if data\nimport/export using LOAD DATA INFILE or SELECT local_file is not used, the\nfunctionality should be disabled entirely by setting --secure-file-priv to NULL.",
+    "rationale": "Setting secure_file_priv reduces an attacker's ability to read sensitive files off the\naffected server via a SQL injection vulnerability.",
+    "remediation": "If you are not going to use this feature, remove secure_file_priv from the [mysqld]\nsection of the MySQL configuration file and restart the MySQL service.\nIf you need this feature add the following line to the [mysqld] section of the MySQL\nconfiguration file and restart the MySQL service:\nsecure_file_priv=<path_to_load_directory>\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "4.9",
+    "title": "Ensure 'sql_mode' Contains 'STRICT_ALL_TABLES'",
+    "audit": "To audit for this recommendation, execute the following query:\nSHOW VARIABLES LIKE 'sql_mode';\n+---------------+-----------------------------------------------------------+\n| Variable_name | Value |\n+---------------+-----------------------------------------------------------+\n| sql_mode | ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE, |\n| | NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO, |\n| | NO_ENGINE_SUBSTITUTION |\n+---------------+-----------------------------------------------------------+\nIf STRICT_ALL_TABLES is not in the list returned, this is a fail.",
+    "description": "When data changing statements are made (i.e., INSERT, UPDATE), MySQL can handle\ninvalid or missing values differently depending on whether strict SQL mode is enabled.\nWhen strict SQL mode is enabled, data may not be truncated or otherwise \"adjusted\" to\nmake the data changing statement work.",
+    "rationale": "Without strict mode the server tries to proceed with the action when an error might have\nbeen a more secure choice. For example, by default MySQL will truncate data if it does\nnot fit in a field, which can lead to unknown behavior, or be leveraged by an attacker to\ncircumvent data validation.",
+    "remediation": "Set STRICT_ALL_TABLES to the sql_mode in the server's global configuration, for\nexample:\nSET GLOBAL sql_mode\n='STRICT_ALL_TABLES,ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO\n_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.1",
+    "title": "Ensure Only Administrative Users Have Full Database Access",
+    "audit": "Execute the following SQL statement(s) to assess this recommendation:\nselect * from information_schema.user_privileges\nwhere grantee not like ('\\'mysql.%localhost\\'');\nEnsure all users returned are administrative users with minimal privileges required.\nThe above query ignores MySQL internal reserved accounts.",
+    "description": "The mysql.user, mysql.db, and other mysql tables ending in _priv list a variety of\nprivileges that can be granted (or denied) to MySQL users. Some of the privileges of\nconcern include: Select_priv, Insert_priv, Update_priv, Delete_priv,\nDrop_priv, and so on. Typically, these privileges should not be available to every\nMySQL user and often are reserved for administrative use only. The\ninformation_schema.user_privileges provides a consolidated view of all user\nprivileges.",
+    "rationale": "Limiting the accessibility of the mysql database will protect the confidentiality, integrity,\nand availability of the data housed within MySQL. A user which has direct access to\nmysql.* might view password hashes, change permissions, or alter or destroy\ninformation intentionally or unintentionally.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Enumerate non-administrative users resulting from the audit procedure.\n2. For each non-administrative user, use the REVOKE statement to remove privileges\nas appropriate.",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.10",
+    "title": "Securely Define Stored Procedures and Functions DEFINER and INVOKER (Manual)",
+    "audit": "Run the following:\nSHOW PROCEDURE STATUS;\nSHOW FUNCTION STATUS;\nInspect Definer and Invoker security types.\nIf DEFINER is a powerful user consider that user's permissions.\nIf INVOKER then the rights for the stored procedure or function are that of the user\nexecuting these.\nReview code using\nSHOW CREATE PROCEDURE <name>;\nSHOW CREATE FUNCTION <name>;\nFor more details on Procedures and Functions\nSELECT * FROM information_schema.routines;\nFor more details on Procedures and Functions input and output parameters.\nSELECT * FROM information_schema.parameters;",
+    "description": "Stored procedure and stored function declarations include a definition of permissions\nwhich can be used to escalate permissions. It's important to inspect these settings to\nensure they do not unnecessarily escalate privileges.",
+    "rationale": "A stored procedure or function that improperly escalates privileges may provide\nunintended access rights which can be improperly used.",
+    "remediation": "Drop and recreate stored procedures and functions using proper DEFINER and\nINVOKER settings, or other code changes.\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.11",
+    "title": "Ensure Proper Use Of 'SET_ANY_DEFINER'",
+    "audit": "Execute the following SQL statements to audit this setting:\nSELECT GRANTEE\nFROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'SET_ANY_DEFINER';\nEnsure only administrative users are returned in the result set.",
+    "description": "Its critical to limit users ability to set and effective authorization ID that is used with\nexecuting a view or stored program. This grant provides a method to escalate privileges\nwithin MySQL views and procedures. A user with this privilege can specify any account\nas the DEFINER attribute for CREATE PROCEDURE, CREATE FUNCTION, CREATE TRIGGER,\nCREATE EVENT, ALTER EVENT, CREATE VIEW, and ALTER VIEW. Without this privilege,\nonly the effective authentication ID can be specified.",
+    "rationale": "Enabling a user to create a view, stored procedure or function that improperly escalates\nprivileges may provide unintended access rights which can be improperly used.\nSide Note: The previous versions of MySQL users required a grant to SET_USER_ID\nprivilege to create procedures with DEFINER set.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace with the non-\nadministrative user):\nREVOKE SET_ANY_DEFINER ON *.* FROM '<user>';\\",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.12",
+    "title": "Ensure Proper Use Of ALLOW_NONEXISTENT_DEFINER",
+    "audit": "Execute the following SQL statements to audit this setting:\nSELECT GRANTEE\nFROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'ALLOW_NONEXISTENT_DEFINER';\nEnsure only administrative users are returned in the result set.",
+    "description": "Its critical to limit users ability to set and effective authorization ID that is used with\nexecuting a view or stored program. This grant provides a method to escalate privileges\nwithin MySQL views and procedures. A user with this privilege can specify an non-\nexisting account as the DEFINER attribute for CREATE PROCEDURE, CREATE FUNCTION,\nCREATE TRIGGER, CREATE EVENT, ALTER EVENT, CREATE VIEW, and ALTER VIEW.\nLater a user with escalated privileges could be created, providing unintended access\nrights which can be improperly used.\nThis permission is often needed temporarily when performing database migration. Once\na migration is complete this permission is typically no longer necessary and should be\nremoved.",
+    "rationale": "Enabling a user to create a view, stored procedure or function and later create a user\nthat improperly escalates privileges may provide unintended access rights which can be\nimproperly used.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace with the non-\nadministrative user):\nREVOKE ALLOW_NONEXISTENT_DEFINER ON *.* FROM '<user>';\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.2",
+    "title": "Ensure 'FILE' is Not Granted to Non-Administrative Users",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'FILE';\nEnsure only administrative users are returned in the result set.",
+    "description": "The FILE privilege is used to allow or disallow a user from reading and writing files on\nthe server host. Any user with the FILE right granted has the ability to:\n\u2022 Read files from the local file system that are readable by the MySQL server (this\nincludes world-readable files).\n\u2022 Write files to the local file system where the MySQL server has write access.",
+    "rationale": "The FILE right allows MySQL users to read files from disk and to write files to disk. This\nmay be leveraged by an attacker to further compromise MySQL. It should be noted that\nthe MySQL server should not overwrite existing files.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure.\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE FILE ON *.* FROM '<user>';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.3",
+    "title": "Ensure 'PROCESS' is Not Granted to Non-Administrative Users (Manual)",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'PROCESS';\nEnsure only administrative users are returned in the result set.",
+    "description": "The PROCESS privilege found in the mysql.user table determines whether a given user\ncan see statement execution information for all sessions.",
+    "rationale": "The PROCESS privilege allows principals to view currently executing MySQL statements\nbeyond their own, including statements used to manage passwords. This may be\nleveraged by an attacker to compromise MySQL or to gain access to potentially\nsensitive data.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE PROCESS ON *.* FROM '<user>';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.4",
+    "title": "Ensure 'SUPER' is Not Granted to Non-Administrative Users",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'SUPER';\nEnsure only administrative users are returned in the result set.\nInternal Only - General",
+    "description": "The SUPER privilege is a powerful and far-reaching privilege and should not be granted\nlightly. In MySQL 8.0, SUPER is deprecated and will be removed in a future version of\nMySQL.\nThe SUPER privilege shown in the INFORMATION_SCHEMA.USER_PRIVILEGES table\ngoverns the use of a variety of MySQL features. These features include, CHANGE\nMASTER TO, KILL, mysqladmin kill option, PURGE BINARY LOGS, SET GLOBAL,\nmysqladmin debug option, logging control, and more.\nIn MySQL 8.0, SUPER is deprecated and will be removed in a future version of MySQL.\nMigrating Accounts from SUPER to Dynamic Privileges is recommended.",
+    "rationale": "The SUPER privilege allows principals to perform many actions, including view and\nterminate currently executing MySQL statements (including statements used to manage\npasswords). This privilege also provides the ability to configure MySQL, such as\nenable/disable logging, alter data, disable/enable features. Limiting the accounts that\nhave the SUPER privilege reduces the chances that an attacker can exploit these\ncapabilities.\nIt is more secure to migrate administrative users off SUPER and instead assign the\nspecific and minimal set of mysql Dynamic Privileges needed to perform their tasks.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE SUPER ON *.* FROM '<user>';\nNext minimize administrator rights\n1. Assess the minimal set of Dynamic Permissions needed by a user to\nperform their duties.\n2. For each user assign the appropriate Dynamic Permission and then\nrevoke that <user> SUPER capability.\nFor example, if administrator 'u1'@'localhost' requires SUPER for\nbinary log purging and system variable modification, these statements\nmake the required changes to the account thus limiting rights to what is\nneeded:\nGRANT BINLOG_ADMIN, SYSTEM_VARIABLES_ADMIN ON *.* TO\n'u1'@'localhost';\nREVOKE SUPER ON *.* FROM 'u1'@'localhost';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.5",
+    "title": "Ensure 'SHUTDOWN' is Not Granted to Non-Administrative Users (Manual)",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'SHUTDOWN';\nEnsure only administrative users are returned in the result set.",
+    "description": "The SHUTDOWN privilege simply enables use of the shutdown option to the mysqladmin\ncommand, which allows a user with the SHUTDOWN privilege the ability to shut down the\nMySQL server.",
+    "rationale": "The SHUTDOWN privilege allows principals to shutdown MySQL. This may be leveraged\nby an attacker to negatively impact the availability of MySQL.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure.\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE SHUTDOWN ON *.* FROM '<user>';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.6",
+    "title": "Ensure 'CREATE USER' is Not Granted to Non-Administrative Users (Manual)",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE FROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'CREATE USER';\nEnsure only administrative users are returned in the result set.",
+    "description": "The CREATE USER privilege governs the right of a given user to add or remove users,\nchange existing users' names, or revoke existing users' privileges.",
+    "rationale": "Reducing the number of users granted the CREATE USER right minimizes the number of\nusers able to add/drop users, alter existing users' names, and manipulate existing\nusers' privileges.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result set of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE CREATE USER ON *.* FROM '<user>';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.7",
+    "title": "Ensure 'GRANT OPTION' is Not Granted to Non- Administrative Users (Manual)",
+    "audit": "Execute the following SQL statements to audit this setting:\nSELECT DISTINCT GRANTEE\nFROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE IS_GRANTABLE = 'YES';\nEnsure only administrative users are returned in the result set.",
+    "description": "The GRANT OPTION privilege exists in different contexts (mysql.user, mysql.db) for the\npurpose of governing the ability of a privileged user to manipulate the privileges of other\nusers.",
+    "rationale": "The GRANT OPTION privilege allows a principal to grant other principals additional\nprivileges. This may be used by an attacker to compromise MySQL.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-administrative users found in the result sets of the audit\nprocedure\n2. For each user, issue the following SQL statement (replace <user> with the non-\nadministrative user):\nREVOKE GRANT OPTION ON *.* FROM '<user>';",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.8",
+    "title": "Ensure 'REPLICATION SLAVE' is Not Granted to Non- Administrative Users (Manual)",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT GRANTEE\nFROM INFORMATION_SCHEMA.USER_PRIVILEGES\nWHERE PRIVILEGE_TYPE = 'REPLICATION SLAVE';\nEnsure only accounts designated for replica users are granted this privilege.",
+    "description": "The REPLICATION SLAVE privilege governs whether a given user (in the context of the\nsource server) can request updates that have been made on the source server.",
+    "rationale": "The REPLICATION SLAVE privilege allows a principal to fetch binlog files containing all\ndata changing statements and/or changes to table data from the source. This may be\nused by an attacker to read/fetch sensitive data from MySQL.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the non-replica users found in the result set of the audit procedure\n2. For each user, issue the following SQL statement (replace <user> with the non-\nreplica user):\nREVOKE REPLICATION SLAVE ON *.* FROM '<user>';\nUse the REVOKE statement to remove the REPLICATION SLAVE privilege from\nusers who shouldn't have it.",
+    "hollow": true
+  },
+  {
+    "rule_id": "5.9",
+    "title": "Ensure DML/DDL Grants are Limited to Specific Databases and Users (Manual)",
+    "audit": "Execute the following SQL statement to audit this setting:\nSELECT User,Host,Db\nFROM mysql.db\nWHERE Select_priv='Y'\nOR Insert_priv='Y'\nOR Update_priv='Y'\nOR Delete_priv='Y'\nOR Create_priv='Y'\nOR Drop_priv='Y'\nOR Alter_priv='Y';\nEnsure all users returned are permitted to have these privileges on the indicated\ndatabases.",
+    "description": "DML/DDL includes the set of privileges used to modify or create data structures. This\nincludes INSERT, SELECT, UPDATE, DELETE, DROP, CREATE, and ALTER privileges.",
+    "rationale": "INSERT, SELECT, UPDATE, DELETE, DROP, CREATE, and ALTER are powerful privileges in\nany database. Such privileges should be limited only to those users requiring such\nrights. By limiting the users with these rights and ensuring that they are limited to\nspecific databases, the attack surface of the database is reduced.",
+    "remediation": "Perform the following steps to remediate this setting:\n1. Enumerate the unauthorized users, hosts, and databases returned in the result\nset of the audit procedure\n2. For each user, issue the following SQL statement (replace <user> with the\nunauthorized user, <host> with host name, and <database> with the database\nname):\nREVOKE SELECT ON <host>.<database> FROM <user>;\nREVOKE INSERT ON <host>.<database> FROM <user>;\nREVOKE UPDATE ON <host>.<database> FROM <user>;\nInternal Only - General\nREVOKE DELETE ON <host>.<database> FROM <user>;\nREVOKE CREATE ON <host>.<database> FROM <user>;\nREVOKE DROP ON <host>.<database> FROM <user>;\nREVOKE ALTER ON <host>.<database> FROM <user>;",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.1",
+    "title": "Ensure 'log_error' is configured correctly",
+    "audit": "Execute the following SQL statement to audit this setting:\nSHOW variables LIKE 'log_error';\nEnsure the Value returned is a path to a file and not ./stderr.err.",
+    "description": "The error log contains information about events such as mysqld starting and stopping,\nwhen a table needs to be checked or repaired, and, depending on the host operating\nsystem, stack traces when mysqld fails.",
+    "rationale": "Enabling error logging can increase the ability to detect malicious attempts against\nMySQL, and other critical messages. For example, if the error log is not enabled then a\nconnection error could go unnoticed.\nWhen configured to stderr MySQL will send log data to the console. Logging to the\nconsole is useful, but remember it is ephemeral. This is not recommended due to the\nfact that logging to console does not provide a means to force restricted access via\npermissions strictly to MySQL and dedicated MySQL audit accounts. This may\ncompromise the confidentiality of the MySQL log data. Furthermore use caution if co-\nmingling log data from multiple sources as that can complicate log inspection.\nAdditionally from a security auditing perspective, it's difficult and error prone to verify\nlogging is correct using stderr or redirected stderr.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Open the MySQL configuration file (my.cnf or my.ini).\n2. Set the log-error option to the path for the error log.",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.2",
+    "title": "Ensure Log Files are Stored on a Non-System Partition",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSELECT @@global.log_bin_basename;\nEnsure the value returned does not indicate root (/), /var, or /usr.",
+    "description": "MySQL log files can be set in the MySQL configuration to exist anywhere on the\nfilesystem. It is common practice to ensure that the system filesystem is left uncluttered\nby application logs. System filesystems include the root (/), /var, or /usr.",
+    "rationale": "Moving the MySQL logs off the system partition will reduce the probability of denial of\nservice via the exhaustion of available disk space to the operating system.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Open the MySQL configuration file (my.cnf)\n2. Locate the log-bin entry and set it to a file not on root (/), /var, or /usr",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.3",
+    "title": "Ensure 'log_error_verbosity' is Set to '2'",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSHOW GLOBAL VARIABLES LIKE 'log_error_verbosity';\nEnsure the Value returned equals 2.",
+    "description": "The log_error_verbosity system variable, set to 2 by default, specifies the verbosity\nof events sent to the MySQL error log. A value of 2 enables logging of error and warning\nmessages, a value of 3 also includes informational logging, a value of 1 logs only errors.",
+    "rationale": "This might help to detect malicious behavior by logging communication errors and\naborted connections.",
+    "remediation": "Perform the following actions to remediate this setting:\n\u2022 Open the MySQL configuration file (my.cnf)\n\u2022 Ensure the following line is found in the mysqld section\nlog_error_verbosity = 2",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.4",
+    "title": "Ensure 'log-raw' is Set to 'OFF'",
+    "audit": "Perform the following actions to assess this recommendation:\n\u2022 Open the MySQL configuration file (my.cnf)\n\u2022 Ensure the log-raw entry is present\n\u2022 Ensure the log-raw entry is set to OFF",
+    "description": "The log-raw MySQL option determines whether passwords are rewritten by the server\nso as not to appear in log files as plain text. If log-raw is enabled, then passwords are\nwritten to the various log files (general query log, slow query log, and binary\nlog) in plain text.",
+    "rationale": "With raw logging of passwords enabled someone with access to the log files might see\nplain text passwords.",
+    "remediation": "Perform the following actions to remediate this setting:\n\u2022 Open the MySQL configuration file (my.cnf)\n\u2022 Find the log-raw entry and set it as follows\nlog-raw = OFF",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.5",
+    "title": "Ensure Audit Filters Capture Connection Attempts",
+    "audit": "To assess this recommendation, execute the following SQL statements:\nEvaluate the filters:\nSELECT * FROM mysql.audit_log_filter;\nand to which accounts the filters are assigned:\nSELECT * FROM mysql.audit_log_user;\nDetermine whether the filters and users assigned to filter meet your security, business,\nand regulatory requirements. If they do not, this is a fail.\nTest your filters by attempting successful and failed connections or other events that\nshould be captured in the audit trail and review the audit log to confirm those events\nwere captured.\nFor example:\nSuccessful Connections will have json fields:\n\"class\": \"connection\", \"event\": \"connect\"\nFailed Connections will have a failed status value - \"status\": 1045\nInternal Only - General\n{ \"timestamp\": \"2020-03-19 20:13:40\", \"id\": 0, \"class\": \"connection\",\n\"event\": \"connect\", \"connection_id\": 30, \"account\": { \"user\": \"\", \"host\":\n\"localhost\" }, \"login\": { \"user\": \"app_developer\", \"os\": \"\", \"ip\":\n\"127.0.0.1\", \"proxy\": \"\" }, \"connection_data\": { \"connection_type\": \"ssl\",\n\"status\": 1045, \"db\": \"\" } }\nSuccessful Connections will show a successful status value - \"status\": 0\n{ \"timestamp\": \"2020-03-19 21:04:13\", \"id\": 1, \"class\": \"connection\",\n\"event\": \"connect\", \"connection_id\": 38, \"account\": { \"user\": \"newuser\",\n\"host\": \"localhost\" }, \"login\": { \"user\": \"newuser\", \"os\": \"\", \"ip\":\n\"127.0.0.1\", \"proxy\": \"\" }, \"connection_data\": { \"connection_type\": \"ssl\",\n\"status\": 0, \"db\": \"\", \"connection_attributes\": { \"_pid\": \"4971\", \"_os\":\n\"macos10.14\", \"_platform\": \"x86_64\", \"_client_version\": \"8.0.18\",\n\"_client_name\": \"libmysql\", \"program_name\": \"MySQLWorkbench\" } } },",
+    "description": "The functions audit_log_filter_set_filter() and\naudit_log_filter_set_user() are used to define rules for auditing. With this feature\nyou can easily audit successful and/or failed connection events and write to the audit\nlog file.",
+    "rationale": "The audit_log_filter_set_filter function which defines auditing filters. The users\nfor which filter(s) apply is defined by audit_log_filter_set_user. One or more filters\ncan be created to log connections success and/or failure.",
+    "remediation": "To remediate this configuration setting, execute one of the following SQL statements:\nLog All connections - Successful and Failed:\nSET @f = '{ \"filter\": { \"class\": { \"name\": \"connection\" } } }';\nSELECT audit_log_filter_set_filter('log__all_conn_events', @f);\nSELECT audit_log_filter_set_user('%', 'log_all_conn_events');\nOr\nLog Only Failed Connections:\nSET @f='\n{\n\"filter\": {\n\"log\": false,\n\"class\": {\n\"name\": \"connection\",\n\"event\": [\n{ \"name\": \"connect\", \"log\" : { \"not\": { \"field\": { \"name\":\n\"status\", \"value\": 0 } } } },\n{ \"name\": \"disconnect\", \"log\": false }\n]\n}\n}\n}';\nselect @f;\nSELECT audit_log_filter_set_filter('log_conn_events', @f);\nSELECT audit_log_filter_set_user('%', 'log_conn_events');",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.6",
+    "title": "Ensure ALL Events are Audited",
+    "audit": "Show all filters.\nSELECT * FROM mysql.audit_log_filter;\nMust return a filter name with a filter defined to log everything, for example:\n+---------+---------------------------+\n| NAME | FILTER |\n+---------+---------------------------+\n| log_all | {\"filter\": {\"log\": true}} |\n+---------+---------------------------+\nShow users to filter binding.\nSELECT * FROM mysql.audit_log_user;\nEnsure the filter to log_all (name can vary) is applied to all users.\n+------+------+------------+\n| USER | HOST | FILTERNAME |\n+------+------+------------+\n| % | | log_all |\n+------+------+------------+",
+    "description": "This filter defines all events to be written to the audit log.",
+    "rationale": "This filter to log all, and binding to all, users must be set to ensure all event information\nis written to the audit log.",
+    "remediation": "Create Log All Filter:\nSELECT audit_log_filter_set_filter('log_all', '{ \"filter\": { \"log\": true }\n}');\nInternal Only - General\nApply to all logins:\nSELECT audit_log_filter_set_user('%', 'log_all');",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.7",
+    "title": "Set audit_log_strategy to SYNCHRONOUS or SEMISYNCRONOUS (Automated)",
+    "audit": "To assess this recommendation, execute the following SQL statement:\nSHOW GLOBAL VARIABLES LIKE 'audit_log_strategy';\nThe result should be SYNCHRONOUS or SEMISYNCHRONOUS",
+    "description": "The audit_log_strategy must be set to SYNCHRONOUS or SEMISYNCHRONOUS",
+    "rationale": "This setting controls how information is written to the audit log. It can be set to\nSYNCHRONOUS to make it fully durable or other settings which are less durable but have\nless performance overhead.",
+    "remediation": "To remediate this configuration:\n1. Open the MySQL configuration file (my.cnf)\n2. Navigate to the mysqld section of the configuration file\n3. Set audit_log_strategy='SEMISYNCHRONOUS' (or SYNCHRONOUS)",
+    "hollow": true
+  },
+  {
+    "rule_id": "6.8",
+    "title": "Ensure the Audit Plugin Can't be Unloaded",
+    "audit": "To assess this recommendation, execute the following SQL statement:\nSELECT LOAD_OPTION FROM information_schema.plugins WHERE\nPLUGIN_NAME='audit_log';\nThe result must be FORCE_PLUS_PERMANENT",
+    "description": "Set audit_log to FORCE_PLUS_PERMANENT",
+    "rationale": "This disables unloading on the plugin.",
+    "remediation": "To remediate this setting, follow these steps:\n1. Open the MySQL configuration file (my.cnf)\n2. Ensure the following line is found in the mysqld section\naudit_log = 'FORCE_PLUS_PERMANENT'",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.1",
+    "title": "Ensure default_authentication_plugin is Set to a Secure Option (Automated)",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSHOW VARIABLES WHERE Variable_name = 'default_authentication_plugin';\nEnsure the Value field is not set to mysql_native_password.",
+    "description": "The -default-authentication-plugin system variable governs two things:\n\u2022 Authentication plugin used by a new user account if a plugin is not specified\nexplicitly through CREATE USER statement\n\u2022 Initial authentication data payload generated by server in case of a new\nconnection.\nCaching SHA-2 Authentication is the new default in MySQL 8.0. It provides stronger\npassword protection than the prior Native Authentication and provides better\nperformance than SHA2 Authentication. Alternatively, there are additional methods to\nsecurely connect using Lightweight Directory Access Protocol (LDAP) and Active\nDirectory authentication.",
+    "rationale": "MySQL Native Authentication relies on the Secure Hash Algorithm 1 (SHA1) algorithm\nand the National Institute of Standards and Technology (NIST) has suggested to stop\nusing it.\nThe MySQL Native Authentication plugin leverages this weak hashing algorithm that\ncan be quickly brute forced.",
+    "remediation": "Configure mysql to default to the caching_sha2_password plugin.\nRequire caching_sha2_password plugin to be used by default for new accounts.\nEdit my.cnf, in the section [mysqld] add:\ndefault_authentication_plugin=caching_sha2_password\nDetermine if any users are using mysql_native_password.\nInternal Only - General\nselect host, user, plugin from mysql.user;\nMigrate these users from mysql_native_password.\nALTER USER user\nIDENTIFIED WITH caching_sha2_password IDENTIFIED BY RANDOM PASSWORD\nPASSWORD EXPIRE;\nProvide users the random password value through a secure mechanism - on next login\nthey will be forced to change the password.",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.2",
+    "title": "Ensure Passwords are Not Stored in the Global Configuration",
+    "audit": "To assess this recommendation, perform the following steps:\n\u2022 Open the MySQL configuration file (e.g., my.cnf)\n\u2022 Examine the [client] section of the MySQL configuration file and ensure\npassword is not employed.",
+    "description": "The [client] section of the MySQL configuration file allows setting a user and\npassword to be used. Verify the password option is not used in the global configuration\nfile (my.cnf).",
+    "rationale": "Using the password parameter may negatively impact the confidentiality of the user's\npassword.",
+    "remediation": "Use the mysql_config_editor to store authentication credentials in .mylogin.cnf in\nencrypted form.\nIf not possible, use the user-specific options file, .my.cnf., and restricting file access\npermissions to the user identity.",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.3",
+    "title": "Ensure Passwords are Set for All MySQL Accounts",
+    "audit": "Execute the following SQL query to determine if any users have a blank password:\nSELECT User,host\nFROM mysql.user\nWHERE\n(plugin='sha256_password' OR plugin='caching_sha2_password') AND\nLENGTH(authentication_string) = 0;\nUNION\nSELECT User,host\nFROM mysql.user\nWHERE\n(plugin IN('mysql_native_password', 'mysql_old_password','')\nAND (LENGTH(authentication_string) = 0\nOR authentication_string IS NULL));\nNo rows will be returned if all accounts have a password set.",
+    "description": "Blank passwords allow a user to login without using a password.",
+    "rationale": "Without a password only knowing the username and the list of allowed hosts will allow\nsomeone to connect to the server and assume the identity of the user. This, in effect,\nbypasses authentication mechanisms.",
+    "remediation": "For each row returned from the audit procedure, reset the password for the given user\nusing the following statement (as an example):\nALTER USER\n<user>@<host> IDENTIFIED BY RANDOM PASSWORD PASSWORD EXPIRE;\nThis resets the password temporarily to a RANDOM string and returns that temporary\npassword as a result.\nThe user can then use this temporary password to login and is forced to set the\npassword to one of their choosing upon login.\nNote: Replace <user>, <host> with appropriate values.\nInternal Only - General\nAdditionally install the password policy component and define your password policy\nINSTALL COMPONENT 'file://component_validate_password';\nEdit the my.cnf file to define and enforce a password policy\n[mysqld]\nvalidate_password.dictionary_file=/usr/share/dict/words\nvalidate_password.length=10\nvalidate_password.number_count=2",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.4",
+    "title": "Set 'default_password_lifetime' to Require a Yearly Password Change (Automated)",
+    "audit": "Execute the following SQL statements to assess this recommendation:\nSHOW VARIABLES LIKE 'default_password_lifetime';\nThe result should not be 0 and less than or equal to 365.",
+    "description": "Password expiry provides passwords with a time bounded lifetime.",
+    "rationale": "The default_password_lifetime global variable prevents a password being set for\nan indefinite period. Excessive password expiration requirements do more harm than\ngood, because these requirements make users select predictable passwords,\ncomposed of sequential words and numbers that are closely related to each other. More\nimportantly, when events occur that could compromise password security account\npasswords should be expired immediately.",
+    "remediation": "To remediate this recommendation, execute the following command:\nSET GLOBAL default_password_lifetime=365;",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.5",
+    "title": "Ensure Password Complexity Policies are in Place",
+    "audit": "Execute the following to see if the password validation component is installed:\nselect * from mysql.component where component_urn like '%validate_password';\nIf no rows are returned, this check fails.\nExecute the following SQL statements to assess this recommendation:\nSHOW VARIABLES LIKE 'validate_password%';\nThe result set from the above statement should show:\n\u2022 validate_password.length should be 14 or more\n\u2022 validate_password.check_user_name should be ON\n\u2022 validate_password.policy should be STRONG - checks length; numeric,\nlowercase/uppercase, and special characters; dictionary file\nNew passwords should be checked against a dictionary file that contains values known\nto be commonly-used, expected, or compromised. For example, the list should include,\nbut is not limited to:\n\u2022 Passwords obtained from previous breaches\n\u2022 Dictionary words\n\u2022 Repetitive or sequential characters (e.g., aaaaaa, 1234abcd)\n\u2022 Context-specific words, such as the name of the service, the username, and\nderivatives thereof\n\u2022 validate_password.dictionary_file should point to a dictionary file of\ncommon words used in passwords.\nInternal Only - General\nThe following may make the password complexity too difficult, use sparingly.\n\u2022 validate_password.mixed_case_count not more than 1\n\u2022 validate_password.number_count not more than 1\n\u2022 validate_password.special_char_count not more than 1",
+    "description": "Password complexity includes password characteristics such as length, case,\nnumerical, and character sets.",
+    "rationale": "Complex passwords help mitigate dictionary, brute forcing, and other password attacks.\nThis recommendation prevents users from choosing weak passwords which can easily\nbe guessed.",
+    "remediation": "Install component_validate_password component:\nINSTALL COMPONENT 'file://component_validate_password';\nPersist following configuration:\nSET PERSIST validate_password.length=14;\nSET PERSIST validate_password.check_user_name=ON;\nSET PERSIST validate_password.dictionary_file=<path to dictionary file>;\nSET PERSIST validate_password.policy=STRONG;\nOptionally set one or more of these - ensuring complexity is not overly onerous\nSET PERSIST validate_password.mixed_case_count=1;\nSET PERSIST validate_password.number_count=1;\nSET PERSIST validate_password.special_char_count=1;\nAnd change passwords for users which have passwords which are identical to their\nusername.",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.6",
+    "title": "Ensure No Users Have Wildcard Hostnames",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSELECT user, host FROM mysql.user WHERE host = '%';\nEnsure no rows are returned.",
+    "description": "MySQL can make use of host wildcards when granting permissions to users on specific\ndatabases. For example, you may grant a given privilege to '<user>'@'%'.",
+    "rationale": "Avoiding the use of wildcards within hostnames helps control the specific locations from\nwhich a given user may connect to and interact with the database.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Enumerate all users returned after running the audit procedure.\n2. Either ALTER the user's host to be specific or DROP the user.",
+    "hollow": true
+  },
+  {
+    "rule_id": "7.7",
+    "title": "Ensure No Anonymous Accounts Exist",
+    "audit": "Execute the following SQL query to identify anonymous accounts:\nSELECT user,host FROM mysql.user WHERE user = '';\nThe above query will return zero rows if no anonymous accounts are present.",
+    "description": "Anonymous accounts are users with empty usernames (''). Anonymous accounts have\nno passwords, so anyone can use them to connect to the MySQL server.",
+    "rationale": "Removing anonymous accounts will help ensure that only identified and trusted\nprincipals are capable of interacting with MySQL.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Enumerate the anonymous users returned from executing the audit procedure.\n2. For each anonymous user, DROP or assign them a name.\nNote: As an alternative, you may execute the mysql_secure_installation utility.",
+    "hollow": true
+  },
+  {
+    "rule_id": "8.1",
+    "title": "Ensure 'require_secure_transport' is Set to 'ON'",
+    "audit": "Execute the following SQL statements to assess this recommendation:\nCheck the global default.\nselect @@require_secure_transport;\nEnsure the returned Value is ON or 1",
+    "description": "All network traffic must use SSL/TLS when traveling over untrusted networks.",
+    "rationale": "Enabling Secure Sockets Layer (SSL) will allow clients to encrypt network traffic and\nverify the identity of the server. The SSL/TLS-protected MySQL protocol helps to\nprevent eavesdropping and man-in-the-middle attacks.",
+    "remediation": "Follow the procedures as documented in the MySQL 8.0 Reference Manual to setup\nSSL.\nSet global policy to force SSL for all connections:\nset persist require_secure_transport=ON;",
+    "hollow": true
+  },
+  {
+    "rule_id": "8.2",
+    "title": "Ensure 'ssl_type' is Set to 'ANY', 'X509', or 'SPECIFIED' for All Remote Users (Automated)",
+    "audit": "Execute the following SQL statements to assess this recommendation:\nSELECT user, host, ssl_type FROM mysql.user\nWHERE NOT HOST IN ('::1', '127.0.0.1', 'localhost');\nEnsure the ssl_type for each user returned is equal to X509, or SPECIFIED.\nNote: ANY means the connection must be using TLS and could optionally provide a\nclient-side certificate.",
+    "description": "All network traffic must use SSL/TLS when traveling over untrusted networks.\nSSL/TLS should be enforced on a per-user basis for users which enter the system\nthrough the network.",
+    "rationale": "The SSL/TLS-protected MySQL protocol helps to prevent eavesdropping and man-in-\nthe-middle attacks.",
+    "remediation": "Use the ALTER USER statement to require the use of SSL:\nALTER USER 'my_user'@'app1.example.com' REQUIRE X509;\nNote: REQUIRE SSL only enforces SSL. There are additional options REQUIRE ISSUER,\nREQUIRE SUBJECT which can be used to further restrict the connection.",
+    "hollow": true
+  },
+  {
+    "rule_id": "8.3",
+    "title": "Set Maximum Connection Limits for Server and per User",
+    "audit": "To check global (default) concurrent-sessions settings in the MySQL database server,\nto check the per user default run the query:\nSELECT VARIABLE_NAME, VARIABLE_VALUE\nFROM performance_schema.global_variables\nWHERE VARIABLE_NAME LIKE 'max_%connections';\nIf the value of max_user_connections is 0 this means there is \"no limit\".\nIf the value of max_connections is not set, there is no limit.\nAlso check the values on a per user basis run the following:\nselect user, host, max_user_connections from mysql.user where user not like\n'mysql.%' and user not like 'root';\nIf the value is 0 this means the global value of max_user_connections applies.\nIf no limits are configured this is a fail.",
+    "description": "Limiting concurrent connections to a MySQL server can be used to reduce risk of Denial\nof Service (DoS) attacks performed by exhausting connection resources.",
+    "rationale": "Limiting the number of concurrent sessions at the server and per user level helps to\nreduce the risk of DoS attacks. MySQL provides mechanisms to limit the number of\nsimultaneous connections that can be made at the server level or by any given account.",
+    "remediation": "Connect to the MySQL Database as an administrator.\nFor example, to set the global default per user to 50 run the command:\nSET PERSIST max_user_connections=50;\nTo control the maximum number of clients the server permits to connect simultaneously,\nset the max_connections system variable:\nSET PERSIST max_connections=1000;\nInternal Only - General\nAdditionally, this max user connections can be set per user as well as for a given period\nof time period using CREATE or ALTER.\nFor example:\nALTER USER 'fred'@'localhost'\nWITH MAX_CONNECTIONS_PER_HOUR 5\nMAX_USER_CONNECTIONS 2;",
+    "hollow": true
+  },
+  {
+    "rule_id": "9.1",
+    "title": "Ensure Replication Traffic is Secured",
+    "audit": "Check if the replication traffic is using one or more of the following to provide\nconfidentiality and integrity for the traffic, and mutual authentication for the servers:\n\u2022 A private network\n\u2022 A VPN\n\u2022 SSL/TLS\n\u2022 A SSH Tunnel",
+    "description": "The replication traffic between servers should be secured. Security measures should\ninclude ensuring the confidentiality and integrity of the traffic, and performing mutual\nauthentication between the servers before performing replication.",
+    "rationale": "The replication traffic should be secured as it gives access to all transferred information\nand might leak passwords.",
+    "remediation": "Secure the network traffic using one or more technologies to provide confidentiality and\nintegrity for the traffic, and mutual authentication for the servers.\nInternal Only - General",
+    "hollow": true
+  },
+  {
+    "rule_id": "9.2",
+    "title": "Ensure 'SOURCE_SSL_VERIFY_SERVER_CERT' is Set to 'YES' or '1' (Automated)",
+    "audit": "To assess this recommendation, issue the following statement:\nselect ssl_verify_server_cert from mysql.slave_master_info;\nVerify the value of ssl_verify_server_cert is 1.\nInternal Only - General",
+    "description": "In the MySQL REPLICA (SLAVE is deprecated as of 8.0.22) context the setting\nSOURCE_SSL_VERIFY_SERVER_CERT (MASTER_SSL_VERIFY_SERVER_CERT is deprecated\nas of 8.0.22) indicates whether the REPLICA should verify the SOURCE's certificate. This\nconfiguration item may be set to Yes or No, and unless SSL has been enabled on the\nREPLICA, the value will be ignored.",
+    "rationale": "When SSL is in use certificate verification is important to authenticate the party to which\na connection is being made. In this case, the REPLICA (client) should verify the\nSOURCE's (server's) certificate to authenticate the SOURCE prior to continuing the\nconnection.",
+    "remediation": "To remediate this setting, you must use the CHANGE SOURCE TO command.\nFrom 8.0.23:\nSTOP REPLICA; -- required if replication was already running\nCHANGE REPLICATION SOURCE TO SOURCE_SSL_VERIFY_SERVER_CERT=1;\nSTART REPLICA; -- required if you want to restart replication\nPrior to 8.0.23:\nSTOP SLAVE; -- required if replication was already running\nCHANGE MASTER TO MASTER_SSL_VERIFY_SERVER_CERT=1;\nSTART SLAVE; -- required if you want to restart replication",
+    "hollow": true
+  },
+  {
+    "rule_id": "9.3",
+    "title": "Ensure 'master_info_repository' is Set to 'TABLE'",
+    "audit": "Execute the following SQL statement to assess this recommendation:\nSHOW GLOBAL VARIABLES LIKE 'master_info_repository';\nThe result should be TABLE instead of FILE.\nNote: There also should not be a source.info or master.info file in the datadir.",
+    "description": "The master_info_repository setting, which is deprecated as of 8.0.22, determines to\nwhere a REPLICA (slave is deprecated as of 8.0.22) logs SOURCE status and connection\ninformation. The options are FILE or TABLE. Note also that this setting is associated\nwith the sync_master_info, which is deprecated in 8.0.22, setting as well.",
+    "rationale": "The password which the client uses is stored in the SOURCE info repository, which by\ndefault is a plaintext file. The TABLE SOURCE info repository is a bit safer, but with\nfilesystem access it's still possible to gain access to the password the REPLICA is using.",
+    "remediation": "Perform the following actions to remediate this setting:\n1. Open the MySQL configuration file (my.cnf)\n2. Locate master_info_repository\n3. Set the master_info_repository value to TABLE\nNote: If master_info_repository does not exist, add it to the configuration file.",
+    "hollow": true
+  },
+  {
+    "rule_id": "9.4",
+    "title": "Ensure 'super_priv' is Not Set to 'Y' for Replication Users",
+    "audit": "Execute the following SQL statement to audit this setting:\nselect user, host from mysql.user where user='repl' and Super_priv = 'Y';\nNo rows should be returned.\nIf you wish to validate permissions in more detail:\nselect * from mysql.user where user='repl'\\G\nThe following columns should return Y.\n*************************** 1. row ***************************\nSelect_priv: Y\nReload_priv: Y\nShutdown_priv: Y\nProcess_priv: Y\nFile_priv: Y\nGrant_priv: Y\nExecute_priv: Y\nRepl_slave_priv: Y\nInternal Only - General\nRepl_client_priv: Y\nCreate_user_priv: Y",
+    "description": "The SUPER privilege found in the mysql.user table governs the use of a variety of\nMySQL features. These features include, CHANGE MASTER TO, KILL, mysqladmin kill\noption, PURGE BINARY LOGS, SET GLOBAL, mysqladmin debug option, logging control,\nand more.",
+    "rationale": "The SUPER privilege allows principals to perform many actions, including view and\nterminate currently executing MySQL statements (including statements used to manage\npasswords). This privilege also provides the ability to configure MySQL, such as\nenable/disable logging, alter data, disable/enable features. Limiting the accounts that\nhave the SUPER privilege reduces the chances that an attacker can exploit these\ncapabilities.",
+    "remediation": "",
+    "hollow": true
+  }
+]

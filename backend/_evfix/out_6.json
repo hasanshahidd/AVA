@@ -1,0 +1,56 @@
+{
+ "set_id": "S014",
+ "di": 1,
+ "groups": [
+  {
+   "name": "DPIA/PIA methodology and procedure",
+   "absorbs": [
+    "DPIA methodology",
+    "Documented procedure or work instruction implementing Privacy and Impact"
+   ]
+  },
+  {
+   "name": "Completed DPIAs/impact assessment records",
+   "absorbs": [
+    "Completed DPIAs"
+   ]
+  },
+  {
+   "name": "Risk mitigation measures from the assessment",
+   "absorbs": [
+    "Risk mitigation measures"
+   ]
+  },
+  {
+   "name": "Approved privacy/impact-assessment policy and standard",
+   "absorbs": [
+    "Approved policy and standard addressing Privacy and Impact Assessment"
+   ]
+  },
+  {
+   "name": "Periodic review records",
+   "absorbs": [
+    "Periodic review records with reviewer"
+   ]
+  },
+  {
+   "name": "Privacy notice/statement published to data subjects",
+   "absorbs": [
+    "Privacy notice/statement published to data subjects with version history"
+   ]
+  },
+  {
+   "name": "Consent, opt-out, and data subject request records",
+   "absorbs": [
+    "Consent records, opt-out tracking, and data subject request logs"
+   ]
+  },
+  {
+   "name": "Privacy awareness communications",
+   "absorbs": [
+    "Awareness communications demonstrating that personnel are informed of the"
+   ]
+  }
+ ],
+ "excluded": []
+}

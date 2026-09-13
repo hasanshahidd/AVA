@@ -1,0 +1,114 @@
+{
+ "set_id": "S001",
+ "di": 17,
+ "groups": [
+  {
+   "name": "Third-party/service-provider monitoring procedures & program",
+   "absorbs": [
+    "Service provider monitoring procedures",
+    "TPSP Compliance Monitoring Program",
+    "Documented procedure or work instruction implementing Monitoring and Review"
+   ]
+  },
+  {
+   "name": "Third-party monitoring/performance reports",
+   "absorbs": [
+    "Monitoring reports",
+    "Third party monitoring reports and assessments",
+    "Third party service performance reports",
+    "Performance monitoring reports"
+   ]
+  },
+  {
+   "name": "SLA monitoring / compliance tracking",
+   "absorbs": [
+    "SLA compliance tracking",
+    "SLA monitoring reports"
+   ]
+  },
+  {
+   "name": "Service level agreements with security requirements",
+   "absorbs": [
+    "Service level agreements with security requirements",
+    "Third-party agreements with security clauses, SLAs, and right-to-audit"
+   ]
+  },
+  {
+   "name": "Third-party compliance monitoring records/register",
+   "absorbs": [
+    "Third party compliance monitoring records",
+    "CSP Compliance Monitoring Register",
+    "Compliance Monitoring Tracker",
+    "Compliance verification records"
+   ]
+  },
+  {
+   "name": "Periodic compliance/service review reports",
+   "absorbs": [
+    "Periodic Compliance Review Reports",
+    "Service review records"
+   ]
+  },
+  {
+   "name": "Third-party / vendor audit reports",
+   "absorbs": [
+    "Third party audit reports",
+    "Third party audit reports",
+    "Vendor performance audits",
+    "Audit plan, reports with scope, findings, and remediation tracking"
+   ]
+  },
+  {
+   "name": "Incident records related to third parties",
+   "absorbs": [
+    "Incident records related to third parties"
+   ]
+  },
+  {
+   "name": "Third-party risk assessments",
+   "absorbs": [
+    "Third party risk assessments"
+   ]
+  },
+  {
+   "name": "Contractual obligation tracker",
+   "absorbs": [
+    "Contractual Obligation Tracker"
+   ]
+  },
+  {
+   "name": "Regulatory change impact log",
+   "absorbs": [
+    "Regulatory Change Impact Log"
+   ]
+  },
+  {
+   "name": "Monitoring & review policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Monitoring and Review of"
+   ]
+  },
+  {
+   "name": "TPSP Attestation of Compliance (AOC) repository",
+   "absorbs": [
+    "TPSP AOC Repository"
+   ]
+  },
+  {
+   "name": "Non-compliance escalation records",
+   "absorbs": [
+    "Non-Compliance Escalation Records"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Audit logging configuration evidence",
+   "reason": "System audit-logging config, not third-party service monitoring"
+  },
+  {
+   "name": "Log review records and follow-up case documentation",
+   "reason": "Internal log-review activity, not monitoring of third-party services/compliance"
+  }
+ ]
+}

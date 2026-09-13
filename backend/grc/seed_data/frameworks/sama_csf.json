@@ -1,0 +1,686 @@
+{
+ "metadata": {
+  "name": "SAMA Cyber Security Framework",
+  "description": "The SAMA Cyber Security Framework is a comprehensive regulatory framework issued by the Saudi Arabian Monetary Authority (SAMA) to ensure that financial institutions operating in Saudi Arabia maintain robust cybersecurity controls and practices.",
+  "version": "2023",
+  "source_organization": "Saudi Arabian Monetary Authority (SAMA)",
+  "effective_date": "2023-01-01",
+  "classification": "compliance",
+  "framework_type": "regulatory",
+  "classification_confidence": 0.95,
+  "classification_reasoning": "The SAMA Cyber Security Framework is a mandatory compliance framework issued by the Saudi Arabian Monetary Authority for financial institutions operating in Saudi Arabia. It mandates specific cybersecurity controls and maturity levels, with enforcement by SAMA.",
+  "framework_purpose": "To establish mandatory cybersecurity requirements for financial institutions in Saudi Arabia, ensuring the protection of critical financial infrastructure and customer data against cyber threats.",
+  "framework_scope": "All financial institutions regulated by SAMA, including banks, insurance companies, finance companies, and other financial entities operating in Saudi Arabia.",
+  "framework_objectives": [
+   "Establish a robust cybersecurity governance structure",
+   "Implement comprehensive cyber risk management practices",
+   "Ensure protection of critical information assets",
+   "Maintain cyber resilience and incident response capabilities",
+   "Manage third-party cybersecurity risks",
+   "Achieve defined cybersecurity maturity levels"
+  ],
+  "target_audience": "CISOs, IT Security Teams, Compliance Officers, Risk Managers, and Board Members of SAMA-regulated financial institutions",
+  "certification_body": null,
+  "certification_validity_period": null,
+  "certification_levels": null,
+  "certification_lifecycle": null,
+  "required_artifacts": null,
+  "regulatory_authority": "Saudi Arabian Monetary Authority (SAMA)",
+  "compliance_deadline": null,
+  "penalty_for_non_compliance": "Non-compliance may result in regulatory sanctions, fines, restrictions on business activities, and reputational damage as determined by SAMA.",
+  "adoption_approach": [
+   "Conduct initial gap assessment against framework requirements",
+   "Develop remediation roadmap based on gap analysis",
+   "Implement required controls across all domains",
+   "Conduct self-assessment to verify compliance",
+   "Submit compliance reports to SAMA as required",
+   "Maintain continuous improvement and monitoring"
+  ],
+  "hierarchy_structure": null,
+  "exported_at": "2026-01-28T13:55:10.046451",
+  "source_framework_id": 36,
+  "total_controls": 170,
+  "repaired": "control ids/titles corrected against the published standard"
+ },
+ "controls": [
+  {
+   "control_id": "3.1.1.1",
+   "original_reference": "SAMA CSF 3.1.1",
+   "title": "Develop and approve a cyber security committee charter",
+   "description": "Create and formally approve a charter that defines the purpose, structure, and responsibilities of the cyber security committee.",
+   "full_text": "A cyber security committee charter should be developed, approved and reflect committee objectives, roles and responsibilities, minimum number of meeting participants, and meeting frequency.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.1 Cyber Security Governance"
+  },
+  {
+   "control_id": "3.1.1.2",
+   "original_reference": "SAMA CSF 3.1.1",
+   "title": "Appoint a full-time senior manager (CISO) for cyber security",
+   "description": "Ensure the appointment of a qualified, full-time CISO to oversee the organization's cyber security function.",
+   "full_text": "A full-time senior manager for the cyber security function, referred to as CISO, should be appointed at senior management level.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.1 Cyber Security Governance"
+  },
+  {
+   "control_id": "3.1.1.3",
+   "original_reference": "SAMA CSF 3.1.1",
+   "title": "Ensure CISO has Saudi nationality and is qualified",
+   "description": "Verify that the appointed CISO is a Saudi national and possesses the necessary qualifications for the role.",
+   "full_text": "The Member Organization should ensure the CISO has a Saudi nationality and is sufficiently qualified.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.1 Cyber Security Governance"
+  },
+  {
+   "control_id": "3.1.1.4",
+   "original_reference": "SAMA CSF 3.1.1",
+   "title": "Ensure cyber security function is independent from IT",
+   "description": "Establish a cyber security function that operates independently from the IT department to avoid conflicts of interest.",
+   "full_text": "The cyber security function should be independent from the information technology function.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.1 Cyber Security Governance"
+  },
+  {
+   "control_id": "3.1.1.5",
+   "original_reference": "SAMA CSF 3.1.1",
+   "title": "Allocate sufficient budget for cyber security activities",
+   "description": "Ensure that the board allocates adequate financial resources to support all necessary cyber security initiatives.",
+   "full_text": "The board of the Member Organization should allocate sufficient budget to execute the required cyber security activities.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.1 Cyber Security Governance"
+  },
+  {
+   "control_id": "3.1.4.1",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Approve cyber security committee charter",
+   "description": "The Board of Directors must formally approve the charter that defines the roles, responsibilities, and authority of the cyber security committee.",
+   "full_text": "The Board of Directors has the ultimate responsibility for cyber security, including approving the cyber security committee charter.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.2",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Endorse cyber security governance",
+   "description": "The Board of Directors must formally endorse the cyber security governance framework after it has been approved by the cyber security committee.",
+   "full_text": "The Board of Directors has the ultimate responsibility for cyber security, including endorsing (after being approved by the cyber security committee) the cyber security governance.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.3",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Endorse cyber security strategy",
+   "description": "The Board of Directors must formally endorse the organization's cyber security strategy after it has been approved by the cyber security committee.",
+   "full_text": "The Board of Directors has the ultimate responsibility for cyber security, including endorsing (after being approved by the cyber security committee) the cyber security strategy.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.4",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Endorse cyber security policy",
+   "description": "The Board of Directors must formally endorse the organization's cyber security policy after it has been approved by the cyber security committee.",
+   "full_text": "The Board of Directors has the ultimate responsibility for cyber security, including endorsing (after being approved by the cyber security committee) the cyber security policy.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.5",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Monitor, review, and communicate cyber security risk appetite",
+   "description": "The cyber security committee must ensure the organization's risk appetite is regularly reviewed, updated, and communicated to relevant stakeholders.",
+   "full_text": "The cyber security committee should be responsible for monitoring, reviewing and communicating the Member Organization's cyber security risk appetite periodically or upon a material change in the risk appetite.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.6",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Review cyber security strategy to align with objectives",
+   "description": "The cyber security committee must periodically review the cyber security strategy to ensure alignment with the organization's overall objectives.",
+   "full_text": "The cyber security committee should be responsible for reviewing the cyber security strategy to ensure that it supports the Member Organization objectives.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.7",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Approve and monitor cyber security risk management process",
+   "description": "The cyber security committee must oversee and ensure the effectiveness of the organization's risk management process for cyber security.",
+   "full_text": "The cyber security committee should be responsible for approving, communicating, supporting and monitoring the cyber security risk management process.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.8",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Approve and monitor KRIs and KPIs for cyber security",
+   "description": "The cyber security committee must define, approve, and track KRIs and KPIs to measure and manage cyber security performance.",
+   "full_text": "The cyber security committee should be responsible for approving, communicating, supporting and monitoring the key risk indicators (KRIs) and key performance indicators (KPIs) for cyber security.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.9",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Ensure standards, processes, and procedures reflect security requirements",
+   "description": "Senior management must ensure that all organizational standards, processes, and procedures align with defined security requirements.",
+   "full_text": "The senior management should be responsible for ensuring that standards, processes and procedures reflect security requirements (if applicable).",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.10",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Ensure compliance with cyber security policy and standards",
+   "description": "Senior management must ensure that all employees acknowledge and adhere to the organization's cyber security policies and standards.",
+   "full_text": "The senior management should be responsible for ensuring that individuals accept and comply with the cyber security policy, supporting standards and procedures when they are issued and updated.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.11",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Incorporate cyber security responsibilities in job descriptions",
+   "description": "Senior management must ensure that job descriptions for key roles include specific cyber security responsibilities.",
+   "full_text": "The senior management should be responsible for ensuring that cyber security responsibilities are incorporated in the job descriptions of key positions and cyber security staff.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.1.4.12",
+   "original_reference": "SAMA CSF 3.1.4",
+   "title": "Develop and maintain cyber security strategy",
+   "description": "The CISO must create and regularly update a comprehensive cyber security strategy aligned with organizational goals.",
+   "full_text": "The CISO should be responsible for developing and maintaining the cyber security strategy.",
+   "domain": "Cyber Security Leadership and Governance",
+   "parent_section": "3.1.4 Cyber Security Roles and Responsibilities"
+  },
+  {
+   "control_id": "3.3.1.1",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Define, approve and implement cyber security requirements in HR processes",
+   "description": "The cyber security requirements that apply to the human resources processes must be defined, formally approved and implemented.",
+   "full_text": "The cyber security requirements within the human resources processes should be defined, approved and implemented.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.2",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Monitor effectiveness of HR processes",
+   "description": "Organizations should monitor the ongoing effectiveness of HR processes in meeting cyber security requirements.",
+   "full_text": "The effectiveness of the human resources process should be monitored.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.3",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Measure and evaluate HR process effectiveness",
+   "description": "Organizations should periodically assess the effectiveness of HR processes in meeting cyber security requirements.",
+   "full_text": "The effectiveness of the human resources process should be measured and periodically evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.4",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Include cyber security responsibilities in staff agreements",
+   "description": "Staff agreements should include clauses outlining cyber security responsibilities and confidentiality obligations.",
+   "full_text": "The human resource process should include cyber security responsibilities and non-disclosure clauses within staff agreements (during and after the employment).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.5",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Conduct screening and background checks",
+   "description": "Ensure all employees undergo screening and background checks as part of the hiring process.",
+   "full_text": "The human resource process should include screening and background check.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.6",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Provide cyber security awareness training to staff",
+   "description": "Ensure all staff are trained on cyber security awareness during onboarding and periodically throughout their employment.",
+   "full_text": "Staff should receive cyber security awareness at the start and during their employment.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.7",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Define when disciplinary actions are applicable",
+   "description": "Establish clear guidelines on when disciplinary actions are applicable for cyber security violations.",
+   "full_text": "The human resource process should include when disciplinary actions will be applicable.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.8",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Revoke access rights post-employment",
+   "description": "Ensure all access rights are revoked immediately after an employee's termination.",
+   "full_text": "Post-employment cyber security activities should include revoking access rights.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.1.9",
+   "original_reference": "SAMA CSF 3.3.1",
+   "title": "Ensure return of assigned information assets post-employment",
+   "description": "Ensure all assigned information assets are returned upon an employee's termination.",
+   "full_text": "Post-employment cyber security activities should include returning information assets assigned (e.g., access badge, tokens, mobile devices, all electronic and physical information).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.1 Human Resources"
+  },
+  {
+   "control_id": "3.3.2.1",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Define, approve and implement the physical security process",
+   "description": "Ensure physical security measures are in place to protect facilities and assets from unauthorized access or harm.",
+   "full_text": "The physical security process should be defined, approved and implemented.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.2.2",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Monitor effectiveness of physical security process",
+   "description": "Continuously monitor physical security measures to detect and respond to potential weaknesses or breaches.",
+   "full_text": "The effectiveness of the physical security process should be monitored.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.2.3",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Measure and evaluate physical security process effectiveness",
+   "description": "Regularly assess the performance of physical security measures to ensure they meet objectives and identify areas for improvement.",
+   "full_text": "The effectiveness of the physical security process should be measured and periodically evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.2.4",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Implement physical entry controls",
+   "description": "Establish controls to manage and restrict physical entry to facilities, including visitor management processes.",
+   "full_text": "The physical security process should include physical entry controls (including visitor security).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.2.5",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Implement monitoring and surveillance",
+   "description": "Deploy monitoring and surveillance systems to detect and deter unauthorized activities or breaches.",
+   "full_text": "The physical security process should include monitoring and surveillance (e.g., CCTV, ATMs GPS tracking, sensitivity sensors).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.2.6",
+   "original_reference": "SAMA CSF 3.3.2",
+   "title": "Protect data centers and data rooms",
+   "description": "Implement physical security measures to safeguard data centers and rooms from unauthorized access or damage.",
+   "full_text": "The physical security process should include protection of data centers and data rooms.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.2 Physical Security"
+  },
+  {
+   "control_id": "3.3.11.1",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Define, approve, and implement secure disposal standard",
+   "description": "Establish and formalize a secure disposal standard to ensure proper handling of sensitive data during disposal.",
+   "full_text": "The secure disposal standard and procedure should be defined, approved and implemented.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.2",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Monitor compliance with secure disposal standard",
+   "description": "Regularly monitor adherence to the secure disposal standard to ensure compliance.",
+   "full_text": "The compliance with the secure disposal standard and procedure should be monitored.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.3",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Measure and evaluate effectiveness of secure disposal controls",
+   "description": "Assess the effectiveness of secure disposal controls to ensure they meet intended objectives.",
+   "full_text": "The effectiveness of the secure disposal cyber security controls should be measured and periodically evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.4",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Dispose of information assets per legal and regulatory requirements",
+   "description": "Ensure that information assets are disposed of in compliance with applicable legal and regulatory requirements.",
+   "full_text": "Information assets should be disposed in accordance with legal and regulatory requirements, when no longer required.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.5",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Destroy sensitive information using non-retrievable techniques",
+   "description": "Use secure destruction methods to ensure sensitive information cannot be retrieved after disposal.",
+   "full_text": "Sensitive information should be destroyed using techniques to make the information non-retrievable (e.g., secure erase, secure wiping, incineration, double crosscut, shredding).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.6",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Ensure third-party compliance with secure disposal standards",
+   "description": "Verify that third-party vendors comply with secure disposal standards and procedures.",
+   "full_text": "The Member Organization should ensure that third party service providers used for secure disposal, transport and storage comply with the secure disposal standard and procedure.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.11.7",
+   "original_reference": "SAMA CSF 3.3.11",
+   "title": "Measure and evaluate third-party secure disposal effectiveness",
+   "description": "Assess the effectiveness of third-party secure disposal processes to ensure compliance and adequacy.",
+   "full_text": "The effectiveness of third-party secure disposal processes should be periodically measured and evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.11 Secure Disposal of Information Assets"
+  },
+  {
+   "control_id": "3.3.12.1",
+   "original_reference": "SAMA CSF 3.3.12",
+   "title": "Define, approve, implement, and monitor payment systems standard",
+   "description": "Establish and maintain a cyber security standard for payment systems, ensuring it is approved and monitored.",
+   "full_text": "The Member Organization should define, approve, implement and monitor a cyber security standard for payment systems.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.12 Payment Systems"
+  },
+  {
+   "control_id": "3.3.12.2",
+   "original_reference": "SAMA CSF 3.3.12",
+   "title": "Measure and evaluate effectiveness of payment systems standard",
+   "description": "Regularly assess the effectiveness of the payment systems cyber security standard.",
+   "full_text": "The effectiveness of this process should be measured and periodically evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.12 Payment Systems"
+  },
+  {
+   "control_id": "3.3.13.1",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Define, approve, and implement electronic banking standards",
+   "description": "Establish and implement cyber security standards for electronic banking services.",
+   "full_text": "The cyber security standards for electronic banking services should be defined, approved and implemented.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.2",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Monitor compliance with electronic banking standards",
+   "description": "Ensure compliance with electronic banking standards is continuously monitored.",
+   "full_text": "The compliance with cyber security standards for electronic banking services should be monitored.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.3",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Measure and evaluate effectiveness of electronic banking standards",
+   "description": "Regularly assess the effectiveness of the electronic banking cyber security standard.",
+   "full_text": "The effectiveness of the cyber security standard for electronic banking services should be measured and periodically evaluated.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.4",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Use brand protection measures for online services",
+   "description": "Ensure that online services, including social media, are protected from brand misuse or impersonation through appropriate measures.",
+   "full_text": "Electronic banking services security standard should cover the use of brand protection measures to protect online services including social media.",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.5",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Use official application stores and websites for online and mobile banking",
+   "description": "Ensure that online and mobile banking applications are only distributed through official application stores and websites to prevent unauthorized versions.",
+   "full_text": "Use of official application stores and websites (applicable for online and mobile banking).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.6",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Detect and take down malicious apps and websites",
+   "description": "Implement measures to detect and remove malicious apps and websites that could harm users or the organization.",
+   "full_text": "Use of detection measures and take-down of malicious apps and websites (applicable for online and mobile banking).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.7",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Use sandboxing for online and mobile banking",
+   "description": "Implement sandboxing techniques to isolate and analyze potentially malicious activities in online and mobile banking environments.",
+   "full_text": "Use of sandboxing (applicable for online and mobile banking).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.8",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Use non-caching techniques for online and mobile banking",
+   "description": "Implement non-caching techniques to prevent sensitive data from being stored in browser or application caches.",
+   "full_text": "Use of non-caching techniques (applicable for online and mobile banking).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.3.13.9",
+   "original_reference": "SAMA CSF 3.3.13",
+   "title": "Use communication techniques to avoid man-in-the-middle attacks",
+   "description": "Implement secure communication techniques, such as encryption and certificate pinning, to prevent man-in-the-middle attacks.",
+   "full_text": "Use of communication techniques to avoid 'man-in-the-middle' attacks (applicable for online and mobile banking).",
+   "domain": "Cyber Security Operations and Technology",
+   "parent_section": "3.3.13 Electronic Banking Services"
+  },
+  {
+   "control_id": "3.4.2.1",
+   "original_reference": "SAMA CSF 3.4.2",
+   "title": "Measure and evaluate effectiveness of the outsourcing policy and process",
+   "description": "Ensure that the organization's outsourcing policy and processes are regularly reviewed and assessed for effectiveness and compliance.",
+   "full_text": "The effectiveness of the outsourcing policy and process should be measured and periodically evaluated.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.2 Outsourcing"
+  },
+  {
+   "control_id": "3.4.2.2",
+   "original_reference": "SAMA CSF 3.4.2",
+   "title": "Obtain SAMA approval for material outsourcing",
+   "description": "Ensure SAMA approval is obtained before outsourcing critical functions or services.",
+   "full_text": "The outsourcing process should include the approval from SAMA prior to material outsourcing.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.2 Outsourcing"
+  },
+  {
+   "control_id": "3.4.2.3",
+   "original_reference": "SAMA CSF 3.4.2",
+   "title": "Involve cyber security function in outsourcing",
+   "description": "Ensure the cyber security function is engaged in the outsourcing process to address security risks.",
+   "full_text": "The outsourcing process should include the involvement of the cyber security function.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.2 Outsourcing"
+  },
+  {
+   "control_id": "3.4.2.4",
+   "original_reference": "SAMA CSF 3.4.2",
+   "title": "Ensure compliance with SAMA outsourcing circular",
+   "description": "Ensure that all outsourcing activities comply with the requirements outlined in the SAMA outsourcing circular.",
+   "full_text": "The outsourcing process should include compliance with the SAMA circular on outsourcing.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.2 Outsourcing"
+  },
+  {
+   "control_id": "3.4.3.1",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Define, approve, implement, and communicate cloud security controls",
+   "description": "Establish and communicate cloud security controls to ensure secure use of hybrid and public cloud services.",
+   "full_text": "The cyber security controls within the cloud computing policy for hybrid and public cloud services should be defined, approved and implemented and communicated within Member Organization.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.2",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Monitor compliance with cloud computing policy",
+   "description": "Regularly monitor adherence to the cloud computing policy to ensure compliance.",
+   "full_text": "The compliance with the cloud computing policy should be monitored.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.3",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Measure and evaluate cloud security controls periodically",
+   "description": "Ensure that cloud security controls are regularly reviewed and assessed to maintain their effectiveness and alignment with organizational policies.",
+   "full_text": "The cyber security controls regarding the cloud computing policy and process for hybrid and public cloud services should be periodically measured and evaluated.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.4",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Perform cyber security risk assessment for cloud services",
+   "description": "Conduct a thorough risk assessment and due diligence to identify potential security risks associated with the cloud service provider.",
+   "full_text": "A cyber security risk assessment and due diligence on the cloud service provider and its cloud services should be performed.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.5",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Obtain SAMA approval before using cloud services",
+   "description": "Secure approval from SAMA before engaging with a cloud service provider or signing any contracts.",
+   "full_text": "The Member Organization should obtain SAMA approval prior to using cloud services or signing the contract with the cloud provider.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.6",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Ensure contract includes cyber security requirements",
+   "description": "Ensure that the contract with the cloud provider explicitly includes all necessary cyber security requirements.",
+   "full_text": "A contract should be in place, including the cyber security requirements, before using cloud services.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.7",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Use cloud services located in Saudi Arabia or obtain SAMA approval",
+   "description": "Ensure cloud services are hosted within Saudi Arabia or obtain explicit approval from SAMA for services hosted outside the country.",
+   "full_text": "In principle only cloud services should be used that are located in Saudi Arabia, or when cloud services are to be used outside Saudi Arabia that the Member Organization should obtain explicit approval from SAMA.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.8",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Prohibit cloud provider from secondary use of data",
+   "description": "Ensure that the cloud provider is contractually prohibited from using organizational data for any purpose other than the agreed services.",
+   "full_text": "The cloud service provider should not use the Member Organization's data for secondary purposes.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.9",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Implement and monitor cloud security controls",
+   "description": "Ensure that the cloud provider implements and continuously monitors security controls to protect organizational data.",
+   "full_text": "The cloud service provider should implement and monitor the cyber security controls as determined in the risk assessment for protecting the confidentiality, integrity and availability of the Member Organization's data.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.10",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Ensure logical segregation of data in cloud services",
+   "description": "Ensure that the cloud provider logically separates organizational data from other clients' data to maintain data integrity and confidentiality.",
+   "full_text": "The Member Organization's data is logically segregated from other data held by the cloud service provider, including that the cloud service provider should be able to identify the Member Organization's data and at all times should be able to distinguish it from other data.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.11",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Meet business continuity requirements for cloud services",
+   "description": "Ensure that the cloud provider's services align with the organization's business continuity requirements to minimize disruptions.",
+   "full_text": "Business continuity requirements are met in accordance with the Member Organization's business continuity policy.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.12",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Perform cyber security review at cloud provider",
+   "description": "Ensure the organization exercises its right to conduct periodic cyber security reviews of the cloud provider.",
+   "full_text": "The Member Organization has the right to perform a cyber security review at the cloud service provider.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.13",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Perform cyber security audit at cloud provider",
+   "description": "The organization should ensure it has the ability to conduct audits of the cloud provider's cyber security practices to verify compliance with agreed standards.",
+   "full_text": "The Member Organization has the right to perform a cyber security audit at the cloud service provider.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.14",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Perform cyber security examination at cloud provider",
+   "description": "The organization should ensure it can conduct examinations of the cloud provider's cyber security measures to assess risks and compliance.",
+   "full_text": "The Member Organization has the right to perform a cyber security examination at the cloud service provider.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.15",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Ensure termination rights in cloud contracts",
+   "description": "The organization should ensure that its contract with the cloud provider includes clear termination rights to protect its interests.",
+   "full_text": "The Member Organization has termination rights.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.16",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Ensure data return upon termination",
+   "description": "The organization should ensure that the cloud provider is contractually obligated to return all data upon termination of the agreement.",
+   "full_text": "The cloud service provider has to return the Member Organization's data on termination.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  },
+  {
+   "control_id": "3.4.3.17",
+   "original_reference": "SAMA CSF 3.4.3",
+   "title": "Ensure irreversible data deletion upon termination",
+   "description": "The organization should ensure that the cloud provider is contractually obligated to irreversibly delete all data upon termination to prevent unauthorized access.",
+   "full_text": "The cloud service provider has to irreversibly delete the Member Organization's data on termination.",
+   "domain": "Third Party Cyber Security",
+   "parent_section": "3.4.3 Cloud Computing"
+  }
+ ]
+}

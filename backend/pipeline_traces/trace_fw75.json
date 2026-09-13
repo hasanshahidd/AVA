@@ -1,0 +1,586 @@
+{
+  "framework_id": 75,
+  "tenant_id": 1,
+  "started_epoch": 1782900213.0242817,
+  "no_chunking": true,
+  "steps": [
+    {
+      "phase": "read",
+      "percent": 8,
+      "message": "Found 36 controls, 72 evidence items and 18 artifacts in “ISO 45001:2018 Occupational Health and Safety Management System”.",
+      "elapsed_s": 0.02,
+      "new_controls": 36,
+      "evidence_in": 72,
+      "artifacts_in": 18,
+      "framework": "ISO 45001:2018 Occupational Health and Safety Management System"
+    },
+    {
+      "phase": "domains",
+      "percent": 22,
+      "message": "Merging the framework's domains into your existing domains…",
+      "elapsed_s": 0.03
+    },
+    {
+      "phase": "domains",
+      "percent": 42,
+      "message": "Mapped onto 10 existing domains — 0 new domains created.",
+      "elapsed_s": 7.55,
+      "domains_used": [
+        "Audit & Assurance",
+        "Awareness & Training",
+        "Business Continuity & Resilience",
+        "Compliance & Legal",
+        "Configuration & Change Management",
+        "Governance, Leadership & Policy",
+        "Incident Management",
+        "Operations & IT Service Management",
+        "Risk Management",
+        "Third-Party / Supply Chain"
+      ],
+      "new_domains": []
+    },
+    {
+      "phase": "normalize",
+      "percent": 52,
+      "message": "Matching each control to your existing normalized sets…",
+      "elapsed_s": 7.55
+    },
+    {
+      "phase": "normalize",
+      "percent": 62,
+      "message": "17 candidate joins — verifying each is a genuine match…",
+      "elapsed_s": 21.04,
+      "would_join": 17,
+      "would_standalone": 19
+    },
+    {
+      "phase": "normalize",
+      "percent": 70,
+      "message": "14 controls join existing sets, 22 standalone (verification demoted 3 weak matches to their own set).",
+      "elapsed_s": 31.67,
+      "would_join": 14,
+      "would_standalone": 22,
+      "joins_verified_kept": 14,
+      "joins_demoted": 3,
+      "demoted_items": [
+        {
+          "control_id": "4.4",
+          "title": "OH&S management system",
+          "was_set": "Establish an information security management program/system",
+          "reason": "different management system focus"
+        },
+        {
+          "control_id": "5.2",
+          "title": "OH&S policy",
+          "was_set": "Establish and maintain an approved information security policy document",
+          "reason": "different policy focus"
+        },
+        {
+          "control_id": "5.4",
+          "title": "Consultation and participation of workers",
+          "was_set": "Define and document roles, communication lines and structure",
+          "reason": "different focus on consultation"
+        }
+      ]
+    },
+    {
+      "phase": "build",
+      "percent": 80,
+      "message": "Cloning your library into a safe candidate and adding the framework…",
+      "elapsed_s": 31.67
+    },
+    {
+      "phase": "build",
+      "percent": 90,
+      "message": "Candidate library #63 built (your live library is untouched).",
+      "elapsed_s": 58.58,
+      "candidate_run_id": 63,
+      "would_join": 14,
+      "would_standalone": 22
+    },
+    {
+      "phase": "evidence",
+      "percent": 92,
+      "message": "Normalizing evidence — merging onto matched sets…",
+      "elapsed_s": 58.6
+    },
+    {
+      "phase": "evidence",
+      "percent": 96,
+      "message": "Merged 28 evidence items into 12 sets (0 already covered).",
+      "elapsed_s": 58.88,
+      "evidence_merged": 28,
+      "evidence_deduped": 0,
+      "sets_evidence_enriched": 12,
+      "evidence_generated": 0
+    },
+    {
+      "phase": "artifacts",
+      "percent": 98,
+      "message": "Normalizing artifacts against the unified catalog…",
+      "elapsed_s": 58.89
+    },
+    {
+      "phase": "artifacts",
+      "percent": 100,
+      "message": "8 new artifacts added, 10 deduped against existing frameworks.",
+      "elapsed_s": 58.97,
+      "artifacts_total": 18,
+      "artifacts_new": 8,
+      "artifacts_duplicate": 10
+    }
+  ],
+  "framework": "ISO 45001:2018 Occupational Health and Safety Management System",
+  "elapsed_s": 58.97,
+  "decisions": [
+    {
+      "control_id": "4.1",
+      "title": "Understanding the organization and its context",
+      "framework_domain": "Context of the Organization",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Understand the organization and its context"
+    },
+    {
+      "control_id": "4.2",
+      "title": "Understanding the needs and expectations of workers and other interested parties",
+      "framework_domain": "Context of the Organization",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Understand the needs and expectations of interested parties"
+    },
+    {
+      "control_id": "4.3",
+      "title": "Determining the scope of the OH&S management system",
+      "framework_domain": "Context of the Organization",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Determine the scope of the management system"
+    },
+    {
+      "control_id": "4.4",
+      "title": "OH&S management system",
+      "framework_domain": "Context of the Organization",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "5.1",
+      "title": "Leadership and commitment",
+      "framework_domain": "Leadership and Worker Participation",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Demonstrate top-management commitment and leadership for the security/management program"
+    },
+    {
+      "control_id": "5.2",
+      "title": "OH&S policy",
+      "framework_domain": "Leadership and Worker Participation",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "5.3",
+      "title": "Organizational roles, responsibilities and authorities",
+      "framework_domain": "Leadership and Worker Participation",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Define and allocate information security roles and responsibilities"
+    },
+    {
+      "control_id": "5.4",
+      "title": "Consultation and participation of workers",
+      "framework_domain": "Leadership and Worker Participation",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.1.1",
+      "title": "Actions to address risks and opportunities — General",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Risk Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.1.2",
+      "title": "Hazard identification and assessment of risks and opportunities",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Risk Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.1.3",
+      "title": "Determination of legal requirements and other requirements",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.1.4",
+      "title": "Planning action",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.2.1",
+      "title": "OH&S objectives",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "6.2.2",
+      "title": "Planning to achieve OH&S objectives",
+      "framework_domain": "Planning",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "7.1",
+      "title": "Resources",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Provide resources for the management system"
+    },
+    {
+      "control_id": "7.2",
+      "title": "Competence",
+      "framework_domain": "Support",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "joined",
+      "joined_set": "Commitment to competence of personnel"
+    },
+    {
+      "control_id": "7.3",
+      "title": "Awareness",
+      "framework_domain": "Support",
+      "reconciled_domain": "Awareness & Training",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "7.4.1",
+      "title": "Communication — General",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "7.4.2",
+      "title": "Internal communication",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "7.4.3",
+      "title": "External communication",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "7.5.1",
+      "title": "Documented information — General",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Control of documented information / document management"
+    },
+    {
+      "control_id": "7.5.2",
+      "title": "Creating and updating documented information",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Creating and Updating Documented Information"
+    },
+    {
+      "control_id": "7.5.3",
+      "title": "Control of documented information",
+      "framework_domain": "Support",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Control of documented information / document management"
+    },
+    {
+      "control_id": "8.1.1",
+      "title": "Operational planning and control — General",
+      "framework_domain": "Operation",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "8.1.2",
+      "title": "Eliminating hazards and reducing OH&S risks",
+      "framework_domain": "Operation",
+      "reconciled_domain": "Risk Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "8.1.3",
+      "title": "Management of change",
+      "framework_domain": "Operation",
+      "reconciled_domain": "Configuration & Change Management",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "8.1.4",
+      "title": "Procurement (including contractors and outsourcing)",
+      "framework_domain": "Operation",
+      "reconciled_domain": "Third-Party / Supply Chain",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "8.2",
+      "title": "Emergency preparedness and response",
+      "framework_domain": "Operation",
+      "reconciled_domain": "Business Continuity & Resilience",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "9.1.1",
+      "title": "Monitoring, measurement, analysis and evaluation — General",
+      "framework_domain": "Performance Evaluation",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "9.1.2",
+      "title": "Evaluation of compliance",
+      "framework_domain": "Performance Evaluation",
+      "reconciled_domain": "Compliance & Legal",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "9.2.1",
+      "title": "Internal audit — General",
+      "framework_domain": "Performance Evaluation",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "9.2.2",
+      "title": "Internal audit programme",
+      "framework_domain": "Performance Evaluation",
+      "reconciled_domain": "Audit & Assurance",
+      "disposition": "standalone",
+      "joined_set": null
+    },
+    {
+      "control_id": "9.3",
+      "title": "Management review",
+      "framework_domain": "Performance Evaluation",
+      "reconciled_domain": "Governance, Leadership & Policy",
+      "disposition": "joined",
+      "joined_set": "Conduct periodic management review of the management system"
+    },
+    {
+      "control_id": "10.1",
+      "title": "Improvement — General",
+      "framework_domain": "Improvement",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Continually improve the management system"
+    },
+    {
+      "control_id": "10.2",
+      "title": "Incident, nonconformity and corrective action",
+      "framework_domain": "Improvement",
+      "reconciled_domain": "Incident Management",
+      "disposition": "joined",
+      "joined_set": "Nonconformity and Corrective Action"
+    },
+    {
+      "control_id": "10.3",
+      "title": "Continual improvement",
+      "framework_domain": "Improvement",
+      "reconciled_domain": "Operations & IT Service Management",
+      "disposition": "joined",
+      "joined_set": "Continually improve the management system"
+    }
+  ],
+  "result": {
+    "candidate_run_id": 63,
+    "promoted": false,
+    "added_framework": "ISO 45001:2018 Occupational Health and Safety Management System",
+    "added_join": 14,
+    "added_standalone": 22,
+    "cloned_sets": 2332,
+    "cloned_standalone": 0,
+    "new_controls": 36,
+    "would_join": 14,
+    "would_standalone": 22,
+    "domains_used": [
+      "Audit & Assurance",
+      "Awareness & Training",
+      "Business Continuity & Resilience",
+      "Compliance & Legal",
+      "Configuration & Change Management",
+      "Governance, Leadership & Policy",
+      "Incident Management",
+      "Operations & IT Service Management",
+      "Risk Management",
+      "Third-Party / Supply Chain"
+    ],
+    "new_domains": [],
+    "evidence_generated": 0,
+    "evidence_merged": 28,
+    "evidence_deduped": 0,
+    "sets_evidence_enriched": 12,
+    "artifacts_total": 18,
+    "artifacts_new": 8,
+    "artifacts_duplicate": 10,
+    "artifacts_new_sample": [
+      {
+        "artifact": "OH&S Policy",
+        "type": "Policy",
+        "control_ref": "5.2"
+      },
+      {
+        "artifact": "Worker Consultation & Participation Plan",
+        "type": "Plan",
+        "control_ref": "5.4"
+      },
+      {
+        "artifact": "Legal & Other Requirements Register",
+        "type": "Register",
+        "control_ref": "6.1.3"
+      },
+      {
+        "artifact": "OH&S Objectives & Improvement Plan",
+        "type": "Plan",
+        "control_ref": "6.2.1"
+      },
+      {
+        "artifact": "OH&S Communication Log",
+        "type": "Log",
+        "control_ref": "7.4.1"
+      },
+      {
+        "artifact": "Hierarchy of Controls / Safe Work Procedures",
+        "type": "Procedure",
+        "control_ref": "8.1.2"
+      },
+      {
+        "artifact": "Contractor & Procurement OH&S Requirements",
+        "type": "Procedure",
+        "control_ref": "8.1.4"
+      },
+      {
+        "artifact": "OH&S Monitoring & Measurement Records",
+        "type": "Record",
+        "control_ref": "9.1.1"
+      }
+    ],
+    "artifacts_dup_sample": [
+      {
+        "artifact": "OH&S Management System Scope Statement",
+        "type": "Policy",
+        "matches": "AI Management System Scope Statement",
+        "in_framework": "ISO/IEC 42001:2023 AI Management System"
+      },
+      {
+        "artifact": "Interested Parties & Needs Register",
+        "type": "Register",
+        "matches": "Interested Parties Register",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Roles, Responsibilities & Authorities Matrix",
+        "type": "Matrix",
+        "matches": "Roles, Responsibilities & Authorities",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Hazard Identification & Risk Assessment Register",
+        "type": "Register",
+        "matches": "Risk Register",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Competence & Training Records",
+        "type": "Record",
+        "matches": "Competence & Training Records",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Management of Change Procedure",
+        "type": "Procedure",
+        "matches": "Change Management Policy & Procedure",
+        "in_framework": "COBIT 2019"
+      },
+      {
+        "artifact": "Emergency Preparedness & Response Plan",
+        "type": "Plan",
+        "matches": "Emergency Preparedness & Response Plan",
+        "in_framework": "ISO 41001:2018"
+      },
+      {
+        "artifact": "Internal Audit Programme & Reports",
+        "type": "Report",
+        "matches": "Internal Audit Programme",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Management Review Minutes",
+        "type": "Record",
+        "matches": "Management Review Minutes",
+        "in_framework": "ISO/IEC 27001:2022"
+      },
+      {
+        "artifact": "Incident, Nonconformity & Corrective Action Log",
+        "type": "Log",
+        "matches": "Nonconformity & Corrective Action Register",
+        "in_framework": "ISO/IEC 27001:2022"
+      }
+    ],
+    "joins_verified_kept": 14,
+    "joins_demoted": 3,
+    "demoted_items": [
+      {
+        "control_id": "4.4",
+        "title": "OH&S management system",
+        "was_set": "Establish an information security management program/system",
+        "reason": "different management system focus"
+      },
+      {
+        "control_id": "5.2",
+        "title": "OH&S policy",
+        "was_set": "Establish and maintain an approved information security policy document",
+        "reason": "different policy focus"
+      },
+      {
+        "control_id": "5.4",
+        "title": "Consultation and participation of workers",
+        "was_set": "Define and document roles, communication lines and structure",
+        "reason": "different focus on consultation"
+      }
+    ],
+    "framework": "ISO 45001:2018 Occupational Health and Safety Management System"
+  },
+  "completed": true,
+  "total_seconds": 59.06
+}

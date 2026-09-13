@@ -1,0 +1,64 @@
+{
+ "set_id": "S019",
+ "di": 7,
+ "groups": [
+  {
+   "name": "Diagnostic/configuration port whitelist",
+   "absorbs": [
+    "Diagnostic/configuration port whitelist"
+   ]
+  },
+  {
+   "name": "Disabled services/utilities documentation",
+   "absorbs": [
+    "Disabled services/utilities documentation"
+   ]
+  },
+  {
+   "name": "Authorized workstation list for remote diagnostics",
+   "absorbs": [
+    "Authorized workstation list for remote diagnostics"
+   ]
+  },
+  {
+   "name": "Remote diagnostic access logs",
+   "absorbs": [
+    "Remote diagnostic access logs"
+   ]
+  },
+  {
+   "name": "Approved remote diagnostic and configuration policy/standard",
+   "absorbs": [
+    "Approved policy and standard addressing Remote Diagnostic and Configuration"
+   ]
+  },
+  {
+   "name": "Documented procedure/work instruction for remote diagnostic and configuration",
+   "absorbs": [
+    "Documented procedure or work instruction implementing Remote Diagnostic and"
+   ]
+  },
+  {
+   "name": "Network architecture/segmentation diagram",
+   "absorbs": [
+    "Network architecture diagram showing segmentation, firewalls, and trust zones"
+   ]
+  },
+  {
+   "name": "Network device configuration baselines and ruleset review records",
+   "absorbs": [
+    "Network device configuration baselines and ruleset review records"
+   ]
+  }
+ ],
+ "excluded": [
+  {
+   "name": "Physical access logs (badge/biometric) and visitor register",
+   "reason": "Physical access control evidence, off-topic for remote diagnostic/configuration port control"
+  },
+  {
+   "name": "CCTV deployment evidence and footage retention records",
+   "reason": "Physical surveillance evidence, off-topic for remote diagnostic/configuration port control"
+  }
+ ]
+}

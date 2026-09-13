@@ -1,0 +1,14 @@
+[
+ {
+  "i": 17,
+  "decision": "join",
+  "set_id": "S004",
+  "reason": "Monitoring adherence to established cyber security requirements/documentation - same as S004 (already has SAMA CSF + MAS)"
+ },
+ {
+  "i": 28,
+  "decision": "standalone",
+  "set_id": "",
+  "reason": "Measuring effectiveness of a specific payment systems standard - no true cross-framework equivalent"
+ }
+]

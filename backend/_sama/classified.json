@@ -1,0 +1,404 @@
+[
+  {
+    "i": 0,
+    "domain_index": 10,
+    "domain": "Asset Management",
+    "reason": "controls applied to information assets -> asset mgmt"
+  },
+  {
+    "i": 1,
+    "domain_index": 10,
+    "domain": "Asset Management",
+    "reason": "controls for storage devices/USB -> asset mgmt"
+  },
+  {
+    "i": 2,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "improve cyber security controls program -> governance"
+  },
+  {
+    "i": 3,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "initiate foundational controls program -> governance"
+  },
+  {
+    "i": 4,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "maintain/review controls program -> governance"
+  },
+  {
+    "i": 5,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "continuously monitor controls to detect/respond -> monitoring"
+  },
+  {
+    "i": 6,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "direction for subsidiaries cyber requirements -> governance"
+  },
+  {
+    "i": 7,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "mandate framework adoption -> governance/framework"
+  },
+  {
+    "i": 8,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "update framework periodically -> governance/framework"
+  },
+  {
+    "i": 9,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "review framework periodically -> governance/framework"
+  },
+  {
+    "i": 10,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "formal framework update request process -> governance/framework"
+  },
+  {
+    "i": 11,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "update framework based on review -> governance/framework"
+  },
+  {
+    "i": 12,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "self-assessment via questionnaire -> governance (self-assessment)"
+  },
+  {
+    "i": 13,
+    "domain_index": 3,
+    "domain": "Audit & Assurance",
+    "reason": "SAMA review and audit self-assessments -> audit/assurance"
+  },
+  {
+    "i": 14,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "measure cyber security maturity of program -> governance"
+  },
+  {
+    "i": 15,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "documentation why/what/how -> governance/policy"
+  },
+  {
+    "i": 16,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "establish policies, standards, procedures -> governance/policy"
+  },
+  {
+    "i": 17,
+    "domain_index": 2,
+    "domain": "Compliance & Legal",
+    "reason": "monitor compliance with documentation -> compliance"
+  },
+  {
+    "i": 18,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "KRIs for trend reporting/improvement -> risk"
+  },
+  {
+    "i": 19,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "appoint CISO -> governance/leadership"
+  },
+  {
+    "i": 20,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "cyber security committee charter -> governance"
+  },
+  {
+    "i": 21,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "CISO nationality/qualified -> governance/leadership"
+  },
+  {
+    "i": 22,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "cyber function independent from IT -> governance"
+  },
+  {
+    "i": 23,
+    "domain_index": 10,
+    "domain": "Asset Management",
+    "reason": "implement security requirements for info assets -> asset mgmt"
+  },
+  {
+    "i": 24,
+    "domain_index": 15,
+    "domain": "Human Resources Security",
+    "reason": "cyber requirements in HR processes -> HR security"
+  },
+  {
+    "i": 25,
+    "domain_index": 15,
+    "domain": "Human Resources Security",
+    "reason": "implement cyber requirements in HR -> HR security"
+  },
+  {
+    "i": 26,
+    "domain_index": 15,
+    "domain": "Human Resources Security",
+    "reason": "evaluate HR process effectiveness -> HR security"
+  },
+  {
+    "i": 27,
+    "domain_index": 15,
+    "domain": "Human Resources Security",
+    "reason": "monitor HR process effectiveness -> HR security"
+  },
+  {
+    "i": 28,
+    "domain_index": 2,
+    "domain": "Compliance & Legal",
+    "reason": "evaluate payment systems standard effectiveness -> compliance/standard"
+  },
+  {
+    "i": 29,
+    "domain_index": 14,
+    "domain": "Physical & Environmental Security",
+    "reason": "evaluate physical security effectiveness -> physical"
+  },
+  {
+    "i": 30,
+    "domain_index": 14,
+    "domain": "Physical & Environmental Security",
+    "reason": "monitor physical security effectiveness -> physical"
+  },
+  {
+    "i": 31,
+    "domain_index": 17,
+    "domain": "Third-Party / Supply Chain",
+    "reason": "evaluate cloud security controls -> cloud/third-party"
+  },
+  {
+    "i": 32,
+    "domain_index": 17,
+    "domain": "Third-Party / Supply Chain",
+    "reason": "third-party secure disposal effectiveness -> third-party"
+  },
+  {
+    "i": 33,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "strategic direction for cyber security -> governance/strategy"
+  },
+  {
+    "i": 34,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "responsible use of enterprise resources -> governance"
+  },
+  {
+    "i": 35,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "continuous monitoring of security state -> monitoring"
+  },
+  {
+    "i": 36,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "risk mitigation strategy -> risk"
+  },
+  {
+    "i": 37,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "define infosec roles and responsibilities -> governance"
+  },
+  {
+    "i": 38,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "facilitate/monitor implementation of infosec practices -> governance"
+  },
+  {
+    "i": 39,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "identify known/emerging security threats -> threat mgmt"
+  },
+  {
+    "i": 40,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "shifts in risk appetite -> risk"
+  },
+  {
+    "i": 41,
+    "domain_index": 16,
+    "domain": "Awareness & Training",
+    "reason": "guidance and training on infosec/risk -> awareness/training"
+  },
+  {
+    "i": 42,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "provide infosec/risk frameworks -> governance/framework"
+  },
+  {
+    "i": 43,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "set infosec goals -> governance"
+  },
+  {
+    "i": 44,
+    "domain_index": 0,
+    "domain": "Governance, Leadership & Policy",
+    "reason": "support infosec policies/roles/goals -> governance/policy"
+  },
+  {
+    "i": 45,
+    "domain_index": 17,
+    "domain": "Third-Party / Supply Chain",
+    "reason": "define SLAs with service providers -> third-party"
+  },
+  {
+    "i": 46,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "establish risk register -> risk"
+  },
+  {
+    "i": 47,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "establish SOC monitor/detect/respond -> monitoring/detection"
+  },
+  {
+    "i": 48,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "red-teaming simulated attacks -> threat mgmt"
+  },
+  {
+    "i": 49,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "risk treatment processes -> risk"
+  },
+  {
+    "i": 50,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "sandboxing to analyze malicious software -> threat mgmt"
+  },
+  {
+    "i": 51,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "SIEM tools security data correlation -> monitoring"
+  },
+  {
+    "i": 52,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "vulnerability management practices -> vuln mgmt"
+  },
+  {
+    "i": 53,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "mitigate negative consequences of risks -> risk"
+  },
+  {
+    "i": 54,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "security testing of systems -> threat/vuln mgmt"
+  },
+  {
+    "i": 55,
+    "domain_index": 1,
+    "domain": "Risk Management",
+    "reason": "promote risk-aware culture -> risk"
+  },
+  {
+    "i": 56,
+    "domain_index": 13,
+    "domain": "Business Continuity & Resilience",
+    "reason": "recover to operational posture in timeframe -> BC/resilience"
+  },
+  {
+    "i": 57,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "assess security data in SOC -> monitoring/detection"
+  },
+  {
+    "i": 58,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "detect indicators of compromise in SOC -> detection"
+  },
+  {
+    "i": 59,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "disseminate security info from SOC -> monitoring/detection"
+  },
+  {
+    "i": 60,
+    "domain_index": 12,
+    "domain": "Incident Management",
+    "reason": "investigate indicators of compromise -> incident mgmt"
+  },
+  {
+    "i": 61,
+    "domain_index": 11,
+    "domain": "Logging, Monitoring & Detection",
+    "reason": "monitor security data in SOC -> monitoring"
+  },
+  {
+    "i": 62,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "overview of threats and trends -> threat mgmt"
+  },
+  {
+    "i": 63,
+    "domain_index": 17,
+    "domain": "Third-Party / Supply Chain",
+    "reason": "third-party providers adhere to standards -> third-party"
+  },
+  {
+    "i": 64,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "identify vulnerabilities -> vuln mgmt"
+  },
+  {
+    "i": 65,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "mitigate vulnerabilities -> vuln mgmt"
+  },
+  {
+    "i": 66,
+    "domain_index": 18,
+    "domain": "Vulnerability & Threat Management",
+    "reason": "remediate vulnerabilities apply patches -> vuln mgmt"
+  }
+]
