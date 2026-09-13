@@ -224,10 +224,16 @@ Return JSON:
 
 # ── the two rounds ────────────────────────────────────────────────────────────
 def _chat(client, model: str, system: str, user: str) -> str:
+    # Per-request timeout: without it the OpenAI client defaults to 600s, so a
+    # single stalled chapter request hangs the whole ThreadPoolExecutor scan for
+    # up to 600s x 2 retries (~20 min) — which also holds the single-flight run
+    # lock and blocks every future CTEM Validate run. 60s fails fast; the
+    # caller (_scan_chapter) retries once, so a transient stall still recovers.
     resp = client.chat.completions.create(
         model=model, temperature=0, response_format={"type": "json_object"},
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": user}],
+        timeout=60,
     )
     return resp.choices[0].message.content or "{}"
 
