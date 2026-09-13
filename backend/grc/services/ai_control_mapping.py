@@ -46,7 +46,9 @@ PROMPT_VERSION = "p6-ctx-2.0"
 # every line instead of skimming one giant scroll.
 _CHAPTER_BUDGET = 45_000
 _STATEMENT_CAP = 1_000          # cap pathological outliers, keep normal statements whole
-_SCAN_WORKERS = 6
+_SCAN_WORKERS = 3          # lowered from 6: 6 concurrent ~11k-token requests tripped
+                           # rate-limit stalls; 3 completes reliably (timeout in _chat
+                           # still caps any single stall)
 
 
 def bucket_for(vuln) -> str:
