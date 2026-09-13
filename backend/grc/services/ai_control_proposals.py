@@ -227,6 +227,22 @@ def generate_proposals(db: Session, tenant_id: int, *, vulnerability_ids: Option
     from ..models import (Vulnerability, ITAsset, VulnerabilityAssetLink, VulnerabilityControlLink,
                           AiControlProposal, AiControlProposalRun)
 
+    # Warm the tenant engine BEFORE opening the finding-query transaction below.
+    # The per-provider AI-usage recorder opens its own tenant session on each of
+    # the concurrent scan calls; on a COLD engine that first open triggers
+    # _init_tenant_schema, whose additive-column self-heal takes ACCESS EXCLUSIVE
+    # on grc_vulnerabilities and deadlocks against this function's still-open
+    # finding SELECT. Running any schema init here, up front, with no competing
+    # transaction removes the collision. No-op when the engine is already warm
+    # (the router pre-opens the background session, so production usually is).
+    try:
+        _slug = db.info.get("tenant_slug")
+        if _slug:
+            from ..db import open_tenant_session
+            open_tenant_session(_slug).close()
+    except Exception:
+        logger.exception("tenant engine warm-up failed (non-fatal)")
+
     run_id = uuid.uuid4().hex[:24]
     run = AiControlProposalRun(tenant_id=tenant_id, run_id=run_id, prompt_version=PROMPT_VERSION,
                                ctem_scope_id=ctem_scope_id, triggered_by=triggered_by)

@@ -240,6 +240,15 @@ def _ensure_vulnerability_host_identity(engine: Engine) -> None:
     inspector = sa_inspect(engine)
     if not inspector.has_table("grc_vulnerabilities"):
         return
+    # Skip the ALTER when the column already exists. `ADD COLUMN IF NOT EXISTS`
+    # still acquires an ACCESS EXCLUSIVE lock on the table even as a no-op, which
+    # deadlocks against any concurrent open transaction holding a lock on
+    # grc_vulnerabilities (e.g. the CTEM AI mapper's still-open finding SELECT
+    # while its worker threads trigger this self-heal via usage logging). The
+    # existence check is metadata-only (no table lock), so the already-migrated
+    # path — the normal case — never locks grc_vulnerabilities.
+    if any(c["name"] == "host_identity" for c in inspector.get_columns("grc_vulnerabilities")):
+        return
     with engine.begin() as conn:
         conn.execute(text(
             "ALTER TABLE grc_vulnerabilities ADD COLUMN IF NOT EXISTS host_identity JSON"
