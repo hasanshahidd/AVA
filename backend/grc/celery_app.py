@@ -54,9 +54,6 @@ celery_app = Celery(
     backend=RESULT_BACKEND,
     include=[
         "grc.tasks.base",
-        "grc.tasks.governance",
-        "grc.tasks.frameworks",
-        "grc.tasks.control_library",
         # Vulnerability enrichment — dispatched by ingestion adapters and the
         # daily beat refresh. Runs on the existing `parsing` queue so no new
         # worker service is required.
@@ -69,7 +66,6 @@ celery_app = Celery(
         # task that fans out daily; lives on `parsing` until the dedicated
         # `notification` queue spins up.
         "grc.tasks.exceptions",
-        "grc.tasks.tprm",
         # Phase 7 — Cloud connector sync. Lives on `parsing` until the
         # dedicated `sync` queue spins up.
         "grc.tasks.cloud_sync",
@@ -135,13 +131,6 @@ celery_app.conf.update(
     # enrichment until a future PR explicitly opts it into `enrichment`.
     task_default_queue="default",
     task_routes={
-        "grc.tasks.frameworks.*": {"queue": "parsing"},
-        "grc.tasks.governance.parse_policy_document": {"queue": "parsing"},
-        "grc.tasks.governance.run_gap_analysis": {"queue": "parsing"},
-        # Post-parse control recommendation (internal ERM + framework controls
-        # per statement). Same AI-heavy character as policy parse / gap analysis.
-        "grc.tasks.governance.auto_map_document_controls": {"queue": "parsing"},
-        "grc.tasks.control_library.ai_compare_frameworks": {"queue": "parsing"},
         # Vuln enrichment shares the parsing queue — same worker can handle
         # it; the work is light (HTTP calls + a small DB write per row).
         "grc.tasks.vulnerabilities.*": {"queue": "parsing"},
@@ -152,7 +141,6 @@ celery_app.conf.update(
         # Phase 8 — exception workflow sweep. Same story: shares `parsing`
         # until the dedicated `notification` queue lands.
         "grc.tasks.exceptions.*": {"queue": "parsing"},
-        "grc.tasks.tprm.*": {"queue": "parsing"},
         # Phase 7 — cloud connector sync. Shares `parsing` for now.
         "grc.tasks.cloud_sync.*": {"queue": "parsing"},
         # External-connector framework (ticketing / SIEM / pentest / collab /
@@ -203,21 +191,6 @@ celery_app.conf.update(
         "exception-expiry-daily-sweep": {
             "task": "grc.tasks.exceptions.daily_exception_expiry_sweep",
             "schedule": 24 * 60 * 60,
-            "options": {"queue": "parsing"},
-        },
-        # TPRM — daily portfolio + per-vendor risk snapshot so the dashboard
-        # "risk over time" trend keeps moving between assessments.
-        "tprm-daily-snapshot-sweep": {
-            "task": "grc.tasks.tprm.daily_tprm_snapshot_sweep",
-            "schedule": 24 * 60 * 60,
-            "options": {"queue": "parsing"},
-        },
-        # TPRM — continuous-monitoring connector poll fan-out (every 6h). A no-op
-        # until a live provider is registered in tpra.monitoring_connectors.CONNECTORS;
-        # the seam is scheduled now so a feed goes live by adding the connector alone.
-        "tprm-monitoring-connector-poll": {
-            "task": "grc.tasks.tprm.poll_monitoring_connectors_sweep",
-            "schedule": 6 * 60 * 60,
             "options": {"queue": "parsing"},
         },
         # Phase 7 — Cloud connector sync fan-out. Every 6 hours; per-row

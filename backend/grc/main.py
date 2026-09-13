@@ -9,8 +9,6 @@ from .audit_logger import should_audit_request, parse_request_payload, write_aud
 from .routers import (
     auth_router,
     tenants_router,
-    frameworks_router,
-    controls_router,
     evidence_router,
     risks_router,
     governance_router,
@@ -186,8 +184,6 @@ app.include_router(sso_router)
 app.include_router(entra_router)
 app.include_router(admin_router)
 app.include_router(tenants_router)
-app.include_router(frameworks_router)
-app.include_router(controls_router)
 app.include_router(evidence_router)
 app.include_router(risks_router)
 app.include_router(governance_router)

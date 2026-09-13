@@ -17,12 +17,13 @@ Design decisions
 * **Best available, executable preferred.** Each pattern lists candidate
   benchmark names in priority order; the first one that actually exists in the
   tenant (enabled + approved) wins. Executable benchmarks (real runner) are
-  listed first; RHEL-family v9 maps to the binary-compatible AlmaLinux 9
-  EXECUTABLE benchmark so those hosts are genuinely scannable. Where no
-  executable benchmark exists (RHEL 8, Server 2016/2019/2022, Rocky, SUSE,
-  macOS, ESXi, k8s, cloud) the newest non-archived MANUAL benchmark is used —
-  so the asset still surfaces its applicable (attestation) rules instead of
-  resolving to nothing.
+  listed first; each RHEL-family distro maps to its OWN executable benchmark
+  first (RHEL 8/9/10, AlmaLinux, Oracle Linux, Amazon Linux 2 all have real
+  runners now), with the binary-compatible sibling as a fallback for tenants
+  where the dedicated benchmark isn't present. Where no executable benchmark
+  exists (Server 2016/2019/2022, Rocky, SUSE, macOS, ESXi, k8s, cloud) the
+  newest non-archived MANUAL benchmark is used — so the asset still surfaces
+  its applicable (attestation) rules instead of resolving to nothing.
 * **Never archived.** Archived benchmarks are never a mapping target.
 * **Idempotent + non-destructive.** A pattern that already has an active row
   pointing at an available benchmark is left untouched (respects operator
@@ -71,21 +72,25 @@ MAPPINGS: List[Tuple[str, List[str], int]] = [
     ("debian-12", ["CIS_Debian_Linux_12_Benchmark_v1.1.0"], 50),
     ("debian-11", ["CIS_Debian_Linux_11_Benchmark_v2.0.0"], 50),
     ("debian", ["CIS_Debian_Linux_12_Benchmark_v1.1.0"], 200),
-    # ── RHEL family (v9 → AlmaLinux 9 executable proxy; else native manual) ──
-    ("rhel-9", ["CIS_AlmaLinux_OS_9_Benchmark_v2.0.0", "CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0"], 50),
+    # ── RHEL family — each distro maps to its OWN benchmark first (all are now
+    # executable oscap), with the binary-compatible sibling as a fallback for
+    # tenants where the dedicated one isn't present (Phase 2 F3). ──
+    ("rhel-9", ["CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0", "CIS_AlmaLinux_OS_9_Benchmark_v2.0.0"], 50),
     ("rhel-8", ["CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0"], 50),
     ("rhel-10", ["CIS_Red_Hat_Enterprise_Linux_10_Benchmark_v1.0.1"], 50),
-    ("rhel", ["CIS_AlmaLinux_OS_9_Benchmark_v2.0.0"], 200),
+    ("rhel", ["CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0", "CIS_AlmaLinux_OS_9_Benchmark_v2.0.0"], 200),
     ("almalinux-9", ["CIS_AlmaLinux_OS_9_Benchmark_v2.0.0"], 50),
-    ("almalinux-8", ["CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0"], 80),
+    ("almalinux-8", ["CIS_ALMALINUX_OS_8_v4.0.0", "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0"], 80),
     ("oraclelinux-9", ["CIS_Oracle_Linux_9_Benchmark_v2.0.0"], 50),
-    ("oraclelinux-8", ["CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0"], 80),
+    ("oraclelinux-8", ["CIS_Oracle_Linux_8_Benchmark_v4.0.0", "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0"], 80),
     ("rockylinux-9", ["CIS_AlmaLinux_OS_9_Benchmark_v2.0.0", "CIS_Rocky_Linux_9_Benchmark_v2.0.0"], 50),
     ("rockylinux-8", ["CIS_Rocky_Linux_8_Benchmark_v3.0.0"], 50),
     ("rockylinux-10", ["CIS_Rocky_Linux_10_Benchmark_v1.0.0"], 50),
     # ── Amazon Linux / SUSE ──
     ("amazonlinux-2023", ["CIS_Amazon_Linux_2023_Benchmark_v1.0.0"], 50),
-    ("amazonlinux-2", ["CIS_Amazon_Linux_2023_Benchmark_v1.0.0"], 150),
+    # AL2 is RHEL7-era, NOT AL2023 — map it to its own benchmark, never the
+    # AL2023 datastream (Phase 2 F4). AL2023 remains the fallback.
+    ("amazonlinux-2", ["CIS_AMAZON_LINUX_2_v4.0.0", "CIS_Amazon_Linux_2023_Benchmark_v1.0.0"], 150),
     ("sles-15", ["CIS_SUSE_Linux_Enterprise_15_Benchmark_v2.0.1"], 50),
     ("sles-12", ["CIS_SUSE_Linux_Enterprise_12_Benchmark_v3.2.1"], 50),
     ("sles", ["CIS_SUSE_Linux_Enterprise_15_Benchmark_v2.0.1"], 80),

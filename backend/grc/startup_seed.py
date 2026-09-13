@@ -911,10 +911,12 @@ def ensure_issues_incidents_seed(db: Session, tenant_id: int) -> dict:
 def ensure_assurance_workbench_seed(db: Session, tenant_id: int, user_id: Optional[int] = None) -> dict:
     """Materialize CT&A work items from internal controls so assurance scorecards have data."""
     from grc.models import InternalControl, ControlWorkItem
-    from grc.modules.control_library.routers.workbench import ensure_tables, sync_internal_control_work_items
 
     out: dict[str, Any] = {"seeded": False, "work_items": 0}
     try:
+        # Old control library was removed; guard the import so a future seeding
+        # re-enable logs + skips instead of crashing (module no longer exists).
+        from grc.modules.control_library.routers.workbench import ensure_tables, sync_internal_control_work_items
         uid = user_id or _first_user_id(db)
         ensure_tables(db)
         now = datetime.utcnow()
