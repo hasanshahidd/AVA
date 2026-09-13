@@ -53,8 +53,31 @@ REMAPS = [
     ("almalinux-8",   "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0", "CIS_ALMALINUX_OS_8_v4.0.0"),
     ("oraclelinux-8", "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0", "CIS_Oracle_Linux_8_Benchmark_v4.0.0"),
     ("amazonlinux-2", "CIS_Amazon_Linux_2023_Benchmark_v1.0.0",          "CIS_AMAZON_LINUX_2_v4.0.0"),
+    # aws-account pointed at the all-placeholder AWS Foundations v7 (0 usable
+    # rules); repoint to v3.0, the real benchmark (18 automated checks).
+    ("aws-account",   "CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0", "CIS_AWS_FOUNDATIONS_v3.0"),
+    # Archive-mapping review: bare/generic patterns wrongly pinned to an EOL
+    # archive -> repoint to the current version. (Version-pinned EOL patterns
+    # like mongodb-3/mssql-2016/postgresql-12 are left alone — the archive is
+    # the correct version-specific coverage there.)
+    ("mongodb",       "CIS_MongoDB_Benchmark_v1.0.0_ARCHIVE",                        "CIS_MongoDB8_Benchmark_v1.0.0"),
+    ("mysql",         "CIS_Oracle_MySQL_Community_Server_5.7_Benchmark_v2.0.0_ARCHIVE", "CIS_Oracle_MySQL_Community_Server_8.4_Benchmark_v1.1.0"),
+    ("oracle-db",     "CIS_Oracle_Database_Server_11_-_11g_R2_Benchmark_v1.0.0_ARCHIVE", "CIS_Oracle_Database_19c_Benchmark_v2.0.0"),
+    # Optional (same OS, newer point release — safe):
+    ("solaris-11",    "CIS_Oracle_Solaris_11_Benchmark_v1.1.0_Archive",   "CIS_Oracle_Solaris_11.4_Benchmark_v1.1.0"),
+    ("solaris-11.1",  "CIS_Oracle_Solaris_11.1_Benchmark_v1.0.0_Archive", "CIS_Oracle_Solaris_11.4_Benchmark_v1.1.0"),
+    ("oracle-db-18",  "CIS_Oracle_Database_18c_Benchmark_v1.1.0_ARCHIVE", "CIS_Oracle_Database_19c_Benchmark_v2.0.0"),
 ]
-LANDMINE = ("linux", "CIS_UBUNTU_22_04_v2.0")           # F1: (pattern, benchmark)
+# (pattern, benchmark) mappings to deactivate — dead/ancient or too-generic.
+# NOTE: only deactivate patterns with NO generic catch-all above them. windows-xp
+# / windows-server-2003 are intentionally NOT here: a bare `windows`(→Win11) and
+# `windows-server`(→2022) pattern exist, so deactivating the specific EOL mapping
+# routes those assets to the WRONG modern benchmark instead of out of scope —
+# worse than leaving them on their own version-correct archive.
+DEACTIVATE = [
+    ("linux",                "CIS_UBUNTU_22_04_v2.0"),                                       # F1 landmine (no generic `linux` catch-all remains)
+    ("db",                   "CIS_Oracle_Database_Server_11_-_11g_R2_Benchmark_v1.0.0_ARCHIVE"),  # over-generic catch-all; falls through to None
+]
 DEDUP_BENCH = "CIS_UBUNTU_22_04_v2.0"                   # F2
 CANON_BENCH = "CIS_Ubuntu_Linux_22.04_LTS_Benchmark_v3.0.0"
 
@@ -101,18 +124,18 @@ def reconcile(slug: str, apply: bool) -> int:
     try:
         G = BenchmarkOsMapping.tenant_id.is_(None)
 
-        # F1 — deactivate the landmine mapping.
-        pat, bench = LANDMINE
-        rows = db.query(BenchmarkOsMapping).filter(
-            G, BenchmarkOsMapping.os_pattern == pat,
-            BenchmarkOsMapping.benchmark_name == bench,
-            BenchmarkOsMapping.is_active.is_(True),
-        ).all()
-        for r in rows:
-            print(f"  [{slug}] F1 deactivate {pat!r} -> {bench}")
-            if apply:
-                r.is_active = False
-            changed += 1
+        # Deactivate dead/ancient/too-generic mappings (landmine + archive review).
+        for pat, bench in DEACTIVATE:
+            rows = db.query(BenchmarkOsMapping).filter(
+                G, BenchmarkOsMapping.os_pattern == pat,
+                BenchmarkOsMapping.benchmark_name == bench,
+                BenchmarkOsMapping.is_active.is_(True),
+            ).all()
+            for r in rows:
+                print(f"  [{slug}] deactivate {pat!r} -> {bench}")
+                if apply:
+                    r.is_active = False
+                changed += 1
 
         # F3/F4 — repoint from the known old target, only if new target is real.
         for pat, old, new in REMAPS:

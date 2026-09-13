@@ -235,9 +235,18 @@ def import_tenant(slug: str, tenant_id: int, force: bool = False) -> Dict[str, A
         db.commit()
 
         # ── the bridge: one NormalizedControl per SCF control ────────────────
+        # This SCF run IS the tenant's baseline control library. The AI control
+        # mapper (services/ai_control_mapping.baseline_run_id) and the Control
+        # Library UI read ONLY the baseline run's controls/groups, so any prior
+        # baseline (e.g. stale runs carried over from a cloned DB) must be cleared
+        # and THIS run marked baseline — otherwise the mapper filters to an empty
+        # run and reports "the control library is empty", mapping nothing.
+        db.query(NormalizationRun).filter(
+            NormalizationRun.is_baseline.is_(True)
+        ).update({"is_baseline": False}, synchronize_session=False)
         run = NormalizationRun(
             tenant_id=tenant_id, label=f"SCF {version}", scope="full",
-            status="completed", is_baseline=False,
+            status="completed", is_baseline=True,
             started_at=datetime.utcnow(), completed_at=datetime.utcnow(),
             summary={"source": "scf", "version": version, "controls": len(ctls)},
         )

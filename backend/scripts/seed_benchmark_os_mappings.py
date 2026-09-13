@@ -116,12 +116,20 @@ MAPPINGS: List[Tuple[str, List[str], int]] = [
     ("aruba-aos", ["CIS_HPE_Aruba_Networking_CX_Switch_Benchmark_v1.0.1"], 80),
     ("checkpoint-gaia", ["CIS_Check_Point_Firewall_Benchmark_v1.1.0"], 80),
     # ── Cloud / orchestration ──
-    ("aws-account", ["CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0"], 50),
+    # AWS Foundations v7 is an all-placeholder (kind:any) benchmark with 0 usable
+    # rules; v3.0 is the real one (18 automated aws_readonly checks). Prefer v3.0.
+    ("aws-account", ["CIS_AWS_FOUNDATIONS_v3.0", "CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0"], 50),
     ("azure-subscription", ["CIS_Microsoft_Azure_Foundations_Benchmark_v6.0.0"], 50),
     ("kubernetes", ["CIS_Kubernetes_Benchmark_v2.0.1"], 80),
     # ── Oracle DB (executable) ──
     ("oracle-db-19c", ["CIS_Oracle_Database_19c_Benchmark_v2.0.0"], 50),
     ("oracle-db-23ai", ["CIS_Oracle_Database_23ai_Benchmark_v1.1.0"], 50),
+    # Bare DB catch-alls → current version (archive-mapping review). Version-pinned
+    # EOL patterns (mysql-5.7, oracle-db-11, mongodb-3, …) stay on their own
+    # version's benchmark and are seeded elsewhere / left as operator data.
+    ("oracle-db", ["CIS_Oracle_Database_19c_Benchmark_v2.0.0"], 200),
+    ("mysql", ["CIS_Oracle_MySQL_Community_Server_8.4_Benchmark_v1.1.0"], 200),
+    ("mongodb", ["CIS_MongoDB8_Benchmark_v1.0.0"], 200),
 ]
 
 

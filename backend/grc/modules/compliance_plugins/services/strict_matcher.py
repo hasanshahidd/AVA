@@ -196,6 +196,13 @@ def applicable_plugins_for_asset(
             ),
             CompliancePlugin.benchmark == benchmark_name,
             CompliancePlugin.enabled.is_(True),
+            # Only scan-eligible rules count toward the denominator — same filter
+            # the scanner (_do_scan_all) uses. Without this, ~synthesised rules
+            # the scanner will never run were still counted as "applicable",
+            # inflating the denominator and understating the pass rate (owner
+            # rule #5: keep the exclusion set IDENTICAL across scanner / card
+            # pass% / residual / full-posture).
+            CompliancePlugin.review_status.in_(["approved", "auto_approved"]),
             # Well-formed-check exclusions (TODO / kind:any / dangling-pipe) —
             # shared with the scan path and _multi so they can never drift.
             *runnable_check_clauses(),
@@ -274,6 +281,9 @@ def applicable_plugins_for_asset_multi(
             ),
             CompliancePlugin.benchmark.in_(names),
             CompliancePlugin.enabled.is_(True),
+            # Scan-eligible only — matches the scanner + applicable_plugins_for_asset
+            # so the denominator never counts rules the scanner won't run (rule #5).
+            CompliancePlugin.review_status.in_(["approved", "auto_approved"]),
             CompliancePlugin.runner_type != "manual",
             *runnable_check_clauses(),
         )

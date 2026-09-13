@@ -1,0 +1,400 @@
+﻿benchmark,rule_id,title,runner_type,why_dead
+CIS_AKS_Optimized_Azure_Linux_2_Benchmark_v1.1.0,2.2.17,Ensure mail transfer agent is configured for local-only mode (Automated),linux_ssh,dangling-pipe command
+CIS_AKS_Optimized_Azure_Linux_3_Benchmark_v1.0.0,2.2.17,Ensure mail transfer agent is configured for local-only mode (Automated),linux_ssh,dangling-pipe command
+CIS_ALIBABA_CLOUD_LINUX_3_v2.0.0,5.4.1.6,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_ALIBABA_CLOUD_LINUX_3_v2.0.0,5.4.2.5,Ensure root path integrity,linux_ssh,dangling-pipe command
+CIS_ALIBABA_CLOUD_LINUX_3_v2.0.0,6.3.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_STIG_v2.0.1,2.2.16,Ensure mail transfer agent is configured for local-only mode,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_STIG_v2.0.1,3.5.1.3,Ensure nftables either not installed or masked with firewalld,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_STIG_v2.0.1,3.5.3.1.3,Ensure firewalld is either not installed or masked with iptables,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_STIG_v2.0.1,5.5.1.5,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_STIG_v2.0.1,6.2.10,Ensure root PATH Integrity,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_v4.0.0,5.5.1.6,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_AMAZON_LINUX_2_v4.0.0,6.2.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.1,Ensure centralized root access in AWS Organizations,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.2,Ensure authorization guardrails for all AWS Organization accounts (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.3,Ensure Organizations management account is not used for workloads (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.4,Ensure Organizational Units are structured by environment and sensitivity (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.5,Ensure delegated admin manages AWS Organizations policies (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.1.6,Ensure delegated admins manage AWS Organizations- integrated services (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.10,Ensure multi-factor authentication (MFA) is enabled for all IAM users that have a console password (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.11,Ensure credentials unused for 45 days or more are disabled,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.12,Ensure access keys are rotated every 90 days or less,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.13,Ensure IAM users receive permissions only through groups,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.14,"Ensure IAM policies that allow full ""*:*"" administrative privileges are not attached (Automated)",aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.15,Ensure a support role has been created to manage incidents with AWS Support (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.16,Ensure IAM instance roles are used for AWS resource access from instances (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.17,Ensure that all expired SSL/TLS certificates stored in AWS IAM are removed (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.18,Ensure that IAM External Access Analyzer is enabled for all regions (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.19,Ensure IAM users are managed centrally via identity federation or AWS Organizations for multi-account environments (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.2,Maintain current AWS account contact details,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.20,Ensure access to AWSCloudShellFullAccess is restricted,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.21,"Ensure AWS resource policies do not allow unrestricted access using ""Principal"": ""*"" (Manual)",aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.3,Ensure security contact information is registered,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.4,Ensure no 'root' user account access key exists,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.5,Ensure MFA is enabled for the 'root' user account,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.6,Ensure hardware MFA is enabled for the 'root' user account,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.7,Eliminate use of the 'root' user for administrative and daily tasks (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.8,Ensure IAM password policy requires minimum length of 14 or greater (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,2.9,Ensure IAM password policy prevents password reuse,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.1.1,Ensure S3 Bucket Policy is set to deny HTTP requests,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.1.2,Ensure MFA Delete is enabled on S3 buckets,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.1.3,"Ensure all data in Amazon S3 has been discovered, classified, and secured when necessary (Manual)",aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.1.4,Ensure that S3 is configured with 'Block Public Access' enabled (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.2.1,Ensure that encryption-at-rest is enabled for RDS instances,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.2.2,Ensure the Auto Minor Version Upgrade feature is enabled for RDS instances (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.2.3,Ensure that RDS instances are not publicly accessible,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.2.4,Ensure Multi-AZ deployments are used for enhanced availability in Amazon RDS (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,3.3.1,Ensure that encryption is enabled for EFS file systems,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.1,Ensure CloudTrail is enabled in all regions,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.10,Ensure all AWS-managed web front-end services have access logging enabled (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.2,Ensure CloudTrail log file validation is enabled,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.3,Ensure AWS Config is enabled in all regions,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.4,Ensure that server access logging is enabled on the CloudTrail S3 bucket (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.5,Ensure CloudTrail logs are encrypted at rest using KMS CMKs (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.6,Ensure rotation for customer-created symmetric CMKs is enabled (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.7,Ensure VPC flow logging is enabled in all VPCs,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.8,Ensure that object-level logging for write events is enabled for S3 buckets (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,4.9,Ensure that object-level logging for read events is enabled for S3 buckets (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.1,Ensure unauthorized API calls are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.10,Ensure security group changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.11,Ensure Network Access Control List (NACL) changes are monitored (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.12,Ensure changes to network gateways are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.13,Ensure route table changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.14,Ensure VPC changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.15,Ensure AWS Organizations changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.16,Ensure AWS Security Hub is enabled,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.2,Ensure management console sign-in without MFA is monitored (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.3,Ensure usage of the 'root' account is monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.4,Ensure IAM policy changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.5,Ensure CloudTrail configuration changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.6,Ensure AWS Management Console authentication failures are monitored (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.7,Ensure disabling or scheduled deletion of customer created CMKs is monitored (Manual),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.8,Ensure S3 bucket policy changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,5.9,Ensure AWS Config configuration changes are monitored,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.1.1,Ensure EBS volume encryption is enabled in all regions,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.1.2,Ensure CIFS access is restricted to trusted networks to prevent unauthorized access (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.3,Ensure no security groups allow ingress from 0.0.0.0/0 to remote server administration ports (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.4,Ensure no security groups allow ingress from ::/0 to remote server administration ports (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.5,Ensure the default security group of every VPC restricts all traffic (Automated),aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.6,"Ensure routing tables for VPC peering are ""least access""",aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.7,Ensure that the EC2 Metadata Service only allows IMDSv2,aws_readonly,kind:any placeholder
+CIS_Amazon_Web_Services_Foundations_Benchmark_v7.0.0,6.8,Ensure VPC Endpoints are used for access to AWS Services,aws_readonly,kind:any placeholder
+CIS_Apache_Cassandra_4.0_Benchmark_v1.3.0_PDF,3.5,Ensure that Cassandra only listens for network connections on authorized interfaces (Manual),linux_ssh,dangling-pipe command
+CIS_Apache_Cassandra_5.0_Benchmark_v1.1.0_PDF,3.5,Ensure that Cassandra only listens for network connections on authorized interfaces (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,2.3.1,Ensure an Inactivity Interval of 20 Minutes Or Less for the Screen Saver Is Enabled (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,5.1.6,Ensure No World Writable Files Exist in the System Folder,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,5.2.3,Ensure Complex Password Must Contain Alphabetic Characters Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,5.2.4,Ensure Complex Password Must Contain Numeric Character Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Cloud-tailored_Benchmark_v1.1.0,2.2.1,Ensure an Inactivity Interval of 20 Minutes Or Less for the Screen Saver Is Enabled (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Cloud-tailored_Benchmark_v1.1.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Cloud-tailored_Benchmark_v1.1.0,5.1.5,Ensure No World Writable Files Exist in the System Folder,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_12.0_Monterey_Cloud-tailored_Benchmark_v1.1.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,5.1.6,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,5.2.3,Ensure Complex Password Must Contain Alphabetic Characters Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,5.2.4,Ensure Complex Password Must Contain Numeric Character Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,6.3.6,Ensure Advertising Privacy Protection in Safari Is Enabled,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Cloud-tailored_Benchmark_v1.1.0,2.4.1,Ensure an Inactivity Interval of 20 Minutes Or Less for the Screen Saver Is Enabled (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Cloud-tailored_Benchmark_v1.1.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Cloud-tailored_Benchmark_v1.1.0,5.1.5,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_13.0_Ventura_Cloud-tailored_Benchmark_v1.1.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,5.1.6,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,5.2.3,Ensure Complex Password Must Contain Alphabetic Characters Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,5.2.4,Ensure Complex Password Must Contain Numeric Character Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,6.3.6,Ensure Advertising Privacy Protection in Safari Is Enabled,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,5.1.6,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,5.2.3,Ensure Complex Password Must Contain Alphabetic Characters Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,5.2.4,Ensure Complex Password Must Contain Numeric Character Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,6.3.6,Ensure Advertising Privacy Protection in Safari Is Enabled,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Cloud-tailored_Benchmark_v1.0.0,2.4.1,Ensure an Inactivity Interval of 20 Minutes Or Less for the Screen Saver Is Enabled (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Cloud-tailored_Benchmark_v1.0.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Cloud-tailored_Benchmark_v1.0.0,5.1.5,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_15.0_Sequoia_Cloud-tailored_Benchmark_v1.0.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,5.1.1,Ensure Home Folders Are Secure,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,5.1.6,Ensure No World Writable Folders Exist in the System Folder (Automated),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,5.2.2,Ensure Password Minimum Length Is Configured,linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,5.2.3,Ensure Complex Password Must Contain Alphabetic Characters Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,5.2.4,Ensure Complex Password Must Contain Numeric Character Is Configured (Manual),linux_ssh,dangling-pipe command
+CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,6.3.6,Ensure Advertising Privacy Protection in Safari Is Enabled,linux_ssh,dangling-pipe command
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,10.1,Ensure Managed Platform updates is configured,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,10.2,Ensure Persistent logs is setup and configured to S3,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,10.3,Ensure access logs are enabled.,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,10.4,Ensure that HTTPS is enabled on load balancer,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,11.1,Ensure customer-managed keys are used to encrypt AWS Fargate ephemeral storage data for Amazon ECS (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.1,Ensure AWS Config is Enabled for Lambda and Serverless,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.10,Ensure Lambda functions do not allow unknown cross account access via permission policies. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.11,Ensure that the runtime environment versions used for your Lambda functions do not have end of support dates. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.12,Ensure encryption in transit is enabled for Lambda environment variables (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.2,Ensure Cloudwatch Lambda insights is enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.3,Ensure AWS Secrets manager is configured and being used by Lambda for databases (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.5,Ensure every Lambda function has its own IAM Role,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.6,Ensure Lambda functions are not exposed to everyone.,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.7,Ensure Lambda functions are referencing active execution roles. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.8,Ensure that Code Signing is enabled for Lambda functions.,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,12.9,Ensure there are no Lambda functions with admin privileges within your AWS account (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.1.1,Ensure Consistent Naming Convention is used for Organizational AMI (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.1.2,Ensure Amazon Machine Images (AMIs) are encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.1.4,Ensure Images (AMI) are not older than 90 days,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.1.5,Ensure Images are not Publicly Available,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.10,Ensure unused ENIs are removed,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.12,Ensure EBS volumes attached to an EC2 instance is marked for deletion upon instance termination (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.13,Ensure Secrets and Sensitive Data are not stored directly in EC2 User Data (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.14,Ensure EC2 Auto Scaling Groups Propagate Tags to EC2 Instances that it launches (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.3,Ensure Tag Policies are Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.4,Ensure an Organizational EC2 Tag Policy has been Created,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.5,Ensure no AWS EC2 Instances are Older than 180 days,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.6,Ensure detailed monitoring is enable for production EC2 Instances (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,2.9,Ensure use of AWS Systems Manager to manage EC2 instances (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.1,Ensure Amazon ECS task definitions using 'host' network mode do not allow privileged or root user access to the host (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.10,Ensure Amazon ECS services are tagged,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.11,Ensure Amazon ECS clusters are tagged,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.12,Ensure Amazon ECS task definitions are tagged,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.13,Ensure only trusted images are used with Amazon ECS,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.14,Ensure 'assignPublicIp' is set to 'DISABLED' for Amazon ECS task sets (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.2,Ensure 'assignPublicIp' is set to 'DISABLED' for Amazon ECS services (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.3,Ensure Amazon ECS task definitions do not have 'pidMode' set to 'host' (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.4,Ensure Amazon ECS task definitions do not have 'privileged' set to 'true' (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.5,Ensure 'readonlyRootFilesystem' is set to 'true' for Amazon ECS task definitions (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.6,Ensure secrets are not passed as container environment variables in Amazon ECS task definitions (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.7,Ensure logging is configured for Amazon ECS task definitions,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.8,Ensure Amazon ECS Fargate services are using the latest Fargate platform version (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,3.9,Ensure monitoring is enabled for Amazon ECS clusters,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.1,Apply updates to any apps running in Lightsail,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.10,Enable storage bucket access logging,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.11,Ensure your Windows Server based lightsail instances are updated with the latest security patches. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.12,Change the auto-generated password for Windows based instances. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.2,Change default Administrator login names and passwords for applications (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.3,Disable SSH and RDP ports for Lightsail instances when not needed. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.4,Ensure SSH is restricted to only IP address that should have this access. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.5,Ensure RDP is restricted to only IP address that should have this access. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.6,Disable IPv6 Networking if not in use within your organization.,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.7,Ensure you are using an IAM policy to manage access to buckets in Lightsail. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.8,Ensure Lightsail instances are attached to the buckets,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,5.9,Ensure that your Lightsail buckets are not publicly accessible,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,6.1,Ensure you are using VPC Endpoints for source code access,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,8.1,Ensure AWS Batch is configured with AWS Cloudwatch Logs.,aws_readonly,kind:any placeholder
+CIS_AWS_Compute_Services_Benchmark_v1.1.0,8.2,Ensure Batch roles are configured for cross-service confused deputy prevention (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.1,Ensure Data Ingestion is Secure,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.10,Ensure Database has automated Backups enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.2,Ensure Data at Rest is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.3,Ensure Encryption in Transit is Configured,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.4,Ensure Access Control and Authentication is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.5,Ensure Fine-Grained Access Control is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.6,Ensure Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.7,Ensure Regular Updates and Patches are Installed,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.8,Ensure Monitoring and Alerting is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,10.9,Ensure to Review and Update the Security Configuration,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.1,Ensure to Implement Identity and Access Management (IAM),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.2,Ensure Network Access is Secure,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.3,Ensure Data at Rest is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.4,Ensure Data in Transit is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.5,Ensure to Implement Access Control and Authentication,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.6,Ensure Monitoring and Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,11.7,Ensure to Enable Backup and Recovery,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.1,Ensure the Use of Security Groups,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.10,Ensure Database has IAM Auth is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.11,Ensure Database has delete protection enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.3,Ensure Data in Transit Encryption is Enforced,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.4,Ensure IAM Roles and Policies are Created,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.5,Ensure Database Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.6,Ensure Passwords are Regularly Rotated,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.7,Ensure Least Privilege Access,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.8,Ensure Automatic Backups and Retention Policies are configured (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,2.9,Ensure Database is not Publicly accessible,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.10,Ensure to Enable Backup and Recovery,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.11,Ensure to Regularly Review Security Configuration,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.12,Ensure Database is not Publicly accessible,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.13,Ensure Database has IAM Auth is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.14,Ensure Database has delete protection enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.3,Ensure to Create a Virtual Private Cloud (VPC),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.4,Ensure to Configure Security Groups,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.5,Enable Encryption at Rest,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.6,Enable Encryption in Transit,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,3.7,Ensure to Implement Access Control and Authentication,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.1,Ensure AWS Identity and Access Management (IAM) is in use,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.2,Ensure Fine-Grained Access Control is implemented,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.3,Ensure DynamoDB Encryption at Rest,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.4,Ensure DynamoDB Encryption in Transit,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.5,Ensure VPC Endpoints are configured,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.6,Ensure DynamoDB Streams and AWS Lambda for Automated Compliance Checking is Enabled (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.7,Ensure Monitor and Audit Activity is enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.8,Ensure Database has delete protection enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,4.9,Ensure Database has Backup enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.1,Ensure Secure Access to ElastiCache,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.10,Ensure Security Configurations are Reviewed Regularly,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.11,Ensure ElastiCache has Cluster Mode Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.12,Ensure ElastiCache is deployed across multiple Availability Zones (AZs) (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.13,Ensure ElastiCache has automatic backups enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.2,Ensure Network Security is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.3,Ensure Encryption at Rest and in Transit is configured,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.4,Ensure Automatic Updates and Patching are Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.5,Ensure Virtual Private Cloud (VPC) is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.6,Ensure Monitoring and Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.7,Ensure Security Configurations are Reviewed Regularly,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.8,Ensure Authentication and Access Control is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,5.9,Ensure Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,6.3,Ensure Authentication and Access Control is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,6.4,Ensure Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,6.5,Ensure Security Configurations are Reviewed Regularly,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,6.6,Ensure Monitoring and Alerting is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.1,Ensure Network Architecture Planning,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.11,Ensure to Conduct Security Assessments,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.12,Ensure DocumentDB has delete protection enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.2,Ensure VPC Security is Configured,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.3,Ensure Encryption at Rest is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.4,Ensure Encryption in Transit is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.5,Ensure to Implement Access Control and Authentication,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.6,Ensure Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.7,Ensure Regular Updates and Patches,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.8,Ensure to Implement Monitoring and Alerting,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,7.9,Ensure to Implement Backup and Disaster Recovery,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,8.1,Ensure Keyspace Security is Configured,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,8.2,Ensure Network Security is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,8.3,Ensure Data at Rest and in Transit is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,8.4,Ensure Amazon Keyspaces tables have Point-in-Time Recovery (PITR) enabled (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.1,Ensure Network Security is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.10,Ensure Database has delete protection enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.11,Ensure Neptune DB instances are deployed across multiple Availability Zones (AZs) (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.2,Ensure Data at Rest is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.3,Ensure Data in Transit is Encrypted,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.4,Ensure Authentication and Access Control is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.5,Ensure Audit Logging is Enabled,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.6,Ensure Security Configurations are Reviewed Regularly,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.8,Ensure Neptune Database is not Publicly accessible,aws_readonly,kind:any placeholder
+CIS_AWS_Database_Services_Benchmark_v2.0.0_-_PDF,9.9,Ensure Neptune Database has automatic backups enabled,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.1,Ensure Administration of WorkSpaces is defined using IAM,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.11,Ensure your WorkSpaces image has the appropriate CIS Operating System Benchmark applied (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.12,Restrict WorkSpaces Bundle options to organization approved versions (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.14,Ensure WorkSpaces that are not being utilized are removed.,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.17,Ensure WorkSpaces API requests flow through a VPC Endpoint (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.18,Ensure Radius server is using the recommended security protocol (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.2,Ensure MFA is enabled for WorkSpaces users,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.3,Ensure WorkSpace volumes are encrypted.,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,2.4,Ensure WorkSpaces are deployed in their own virtual private cloud (VPC) (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,4.1,Ensure Administrators of WorkDocs is defined using IAM,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,4.2,Ensure MFA is enabled for WorkDoc users,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,5.2,Ensure a VPC Endpoint is set for AppStream,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,5.3,Ensure maximum session duration is no longer than 10 hours,aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,5.5,Ensure session Idle disconnect timeout is set to 10 minutes or less (Automated),aws_readonly,kind:any placeholder
+CIS_AWS_End_User_Compute_Services_Benchmark_v1.2.0,5.7,Ensure Operating system updates are applied to your base image every 30 days. (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,1.2,Ensure securing AWS Backups,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,1.3,Ensure to create backup template and name,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,1.4,Ensure to create AWS IAM Policies,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,1.5,Ensure to create IAM roles for Backup,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,1.6,Ensure AWS Backup with Service Linked Roles,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.10,Ensure Resource Access via Tag-based Policies,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.11,Ensure Secure Password Policy Implementation,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.12,Ensure Monitoring EC2 and EBS with CloudWatch,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.4,Ensure the creation of a new volume,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.5,Ensure creating snapshots of EBS volumes,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.6,Ensure Proper IAM Configuration for EC2 Instances,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.7,Ensure creating IAM User,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.8,Ensure the Creation of IAM Groups,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,2.9,Ensure Granular Policy Creation,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.1,EFS (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.10,Ensure managing AWS EFS access points,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.12,Ensure configuring IAM for AWS Elastic Disaster Recovery,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.2,Ensure Implementation of EFS,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.3,Ensure EFS and VPC Integration,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.6,Ensure Secure Ports,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,3.9,Ensure using VPC endpoints - EFS,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,4.4,Ensure the creation of Elastic File Cache,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,4.5,Ensure installation and configuration of Lustre Client,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,4.7,Ensure mounting FSx cache,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,5.1,Amazon Simple Storage Service,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.1,Ensure Elastic Disaster Recovery is Configured,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.12,Ensure CloudWatch Metrics for AWS EDR,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.3,Ensure functionality of Endpoint Detection and Response (EDR) (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.4,Ensure configuration of replication settings,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.5,Ensure proper IAM configuration for AWS Elastic Disaster Recovery (Manual),aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.6,Ensure installation of the AWS Replication Agent,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.8,Ensure execution of a recovery drill,aws_readonly,kind:any placeholder
+CIS_AWS_Storage_Services_Benchmark_v1.0.0,6.9,Ensure Continuous Disaster Recovery Operations,aws_readonly,kind:any placeholder
+CIS_DEBIAN_LINUX_10_v2.0.0,2.2.16,Ensure mail transfer agent is configured for local-only mode (Automated),linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_10_v2.0.0,3.4.1.6,Ensure ufw firewall rules exist for all open ports,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_10_v2.0.0,5.2.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_10_v2.0.0,6.2.9,Ensure root PATH Integrity,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_STIG_v1.0.0,2.2.16,Ensure mail transfer agent is configured for local-only mode (Automated),linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_STIG_v1.0.0,3.4.1.6,Ensure ufw firewall rules exist for all open ports,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_STIG_v1.0.0,5.2.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_STIG_v1.0.0,6.2.9,Ensure root PATH Integrity,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_v2.0.0,4.1.6,Ensure ufw firewall rules exist for all open ports,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_v2.0.0,5.4.1.6,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_v2.0.0,5.4.2.5,Ensure root path integrity,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_v2.0.0,6.4.3.19,Ensure kernel module loading unloading and modification is collected (Automated),linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_11_v2.0.0,6.4.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_13_v1.0.0,5.1.13,Ensure sshd post-quantum cryptography key exchange algorithms are configured (Automated),linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_13_v1.0.0,5.4.1.6,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_DEBIAN_LINUX_13_v1.0.0,6.2.3.10,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.1.2,Ensure nosuid option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.1.3,Ensure noexec option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.2.2,Ensure nosuid option set on /home partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.3.2,Ensure nosuid option set on /var partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.4.2,Ensure nosuid option set on /var/tmp partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.4.3,Ensure noexec option set on /var/tmp partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.5.2,Ensure nosuid option set on /var/log partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.5.3,Ensure noexec option set on /var/log partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.6.2,Ensure nosuid option set on /var/audit partition,linux_ssh,dangling-pipe command
+CIS_FREEBSD_14_v1.0.1,1.1.2.6.3,Ensure noexec option set on /var/audit partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.10,Ensure nodev option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.11,Ensure nosuid option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.12,Ensure noexec option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.3,Ensure nodev option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.4,Ensure nosuid option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.5,Ensure noexec option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.6,Ensure nosuid option set on /var partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.7,Ensure noexec option set on /var partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.8,Ensure nodev option set on /var partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,1.1.9,Ensure nodev option set on /home partition,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,5.3.1.5,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,6.2.6,Ensure root PATH Integrity,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,3.1,Ensure default user umask is configured,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.1.2.10,Ensure all directories in root PATH access are configured,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.1.2.4,Ensure access on /audit and /etc/security/audit is configured,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.18,Ensure rexd daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.19,Ensure rlogin daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.20,Ensure rquotad daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.23,Ensure rusersd daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.24,Ensure rwalld daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.25,Ensure shell daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.27,Ensure talk daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.29,Ensure tftpd daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.30,Ensure time daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.31,Ensure uucp daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.3.4.32,Ensure xmquery daemon is not in use,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.4.1.5,Ensure NFS exports use allow lists,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,4.4.1.6,Ensure access by root over nfs is disabled or blocked,linux_ssh,dangling-pipe command
+CIS_IBM_AIX_7_v1.2.0,5.1.1,Ensure all local user accounts have a hashed password,linux_ssh,dangling-pipe command
+CIS_IBM_Cloud_Foundations_Benchmark_v2.0.0,2.1.1.1,Ensure Cloud Object Storage encryption is done with customer managed keys (Manual),aws_readonly,kind:any placeholder
+CIS_Microsoft_Windows_10_EMS_Gateway_Benchmark_v3.0.0,18.10.65.3,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Automated),windows_winrm,TODO stub
+CIS_Microsoft_Windows_10_Enterprise_Benchmark_v4.0.0,18.10.66.2,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Automated),windows_winrm,TODO stub
+CIS_Microsoft_Windows_10_Stand-alone_Benchmark_v4.0.0,18.10.66.2,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Automated),windows_winrm,TODO stub
+CIS_Microsoft_Windows_11_Enterprise_Benchmark_v5.0.1,18.10.66.2,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Automated),windows_winrm,TODO stub
+CIS_Microsoft_Windows_11_Stand-alone_Benchmark_v5.0.0,18.10.66.2,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Automated),windows_winrm,TODO stub
+CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_ARCHIVE,18.9.69.1,Ensure 'Turn off Automatic Download and Install of updates' is set to 'Disabled' (Scored),windows_winrm,TODO stub
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.10,Ensure noexec option set on /var/tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.14,Ensure nodev option set on /home partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.15,Ensure nodev option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.16,Ensure nosuid option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.17,Ensure noexec option set on /dev/shm partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.3,Ensure nodev option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.4,Ensure nosuid option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.5,Ensure noexec option set on /tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.8,Ensure nodev option set on /var/tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,1.1.9,Ensure nosuid option set on /var/tmp partition,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,2.2.18,Ensure mail transfer agent is configured for local-only mode,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,5.5.1.5,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_7_Benchmark_v4.0.0_ARCHIVE,4.5.1.5,Ensure all users last password change date is in the past,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_7_Benchmark_v4.0.0_ARCHIVE,4.5.2.4,Ensure root password is set,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_7_Benchmark_v4.0.0_ARCHIVE,5.2.3.6,Ensure use of privileged commands are collected,linux_ssh,dangling-pipe command
+CIS_Oracle_Linux_7_Benchmark_v4.0.0_ARCHIVE,6.2.8,Ensure root path integrity,linux_ssh,dangling-pipe command
+CIS_Oracle_MySQL_Community_Server_5.6_Benchmark_v2.0.0_ARCHIVE,3.8,Ensure Plugin Directory Has Appropriate Permissions,linux_ssh,dangling-pipe command
+CIS_Oracle_MySQL_Community_Server_5.7_Benchmark_v2.0.0_ARCHIVE,3.8,Ensure Plugin Directory Has Appropriate Permissions,linux_ssh,dangling-pipe command
+CIS_Oracle_MySQL_Community_Server_8.4_Benchmark_v1.1.0,3.8,Ensure Plugin Directory Has Appropriate Permissions,linux_ssh,dangling-pipe command
