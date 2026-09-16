@@ -369,6 +369,60 @@ def _sweep_targets(
     return findings
 
 
+# ── Firewall / SBC SYN-proxy artifact filter ────────────────────────────────
+# A SIP ALG, IPS, or load-balancer that COMPLETES the TCP handshake on a port
+# for the whole subnet (SIP 5060 is the classic case) makes every address in a
+# routed range look "open" on that port — a scan artifact, not a real host. The
+# per-host probe can't tell the difference (the connect genuinely succeeds), so
+# we detect it at the RANGE level: any port answered by a large majority of a
+# big scope is discounted, and a host left with no genuine evidence is dropped.
+_ARTIFACT_MIN_HOSTS = 24       # only engage on a big scope (a /24-ish sweep)
+_ARTIFACT_FRACTION = 0.5       # "open on > half the range" == a proxy, not a host
+
+# Per-port probe timeout. 1s is fine on a LAN but too tight over a VPN/IPsec
+# tunnel (real hosts sit behind extra hops), so real services get missed while
+# the firewall's local SYN-proxy still answers fast. Default 2.5s; override with
+# DISCOVERY_PROBE_TIMEOUT for very high-latency links.
+_PROBE_TIMEOUT = float(os.getenv("DISCOVERY_PROBE_TIMEOUT", "2.5"))
+
+
+def _drop_firewall_artifacts(
+    findings: List[Dict[str, Any]], hosts_swept: int
+) -> List[Dict[str, Any]]:
+    """Remove firewall SYN-proxy ghosts (see note above). Real hosts keep their
+    genuine ports; a host whose ONLY evidence was an artifact port is dropped. A
+    small/targeted scope is returned untouched — a high hit-rate there is
+    legitimate, not a proxy."""
+    if hosts_swept < _ARTIFACT_MIN_HOSTS:
+        return findings
+    from collections import Counter
+    port_hosts: "Counter[int]" = Counter()
+    for f in findings:
+        for p in (f.get("open_ports") or []):
+            port_hosts[p] += 1
+    artifact = {
+        p for p, n in port_hosts.items()
+        if n > hosts_swept * _ARTIFACT_FRACTION and n >= _ARTIFACT_MIN_HOSTS
+    }
+    if not artifact:
+        return findings
+    kept: List[Dict[str, Any]] = []
+    for f in findings:
+        orig = f.get("open_ports") or []
+        real = [p for p in orig if p not in artifact]
+        fp = f.get("fingerprint") or {}
+        name = f.get("hostname")
+        # Keep only on evidence a firewall CANNOT fake for the whole subnet:
+        # a real (non-artifact) open port, a UDP service, a MAC, or a real name.
+        if real or fp.get("udp_services") or f.get("mac") or (name and name != f.get("ip")):
+            if real != orig:                       # artifact port stripped -> re-classify
+                f["open_ports"] = real
+                fp.update(_classify_fp(real, fp))
+                f["fingerprint"] = fp
+            kept.append(f)
+    return kept
+
+
 def _run_job(
     db: Session, run: DiscoveryRun, job: DiscoveryJob, scope: DiscoveryScope,
     exclusions: Set[str], *, probe: ProbeFn, timeout_s: float, max_workers: int,
@@ -394,6 +448,9 @@ def _run_job(
         targets, probe=probe, timeout_s=timeout_s, max_workers=max_workers,
         rate_limit_per_min=rate_limit_per_min, fingerprinter=fingerprinter,
     )
+    # A SIP/IPS/LB that SYN-proxies a port for the whole subnet ghosts every
+    # address; discount range-wide artifact ports and drop the phantom hosts.
+    findings = _drop_firewall_artifacts(findings, len(targets))
 
     # ── ARP-based liveness enrichment ───────────────────────────────────────
     # The TCP sweep above resolved ARP for the hosts it touched. Reading the
@@ -671,7 +728,7 @@ def execute_run(
     run_id: int,
     *,
     probe: Optional[ProbeFn] = None,
-    timeout_s: float = 1.0,
+    timeout_s: float = _PROBE_TIMEOUT,
     max_workers: int = 32,
     fingerprinter: Optional[FingerprintFn] = None,
 ) -> DiscoveryRun:
@@ -917,7 +974,7 @@ def start_run(
     trigger: str = "manual",
     user=None,
     probe: Optional[ProbeFn] = None,
-    timeout_s: float = 1.0,
+    timeout_s: float = _PROBE_TIMEOUT,
     max_workers: int = 32,
 ) -> DiscoveryRun:
     """Synchronous create-then-execute. Used by scheduled tasks (which are
@@ -926,3 +983,21 @@ def start_run(
     it calls create_run then runs execute_run on a background thread."""
     run = create_run(db, campaign, trigger=trigger, user=user)
     return execute_run(db, run.id, probe=probe, timeout_s=timeout_s, max_workers=max_workers)
+
+
+if __name__ == "__main__":  # pragma: no cover — quick self-check for the ghost filter
+    # SIP-proxy ghost: 5060 "open" on the whole /24; only two hosts have real ports.
+    _n = 254
+    _fs = [{"ip": f"10.0.0.{i}", "hostname": None, "open_ports": [5060],
+            "fingerprint": {"udp_services": []}, "mac": None} for i in range(1, _n + 1)]
+    _fs[0]["open_ports"] = [5060, 22, 80]   # a real server
+    _fs[1]["open_ports"] = [5060, 445]      # a real box
+    _kept = _drop_firewall_artifacts(
+        [dict(f, fingerprint=dict(f["fingerprint"])) for f in _fs], _n)
+    assert len(_kept) == 2, f"expected 2 real hosts, got {len(_kept)}"
+    assert all(5060 not in k["open_ports"] for k in _kept), "artifact 5060 not stripped"
+    # A small scope with a high hit-rate is legitimate — never filtered.
+    _small = [{"ip": f"10.0.0.{i}", "hostname": None, "open_ports": [445],
+               "fingerprint": {}, "mac": None} for i in range(3)]
+    assert len(_drop_firewall_artifacts(_small, 3)) == 3, "small scope must not be filtered"
+    print("executor firewall-artifact self-check OK")
