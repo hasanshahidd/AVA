@@ -115,6 +115,7 @@ python-multipart==0.0.12
 pytrends==4.9.2
 pytz==2026.1.post1
 pywinrm==0.5.0
+impacket==0.12.0  # WMI/DCOM agentless Windows collection (alternative to WinRM)
 PyYAML==6.0.3
 regex==2026.1.15
 requests>=2.32.5,<3.0.0

@@ -23,3 +23,7 @@ _db_backups/
 *.log
 .DS_Store
 Thumbs.db
+
+# test/session artifacts
+.playwright-mcp/
+manual-checks-rhel9.png

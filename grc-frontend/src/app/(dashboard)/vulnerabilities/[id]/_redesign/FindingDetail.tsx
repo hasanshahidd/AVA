@@ -9,7 +9,9 @@
  * `exploitability(id, assetId)` engine returns. This screen renders whatever it
  * returns; there is no scenario picker. Analysis' score is the 7-signal composite
  * (matches backend priority.py); the reachability verdict/chain is the engine's.
- * Remediation / History / Notes reuse the existing real panels.
+ * Remediation / History / Notes reuse the existing real panels. Exploit Test is
+ * GRC's ExploitTest verbatim (Reachability / How it decided / Chain / Proof); the
+ * Exception tab drives the real exception FSM (services/vuln_exception.py).
  */
 
 import { useState } from 'react';
@@ -100,7 +102,7 @@ function computeScore(v: any, asset: any) {
 
 export default function FindingDetail({ vulnId }: { vulnId: number }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'an' | 'rm' | 'ex' | 'hi' | 'no'>('an');
+  const [tab, setTab] = useState<'an' | 'rm' | 'ex' | 'hi' | 'no' | 'xc'>('an');
 
   const { data: v, isLoading } = useQuery({
     queryKey: ['vulnerability', vulnId],
@@ -144,7 +146,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
   const score = computeScore(v, riskAsset);
   const vTone = TONE[verdictTone(reach?.verdict?.verdict)];
 
-  const TABS: [typeof tab, string, boolean?][] = [['an', 'Analysis'], ['rm', 'Remediation'], ['ex', 'Exploit Test', true], ['hi', 'History'], ['no', 'Notes']];
+  const TABS: [typeof tab, string, boolean?][] = [['an', 'Analysis'], ['rm', 'Remediation'], ['ex', 'Exploit Test', true], ['hi', 'History'], ['no', 'Notes'], ['xc', 'Exception']];
 
   return (
     <div className="inv2" style={{ margin: '-16px', background: '#F4F6F7', minHeight: '100vh', padding: '10px 22px 40px', fontSize: 13.5, color: INK }}>
@@ -188,6 +190,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
           {tab === 'rm' && <div style={card}><RemediationPlanCard vulnId={vulnId} hasOwner={!!v.assigned_to} /></div>}
           {tab === 'hi' && <HistoryTimeline vulnId={vulnId} />}
           {tab === 'no' && <div style={card}><NotesPanel entityType="vulnerability" entityId={vulnId} /></div>}
+          {tab === 'xc' && <ExceptionPanel vulnId={vulnId} v={v} onChanged={() => qc.invalidateQueries({ queryKey: ['vulnerability', vulnId] })} />}
         </div>
 
         {/* rail */}
@@ -402,7 +405,7 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
   const breakIdx = visible.findIndex((s) => stageStatus(s) === 'unreachable');   // first stage the attacker can't reach
   const severed = breakIdx >= 0;
   const reached = visible.filter((s) => stageStatus(s) === 'reached').length;
-  const STAT: Record<string, { c: string; label: string }> = { likely: { c: '#C2453F', label: 'likely works' }, possible: { c: '#E0AF33', label: 'possible' }, blocked: { c: '#AEB8C2', label: 'blocked' }, severed: { c: '#AEB8C2', label: 'blocked' } };
+  const STAT: Record<string, { c: string; label: string }> = { likely: { c: '#C2453F', label: 'LIKELY' }, possible: { c: '#E0AF33', label: 'POSSIBLE' }, blocked: { c: '#AEB8C2', label: 'BLOCKED' }, severed: { c: '#AEB8C2', label: 'SEVERED' } };
   const sig = d.signals || {}; const evi = d.evidence || {};
   const proofCount = (v?.public_exploit_count ?? 0) + (v?.exploitdb_count ?? 0);
   const exploitRefs: any[] = Array.isArray(v?.public_exploit_refs) ? v.public_exploit_refs : [];
@@ -413,40 +416,11 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
   // result never reads as a bespoke analysis — the "why does every finding look the same" fix.
   const isInfo = normSev(v?.severity) === 'info';
 
-  // ── plain-language layer (the "make it make sense" rebuild) ──
-  const PLAIN_STAGE: Record<string, string> = {
-    'reconnaissance': 'Find a way in', 'resource-development': 'Set up tooling',
-    'initial-access': 'Get in', 'execution': 'Run malicious code',
-    'persistence': 'Keep access', 'privilege-escalation': 'Gain admin rights',
-    'defense-evasion': 'Avoid detection', 'stealth': 'Avoid detection',
-    'credential-access': 'Steal credentials', 'discovery': 'Look around the network',
-    'lateral-movement': 'Move to other systems', 'collection': 'Gather data',
-    'command-and-control': 'Remote-control the host', 'exfiltration': 'Steal the data out',
-    'impact': 'Do damage',
-  };
-  const _verdict = d.verdict?.verdict; const _entry = d.verdict?.entry_state;
-  const assetNm = d.asset?.name || 'this host';
-  const answer =
-    _verdict === 'likely' ? `Yes — this can likely be exploited on ${assetNm}.`
-    : _verdict === 'possible' ? `Possibly — there is an open way in on ${assetNm}, but no confirmed exploit.`
-    : _entry === 'none' ? `Only with local access — there is no remote way in on ${assetNm}.`
-    : _entry === 'assumed_insufficient' ? `Can't tell yet — there isn't enough data on this finding to judge ${assetNm}.`
-    : `No — every way in is blocked on ${assetNm}.`;
-  const epssPct = v?.epss_score != null ? Math.round(v.epss_score * 100) : null;
-  const why: { label: string; state: boolean | null; note?: string }[] = [
-    { label: 'Reachable from the internet', state: sig.internet_exposed ?? null },
-    { label: 'Public exploit exists', state: (proofCount > 0) || (evi.has_public_exploit === true), note: proofCount > 0 ? `${proofCount} found` : undefined },
-    { label: 'Known exploited (CISA KEV)', state: !!evi.kev },
-    { label: 'High exploit likelihood (EPSS)', state: epssPct == null ? null : epssPct >= 10, note: epssPct != null ? `${epssPct}%` : undefined },
-  ];
-  const dc = d.verdict?.data_completeness ?? 0;
-  const confWord = dc >= 80 ? 'High' : dc >= 50 ? 'Medium' : 'Low';
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* sub-tabs — the mock's Reachability / How it decided / Chain / Proof */}
       <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 10, padding: 3, gap: 2, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
-        {([['reach', 'Can it be exploited?'], ['decided', 'Why we decided'], ['chain', `All techniques${chain.length ? ` · ${chain.length}` : ''}`], ['proof', `Evidence${proofCount ? ` · ${proofCount}` : ''}`]] as const).map(([k, label]) => (
+        {([['reach', 'Reachability'], ['decided', 'How it decided'], ['chain', `Chain${chain.length ? ` · ${chain.length}` : ''}`], ['proof', `Proof${proofCount ? ` · ${proofCount}` : ''}`]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setSub(k)} style={{ height: 30, padding: '0 13px', border: 0, borderRadius: 8, background: sub === k ? '#fff' : 'none', color: sub === k ? ACS : '#6B7787', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: sub === k ? '0 1px 2px rgba(16,24,40,.06)' : 'none' }}>{label}</button>
         ))}
       </div>
@@ -466,44 +440,30 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
           </p>
         </section>
       )}
-      {/* THE ANSWER — plain, first thing you read */}
-      <section style={{ ...card, borderLeft: `4px solid ${vTone.bar}`, background: vTone.soft, padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      {/* verdict hero */}
+      <section style={{ ...card, borderLeft: `4px solid ${vTone.bar}`, background: vTone.soft, padding: '12px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ width: 40, height: 40, borderRadius: 11, background: '#fff', display: 'grid', placeItems: 'center', color: vTone.fg, flex: 'none' }}><VIcon size={21} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <b style={{ fontSize: 17, color: vTone.fg, lineHeight: 1.3 }}>{answer}</b>
-            {d.verdict?.verdict_reason && <p style={{ fontSize: 12.5, color: SEC, marginTop: 5, lineHeight: 1.55 }}>{d.verdict.verdict_reason}</p>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><b style={{ fontSize: 19, color: vTone.fg }}>{vTone.verb}</b>{d.verdict?.viability && <span style={{ ...pill(vTone.fg, '#fff'), border: `1px solid ${vTone.bar}` }}>{String(d.verdict.viability).toUpperCase()}</span>}</div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>assessed on <b style={{ color: SEC }}>{d.asset?.name || 'the affected asset'}</b>{d.attack_version ? ` · ATT&CK v${d.attack_version}` : ''}</div>
           </div>
+          {score?.contextual != null && <div style={{ textAlign: 'right' }}><b className="num" style={{ fontSize: 24, color: vTone.fg }}>{score.contextual}</b>{score.raw != null && score.delta !== 0 && <span style={{ fontSize: 11, color: MUTED, marginLeft: 6 }}>↓{score.delta} vs raw {score.raw}</span>}</div>}
         </div>
-        {/* the real reasons — the signals that drive the verdict, in plain words */}
-        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', color: FAINT, textTransform: 'uppercase', margin: '14px 0 7px' }}>Why</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-          {why.map((w) => {
-            const on = w.state === true, unknown = w.state == null;
-            const c = on ? '#B23A3A' : unknown ? '#9A6410' : '#6B7787';
-            const bg = on ? '#FBEAEA' : unknown ? '#FBF2DF' : '#EEF1F3';
-            return (
-              <span key={w.label} style={{ ...pill(c, bg), fontSize: 11.5, padding: '4px 10px' }}>
-                <span style={{ fontWeight: 800 }}>{on ? '✓' : unknown ? '?' : '–'}</span>
-                {w.label}{w.note ? ` · ${w.note}` : ''}{unknown ? ' (unknown)' : ''}
-              </span>
-            );
-          })}
+        <div style={{ display: 'flex', gap: 20, marginTop: 12, flexWrap: 'wrap', fontSize: 11, color: MUTED }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>signal {d.verdict?.signal_pct ?? 0}%<span style={{ width: 96, height: 6, background: '#EEF1F3', borderRadius: 999, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${d.verdict?.signal_pct ?? 0}%`, background: vTone.bar }} /></span></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>data {d.verdict?.data_completeness ?? 0}%<span style={{ width: 96, height: 6, background: '#EEF1F3', borderRadius: 999, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${d.verdict?.data_completeness ?? 0}%`, background: '#8A95A1' }} /></span></span>
         </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginTop: 12, fontSize: 11.5, color: MUTED }}>
-          <span>Confidence: <b style={{ color: SEC }}>{confWord}</b> — we have {dc}% of the inputs this needs.</span>
-          {score?.contextual != null && <span style={{ marginLeft: 'auto' }}>Risk score for this host: <b style={{ color: SEC }}>{score.contextual}</b>/100 · see the <b style={{ color: ACS }}>Analysis</b> tab</span>}
-        </div>
-        <div style={{ fontSize: 10.5, color: FAINT, marginTop: 8 }}>Assessed on {assetNm}{d.attack_version ? ` · MITRE ATT&CK v${d.attack_version}` : ''}.</div>
+        <p style={{ fontSize: 12.5, color: SEC, marginTop: 10, lineHeight: 1.55 }}>{d.verdict?.verdict_reason}</p>
       </section>
 
       {/* attack chain spine */}
       <section style={{ ...card, padding: '12px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-          <b style={{ fontSize: 14 }}>What an attack would look like</b>
-          <span style={{ marginLeft: 'auto', fontSize: 11.5, color: MUTED }}>attacker gets through <b style={{ color: SEC }}>{reached} of {mappedCount}</b> steps{severed && visible[breakIdx] && <> · <b style={{ color: '#C2453F' }}>blocked at {PLAIN_STAGE[visible[breakIdx].shortname] || visible[breakIdx].name}</b></>}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <b style={{ fontSize: 14 }}>Attack path — the chain</b>
+          <span style={{ fontSize: 11.5, color: FAINT }}>MITRE ATT&amp;CK · the stages in play</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11.5, color: MUTED }}><b style={{ color: SEC }}>{reached} of {mappedCount}</b> reached{severed && visible[breakIdx] && <> · <b style={{ color: '#C2453F' }}>stops at {visible[breakIdx].name}</b></>}</span>
         </div>
-        <div style={{ fontSize: 11, color: FAINT, marginBottom: 12 }}>each step is a stage from MITRE ATT&amp;CK, in the order an attacker would take them</div>
         {chain.length === 0 ? (
           <div style={{ border: `1px solid ${BORDER}`, background: '#FAFBFC', borderRadius: 10, padding: 16, fontSize: 12.5, color: SEC, lineHeight: 1.55 }}>No ATT&amp;CK techniques mapped for this finding — a data condition, not a verdict. It does <b>not</b> mean the finding is unexploitable.</div>
         ) : (
@@ -526,27 +486,26 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
                     {!last && <span style={{ width: 2, flex: 1, minHeight: empty ? 10 : 16, margin: '4px 0', background: reachedStage ? '#9FE3D2' : '#E4E8EC', borderRadius: 2 }} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : empty ? 8 : 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: reachedStage ? INK : FAINT }}>{PLAIN_STAGE[st.shortname] || st.name}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.03em', color: FAINT }}>{st.name}</span>
-                      {isBreak && <span style={{ ...pill('#C2453F', '#FBEAEA'), fontSize: 9 }}>BLOCKED HERE</span>}
-                      {beyond && !empty && <span style={{ ...pill('#8A95A1', '#EEF1F3'), fontSize: 9 }}><Lock size={9} />can&apos;t reach</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.03em', color: reachedStage ? SEC : FAINT }}>{st.name}</span>
+                      {isBreak && <span style={{ ...pill('#C2453F', '#FBEAEA'), fontSize: 9 }}>STOPS HERE</span>}
+                      {beyond && !empty && <span style={{ ...pill('#8A95A1', '#EEF1F3'), fontSize: 9 }}><Lock size={9} />unreachable</span>}
                     </div>
                     {empty ? (
-                      <div style={{ fontSize: 11, color: FAINT, marginTop: 2, fontStyle: 'italic' }}>{unreachable ? 'the attack is already blocked before this step' : 'this flaw does not use this step'}</div>
+                      <div style={{ fontSize: 11, color: FAINT, marginTop: 2, fontStyle: 'italic' }}>{unreachable ? 'unreachable — the chain is severed before this stage' : 'no ATT&CK technique at this stage'}</div>
                     ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 7 }}>
                       {techs.map((c: any) => { const stt = STAT[c.status] || STAT.blocked; return (
                         <div key={c.technique_id} style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${BORDER}`, borderRadius: 9, padding: '6px 10px', background: unreachable ? '#FAFBFC' : '#fff' }} title={c.why || ''}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: stt.c, flex: 'none' }} />
+                          <code style={{ fontFamily: MONO, fontSize: 11, color: MUTED }}>{c.technique_id}</code>
                           <span style={{ fontSize: 12, fontWeight: 500, color: unreachable ? FAINT : '#1F2A33', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                          <code style={{ fontFamily: MONO, fontSize: 10, color: FAINT }}>{c.technique_id}</code>
                           <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.04em', color: stt.c }}>{stt.label}</span>
                         </div>
                       ); })}
                     </div>
                     )}
-                    {isBreak && (st.reason) && <p style={{ fontSize: 12, color: '#B23A3A', background: '#FDF3F3', border: '1px solid #F3D3DA', borderRadius: 9, padding: '7px 10px', marginTop: 8, lineHeight: 1.5 }}><b>The attack stops here.</b> {st.reason}</p>}
+                    {isBreak && (st.reason) && <p style={{ fontSize: 12, color: '#B23A3A', background: '#FDF3F3', border: '1px solid #F3D3DA', borderRadius: 9, padding: '7px 10px', marginTop: 8, lineHeight: 1.5 }}><b>Chain stops here.</b> {st.reason}</p>}
                   </div>
                 </li>
               );
@@ -554,12 +513,7 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
           </ol>
         )}
         {omitted.length > 0 && chain.length > 0 && <p style={{ fontSize: 11, color: FAINT, marginTop: 10, borderTop: `1px solid ${BORDER2}`, paddingTop: 10 }}><b style={{ color: MUTED }}>{omitted.length} ATT&amp;CK {omitted.length === 1 ? 'stage' : 'stages'} omitted</b> ({omitted.map((s: any) => s.name).join(', ')}) — no technique this finding&apos;s weakness maps to there.</p>}
-        <div style={{ fontSize: 11, color: MUTED, marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderTop: `1px solid ${BORDER2}`, paddingTop: 10 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#C2453F' }} />likely works</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#E0AF33' }} />possible</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#AEB8C2' }} />blocked</span>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Shield size={12} /> Nothing was executed — stored evidence only.</span>
-        </div>
+        <p style={{ fontSize: 11, color: MUTED, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}><Shield size={12} /> Nothing was executed — this reads stored evidence only. BLOCKED shows only on a known disqualifying fact; missing data stays POSSIBLE.</p>
       </section>
       </>)}
 
@@ -622,6 +576,147 @@ function ExploitTest({ reach: d, vTone, hasAsset, v, score }: any) {
           <p style={{ fontSize: 11, color: MUTED, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}><Shield size={12} /> Nothing was executed — this is stored evidence only.</p>
         </section>
       )}
+    </div>
+  );
+}
+
+// ── Exception tab ──
+// The finding's risk-exception lifecycle, backed by the real FSM
+// (services/vuln_exception.py): none/denied/expired → request; requested →
+// approve | deny; approved → revoke; revoked is terminal. Separation of duties
+// (a requester can't approve/deny their own) is enforced server-side — its 400
+// reason is shown as-is.
+const EXC_META: Record<string, { label: string; c: string; bg: string }> = {
+  none: { label: 'No exception', c: '#6B7787', bg: '#EEF1F3' },
+  requested: { label: 'Requested · awaiting review', c: '#9A6410', bg: '#FBF2DF' },
+  approved: { label: 'Approved', c: '#1F7A54', bg: '#E7F5EE' },
+  denied: { label: 'Denied', c: '#B23A3A', bg: '#FBEAEA' },
+  expired: { label: 'Expired', c: '#C0682F', bg: '#FCEEE2' },
+  revoked: { label: 'Revoked', c: '#6B7787', bg: '#EEF1F3' },
+};
+
+function ExceptionPanel({ vulnId, v, onChanged }: { vulnId: number; v: any; onChanged: () => void }) {
+  const state: string = v?.exception_status || 'none';
+  const meta = EXC_META[state] || EXC_META.none;
+  const [justification, setJustification] = useState('');
+  const [controls, setControls] = useState('');
+  const [expires, setExpires] = useState('');
+  const [comment, setComment] = useState('');
+  const [denyReason, setDenyReason] = useState('');
+  const [revokeReason, setRevokeReason] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
+  const done = () => {
+    setErr(null); setJustification(''); setControls(''); setExpires('');
+    setComment(''); setDenyReason(''); setRevokeReason('');
+    onChanged();
+  };
+  const fail = (e: any) => setErr(e?.response?.data?.detail || 'Action failed.');
+  // <input type="date"> yields YYYY-MM-DD; the API takes a datetime (end of that day).
+  const iso = (d: string) => (d ? new Date(`${d}T23:59:59`).toISOString() : undefined);
+
+  const request = useMutation({
+    mutationFn: () => {
+      const ctrls = controls.split('\n').map((s) => s.trim()).filter(Boolean);
+      return vulnManagementApi.vulnerabilities.exceptionRequest(vulnId, {
+        justification: justification.trim(),
+        compensating_controls: ctrls.length ? ctrls : undefined,
+        expires_at: iso(expires),
+      });
+    },
+    onSuccess: done, onError: fail,
+  });
+  const approve = useMutation({
+    mutationFn: () => vulnManagementApi.vulnerabilities.exceptionApprove(vulnId, { comment: comment.trim() || undefined, expires_at: iso(expires) }),
+    onSuccess: done, onError: fail,
+  });
+  const deny = useMutation({
+    mutationFn: () => vulnManagementApi.vulnerabilities.exceptionDeny(vulnId, { denial_reason: denyReason.trim() }),
+    onSuccess: done, onError: fail,
+  });
+  const revoke = useMutation({
+    mutationFn: () => vulnManagementApi.vulnerabilities.exceptionRevoke(vulnId, { reason: revokeReason.trim() || undefined }),
+    onSuccess: done, onError: fail,
+  });
+  const busy = request.isPending || approve.isPending || deny.isPending || revoke.isPending;
+
+  const field: React.CSSProperties = { width: '100%', border: '1px solid #E4E8EC', borderRadius: 9, padding: '8px 10px', fontSize: 12.5, color: INK, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' };
+  const lbl: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 600, color: SEC, marginBottom: 5 };
+  const fmtD = (d?: string) => (d ? new Date(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
+  const controlsOnRecord: string[] = Array.isArray(v?.exception_compensating_controls) ? v.exception_compensating_controls : [];
+
+  return (
+    <div style={{ ...card, padding: '16px 18px' }}>
+      {/* current state */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: FAINT, marginBottom: 6 }}>Risk exception</div>
+          <span style={pill(meta.c, meta.bg)}>{meta.label}</span>
+        </div>
+        {state !== 'none' && (
+          <dl style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '3px 14px', fontSize: 12, margin: 0 }}>
+            <dt style={{ color: MUTED }}>Requested</dt><dd style={{ margin: 0, color: INK }}>{fmtD(v.exception_requested_at)}</dd>
+            {v.exception_approved_at && <><dt style={{ color: MUTED }}>Approved</dt><dd style={{ margin: 0, color: INK }}>{fmtD(v.exception_approved_at)}</dd></>}
+            <dt style={{ color: MUTED }}>Expires</dt><dd style={{ margin: 0, color: INK }}>{fmtD(v.exception_expires_at)}</dd>
+            {v.exception_revoked_at && <><dt style={{ color: MUTED }}>Revoked</dt><dd style={{ margin: 0, color: INK }}>{fmtD(v.exception_revoked_at)}</dd></>}
+          </dl>
+        )}
+      </div>
+
+      {/* what's on record */}
+      {state !== 'none' && (v.exception_justification || controlsOnRecord.length > 0 || v.exception_denial_reason) && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${BORDER2}`, display: 'grid', gap: 10 }}>
+          {v.exception_justification && (
+            <div><div style={lbl}>Justification</div><p style={{ margin: 0, fontSize: 12.5, color: SEC, whiteSpace: 'pre-wrap' }}>{v.exception_justification}</p></div>
+          )}
+          {controlsOnRecord.length > 0 && (
+            <div><div style={lbl}>Compensating controls</div><ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: SEC }}>{controlsOnRecord.map((c) => <li key={c}>{c}</li>)}</ul></div>
+          )}
+          {v.exception_denial_reason && (
+            <div><div style={lbl}>Denial reason</div><p style={{ margin: 0, fontSize: 12.5, color: '#B23A3A', whiteSpace: 'pre-wrap' }}>{v.exception_denial_reason}</p></div>
+          )}
+        </div>
+      )}
+
+      {/* actions — only the transitions the FSM allows from this state */}
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${BORDER2}` }}>
+        {(state === 'none' || state === 'denied' || state === 'expired') && (
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>{state === 'none' ? 'Request an exception' : 'Request again'}</div>
+            <div><label style={lbl}>Justification *</label><textarea rows={3} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Why this risk is accepted for now" style={field} /></div>
+            <div><label style={lbl}>Compensating controls <span style={{ color: FAINT, fontWeight: 400 }}>(one per line)</span></label><textarea rows={2} value={controls} onChange={(e) => setControls(e.target.value)} placeholder={'Network segmentation\nEDR monitoring'} style={field} /></div>
+            <div style={{ maxWidth: 220 }}><label style={lbl}>Expires</label><input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} style={field} /></div>
+            <div><button style={{ ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 }} disabled={busy || !justification.trim()} onClick={() => request.mutate()}>Submit request</button></div>
+          </div>
+        )}
+
+        {state === 'requested' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>Approve</div>
+              <div><label style={lbl}>Comment</label><input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional" style={field} /></div>
+              <div><label style={lbl}>Expires</label><input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} style={field} /></div>
+              <div><button style={{ ...btn, background: '#1F7A54', borderColor: '#1F7A54', color: '#fff', fontWeight: 600 }} disabled={busy} onClick={() => approve.mutate()}>Approve</button></div>
+            </div>
+            <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>Deny</div>
+              <div><label style={lbl}>Reason *</label><textarea rows={3} value={denyReason} onChange={(e) => setDenyReason(e.target.value)} placeholder="Required to deny" style={field} /></div>
+              <div><button style={{ ...btn, color: '#B23A3A', borderColor: '#F3D3DA' }} disabled={busy || !denyReason.trim()} onClick={() => deny.mutate()}>Deny</button></div>
+            </div>
+          </div>
+        )}
+
+        {state === 'approved' && (
+          <div style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
+            <div><label style={lbl}>Revoke reason</label><input value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} placeholder="Optional" style={field} /></div>
+            <div><button style={{ ...btn, color: '#B23A3A', borderColor: '#F3D3DA' }} disabled={busy} onClick={() => revoke.mutate()}>Revoke exception</button></div>
+          </div>
+        )}
+
+        {state === 'revoked' && <p style={{ margin: 0, fontSize: 12.5, color: MUTED }}>Revoked — no further actions.</p>}
+
+        {err && <div style={{ marginTop: 10, fontSize: 12.5, color: '#B23A3A', background: '#FBEAEA', borderRadius: 9, padding: '8px 10px' }}>{err}</div>}
+      </div>
     </div>
   );
 }

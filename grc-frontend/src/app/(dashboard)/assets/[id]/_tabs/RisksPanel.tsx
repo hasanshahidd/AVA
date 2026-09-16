@@ -518,7 +518,7 @@ function MappedControlsCard({
                   <div className="w-9 h-9 rounded-[11px] bg-[#F0F3F5] text-[#AEB8C2] grid place-items-center mx-auto mb-2.5">
                     <ShieldCheck size={18} />
                   </div>
-                  <p className="text-[12px] text-[#8A95A1] inline-flex items-center gap-1.5 flex-wrap justify-center">
+                  <div className="text-[12px] text-[#8A95A1] inline-flex items-center gap-1.5 flex-wrap justify-center">
                     No controls mapped yet ·
                     <InlineLinkPicker
                       triggerLabel="Map controls →"
@@ -530,7 +530,7 @@ function MappedControlsCard({
                       searchPlaceholder="Search controls"
                       onSelect={(value) => onLinkControl(Number(value))}
                     />
-                  </p>
+                  </div>
                 </div>
               </td></tr>
             ) : (

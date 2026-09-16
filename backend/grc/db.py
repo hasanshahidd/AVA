@@ -309,6 +309,26 @@ def _ensure_asset_dns_aliases(engine: Engine) -> None:
         ))
 
 
+def _ensure_hosted_scan_columns(engine: Engine) -> None:
+    """Flow 1 two-way-closure counts: vulns_closed / vulns_reopened were added to
+    the existing grc_hosted_scan_runs table. create_all only makes tables, so an
+    already-provisioned DB needs the columns added or every hosted-scan read
+    (which selects the mapped columns) 500s. Additive + nullable → no backfill."""
+    if engine.dialect.name != "postgresql":
+        return
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    if not inspector.has_table("grc_hosted_scan_runs"):
+        return
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE grc_hosted_scan_runs ADD COLUMN IF NOT EXISTS vulns_closed INTEGER"
+        ))
+        conn.execute(text(
+            "ALTER TABLE grc_hosted_scan_runs ADD COLUMN IF NOT EXISTS vulns_reopened INTEGER"
+        ))
+
+
 def _ensure_statutory_audit_tables(engine: Engine) -> None:
     """Focused IF NOT EXISTS / checkfirst ensure for statutory-audit tables.
 
@@ -443,6 +463,10 @@ def _init_tenant_schema(engine: Engine, slug: str) -> None:
             _ensure_asset_ephi_environment(engine)
         except Exception:
             logger.exception("asset ephi_environment ensure failed for slug=%s", slug)
+        try:
+            _ensure_hosted_scan_columns(engine)
+        except Exception:
+            logger.exception("hosted_scan columns ensure failed for slug=%s", slug)
         # Ava: compliance schema self-heal removed with the compliance module.
         try:
             from .modules.identity.schema_migrations import (

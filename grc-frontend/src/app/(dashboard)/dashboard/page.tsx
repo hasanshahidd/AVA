@@ -17,10 +17,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import apiClient, { vulnManagementApi } from '@/lib/api';
+import apiClient, { vulnManagementApi, discoveryApi, compliancePluginsApi } from '@/lib/api';
 import {
   ShieldCheck, Users, Download, ChevronRight, Flame, Bug, Globe, Activity,
-  ShieldAlert, Server, Clock, CheckCircle2,
+  ShieldAlert, Server, Clock, CheckCircle2, Radar, Boxes, Target, ArrowRight,
 } from 'lucide-react';
 
 /* ---------------- palette (styles/tokens.css) ---------------- */
@@ -128,6 +128,39 @@ function WeeklyBars({ weeks }: { weeks: { label: string; n: number }[] }) {
 
 function healthColor(h: string) { return h === 'At risk' ? '#B91C1C' : h === 'Watch' ? '#D97706' : '#047857'; }
 
+/* module scorecard — one card per pipeline stage (Discovery, Inventory, CIS,
+   Vulnerabilities, CTEM). Higher score = better; shows a real empty state when the
+   stage has no data yet, so an empty tenant reads as "get started", not a fake 0. */
+const grade = (s: number) => (s >= 90 ? 'A' : s >= 75 ? 'B' : s >= 60 ? 'C' : s >= 40 ? 'D' : 'F');
+const scoreColor = (s: number) => (s >= 75 ? '#047857' : s >= 40 ? '#B45309' : '#B91C1C');
+function Scorecard({ icon, name, href, score, unit, driver, emptyCta }: {
+  icon: React.ReactNode; name: string; href: string; score: number | null;
+  unit?: string; driver: string; emptyCta?: string;
+}) {
+  const empty = score == null;
+  const col = empty ? '#94A3B8' : scoreColor(score);
+  return (
+    <Link href={href} className={`${cardCls} group flex min-w-0 flex-1 basis-[232px] flex-col gap-3 !py-4 transition hover:border-[#C7D2E4] hover:shadow-[0_4px_16px_rgba(16,24,40,.08)]`}>
+      <div className="flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: 'rgba(0,91,150,.08)', color: AC }}>{icon}</span>
+        <span className="text-[13.5px] font-semibold text-slate-900">{name}</span>
+        <ArrowRight size={15} className="ml-auto text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+      </div>
+      <div className="flex items-center gap-3">
+        <Ring pct={empty ? 0 : score} size={74} stroke={7} color={empty ? '#E2E8F0' : col}>
+          {empty ? <span className="text-[16px] font-bold text-slate-300">—</span>
+            : <><span className="text-[19px] font-bold leading-none text-slate-900">{score}</span>{unit && <span className="text-[8.5px] text-slate-400">{unit}</span>}</>}
+        </Ring>
+        <div className="min-w-0">
+          {!empty && <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: col + '1f', color: col }}>Grade {grade(score)}</span>}
+          <div className={`${empty ? '' : 'mt-1.5'} text-[12px] text-slate-500`}>{driver}</div>
+          {empty && emptyCta && <div className="mt-1 text-[11.5px] font-semibold" style={{ color: AC }}>{emptyCta} →</div>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 /* ================= page ================= */
 export default function PerformanceOverview() {
   const [view, setView] = useState<'admin' | 'team'>('admin');
@@ -152,6 +185,23 @@ export default function PerformanceOverview() {
     queryFn: async () => (await vulnManagementApi.vulnerabilities.getDomains({ include_closed: false })).data as {
       domains: Array<{ family: string; total: number; worst_severity: string }>;
     },
+  });
+  // Per-module scorecard inputs — each defensive + optional so an empty tenant or a
+  // missing endpoint degrades to the card's empty state rather than erroring.
+  const { data: disc } = useQuery({
+    queryKey: ['perf-discovery'],
+    queryFn: async () => (await discoveryApi.discoveredDevices()).data as { devices: any[]; runs: any[]; latest_run_id: number | null },
+    retry: false,
+  });
+  const { data: cisOv } = useQuery({
+    queryKey: ['perf-cis'],
+    queryFn: async () => (await compliancePluginsApi.assetsOverview()).data as any,
+    retry: false,
+  });
+  const { data: ctemPf } = useQuery({
+    queryKey: ['perf-ctem'],
+    queryFn: async () => (await apiClient.get('/erm/ctem/scopes/portfolio')).data as any,
+    retry: false,
   });
 
   const m = useMemo(() => {
@@ -242,6 +292,24 @@ export default function PerformanceOverview() {
 
   const gradeColor = m.index >= 70 ? '#047857' : m.index >= 40 ? '#B45309' : '#B91C1C';
 
+  /* ---- module scorecards (defensive: no data → null score → empty state) ---- */
+  const devs = disc?.devices || [];
+  const discInInv = devs.filter((d: any) => d.in_inventory).length;
+  const discConnected = devs.filter((d: any) => d.connected).length;
+  const discCoverage = devs.length ? Math.round((discInInv / devs.length) * 100) : null;
+  const profiled = assets.filter((a: any) => a.os_family).length;
+  const invScore = assets.length ? Math.round((profiled / assets.length) * 100) : null;
+  const cisPass = cisOv?.passed ?? cisOv?.total_passed ?? cisOv?.summary?.passed ?? null;
+  const cisFail = cisOv?.failed ?? cisOv?.total_failed ?? cisOv?.summary?.failed ?? null;
+  const cisScored = cisPass != null && cisFail != null && (cisPass + cisFail) > 0;
+  const cisScore = cisScored ? Math.round((cisPass / (cisPass + cisFail)) * 100) : null;
+  // Score from findings when any exist — findings can arrive (scanner import)
+  // before the asset inventory is populated; only a truly empty tenant is "—".
+  const vulnScore = vulns.length || assets.length ? m.index : null;
+  const ctemScopes = Array.isArray(ctemPf?.scopes) ? ctemPf.scopes.length
+    : (ctemPf?.scope_count ?? (Array.isArray(ctemPf?.portfolio) ? ctemPf.portfolio.length : 0));
+  const ctemScore = ctemScopes > 0 ? (ctemPf?.avg_score ?? ctemPf?.portfolio_score ?? null) : null;
+
   return (
     <div className="mx-auto flex max-w-[1320px] flex-col gap-4 py-1 text-slate-900" style={{ fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}>
       {/* head row */}
@@ -279,67 +347,63 @@ export default function PerformanceOverview() {
         <div className="grid h-80 place-items-center text-slate-500">Loading live performance data…</div>
       ) : isAdmin ? (
         <div className="flex flex-col gap-4">
-          {/* hero — derived exposure index */}
-          <div className={`${cardCls} flex flex-wrap items-center gap-8 !px-5 !py-4`}>
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[.06em] text-slate-500">Exposure index</div>
-              <Ring pct={m.index} size={128} stroke={11} color={gradeColor}>
-                <span className="text-[32px] font-bold leading-none">{m.index}</span>
-                <span className="mt-0.5 text-[10.5px] text-slate-400">out of 100</span>
-              </Ring>
-              <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'rgba(0,91,150,.10)', color: AC }}>Grade {m.grade} · derived</span>
-            </div>
-            <div className="flex min-w-[300px] flex-1 flex-col gap-2.5">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[.06em] text-slate-500">What drives it · share of open findings</div>
-              {m.drivers.map((d) => (
-                <div key={d.label} className="flex items-center gap-4">
-                  <span className="w-[190px] shrink-0 text-[12.5px] text-slate-700">
-                    {d.label} <span className="text-[10px] text-slate-400">· {Math.round(d.w * 100)}%</span>
-                  </span>
-                  <span className="block h-2 flex-1 overflow-hidden rounded-[5px]" style={{ background: TRACK }}>
-                    <i className="block h-full rounded-[5px]" style={{ width: `${Math.round(d.ratio * 100)}%`, background: d.color }} />
-                  </span>
-                  <b className="w-16 text-right text-[12px] tabular-nums text-slate-700">{nfmt(d.n)} <span className="text-slate-400">({Math.round(d.ratio * 100)}%)</span></b>
-                </div>
-              ))}
-            </div>
-            <div className="flex min-w-[230px] flex-1 basis-[230px] flex-col justify-center gap-1.5">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[.06em] text-slate-500">How to read this</div>
-              <p className="m-0 text-[11.5px] leading-relaxed text-slate-500">
-                A <b className="text-slate-700">derived</b> index (100 = clean) computed live from exploitability, active exploitation and aging of your {nfmt(m.open)} open findings. Remediation-SLA weighting is excluded until findings start getting resolved.
-              </p>
+          {/* Module scorecards — the pipeline, each stage its own score */}
+          <div>
+            <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.06em] text-slate-500">Module scores</div>
+            <div className="flex flex-wrap gap-4">
+              <Scorecard icon={<Radar size={16} />} name="Discovery" href="/asset-discovery"
+                score={discCoverage} unit="% onboarded"
+                driver={devs.length ? `${nfmt(devs.length)} found · ${nfmt(discInInv)} in inventory` : 'No discovery runs yet'}
+                emptyCta="Run a discovery scan" />
+              <Scorecard icon={<Boxes size={16} />} name="Inventory" href="/assets"
+                score={invScore} unit="% profiled"
+                driver={assets.length ? `${nfmt(assets.length)} asset${assets.length === 1 ? '' : 's'} · ${nfmt(profiled)} profiled` : 'No assets yet'}
+                emptyCta="Connect a device" />
+              <Scorecard icon={<ShieldCheck size={16} />} name="CIS Benchmarks" href="/assets?tab=cis"
+                score={cisScore} unit="% pass"
+                driver={cisScored ? `${nfmt(cisPass)}/${nfmt(cisPass + cisFail)} checks pass` : 'No CIS scans yet'}
+                emptyCta="Run a CIS scan" />
+              <Scorecard icon={<Bug size={16} />} name="Vulnerabilities" href="/vulnerabilities"
+                score={vulnScore} unit="exposure"
+                driver={m.open ? `${nfmt(m.open)} open · ${nfmt(m.sev.Critical)} critical` : (vulns.length || assets.length ? 'No open findings — clean' : 'No assets to assess')}
+                emptyCta="Bring findings in" />
+              <Scorecard icon={<Target size={16} />} name="CTEM" href="/vulnerabilities/ctem-scopes"
+                score={ctemScore} unit="managed"
+                driver={ctemScopes > 0 ? `${nfmt(ctemScopes)} scope${ctemScopes === 1 ? '' : 's'} tracked` : 'No exposure scope yet'}
+                emptyCta={ctemScopes > 0 ? undefined : 'Create a scope'} />
             </div>
           </div>
 
-          {/* KPI strip */}
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
-            {[
-              { label: 'Open findings', value: nfmt(m.open), sub: `${nfmt(m.resolved)} resolved all-time`, icon: <Bug size={13} />, color: AC },
-              { label: 'Critical open', value: nfmt(m.sev.Critical), sub: `${nfmt(m.sev.High)} high`, icon: <Flame size={13} />, color: SEV.Critical.c },
-              { label: 'Actively exploited', value: nfmt(m.kev), sub: 'on the CISA KEV list', icon: <Flame size={13} />, color: SEV.Critical.c },
-              { label: 'Publicly exploitable', value: nfmt(m.exploitable), sub: 'KEV or EPSS ≥ 10%', icon: <ShieldAlert size={13} />, color: SEV.High.c },
-              { label: 'Internet-facing', value: nfmt(m.internetAssets), sub: `of ${nfmt(assets.length)} assets`, icon: <Globe size={13} />, color: AC },
-              { label: 'Avg CVSS', value: m.avgCvss.toFixed(1), sub: 'open findings', icon: <Activity size={13} />, color: '#3279A3' },
-            ].map((k) => (
-              <div key={k.label} className="relative min-w-0 overflow-hidden rounded-xl border border-[#E2E5EC] bg-white px-3.5 py-[11px] shadow-[0_1px_2px_rgba(16,24,40,.04)]">
-                <span className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r" style={{ background: k.color }} />
-                <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[.05em] text-slate-500"><span style={{ color: k.color }}>{k.icon}</span>{k.label}</div>
-                <div className="mt-1 text-[22px] font-bold tabular-nums text-slate-900">{k.value}</div>
-                <div className="mt-0.5 text-[11.5px] text-slate-400">{k.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* EPSS · trend · attention */}
+          {/* Attack surface (discovery) · Severity mix · Needs attention */}
           <div className="flex flex-wrap gap-4">
-            <div className={`${cardCls} min-w-0 flex-1 basis-[340px]`}>
-              <CardTitle title="Exploit probability (EPSS)" desc="Open findings by first-party exploit-likelihood score" />
-              <HBars rows={m.epss.map((e) => ({ label: e.label, n: e.n, color: e.color }))} />
+            <div className={`${cardCls} min-w-0 flex-1 basis-[320px]`}>
+              <CardTitle title="Attack surface" desc="What discovery found vs what's under management" />
+              {devs.length ? (
+                <HBars rows={[
+                  { label: 'Discovered', n: devs.length, color: '#94A3B8' },
+                  { label: 'Connectable', n: discConnected, color: '#3279A3' },
+                  { label: 'In inventory', n: discInInv, color: '#047857' },
+                ]} />
+              ) : <div className="py-6 text-center text-[12px] text-slate-400">No discovered devices yet.</div>}
             </div>
 
-            <div className={`${cardCls} flex min-w-0 flex-1 basis-[340px] flex-col`}>
-              <CardTitle title="New findings — weekly" desc="First-seen date, last 12 weeks (resolution history not yet available)" />
-              <WeeklyBars weeks={m.weeks} />
+            <div className={`${cardCls} min-w-0 flex-1 basis-[320px]`}>
+              <CardTitle title="Severity mix" desc={`${nfmt(m.open)} open findings by severity`} />
+              {m.open ? (
+                <div className="flex flex-wrap items-center gap-5">
+                  <Donut rows={SEV_ORDER.map((l) => ({ label: l, n: m.sev[l] }))} total={m.open} size={128} />
+                  <div className="flex min-w-[140px] max-w-[240px] flex-1 flex-col gap-1.5 text-[12px]">
+                    {SEV_ORDER.map((l) => (
+                      <span key={l} className="flex items-center gap-2">
+                        <i className="inline-block h-2 w-2 rounded-[3px]" style={{ background: SEV[l].c }} />
+                        <span className="text-slate-700">{l}</span>
+                        <b className="ml-auto tabular-nums text-slate-900">{nfmt(m.sev[l])}</b>
+                        <span className="w-9 text-right text-[11px] text-slate-400">{pct(m.sev[l], m.open)}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : <div className="py-6 text-center text-[12px] text-slate-400">No open findings yet.</div>}
             </div>
 
             <div className={`${cardCls} flex min-w-0 flex-1 basis-80 flex-col`}>
@@ -360,50 +424,31 @@ export default function PerformanceOverview() {
                   ))}
                 </div>
               )}
-              {m.unassigned > 0 && <div className="mt-2 rounded-lg bg-[#F1F5F9] px-3 py-1.5 text-[11.5px] text-slate-600">{nfmt(m.unassigned)} open findings have no owner — route them to a queue.</div>}
             </div>
           </div>
 
-          {/* funnel + severity mix */}
+          {/* New findings weekly · Exposure funnel */}
           <div className="flex flex-wrap gap-4">
-            <div className={`${cardCls} min-w-0 flex-1 basis-[380px]`}>
-              <CardTitle title="Exposure funnel" desc={`How ${nfmt(m.open)} open findings narrow to what actually matters`} />
-              <div className="flex flex-col gap-2">
-                {m.funnel.map((f, i) => (
-                  <div key={f.label} className="flex items-center gap-2.5">
-                    <span className="w-32 shrink-0 text-[12px] text-slate-700">{f.label}</span>
-                    <span className="flex flex-1 items-center gap-2">
-                      <span className="flex h-[26px] items-center rounded-[7px] pl-2.5 text-[12px] font-semibold tabular-nums text-white" style={{ width: `${Math.max(9, pct(f.n, m.funnel[0].n))}%`, background: f.color }}>{nfmt(f.n)}</span>
-                      {i > 0 && <span className="text-[10.5px] text-slate-400">{pct(f.n, m.funnel[i - 1].n)}%</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {m.kev > 0 && <div className="mt-3 text-[11.5px] text-slate-500">Only <b className="text-[#B91C1C]">{nfmt(m.kev)} findings</b> are on the CISA KEV list — fixing those first removes the highest-probability attack paths.</div>}
+            <div className={`${cardCls} flex min-w-0 flex-1 basis-[380px] flex-col`}>
+              <CardTitle title="New findings — weekly" desc="First-seen date, last 12 weeks" />
+              <WeeklyBars weeks={m.weeks} />
             </div>
-
             <div className={`${cardCls} min-w-0 flex-1 basis-[380px]`}>
-              <CardTitle title="Severity mix" desc={`${nfmt(m.open)} open findings by severity`} />
-              <div className="flex flex-wrap items-center gap-5">
-                <Donut rows={SEV_ORDER.map((l) => ({ label: l, n: m.sev[l] }))} total={m.open} size={132} />
-                <div className="flex min-w-[150px] max-w-[280px] flex-1 flex-col gap-1.5 text-[12px]">
-                  {SEV_ORDER.map((l) => (
-                    <span key={l} className="flex items-center gap-2">
-                      <i className="inline-block h-2 w-2 rounded-[3px]" style={{ background: SEV[l].c }} />
-                      <span className="text-slate-700">{l}</span>
-                      <b className="ml-auto tabular-nums text-slate-900">{nfmt(m.sev[l])}</b>
-                      <span className="w-9 text-right text-[11px] text-slate-400">{pct(m.sev[l], m.open)}%</span>
-                    </span>
+              <CardTitle title="Exposure funnel" desc={`How ${nfmt(m.open)} open findings narrow to what matters`} />
+              {m.open ? (
+                <div className="flex flex-col gap-2">
+                  {m.funnel.map((f, i) => (
+                    <div key={f.label} className="flex items-center gap-2.5">
+                      <span className="w-32 shrink-0 text-[12px] text-slate-700">{f.label}</span>
+                      <span className="flex flex-1 items-center gap-2">
+                        <span className="flex h-[26px] items-center rounded-[7px] pl-2.5 text-[12px] font-semibold tabular-nums text-white" style={{ width: `${Math.max(9, pct(f.n, m.funnel[0].n))}%`, background: f.color }}>{nfmt(f.n)}</span>
+                        {i > 0 && <span className="text-[10.5px] text-slate-400">{pct(f.n, m.funnel[i - 1].n)}%</span>}
+                      </span>
+                    </div>
                   ))}
                 </div>
-              </div>
+              ) : <div className="py-6 text-center text-[12px] text-slate-400">No open findings to funnel yet.</div>}
             </div>
-          </div>
-
-          {/* by domain */}
-          <div className={cardCls}>
-            <CardTitle title="Where risk concentrates — by domain" desc="Scanner plugin-family, worst-severity coloured" />
-            {m.byDomain.length ? <HBars rows={m.byDomain} /> : <div className="py-4 text-[12px] text-slate-400">No domain data.</div>}
           </div>
         </div>
       ) : (

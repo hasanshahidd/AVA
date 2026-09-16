@@ -259,6 +259,16 @@ def on_startup():
     if _disable_complychat_embedding_worker not in ("1", "true", "yes", "on") and _embed_worker_autostart in ("1", "true", "yes", "on"):
         start_complychat_embedding_worker()
 
+    # Re-attach the poll+sync loop to any hosted (Flow 1) scan left in-flight when
+    # we last stopped — the poll thread is in-process and dies on restart, so a
+    # scan that finishes while we're down would otherwise never sync its findings.
+    try:
+        from grc.modules.integrations.services.hosted_scan import resume_inflight_hosted_scans
+        resume_inflight_hosted_scans(os.getenv("AVA_TENANT_SLUG", "ava"))
+    except Exception:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).warning("hosted-scan resume-on-startup skipped", exc_info=True)
+
 
 @app.on_event("shutdown")
 def on_shutdown():

@@ -33,9 +33,9 @@ type Tab = 'overview' | 'discover' | 'connections' | 'inbox' | 'runs';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview',    label: 'Overview' },
   { id: 'discover',    label: 'Discovery' },
+  { id: 'runs',        label: 'Scan history' },
   { id: 'connections', label: 'Connections' },
   { id: 'inbox',       label: 'Review queue' },
-  { id: 'runs',        label: 'Scan history' },
 ];
 
 /* ─── shared bits ──────────────────────────────────────────────────── */
@@ -211,7 +211,9 @@ function RadarCanvas({ labels = [] }: { labels?: string[] }) {
 
 function Overview({ go }: { go: (t?: string) => void }) {
   const campaigns = useQuery({ queryKey: ['disc-campaigns'], queryFn: async () => (await discoveryApi.listCampaigns()).data.campaigns as any[] });
-  const runs = useQuery({ queryKey: ['disc-runs'], queryFn: async () => (await discoveryApi.listRuns(undefined, 8)).data.runs as any[] });
+  // Pull enough run history that EVERY campaign's latest run is present — a small
+  // slice made coverage/observed undercount once runs scrolled past the window.
+  const runs = useQuery({ queryKey: ['disc-runs'], queryFn: async () => (await discoveryApi.listRuns(undefined, 200)).data.runs as any[] });
   const inbox = useQuery({ queryKey: ['disc-inbox'], queryFn: async () => (await discoveryApi.inbox('open')).data.observations as any[] });
   const radarDevQ = useQuery({ queryKey: ['disc-discovered-devices', 'all'], queryFn: async () => (await discoveryApi.discoveredDevices()).data as any });
   const radarLabels: string[] = (radarDevQ.data?.devices ?? []).slice(0, 7).map((d: any) => d.host_name || d.name || d.ip_address || 'device');
@@ -248,9 +250,16 @@ function Overview({ go }: { go: (t?: string) => void }) {
   };
   const netRun = netRuns[0], easmRun = easmRuns[0];
   const netScope = netCamps[0], easmScope = easmCamps[0];
-  const netSeen = netRun?.hosts_seen ?? 0, easmSeen = easmRun?.hosts_seen ?? 0;
-  const observed = netSeen + easmSeen;
-  const linkedTotal = (netRun?.in_inventory ?? 0) + (easmRun?.in_inventory ?? 0);
+  // "Observed entities" = the cumulative distinct-device backlog (deduped across
+  // all runs), NOT the latest run's hosts_seen — a partial re-run or an in-progress
+  // scan would otherwise collapse the whole estate to one run's count (the "reports
+  // 1 entity" bug). Split internal vs external by discovery source.
+  const allDevices: any[] = radarDevQ.data?.devices ?? [];
+  const isExternalDev = (d: any) => (d.discovery_sources || []).some((s: any) => /shodan|censys|securitytrail|crt|\bct\b/i.test(String(s)));
+  const easmSeen = allDevices.filter(isExternalDev).length;
+  const netSeen = allDevices.length - easmSeen;
+  const observed = allDevices.length;
+  const linkedTotal = allDevices.filter((d: any) => d.in_inventory).length;
   const linkage = observed ? Math.round((linkedTotal / observed) * 100) : 0;
   const covered = camps.filter((c) => runList.some((r) => r.campaign_id === c.id && r.status === 'succeeded')).length;
   const coverage = camps.length ? Math.round((covered / camps.length) * 100) : 0;
@@ -294,7 +303,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
         <div className="actions">
           <select className="select" defaultValue="Last 30 days"><option>Last 30 days</option><option>Last 7 days</option><option>Today</option></select>
           <button className="btn btn-secondary" onClick={() => runs.refetch()}>↻ Refresh</button>
-          <button className="btn btn-primary" onClick={() => go('pipeline')}>+ Start discovery</button>
+          <button className="btn btn-primary" onClick={() => go('discover')}>+ Start discovery</button>
         </div>
       </div>
       {/* KPIs (left) · live radar (right) — equal height */}
@@ -327,7 +336,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
         <article className="surface-card surface-network">
           <header>
             <div><span className="surface-label"><i></i> INTERNAL DISCOVERY</span><h3>Network sweep</h3><p>Owned CIDR ranges, devices, services and authenticated enrichment.</p></div>
-            <button className="btn btn-sm btn-secondary" onClick={() => go('pipeline')}>Open network</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => go('discover')}>Open network</button>
           </header>
           {!netScope ? <Empty text="No network campaign yet." hint="Create one in Discover → Connect." /> : (<>
             <div className="surface-scope">
@@ -351,7 +360,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
         <article className="surface-card surface-easm">
           <header>
             <div><span className="surface-label"><i></i> EXTERNAL DISCOVERY</span><h3>EASM domain map</h3><p>Owned apex domains expanded through CT, DNS and public services.</p></div>
-            <button className="btn btn-sm btn-secondary" onClick={() => go('pipeline')}>Open EASM</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => go('discover')}>Open EASM</button>
           </header>
           {!easmScope ? <Empty text="No external scope monitored yet." hint="Add a domain campaign in Discover → Connect." /> : (<>
             <div className="surface-scope">
@@ -362,7 +371,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
               <div className="apex-preview"><span className="domain-icon">◎</span><div><b>{scopeText(easmScope)}</b><small>Apex · certificate + DNS evidence</small></div><em>Owned</em></div>
               <div className="child-preview"><span>↳</span><b>{easmSeen} hostname(s) discovered</b><em>{easmRun?.in_inventory ?? 0} adopted</em></div>
               <div className="child-preview"><span>↳</span><b>{easmRun?.awaiting_login ?? 0} awaiting a decision</b><em className="attention">Review</em></div>
-              <div className="child-preview muted" onClick={() => go('pipeline')}><span>↳</span><b>Open the full domain tree</b><em>View tree →</em></div>
+              <div className="child-preview muted" onClick={() => go('discover')}><span>↳</span><b>Open the full domain tree</b><em>View tree →</em></div>
             </div>
           </>)}
         </article>
@@ -891,11 +900,15 @@ function rdOsFromName(name?: string | null): string | null {
   if (/^android[-_ ]/i.test(n)) return 'android';
   return null;
 }
+// Service-role device types describe what a host RUNS, not what it IS — a Windows
+// box running SQL Server is still a Windows host, not a "Database". So a known OS
+// wins over these; true device identities (printer/camera/switch…) still win.
+const RD_SERVICE_ROLE = new Set(['database', 'directory', 'cluster']);
 function rdType(o: any): string {
   const dt = o.device_type;
-  if (dt && RD_DTYPE[dt] && dt !== 'host') return RD_DTYPE[dt];
   const os = o.os_guess || o.asset_os_family || rdOsFromName(o.device_name || o.host_name);
   const osl = os ? (RD_OS[os] || _cap(os)) : null;
+  if (dt && RD_DTYPE[dt] && dt !== 'host' && !(RD_SERVICE_ROLE.has(dt) && osl)) return RD_DTYPE[dt];
   if (os === 'android' || os === 'ios') return osl!;   // a phone, not a "host"
   if (osl) return `${osl} host`;                       // Windows/macOS/Linux host
   if (dt === 'host') return 'Host';
@@ -1472,6 +1485,7 @@ function HostLoginForm({ platform, onSaved }: { platform: 'windows' | 'linux'; o
 // A discovered device's pre-filled connect form: IP + platform come from the
 // scan, the operator only adds a login and approves.
 function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void }) {
+  const qc = useQueryClient();
   const [f, setF] = useState({ username: '', password: '', domain: '', port: '', database: '' });
   const [err, setErr] = useState<string | null>(null);
   const isWin = device.transport === 'windows';
@@ -1479,9 +1493,21 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
   // service the sweep saw listening (PostgreSQL on 5432, LDAP on 389…). Each kind
   // connects through its OWN door with its OWN credential.
   const svcs: any[] = device.service_suggestions || [];
+  // SNMP (v2c) is always offered as a connect option: it is UDP/161, so the TCP
+  // sweep never suggests it, but network gear / printers speak it. Community
+  // string only, no username.
+  const SNMP_SVC = { kind: 'snmp', integration_type: 'snmp_v2c', label: 'SNMP', port: 161, default_port: 161 };
+  const svcsAll: any[] = svcs.some((s) => s.kind === 'snmp') ? svcs : [...svcs, SNMP_SVC];
   const hostOk = device.transport === 'windows' || device.transport === 'linux';
-  const [mode, setMode] = useState<string>(hostOk ? 'host' : (svcs[0]?.kind || 'host'));
-  const svc = svcs.find((s) => s.kind === mode);
+  const [mode, setMode] = useState<string>(hostOk ? 'host' : (svcsAll[0]?.kind || 'host'));
+  const svc = svcsAll.find((s) => s.kind === mode);
+  // WMI is an alternate Windows transport (DCOM) — same Windows login, routed to
+  // the WMI collector when WinRM is off. 'wmi' mode goes through the host path.
+  const isWmi = mode === 'wmi';
+  const hostTransport = isWmi ? 'wmi' : (device.transport || undefined);
+  // What the panel calls the current door (host modes have no svc entry).
+  const hostLabel = isWmi ? 'WMI (Windows · DCOM)' : (isWin ? 'WinRM (Windows)' : 'SSH (Linux)');
+  const hostCredLabel = isWmi ? 'Windows' : (isWin ? 'WinRM' : 'SSH');
   // Saved logins that fit this host — so siblings sharing a domain account
   // reuse the login instead of re-typing it (the "Window B/C use Window A's
   // account" case). Kind = the credential type for the current mode.
@@ -1510,13 +1536,20 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
             : { kind: svc.kind, username: f.username || undefined, password: f.password, port, database: f.database || undefined })
         : device.asset_id
         ? discoveryApi.reconnectAsset(device.asset_id, cid
-            ? { credential_id: cid, transport: device.transport || undefined }
-            : { username: f.username, password: f.password, domain: f.domain || undefined, transport: device.transport || undefined })
+            ? { credential_id: cid, transport: hostTransport }
+            : { username: f.username, password: f.password, domain: f.domain || undefined, transport: hostTransport })
         : discoveryApi.connectDevice(device.observation_id, cid
-            ? { credential_id: cid, transport: device.transport || undefined }
-            : { username: f.username, password: f.password, domain: f.domain || undefined, transport: device.transport || undefined });
+            ? { credential_id: cid, transport: hostTransport }
+            : { username: f.username, password: f.password, domain: f.domain || undefined, transport: hostTransport });
     },
     onSuccess: (res: any) => {
+      // Refresh the queue AND inventory on every success — a connect can create/
+      // update the asset even when the deep read only partially completes, so the
+      // row must reflect the new state without a manual reload.
+      qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] });
+      qc.invalidateQueries({ queryKey: ['disc-inbox'] });
+      qc.invalidateQueries({ queryKey: ['inventory-assets'] });
+      qc.invalidateQueries({ queryKey: ['assets'] });
       if (res.data?.collected) onDone();
       else setErr(res.data?.error || 'Login saved, but the device could not be read. Check it and retry.');
     },
@@ -1528,19 +1561,19 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
       <div style={{ fontSize: 12.5, color: 'var(--as-secondary)', marginBottom: 10 }}>
         Connecting <strong style={{ color: 'var(--as-ink)' }}>{device.name || device.ip_address}</strong>
         {' · '}<span className="as-mono">{device.ip_address}</span>
-        {' · '}{svc ? `${svc.label} (port ${svc.default_port})` : (isWin ? 'WinRM (Windows)' : 'SSH (Linux)')}
+        {' · '}{svc ? `${svc.label} (port ${svc.default_port})` : hostLabel}
         {' '}<span style={{ color: 'var(--as-faint)' }}>— pre-filled from the scan</span>
       </div>
       {/* "Connect as" — the sweep may have found MORE than one door on this box
           (a Windows host that also runs PostgreSQL). Each choice uses its own
           credential kind and produces a different asset model. */}
-      {(svcs.length > 0) && (
+      {(svcsAll.length > 0) && (
         <div style={{ marginBottom: 10 }}>
           <label style={label}>Connect as</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {(hostOk ? [{ kind: 'host', label: isWin ? 'Windows host (WinRM)' : 'Linux host (SSH)' }] : []).concat(
-              svcs.map((s: any) => ({ kind: s.kind, label: `${s.label} · ${s.port}` })),
-            ).map((o: any) => (
+            {(hostOk ? [{ kind: 'host', label: isWin ? 'Windows host (WinRM)' : 'Linux host (SSH)' }] : [])
+              .concat(isWin ? [{ kind: 'wmi', label: 'WMI (Windows · DCOM)' }] : [])
+              .concat(svcsAll.map((s: any) => ({ kind: s.kind, label: `${s.label} · ${s.port}` }))).map((o: any) => (
               <button key={o.kind} onClick={() => setMode(o.kind)}
                 style={{ border: `1px solid ${mode === o.kind ? 'var(--as-good)' : 'var(--as-border)'}`,
                   background: mode === o.kind ? 'var(--as-good-bg, #EFF5FA)' : '#fff',
@@ -1556,7 +1589,7 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
           is the sibling case (Window B/C reuse Window A's domain account). */}
       {saved.length > 0 && !showForm && (
         <div style={{ marginBottom: 12 }}>
-          <label style={label}>Saved {svc ? svc.label : (isWin ? 'WinRM' : 'SSH')} login{saved.length > 1 ? 's' : ''} — reuse, no re-entry <span style={{ color: 'var(--as-faint)', fontWeight: 500 }}>(only {svc ? svc.label : (isWin ? 'WinRM' : 'SSH')} logins are ever shown here)</span></label>
+          <label style={label}>Saved {svc ? svc.label : hostCredLabel} login{saved.length > 1 ? 's' : ''} — reuse, no re-entry <span style={{ color: 'var(--as-faint)', fontWeight: 500 }}>(only {svc ? svc.label : hostCredLabel} logins are ever shown here)</span></label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {saved.map((c: any) => (
               <button key={c.id} disabled={m.isPending} onClick={() => { setErr(null); m.mutate({ credential_id: c.id }); }}
@@ -1582,16 +1615,22 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-            <div><label style={label}>{svc?.kind === 'k8s' ? 'Username (optional)' : 'Username'}</label><input className="as-input" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder={svc ? (svc.kind === 'postgres' ? 'postgres' : svc.kind === 'mysql' ? 'root' : svc.kind === 'ldap' ? 'CN=svc,DC=corp,DC=local' : 'user') : (isWin ? 'Administrator' : 'root')} /></div>
-            <div><label style={label}>{svc?.kind === 'k8s' ? 'Token' : 'Password'}</label><input className="as-input" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
-            {!svc && isWin && <div><label style={label}>Domain (optional)</label><input className="as-input" value={f.domain} onChange={(e) => setF({ ...f, domain: e.target.value })} placeholder={device.host_name || 'CORP'} /></div>}
-            {svc && <div><label style={label}>Port</label><input className="as-input" value={f.port} onChange={(e) => setF({ ...f, port: e.target.value })} placeholder={String(svc.default_port)} /></div>}
-            {svc && ['postgres', 'mysql', 'mssql', 'oracle'].includes(svc.kind) && (
-              <div><label style={label}>Database (optional)</label><input className="as-input" value={f.database} onChange={(e) => setF({ ...f, database: e.target.value })} placeholder={svc.kind === 'postgres' ? 'postgres' : 'default'} /></div>
+            {svc?.kind === 'snmp' ? (
+              <div><label style={label}>Community string</label><input className="as-input" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="public" /></div>
+            ) : (
+              <>
+                <div><label style={label}>{svc?.kind === 'k8s' ? 'Username (optional)' : 'Username'}</label><input className="as-input" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder={svc ? (svc.kind === 'postgres' ? 'postgres' : svc.kind === 'mysql' ? 'root' : svc.kind === 'ldap' ? 'CN=svc,DC=corp,DC=local' : 'user') : (isWin ? 'Administrator' : 'root')} /></div>
+                <div><label style={label}>{svc?.kind === 'k8s' ? 'Token' : 'Password'}</label><input className="as-input" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
+                {!svc && isWin && <div><label style={label}>Domain (optional)</label><input className="as-input" value={f.domain} onChange={(e) => setF({ ...f, domain: e.target.value })} placeholder={device.host_name || 'CORP'} /></div>}
+                {svc && <div><label style={label}>Port</label><input className="as-input" value={f.port} onChange={(e) => setF({ ...f, port: e.target.value })} placeholder={String(svc.default_port)} /></div>}
+                {svc && ['postgres', 'mysql', 'mssql', 'oracle'].includes(svc.kind) && (
+                  <div><label style={label}>Database (optional)</label><input className="as-input" value={f.database} onChange={(e) => setF({ ...f, database: e.target.value })} placeholder={svc.kind === 'postgres' ? 'postgres' : 'default'} /></div>
+                )}
+              </>
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button className="as-btn as-btn-primary" disabled={!f.password || (!f.username && svc?.kind !== 'k8s') || m.isPending} onClick={() => { setErr(null); m.mutate({}); }}>
+            <button className="as-btn as-btn-primary" disabled={!f.password || (!f.username && svc?.kind !== 'k8s' && svc?.kind !== 'snmp') || m.isPending} onClick={() => { setErr(null); m.mutate({}); }}>
               {m.isPending ? 'Connecting…' : (svc ? `Connect as ${svc.label}` : 'Approve & connect')}
             </button>
             <span style={{ fontSize: 11.5, color: 'var(--as-faint)' }}>
@@ -1601,6 +1640,92 @@ function ConnectDeviceForm({ device, onDone }: { device: any; onDone: () => void
         </>
       )}
       {err && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--as-danger-text)' }}>{err}</div>}
+    </div>
+  );
+}
+
+// AI-assisted explainer for ONE device, shown as a POPUP. Two-phase for speed:
+// the deterministic diagnosis (instant, backend rule engine) renders immediately;
+// the AI-reworded prose swaps in when it arrives — so there is never a wait. The
+// fix steps are always the deterministic, trusted ones.
+function DeviceExplainerModal({ device, onClose }: { device: any; onClose: () => void }) {
+  const det = useQuery({
+    queryKey: ['disc-explain', device.observation_id, 'det'],
+    queryFn: async () => (await discoveryApi.explainDevice(device.observation_id, false)).data,
+    staleTime: 60_000,
+  });
+  const ai = useQuery({
+    queryKey: ['disc-explain', device.observation_id, 'ai'],
+    queryFn: async () => (await discoveryApi.explainDevice(device.observation_id, true)).data,
+    staleTime: 60_000,
+  });
+  const d: any = ai.data ?? det.data;   // prefer AI once ready; steps are identical
+  const sevColor = !d ? C.muted : d.severity === 'blocked' ? '#b4232a' : d.severity === 'ok' ? C.teal : d.severity === 'info' ? C.faint : C.amber;
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, maxHeight: '85vh', overflow: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(18,45,36,0.35)' }}>
+        <div style={{ padding: '15px 20px', borderBottom: `1px solid ${C.bLine}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ font: `700 15px ${FONT}`, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{device.host_name || device.name || device.ip_address}</div>
+            <div style={{ font: `500 12px ${MONO}`, color: C.faint }}>{device.ip_address}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: C.muted, lineHeight: 1, padding: '0 2px' }}>×</button>
+        </div>
+        <div style={{ padding: '16px 20px' }}>
+          {!d ? <div style={{ font: `500 13px ${FONT}`, color: C.muted }}>Reading this device…</div> : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <span style={{ width: 9, height: 9, borderRadius: 999, background: sevColor, flexShrink: 0 }} />
+                <strong style={{ fontSize: 15, color: C.ink }}>{d.headline}</strong>
+                {ai.data
+                  ? <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .3, color: C.teal, border: `1px solid ${C.teal}`, borderRadius: 6, padding: '1px 6px' }}>AI</span>
+                  : <span title="Ava’s built-in diagnosis. The AI wording is loading (or OPENAI_API_KEY is unset)." style={{ fontSize: 10, fontWeight: 700, letterSpacing: .3, color: C.faint, border: `1px solid ${C.bInput}`, borderRadius: 6, padding: '1px 6px' }}>RULES</span>}
+              </div>
+              <div style={{ fontSize: 13, color: C.muted2, lineHeight: 1.6, marginBottom: 14 }}>{d.why}</div>
+              {Array.isArray(d.steps) && d.steps.length > 0 && (
+                <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {d.steps.map((s: string, i: number) => (
+                    <li key={i} style={{ fontSize: 13, color: C.ink, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: fmtStep(s) }} />
+                  ))}
+                </ol>
+              )}
+              <div style={{ marginTop: 14 }}>
+                {d.lockout_risk
+                  ? <span style={{ fontSize: 12, fontWeight: 600, color: '#b4232a' }}>⚠ Wrong-secret risk — each retry counts toward account lockout. Verify the login before trying again.</span>
+                  : d.safe_to_retry
+                    ? <span style={{ fontSize: 12, fontWeight: 600, color: C.teal }}>✓ Safe to retry — your login was never sent, so nothing can lock.</span>
+                    : null}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Render `code` spans in a step (anything in backticks) as monospace chips.
+function fmtStep(s: string): string {
+  const esc = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc.replace(/`([^`]+)`/g, '<code style="font-family:var(--mono, monospace);background:var(--as-row,#eee);padding:1px 5px;border-radius:5px;font-size:11.5px">$1</code>');
+}
+
+// Connect ONE device — shown as a POPUP (not an inline table expansion). The
+// form inside already has the "Connect as" method picker (WinRM / WMI / SNMP),
+// so this is where you choose the method + login for a single device.
+function ConnectDeviceModal({ device, onClose, onDone }: { device: any; onClose: () => void; onDone: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, maxHeight: '88vh', overflow: 'auto', background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(18,45,36,0.35)' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.bLine}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ font: `700 15px ${FONT}`, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Connect {device.host_name || device.name || device.ip_address}</div>
+            <div style={{ font: `500 12px ${MONO}`, color: C.faint }}>{device.ip_address}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: C.muted, lineHeight: 1, padding: '0 2px' }}>×</button>
+        </div>
+        <ConnectDeviceForm device={device} onDone={onDone} />
+      </div>
     </div>
   );
 }
@@ -1724,9 +1849,9 @@ function CsLoginPicker({ options, selected, onToggle, onToggleAll, minWidth }: {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen((v) => !v)} title="Tick the saved login(s) to try — none ticked = best match per device"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: minWidth || 190,
-          border: `1px solid ${open ? C.green : C.bInput}`, background: '#fff', color: C.ink, font: `500 13.5px ${FONT}`,
-          padding: '10px 14px', borderRadius: 11, cursor: 'pointer', boxShadow: open ? '0 0 0 3px rgba(13,92,72,.10)' : 'none', transition: 'border-color .12s, box-shadow .12s' }}>
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minWidth: minWidth || 190, height: 32,
+          border: `1px solid ${open ? C.green : C.bInput}`, background: '#fff', color: C.ink, font: `500 11.5px ${FONT}`,
+          padding: '0 12px', borderRadius: 9, cursor: 'pointer', boxShadow: open ? '0 0 0 3px rgba(13,92,72,.10)' : 'none', transition: 'border-color .12s, box-shadow .12s' }}>
         <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
         <span style={{ color: C.muted, fontSize: 11, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>{CS_ICONS.chevron}</span>
       </button>
@@ -1778,11 +1903,16 @@ function CsDeviceRow({ d, checked, onToggle, onConnect, onAdopt, adopting }: any
   const isDim = !!d.stale;
   const inInv = !!d.in_inventory;
   const inReview = d.resolution === 'review';
-  const connectable = d.connectable === true;                              // WinRM/SSH port CONFIRMED open
+  const connectable = d.connectable === true;                              // a login service ANSWERED (WinRM/SSH/WMI/SNMP)
   const hasSvc = (d.service_suggestions || []).length > 0;                 // a typed service door (Postgres/LDAP/…)
+  // Which doors the sweep actually saw open on THIS device — the backend decides
+  // this, so the operator never has to pick a method up front.
+  const methods: string[] = d.login_methods || [];
+  const METHOD_LABEL: Record<string, string> = { winrm: 'WinRM', ssh: 'SSH', wmi: 'WMI', snmp: 'SNMP' };
+  const methodText = methods.map((m) => METHOD_LABEL[m] || m).join(' · ');
   // "attemptable" = there is SOME door we can authenticate through: a host OS
-  // login (WinRM/SSH), or a detected service with its own credential kind.
-  const attemptable = d.transport === 'windows' || d.transport === 'linux' || hasSvc;
+  // login (WinRM/SSH/WMI/SNMP), or a detected service with its own credential kind.
+  const attemptable = methods.length > 0 || d.transport === 'windows' || d.transport === 'linux' || hasSvc;
   const identified = !inInv && !inReview && !attemptable && (!!d.device_type || !!d.os_guess || !!d.host_name);
   const silent = !inInv && !inReview && !attemptable && !identified;       // IP + MAC only
   // Selectable/Connect-able whenever it's a host OS — the attempt is safe even
@@ -1824,8 +1954,8 @@ function CsDeviceRow({ d, checked, onToggle, onConnect, onAdopt, adopting }: any
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2b5c9b' }} />Needs review
           </span>
         ) : connectable ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, font: `500 13px ${FONT}`, color: C.amberText, background: C.amberFill, padding: '5px 11px', borderRadius: 99 }} title={d.attempt?.detail || 'WinRM/SSH is open — a login should connect.'}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber }} />{d.attempt?.label || 'Ready · needs login'}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, font: `500 13px ${FONT}`, color: C.amberText, background: C.amberFill, padding: '5px 11px', borderRadius: 99 }} title={d.attempt?.detail || `${methodText || 'A login service'} answered on this device — a saved login should connect.`}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber }} />{methodText ? `Login available · ${methodText}` : (d.attempt?.label || 'Ready · needs login')}
           </span>
         ) : attemptable ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, font: `500 13px ${FONT}`, color: C.amberText, background: C.amberFill, padding: '5px 11px', borderRadius: 99 }} title="Recognised host, but WinRM/SSH wasn't seen open in the scan. You can still tick it and try your login — it connects if remote login is reachable, or reports 'unreachable' (a connection error, NOT a bad-password lockout) if it's off.">
@@ -1861,18 +1991,26 @@ function CsDeviceRow({ d, checked, onToggle, onConnect, onAdopt, adopting }: any
   );
 }
 
-function DiscoveredQueue() {
+function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all' }) {
   const qc = useQueryClient();
   const [connecting, setConnecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectedCreds, setSelectedCreds] = useState<Set<number>>(new Set());  // logins to try; empty = auto
+  // Bulk connect method: host (WinRM/SSH by type), wmi (Windows·DCOM, reuses the
+  // WinRM login), or snmp (community string). Applies to the bulk Connect button.
+  const [bulkMethod, setBulkMethod] = useState<'auto' | 'host' | 'wmi' | 'snmp'>('auto');
+  const [bulkCommunity, setBulkCommunity] = useState('public');
   const toggleCred = (id: number) => setSelectedCreds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [search, setSearch] = useState('');
   const [ftype, setFtype] = useState('');
   const [fstatus, setFstatus] = useState('');
   const [runFilter, setRunFilter] = useState<number | undefined>(undefined);
   const [openFor, setOpenFor] = useState<number | null>(null);
-  const didInit = useRef(false);
+  const [explainFor, setExplainFor] = useState<number | null>(null);
+  // The active view ('login' | 'adopt' | 'inventory' | 'all') is chosen by the
+  // parent ConnectionsTab's single tab bar and passed in — one tab row, not
+  // tabs-under-tabs. Clear the selection when the view changes.
+  useEffect(() => { setSelected(new Set()); }, [seg, bulkMethod]);
   const creds = useQuery({ queryKey: ['disc-creds'], queryFn: async () => (await discoveryApi.listCredentials()).data.credentials as any[] });
   const hostCreds = (creds.data ?? []).filter((c: any) => c.kind === 'winrm' || c.kind === 'ssh');
   const q = useQuery({
@@ -1910,22 +2048,22 @@ function DiscoveredQueue() {
   const isIdentified = (d: any) => !attemptOf(d) && (!!d.device_type || !!d.os_guess || !!d.host_name);
   const cConnectable = devices.filter((d) => nonTerminal(d) && connOf(d)).length;   // WinRM/SSH confirmed open
   const cAttempt = devices.filter((d) => nonTerminal(d) && attemptOf(d)).length;    // Windows/Linux we can try
+  const cAttemptOnly = devices.filter((d) => nonTerminal(d) && attemptOf(d) && !connOf(d)).length; // tryable, login port NOT confirmed open
   const cIdentified = devices.filter((d) => nonTerminal(d) && isIdentified(d)).length;
   const cSilent = devices.filter((d) => nonTerminal(d) && !attemptOf(d) && !isIdentified(d)).length;
   const cInv = devices.filter((d) => d.in_inventory).length;
   const cReview = devices.filter((d) => !d.in_inventory && d.resolution === 'review').length;
+  const cAdopt = devices.filter((d) => nonTerminal(d) && !attemptOf(d)).length;   // no login service → adopt only
   const pending = cAttempt;   // Connect-all now acts on every attemptable host
-  // Land on the latest run by default (matches Scan history) instead of the
-  // all-runs union, which mixes older scans and confuses the count.
-  useEffect(() => {
-    if (!didInit.current && runFilter === undefined && q.data?.latest_run_id) {
-      didInit.current = true;
-      setRunFilter(q.data.latest_run_id);
-    }
-  }, [q.data, runFilter]);
+  // Default to ALL runs (the cumulative backlog), NOT the latest run: a partial
+  // re-run or an in-progress scan would otherwise hide every previously-found
+  // device (the queue read "1 device" / "Nothing discovered yet" mid-scan). The
+  // MAC-first dedup keeps the union to one row per device, so it doesn't mix or
+  // double-count. Operators can still pick a single run from the dropdown.
   const toggleSel = (id: number) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const runConnect = useMutation({
-    mutationFn: (v: { ids: number[]; credIds: number[] }) => discoveryApi.connectSelected(v.ids, v.credIds.length ? v.credIds : null),
+    mutationFn: (v: { ids: number[]; credIds: number[]; method?: 'auto' | 'host' | 'wmi' | 'snmp'; community?: string }) =>
+      discoveryApi.connectSelected(v.ids, v.credIds.length ? v.credIds : null, { method: v.method, community: v.community }),
     onSuccess: () => { setSelected(new Set()); setConnecting(true); setTimeout(() => setConnecting(false), 90000); },
   });
   // A device we can't log into is NOT abandoned: Adopt brings it in as an
@@ -1936,6 +2074,12 @@ function DiscoveredQueue() {
       // No bulk endpoint yet — resolve each observation as 'adopt' in parallel.
       await Promise.all(ids.map((id) => discoveryApi.resolve(id, 'adopt')));
     },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); qc.invalidateQueries({ queryKey: ['disc-inbox'] }); },
+  });
+  // Dismiss a row (resolve 'ignore') — removes stale/ghost devices (e.g. a
+  // machine that moved IP and lingers via a stale ARP entry) from the queue.
+  const runDismiss = useMutation({
+    mutationFn: (id: number) => discoveryApi.resolve(id, 'ignore'),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); qc.invalidateQueries({ queryKey: ['disc-inbox'] }); },
   });
   useEffect(() => { if (connecting && pending === 0) setConnecting(false); }, [connecting, pending]);
@@ -1953,11 +2097,18 @@ function DiscoveredQueue() {
 
   const qStatus = (d: any) => d.in_inventory ? 'inventory'
     : d.resolution === 'review' ? 'review'
-    : attemptOf(d) ? 'connectable'   // Windows/Linux — selectable to try (WinRM confirmed OR off)
+    : connOf(d) ? 'ready'            // WinRM/SSH login port CONFIRMED open at last scan
+    : attemptOf(d) ? 'attempt'       // Windows/Linux/service — selectable to try, port NOT confirmed
     : isIdentified(d) ? 'identified'
     : 'silent';
   const types = Array.from(new Set(devices.map(discType))).sort();
+  // Segment = the primary split into separate views.
+  const segMatch = (d: any) => seg === 'all' ? true
+    : seg === 'inventory' ? d.in_inventory
+    : seg === 'adopt' ? (nonTerminal(d) && !attemptOf(d))
+    : (nonTerminal(d) && attemptOf(d));   // 'login'
   const shown = devices.filter((d) => {
+    if (!segMatch(d)) return false;
     if (fstatus && qStatus(d) !== fstatus) return false;
     if (ftype && discType(d) !== ftype) return false;
     if (search.trim()) {
@@ -1966,46 +2117,81 @@ function DiscoveredQueue() {
     }
     return true;
   });
-  const selectableIds: number[] = shown.filter((d) => !d.connected && !d.in_inventory && !d.stale && d.resolution !== 'review' && d.observation_id && attemptOf(d)).map((d) => d.observation_id);
+  // NOTE: stale (last seen in an older scan) only DIMS the row — it must NOT block
+  // selection. The queue now defaults to the full backlog (all runs), so most rows
+  // are "stale" relative to the newest run; excluding them left nothing selectable.
+  // Which devices the bulk Connect can target depends on the chosen METHOD:
+  //  host → attemptable hosts (WinRM/SSH/typed service); wmi → Windows only;
+  //  snmp → any device with an IP (SNMP needs no host login — that's the point,
+  //  it's for the no-login network gear). So the checkboxes light up accordingly.
+  const bulkSelectable = (d: any) => !d.connected && !d.in_inventory && d.resolution !== 'review' && !!d.observation_id && (
+    bulkMethod === 'auto' ? ((d.login_methods || []).length > 0)
+      : bulkMethod === 'snmp' ? !!d.ip_address
+      : bulkMethod === 'wmi' ? d.transport === 'windows'
+      : attemptOf(d));
+  const selectableIds: number[] = shown.filter(bulkSelectable).map((d) => d.observation_id);
   // Non-host devices (phones/printers/silent) that can only be brought in via Adopt.
-  const adoptableIds: number[] = shown.filter((d) => nonTerminal(d) && !attemptOf(d) && !d.stale && d.observation_id).map((d) => d.observation_id);
+  const adoptableIds: number[] = shown.filter((d) => nonTerminal(d) && !attemptOf(d) && d.observation_id).map((d) => d.observation_id);
   const allChecked = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
   const targetIds = selected.size > 0 ? Array.from(selected) : selectableIds;
   const connectLabel = selected.size > 0 ? `Connect ${selected.size} selected` : `Connect all (${selectableIds.length})`;
+  // The device the popup explainer is open for (from the full list, so it
+  // survives filter/segment changes while the modal is up).
+  const explainDev = explainFor != null ? devices.find((d: any) => d.observation_id === explainFor && !d.in_inventory) : null;
+  const connectDev = openFor != null ? devices.find((d: any) => d.observation_id === openFor && !d.in_inventory) : null;
 
   return (
     <section className="panel">
+      {/* One compact bar: filters (search / run / type) on the left, actions
+          (fill names / logins / connect) pushed to the right. The counts already
+          live in the tab ("Can log in N") and the table footer, so no separate
+          info line. */}
       <div className="toolbar">
         <input className="input" placeholder="Search device, IP or hostname" value={search} onChange={(e) => setSearch(e.target.value)} />
         {runs.length > 1 && (
           <select className="select" value={runFilter != null ? String(runFilter) : ''} onChange={(e) => setRunFilter(e.target.value ? Number(e.target.value) : undefined)}>
-            <option value="">All runs · {devices.length} in queue</option>
+            <option value="">All runs · {devices.length}</option>
             {runs.map((r) => <option key={r.run_id} value={String(r.run_id)}>{(r.is_latest ? 'Latest · ' : '') + 'Run #' + r.run_id}</option>)}
           </select>
         )}
         <select className="select" value={ftype} onChange={(e) => setFtype(e.target.value)}>
-          <option value="">All device types</option>
+          <option value="">All types</option>
           {types.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <select className="select" value={fstatus} onChange={(e) => setFstatus(e.target.value)}>
-          <option value="">Any status</option>
-          <option value="connectable">Ready for login ({cAttempt})</option>
-          <option value="identified">No login service ({cIdentified})</option>
-          <option value="silent">Silent · IP only ({cSilent})</option>
-          <option value="inventory">In inventory ({cInv})</option>
-          <option value="review">Needs review ({cReview})</option>
-        </select>
-        {(ftype || fstatus || search) && <button className="btn btn-secondary" onClick={() => { setFtype(''); setFstatus(''); setSearch(''); }}>Clear</button>}
+        {(ftype || search) && <button className="btn btn-secondary" onClick={() => { setFtype(''); setSearch(''); }}>Clear</button>}
         <span className="push" />
         {namelessCount > 0 && <button className="btn btn-secondary" onClick={() => setDhcpOpen(true)} title="Pull real device names from your DHCP server lease table">Fill names <span className="count">{namelessCount}</span></button>}
         {adoptableIds.length > 0 && (
           <button className="btn btn-secondary" disabled={runAdopt.isPending}
             onClick={() => { if (window.confirm(`Adopt ${adoptableIds.length} device${adoptableIds.length === 1 ? '' : 's'} as unmanaged, evidence-only assets?`)) runAdopt.mutate(adoptableIds); }}>
-            {runAdopt.isPending ? 'Adopting…' : `Adopt eligible · ${adoptableIds.length}`}
+            {runAdopt.isPending ? 'Adopting…' : `Adopt ${adoptableIds.length}`}
           </button>
         )}
-        <button className="btn btn-primary" disabled={connecting || runConnect.isPending || targetIds.length === 0}
-          onClick={() => runConnect.mutate({ ids: targetIds, credIds: Array.from(selectedCreds) })}>
+        {/* Bulk method: WinRM/SSH host login (default), WMI (Windows·DCOM, reuses
+            the WinRM login), or SNMP (community string). SNMP swaps the login
+            picker for a community field. */}
+        <CsDropdown minWidth={148} value={bulkMethod} onChange={(v) => setBulkMethod(v as any)}
+          options={[
+            { value: 'auto', label: 'Auto · use what each device answers on' },
+            { value: 'host', label: 'Host · WinRM/SSH' },
+            { value: 'wmi', label: 'WMI · Windows' },
+            { value: 'snmp', label: 'SNMP · 161' },
+          ]} />
+        {bulkMethod === 'snmp'
+          ? <input className="input" style={{ flex: 'none', minWidth: 140, maxWidth: 190 }} placeholder="Community (e.g. public)" value={bulkCommunity} onChange={(e) => setBulkCommunity(e.target.value)} />
+          : hostCreds.length > 0 && (
+            <CsLoginPicker
+              options={hostCreds.map((c: any) => ({ id: c.id, name: c.name, kind: c.kind }))}
+              selected={selectedCreds}
+              onToggle={toggleCred}
+              onToggleAll={(checked) => setSelectedCreds(checked ? new Set<number>(hostCreds.map((c: any) => c.id as number)) : new Set())}
+              minWidth={150}
+            />
+          )}
+        <button className="btn btn-primary"
+          disabled={connecting || runConnect.isPending || targetIds.length === 0 || (bulkMethod === 'snmp' && !bulkCommunity.trim())}
+          title={bulkMethod === 'wmi' ? 'WMI needs impacket on the server + TCP 135 reachable' : bulkMethod === 'snmp' ? 'Reads devices over SNMP UDP/161 with the community string' : undefined}
+          onClick={() => runConnect.mutate({ ids: targetIds, credIds: Array.from(selectedCreds), method: bulkMethod, community: bulkCommunity })}>
           {connecting || runConnect.isPending ? 'Connecting…' : connectLabel}
         </button>
       </div>
@@ -2021,36 +2207,82 @@ function DiscoveredQueue() {
           <table className="data-table">
             <thead><tr>
               <th style={{ width: 34 }}><input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(selectableIds))} /></th>
-              <th>Device</th><th>IP</th><th>Type</th><th>Discovered by</th><th>Last seen</th><th>Status</th><th></th>
+              <th>Device</th><th>IP</th><th title="Hardware address — the one identifier that does not change when the IP or name changes. Ava recognises an existing asset by this.">MAC</th><th>Type</th><th title="Which login doors answered at the last scan — checked automatically for every device">Login methods</th><th>Discovered by</th><th>Last seen</th><th>Status</th><th></th>
             </tr></thead>
             <tbody>
               {shown.map((d) => {
                 const st2 = qStatus(d);
-                const pillCls = st2 === 'inventory' ? 'pill-green' : st2 === 'connectable' ? 'pill-blue' : st2 === 'review' ? 'pill-amber' : 'pill-gray';
-                const pillTxt = st2 === 'inventory' ? 'In inventory' : st2 === 'connectable' ? 'Ready for login' : st2 === 'review' ? 'Needs review' : st2 === 'silent' ? 'Silent · IP only' : 'No login service';
-                const canSel = !d.connected && !d.in_inventory && !d.stale && d.resolution !== 'review' && d.observation_id && attemptOf(d);
+                const pillCls = st2 === 'inventory' ? 'pill-green' : st2 === 'ready' ? 'pill-blue' : (st2 === 'review' || st2 === 'attempt') ? 'pill-amber' : 'pill-gray';
+                const pillTxt = st2 === 'inventory' ? (d.identity_match ? 'Already an asset' : 'In inventory') : st2 === 'ready' ? 'Ready for login' : st2 === 'attempt' ? 'Login not confirmed' : st2 === 'review' ? 'Needs review' : st2 === 'silent' ? 'Silent · IP only' : 'No login service';
+                const pillTip = st2 === 'inventory' && d.identity_match ? `This is a machine you already have in inventory (asset #${d.asset_id}) — recognised by its ${d.identity_match === 'mac' ? 'MAC address, which does not change when the IP or name changes' : d.identity_match === 'ip' ? 'known IP' : 'hostname'}. Adopting it again will not create a duplicate.`
+                  : st2 === 'ready' ? 'A login door (WinRM, SSH, WMI or SNMP) was confirmed open at the last scan.'
+                  : st2 === 'attempt' ? 'This looks like a Windows/Linux host, but its login port (WinRM/SSH) was NOT seen open at the last scan. You can still try a saved login — it fast-fails as "unreachable" if the port is closed (never a bad-password lockout). If it keeps failing, enable remote management on that host, then re-scan.'
+                  : undefined;
+                const canSel = bulkSelectable(d);
                 const canConnect = attemptOf(d);
                 const ty = (discType(d) || '').toLowerCase();
                 const icon = ty.includes('camera') ? '◉' : ty.includes('dns') ? '⌘' : ty.includes('printer') ? '⎙' : (ty.includes('phone') || ty.includes('voip')) ? '☎' : (ty.includes('host') || ty.includes('linux') || ty.includes('server') || ty.includes('windows')) ? '▣' : '▢';
                 return (
                   <Fragment key={d.observation_id ?? d.asset_id}>
-                    <tr className="clickable" style={d.stale ? { opacity: .55 } : undefined}>
+                    <tr className="clickable" title={d.stale ? `Last seen in run #${d.last_seen_run_id ?? '?'} — it wasn't in your most recent scan, so it may be offline now. Still fully usable.` : undefined}>
                       <td><input type="checkbox" disabled={!canSel} checked={selected.has(d.observation_id)} onChange={() => toggleSel(d.observation_id)} /></td>
                       <td><div className="device-cell"><div className="device-icon">{icon}</div><div><b>{d.host_name || d.name || d.ip_address || '—'}</b><span className="sub">{d.os_guess ? _cap(d.os_guess) : (d.vendor || (d.host_name ? '' : 'Name not confirmed'))}</span></div></div></td>
                       <td className="mono">{d.ip_address || '—'}</td>
+                      <td className="mono" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '-.01em' }} title={d.mac_address || ''}>{d.mac_address || '—'}</td>
                       <td>{discType(d)}</td>
-                      <td>{d.source || (d.transport ? _cap(d.transport) : '—')}</td>
-                      <td>{fmt(d.last_seen || d.first_seen)}{d.run_id ? <span className="sub mono">run #{d.run_id}</span> : null}</td>
-                      <td><span className={'pill ' + pillCls}>{pillTxt}</span></td>
+                      <td>
+                        {(() => {
+                          // The three ways the operator can log in, each probed by the
+                          // sweep itself — shown per device so "WinRM off, but WMI/SNMP
+                          // works" is visible at a glance, no method-picking needed.
+                          const lm: string[] = d.login_methods || [];
+                          const CHIP: Array<[string, string]> = [['winrm', 'WinRM'], ['wmi', 'WMI'], ['snmp', 'SNMP']];
+                          return (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {CHIP.map(([k, lbl]) => {
+                                const on = lm.includes(k);
+                                return (
+                                  <span key={k} title={on ? `${lbl} answered at the last scan — a login can go in this way.` : `${lbl} did not answer at the last scan.`}
+                                    style={{ font: '600 10px inherit', letterSpacing: '.02em', padding: '2px 7px', borderRadius: 99,
+                                      color: on ? 'var(--green, #1d8a5f)' : 'var(--faint, #9aa5a0)',
+                                      background: on ? 'rgba(29,138,95,.13)' : 'rgba(140,150,145,.10)' }}>
+                                    {on ? '✓' : '✗'} {lbl}
+                                  </span>
+                                );
+                              })}
+                              {lm.includes('ssh') && (
+                                <span title="SSH answered at the last scan." style={{ font: '600 10px inherit', letterSpacing: '.02em', padding: '2px 7px', borderRadius: 99, color: 'var(--green, #1d8a5f)', background: 'rgba(29,138,95,.13)' }}>✓ SSH</span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td>{(Array.isArray(d.discovery_sources) && d.discovery_sources.length) ? d.discovery_sources.join(' + ') : (d.transport ? _cap(d.transport) : '—')}</td>
+                      <td>{fmt(d.last_seen_at)}{d.last_seen_run_id ? <span className="sub mono">run #{d.last_seen_run_id}</span> : null}</td>
+                      <td>
+                        <span className={'pill ' + pillCls} title={pillTip}>{pillTxt}</span>
+                        {!d.in_inventory && (
+                          <button onClick={() => setExplainFor(d.observation_id)}
+                            title="Explain why this device is in this state and what to do"
+                            style={{ display: 'block', marginTop: 3, background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: '600 11px inherit', color: 'var(--mint2, #1e9e8a)' }}>
+                            {canConnect ? 'Why?' : 'Why only adopt?'}
+                          </button>
+                        )}
+                      </td>
                       <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {d.in_inventory ? <span style={{ fontSize: 11, color: 'var(--faint)' }}>Asset #{d.asset_id}</span>
-                          : canConnect ? <button className="btn btn-sm btn-primary" onClick={() => setOpenFor(openFor === d.observation_id ? null : d.observation_id)}>Connect</button>
-                          : <button className="btn btn-sm btn-secondary" disabled={runAdopt.isPending} onClick={() => runAdopt.mutate([d.observation_id])}>Adopt</button>}
+                          : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                            {canConnect ? <button className="btn btn-sm btn-primary" onClick={() => setOpenFor(openFor === d.observation_id ? null : d.observation_id)}>Connect</button>
+                              : <button className="btn btn-sm btn-secondary" disabled={runAdopt.isPending} onClick={() => runAdopt.mutate([d.observation_id])}>Adopt</button>}
+                            <button onClick={() => { if (window.confirm(`Dismiss ${d.host_name || d.ip_address}? It leaves the queue (marked ignored). A future scan that truly sees it can bring it back.`)) runDismiss.mutate(d.observation_id); }}
+                              disabled={runDismiss.isPending}
+                              title="Remove this row from the queue — use for ghosts (e.g. a device that moved IP and lingers via a stale ARP entry)"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: '600 11px inherit', color: 'var(--faint)' }}>Dismiss</button>
+                          </span>
+                        )}
                       </td>
                     </tr>
-                    {openFor === d.observation_id && (
-                      <tr className="row-detail"><td colSpan={8} style={{ padding: 0 }}><ConnectDeviceForm device={d} onDone={() => { setOpenFor(null); qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); }} /></td></tr>
-                    )}
                   </Fragment>
                 );
               })}
@@ -2069,6 +2301,8 @@ function DiscoveredQueue() {
           error={(runDhcp.error as any)?.response?.data?.detail || (runDhcp.isError ? 'Enrichment failed — check the router IP, source type and credential.' : null)}
           onClose={() => setDhcpOpen(false)} onRun={(v: any) => runDhcp.mutate(v)} />
       )}
+      {explainDev && <DeviceExplainerModal device={explainDev} onClose={() => setExplainFor(null)} />}
+      {connectDev && <ConnectDeviceModal device={connectDev} onClose={() => setOpenFor(null)} onDone={() => { setOpenFor(null); qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); }} />}
     </section>
   );
 }
@@ -2079,6 +2313,12 @@ function DhcpEnrichModal({ creds, nameless, pending, error, onClose, onRun }: an
   const [ip, setIp] = useState('');
   const [srcType, setSrcType] = useState<'mikrotik' | 'dnsmasq' | 'isc' | 'windows'>('mikrotik');
   const [credId, setCredId] = useState<number | ''>('');
+  const [whyOpen, setWhyOpen] = useState(false);
+  const nq = useQuery({
+    queryKey: ['disc-explain-nameless', nameless],
+    queryFn: async () => (await discoveryApi.explainNameless(nameless)).data,
+    enabled: whyOpen, staleTime: 60_000,
+  });
   const label: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: C.muted2, display: 'block', marginBottom: 5 };
   const input: React.CSSProperties = { width: '100%', border: `1px solid ${C.bInput}`, background: '#fff', color: C.ink, font: `500 13.5px ${FONT}`, padding: '10px 13px', borderRadius: 10, outline: 'none' };
   return (
@@ -2089,6 +2329,23 @@ function DhcpEnrichModal({ creds, nameless, pending, error, onClose, onRun }: an
           <div style={{ font: `400 12.5px ${FONT}`, color: C.faint, marginTop: 3, lineHeight: 1.5 }}>
             {nameless} device{nameless === 1 ? '' : 's'} answered no name probe. Your DHCP server (router) knows their names from the lease table — read it with a saved login.
           </div>
+          <button onClick={() => setWhyOpen((v) => !v)} style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: `600 11.5px ${FONT}`, color: C.link }}>
+            {whyOpen ? 'Hide' : 'Why are they nameless?'} {whyOpen ? '▴' : '▾'}
+          </button>
+          {whyOpen && (
+            <div style={{ marginTop: 8, padding: '10px 12px', background: C.fillNeutral, borderRadius: 10, border: `1px solid ${C.bLine}` }}>
+              {nq.isLoading ? <div style={{ font: `500 12px ${FONT}`, color: C.muted }}>Explaining…</div>
+                : nq.data ? (
+                  <>
+                    <div style={{ font: `600 12.5px ${FONT}`, color: C.ink, marginBottom: 4 }}>{(nq.data as any).headline}</div>
+                    <div style={{ font: `400 12px ${FONT}`, color: C.muted2, lineHeight: 1.5, marginBottom: 6 }}>{(nq.data as any).why}</div>
+                    <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {((nq.data as any).steps || []).map((s: string, i: number) => <li key={i} style={{ font: `400 12px ${FONT}`, color: C.ink, lineHeight: 1.45 }} dangerouslySetInnerHTML={{ __html: fmtStep(s) }} />)}
+                    </ol>
+                  </>
+                ) : <div style={{ font: `500 12px ${FONT}`, color: C.muted }}>Couldn’t load an explanation.</div>}
+            </div>
+          )}
         </div>
         <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div><label style={label}>DHCP server IP (your router)</label><input style={input} value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.11.10.1" /></div>
@@ -2231,27 +2488,34 @@ function DiscoveryTab({ go }: { go: (t: string) => void }) {
 
 function ConnectionsTab() {
   const [showAdd, setShowAdd] = useState(false);
-  const [connectView, setConnectView] = useState<'devices' | 'logins'>('devices');
+  // ONE tab row: the device views (login / adopt / inventory / all) and saved
+  // logins live together, so there's no tabs-under-tabs and no duplicate button.
+  const [view, setView] = useState<'login' | 'adopt' | 'inventory' | 'all' | 'logins'>('login');
   const devQ = useQuery({ queryKey: ['disc-discovered-devices', 'all'], queryFn: async () => (await discoveryApi.discoveredDevices()).data as any });
   const credQ = useQuery({ queryKey: ['disc-creds'], queryFn: async () => (await discoveryApi.listCredentials()).data.credentials as any[] });
-  const readyCount = (devQ.data?.devices ?? []).filter((d: any) => !d.asset_id).length;
+  const devices = (devQ.data?.devices ?? []) as any[];
+  const _att = (d: any) => d.transport === 'windows' || d.transport === 'linux' || (d.service_suggestions || []).length > 0;
+  const _nt = (d: any) => !d.in_inventory && d.resolution !== 'review';
+  const cLogin = devices.filter((d) => _nt(d) && _att(d)).length;
+  const cAdopt = devices.filter((d) => _nt(d) && !_att(d)).length;
+  const cInv = devices.filter((d) => d.in_inventory).length;
   const savedCount = (credQ.data ?? []).length;
   return (
     <div className="disc-cc">
       <div className="page-line">
-        <div><h2>Connect discovered devices</h2><p>Use an encrypted reusable login for hosts, or adopt non-login devices with discovery evidence.</p></div>
+        <div><h2>Connect discovered devices</h2></div>
         <div className="actions">
-          <button className="btn btn-secondary" onClick={() => setConnectView('logins')}>Saved logins <span className="count">{savedCount}</span></button>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>＋ Add connection</button>
         </div>
       </div>
-      <div className="notice"><div>i</div><div><b>Automatic login matching is safe and predictable.</b><p>When no login is manually selected, the best subnet-matching login is chosen by priority. Non-host devices never receive a password attempt.</p></div></div>
       <nav className="tabs" style={{ marginBottom: 16 }}>
-        <a className={connectView === 'devices' ? 'active' : ''} onClick={() => setConnectView('devices')}>Ready to connect <span className="count">{readyCount}</span></a>
-        <a className={connectView === 'logins' ? 'active' : ''} onClick={() => setConnectView('logins')}>Saved logins <span className="count">{savedCount}</span></a>
+        <a className={view === 'login' ? 'active' : ''} onClick={() => setView('login')}>Can log in <span className="count">{cLogin}</span></a>
+        <a className={view === 'adopt' ? 'active' : ''} onClick={() => setView('adopt')}>Adopt-only <span className="count">{cAdopt}</span></a>
+        <a className={view === 'inventory' ? 'active' : ''} onClick={() => setView('inventory')}>In inventory <span className="count">{cInv}</span></a>
+        <a className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>All</a>
+        <a className={view === 'logins' ? 'active' : ''} onClick={() => setView('logins')}>Saved logins <span className="count">{savedCount}</span></a>
       </nav>
-      {connectView === 'devices' && <DiscoveredQueue />}
-      {connectView === 'logins' && <Credentials />}
+      {view === 'logins' ? <Credentials /> : <DiscoveredQueue seg={view} />}
       {showAdd && <AddConnectionModal onClose={() => setShowAdd(false)} />}
     </div>
   );

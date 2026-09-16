@@ -77,6 +77,8 @@ logger = logging.getLogger(__name__)
 # a phone on 5060. This is what turns "Unknown / no ports" into a real type.
 NETWORK_SWEEP_PORTS: tuple = (
     445, 22, 3389, 5985, 5986,      # host login: SMB / SSH / RDP / WinRM
+    135,                            # host login: WMI/DCOM endpoint mapper — without it a
+                                    # WMI-only Windows box can never read as reachable
     80, 443, 8080, 8443,            # web management consoles
     9100, 515, 631,                 # printer: JetDirect / LPD / IPP
     554,                            # IP camera: RTSP
@@ -415,6 +417,12 @@ def _run_job(
                 # honest "discovered, identity unknown" asset — evidence is ARP +
                 # MAC only. Do NOT infer WHY it is silent (firewall, isolation,
                 # sleep, UDP-only…). Record it so it is visible in discovery.
+                # ponytail: the OS ARP cache can hold STALE entries for minutes
+                # after a host goes offline, so an arp_only finding can be a false
+                # positive (a down host still cached). It lands as weak `pending`
+                # evidence (never an auto-created asset) and ages out on the next
+                # run that no longer sees it. Upgrade path: gate on a fresh ARP
+                # reachability flag / active liveness touch before recording.
                 fp = {"udp_services": []}
                 fp.update(_classify_fp([], fp))  # device_type='unknown'
                 findings.append({"ip": ip, "hostname": None, "open_ports": [],

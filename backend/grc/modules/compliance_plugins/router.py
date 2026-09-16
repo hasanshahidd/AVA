@@ -633,16 +633,16 @@ def _classify_asset_os(
     # 2/3. Match by host_name → connection(s). Prefer a runner that matches
     # the asset's software signal when several connections share a host
     # (WinRM + postgres_sql on the same box is the common case).
-    host = (asset.host_name or "").lower().strip()
-    if host:
+    if (asset.host_name or "").strip() or (getattr(asset, "ip_address", None) or "").strip():
+        from .services.connection_matcher import candidates_for_asset
         preferred = _classify_from_software_key(asset)
-        all_conns = (connections_by_host_all or {}).get(host) or []
+        all_conns = candidates_for_asset(asset, connections_by_host_all or {})
         if preferred and all_conns:
             for conn in all_conns:
                 mapped = _RUNNER_TYPE_TO_OS.get(conn.integration_type)
                 if mapped == preferred:
                     return mapped
-        conn = connections_by_host.get(host)
+        conn = all_conns[0] if all_conns else None
         if conn and conn.integration_type in _RUNNER_TYPE_TO_OS:
             return _RUNNER_TYPE_TO_OS[conn.integration_type]
 
@@ -691,15 +691,14 @@ def assets_overview(
         .filter(IntegrationConnection.tenant_id == tenant_id)
         .all()
     )
-    connections_by_host: dict[str, IntegrationConnection] = {}
-    connections_by_host_all: dict[str, list] = {}
-    for c in connections:
-        h = (c.console_url or "").lower().strip()
-        if not h:
-            continue
-        connections_by_host_all.setdefault(h, []).append(c)
-        if h not in connections_by_host:
-            connections_by_host[h] = c
+    # Robust multi-key index (hostname + IP + FQDN-short-name), so an asset
+    # matches its connection even when discovery gave an FQDN, an IP, or a
+    # short name rather than the exact console_url string. `connections_by_host`
+    # (first-per-key) is kept for backward-compat with sites that still do a
+    # plain lookup; new matching goes through candidates_for_asset().
+    from .services.connection_matcher import build_index, candidates_for_asset
+    connections_by_host_all = build_index(connections)
+    connections_by_host = {k: v[0] for k, v in connections_by_host_all.items()}
 
     # Approved rule total — the per-asset pass-rate denominator
     total_rules = (
@@ -802,8 +801,7 @@ def assets_overview(
         # runner that matches the asset's software signal when the host has
         # multiple credentials (e.g. WinRM + postgres_sql). Never invent a
         # connection for a different host.
-        host_lc = (a.host_name or "").lower().strip()
-        host_conns = connections_by_host_all.get(host_lc, []) if host_lc else []
+        host_conns = candidates_for_asset(a, connections_by_host_all)
         matched_conn = None
         if host_conns:
             want_family = os_family if _is_application_asset(a) else None
@@ -813,7 +811,7 @@ def assets_overview(
                         matched_conn = c
                         break
             if matched_conn is None:
-                matched_conn = connections_by_host.get(host_lc)
+                matched_conn = host_conns[0]
 
         groups.setdefault(os_family, []).append({
             "id": a.id,
@@ -970,12 +968,9 @@ def per_asset_coverage(
         .filter(IntegrationConnection.tenant_id == tenant_id)
         .all()
     )
-    conns_by_host: dict[str, IntegrationConnection] = {}
-    for c in connections:
-        h = (c.console_url or "").lower().strip()
-        if h and h not in conns_by_host:
-            conns_by_host[h] = c
-    os_family = _classify_asset_os(asset, conns_by_host)
+    from .services.connection_matcher import build_index
+    conns_index = build_index(connections)
+    os_family = _classify_asset_os(asset, {}, conns_index)
 
     return {
         "asset": {
@@ -1209,11 +1204,12 @@ def re_detect_asset_os(
     # Postgres asset, etc.). Prefer the connection whose integration_type
     # matches the asset's vendor / os_normalized profile, then fall back
     # to most recent.
-    candidates = db.query(IntegrationConnection).filter(
+    from .services.connection_matcher import build_index, candidates_for_asset
+    _active_conns = db.query(IntegrationConnection).filter(
         IntegrationConnection.tenant_id == tenant_id,
         IntegrationConnection.is_active.is_(True),
-        func.lower(IntegrationConnection.console_url) == asset.host_name.lower().strip(),
     ).order_by(IntegrationConnection.id.desc()).all()
+    candidates = candidates_for_asset(asset, build_index(_active_conns))
     if not candidates:
         raise HTTPException(
             400,
@@ -3445,16 +3441,17 @@ def scan_all(
             # _do_scan_all; this preflight just gives the operator a fast
             # 400 before we spawn the background thread.
             _has_own_connection = False
-            if _preflight_asset.host_name:
-                _host_lc = _preflight_asset.host_name.lower().strip()
-                _conn = (
+            if _preflight_asset.host_name or _preflight_asset.ip_address:
+                from .services.connection_matcher import build_index, candidates_for_asset
+                _pf_active = (
                     db.query(IntegrationConnection)
                     .filter(IntegrationConnection.tenant_id == tenant_id,
-                            IntegrationConnection.is_active.is_(True),
-                            func.lower(IntegrationConnection.console_url) == _host_lc)
-                    .first()
+                            IntegrationConnection.is_active.is_(True))
+                    .all()
                 )
-                _has_own_connection = _conn is not None
+                # Consistent with the robust binding in _do_scan_all (host→IP→
+                # short-name), so preflight never 400s an asset that would bind.
+                _has_own_connection = bool(candidates_for_asset(_preflight_asset, build_index(_pf_active)))
             _has_ip_group_connection = False
             if not _has_own_connection and _preflight_asset.ip_address:
                 _peer_with_conn = db.execute(text("""
@@ -3658,19 +3655,18 @@ def _do_scan_all(
     # results as DC-01's. Now we require a real connection for the
     # asset; otherwise 400 with a clear error.
     asset_pinned_connection: Optional[IntegrationConnection] = None
-    if asset is not None and asset.host_name:
-        host_lc = asset.host_name.lower().strip()
-        asset_pinned_connection = (
+    if asset is not None and (asset.host_name or asset.ip_address):
+        from .services.connection_matcher import build_index, candidates_for_asset
+        _active = (
             db.query(IntegrationConnection)
             .filter(IntegrationConnection.tenant_id == tenant_id,
                     IntegrationConnection.is_active.is_(True))
             .all()
         )
-        asset_pinned_connection = next(
-            (c for c in asset_pinned_connection
-             if (c.console_url or "").lower().strip() == host_lc),
-            None,
-        )
+        # Robust match: exact hostname → IP → FQDN-short-name (still exact per
+        # key, never fuzzy) so a discovered asset binds to its real connection.
+        _cands = candidates_for_asset(asset, build_index(_active))
+        asset_pinned_connection = _cands[0] if _cands else None
     # Room-scan IP-group fallback: when the opened asset has no integration
     # of its own (typical for application peers like Oracle DB / SQL Server
     # which aren't directly connectable), look for an active connection

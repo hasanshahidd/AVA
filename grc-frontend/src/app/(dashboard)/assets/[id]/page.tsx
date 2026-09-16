@@ -412,11 +412,18 @@ export default function AssetDetailPage() {
   const { data: allControls, isLoading: controlsLoading } = useQuery({
     queryKey: ['asset-internal-controls'],
     queryFn: async () => {
-      const response = await ermApi.internalControls.getAll();
-      return response.data as Array<{ id: number; control_id?: string; name: string; category?: string }>;
+      try {
+        const response = await ermApi.internalControls.getAll();
+        return response.data as Array<{ id: number; control_id?: string; name: string; category?: string }>;
+      } catch {
+        // Ava's ERM control library isn't wired yet (this endpoint 404s) — degrade
+        // to an empty list so the Risks tab renders cleanly instead of erroring.
+        return [] as Array<{ id: number; control_id?: string; name: string; category?: string }>;
+      }
     },
     // Controls now render inside the merged "Risk & Controls" tab.
     enabled: activeTab === 'risks',
+    retry: false,   // the 404 is expected until the control library ships; don't retry-spam
   });
 
   const { data: allEvidence, isLoading: evidenceLoading } = useQuery({

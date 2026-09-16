@@ -56,6 +56,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },
   '/integrations/connections': { title: 'Scanner Connections', subtitle: 'Manage vulnerability scanner connections and sync schedules.' },
   '/integrations/exceptions': { title: 'Integration Exceptions', subtitle: 'Review and manage integration exceptions.' },
+  '/scan-flows/hosted': { title: 'Scan', subtitle: 'Ava drives your Nessus against IT inventory assets' },
   '/tasks': { title: 'Task Board' },
   '/reports': { title: 'Reports', subtitle: 'Explore datasets, build and share reports' },
   '/reports/saved': { title: 'Saved Reports', subtitle: 'Manage, share and organize your report library' },

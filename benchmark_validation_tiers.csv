@@ -1,0 +1,124 @@
+﻿tier,benchmark,runner,scan_eligible_rules,basis
+VALIDATED,CIS_Microsoft_Windows_11_Enterprise_Benchmark_v5.0.1,windows_winrm,530,cross-verified vs live target 2026-09-14
+VALIDATED,CIS_Microsoft_Windows_11_Stand-alone_Benchmark_v5.0.0,windows_winrm,462,cross-verified vs live target 2026-09-14
+VALIDATED,CIS_Ubuntu_Linux_24.04_LTS_Benchmark_v1.0.0,oscap,408,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Debian_Linux_12_Benchmark_v1.1.0,oscap,403,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Ubuntu_Linux_22.04_LTS_Benchmark_v3.0.0,oscap,398,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Red_Hat_Enterprise_Linux_8_STIG_Benchmark_v2.0.0,oscap,392,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0,oscap,340,authoritative SSG/OpenSCAP
+VALIDATED,CIS_ALMALINUX_OS_8_v4.0.0,oscap,340,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Oracle_Linux_8_Benchmark_v4.0.0,oscap,340,authoritative SSG/OpenSCAP
+VALIDATED,CIS_ALMALINUX_OS_10_v1.0.0,oscap,323,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Red_Hat_Enterprise_Linux_10_Benchmark_v1.0.1,oscap,323,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Oracle_Linux_10_Benchmark_v1.0.0,oscap,323,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0,oscap,293,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Oracle_Linux_9_Benchmark_v2.0.0,oscap,293,authoritative SSG/OpenSCAP
+VALIDATED,CIS_AlmaLinux_OS_9_Benchmark_v2.0.0,oscap,288,authoritative SSG/OpenSCAP
+VALIDATED,CIS_Amazon_Linux_2023_Benchmark_v1.0.0,oscap,259,authoritative SSG/OpenSCAP
+VALIDATED,CIS_PostgreSQL_18_Benchmark_v1.0.0,postgres_sql,69,cross-verified vs live target 2026-09-14
+UNVERIFIED,CIS_Microsoft_Windows_10_EMS_Gateway_Benchmark_v3.0.0,windows_winrm,485,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_10_Enterprise_Benchmark_v4.0.0,windows_winrm,439,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2025_Benchmark_v2.0.0,windows_winrm,434,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2022_STIG_Benchmark_v2.0.0,windows_winrm,428,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2019_STIG_Benchmark_v3.0.0,windows_winrm,410,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2016_STIG_Benchmark_v3.0.0,windows_winrm,409,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2022_Benchmark_v5.0.0,windows_winrm,407,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_10_Stand-alone_Benchmark_v4.0.0,windows_winrm,403,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2019_Benchmark_v4.0.0,windows_winrm,392,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2016_Benchmark_v4.0.0,windows_winrm,380,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2019_Stand-alone_v3.0.0,windows_winrm,330,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2022_Stand-alone_Benchmark_v2.0.0,windows_winrm,321,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_DEBIAN_LINUX_11_STIG_v1.0.0,manual,320,manual — needs a live target to validate
+UNVERIFIED,CIS_DEBIAN_LINUX_13_v1.0.0,manual,270,manual — needs a live target to validate
+UNVERIFIED,CIS_DEBIAN_LINUX_11_v2.0.0,manual,251,manual — needs a live target to validate
+UNVERIFIED,CIS_AMAZON_LINUX_2_STIG_v2.0.1,manual,250,manual — needs a live target to validate
+UNVERIFIED,CIS_DEBIAN_LINUX_10_v2.0.0,manual,243,manual — needs a live target to validate
+UNVERIFIED,CIS_ALIBABA_CLOUD_LINUX_3_v2.0.0,manual,228,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Linux_7_Benchmark_v4.0.0_ARCHIVE,manual,214,manual — needs a live target to validate
+UNVERIFIED,CIS_AMAZON_LINUX_2_v4.0.0,manual,201,manual — needs a live target to validate
+UNVERIFIED,CIS_DEBIAN_LINUX_9_v1.0.1,manual,179,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_8.1_Workstation_Benchmark_v2.4.0_ARCHIVE,windows_winrm,170,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2012__non-R2__Benchmark_v3.0.0_ARCHIVE,windows_winrm,168,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_ALIYUN_LINUX_2_v1.0.0,manual,164,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2008_R2_Benchmark_v3.3.0_ARCHIVE,windows_winrm,163,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Linux_6_Benchmark_v2.0.0_ARCHIVE,manual,147,manual — needs a live target to validate
+UNVERIFIED,CIS_AMAZON_LINUX_v2.1.0,manual,143,manual — needs a live target to validate
+UNVERIFIED,CIS_Azure_Compute_Microsoft_Windows_Server_2022_Benchmark_v1.0.0-ARCHIVE,windows_winrm,135,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_IBM_AIX_7_v1.2.0,manual,133,manual — needs a live target to validate
+UNVERIFIED,CIS_Azure_Compute_Microsoft_Windows_Server_2019_Benchmark_v1.0.0.-ARCHIVE,windows_winrm,133,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_IBM_WebSphere_Liberty_Benchmark_v1.0.0,manual,104,manual — needs a live target to validate
+UNVERIFIED,CIS_FREEBSD_14_v1.0.1,manual,103,manual — needs a live target to validate
+UNVERIFIED,CIS_MICROSOFT_WINDOWS_SERVER_2012_R2_v2.5.0,windows_winrm,96,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Google_Container-Optimized_OS_Benchmark_v1.2.0,manual,92,manual — needs a live target to validate
+UNVERIFIED,CIS_AMAZON_LINUX_2014.09_v1.0.0,manual,92,manual — needs a live target to validate
+UNVERIFIED,CIS_AKS_Optimized_Azure_Linux_3_Benchmark_v1.0.0,manual,90,manual — needs a live target to validate
+UNVERIFIED,CIS_AKS_Optimized_Azure_Linux_2_Benchmark_v1.1.0,manual,84,manual — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_14_Benchmark_v1.3.0,postgres_sql,69,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_13_Benchmark_v1.3.0,postgres_sql,69,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_13.0_Ventura_Benchmark_v3.1.0,manual,69,manual — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_16_Benchmark_v1.1.0,postgres_sql,68,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_15_Benchmark_v1.2.0,postgres_sql,68,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_17_Benchmark_v1.0.0,postgres_sql,68,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_14.0_Sonoma_Benchmark_v3.0.0,windows_winrm,65,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_15.0_Sequoia_Benchmark_v2.0.0,windows_winrm,65,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_26_Tahoe_Benchmark_v1.0.0,windows_winrm,64,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Database_19c_Benchmark_v2.0.0,oracle_sql,60,oracle_sql — needs a live target to validate
+UNVERIFIED,CIS_Apache_HTTP_Server_2.4_Benchmark_V2.3.0,manual,59,manual — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_12.0_Monterey_Benchmark_v4.0.0,manual,58,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Windows_Server_2008_non-R2_Benchmark_v3.0.0,windows_winrm,58,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_APACHE_HTTP_SERVER_2.2_v3.6.0,manual,54,manual — needs a live target to validate
+UNVERIFIED,CIS_APACHE_TOMCAT_8_v1.1.0,manual,51,manual — needs a live target to validate
+UNVERIFIED,CIS_APACHE_TOMCAT_9_v1.2.0,manual,50,manual — needs a live target to validate
+UNVERIFIED,CIS_APACHE_TOMCAT_10.1_v1.0.0,manual,49,manual — needs a live target to validate
+UNVERIFIED,CIS_APACHE_TOMCAT_10_v1.1.0,manual,49,manual — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_15.0_Sequoia_Cloud-tailored_Benchmark_v1.0.0,manual,47,manual — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_12.0_Monterey_Cloud-tailored_Benchmark_v1.1.0,manual,47,manual — needs a live target to validate
+UNVERIFIED,CIS_Apple_macOS_13.0_Ventura_Cloud-tailored_Benchmark_v1.1.0,manual,45,manual — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_12_Benchmark_v1.1.0_ARCHIVE,postgres_sql,44,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_Oracle_MySQL_Enterprise_Edition_8.0_Benchmark_v1.5.0_FINAL_UPDATE,mysql_sql,38,mysql_sql — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Solaris_11.4_Benchmark_v1.1.0,manual,38,manual — needs a live target to validate
+UNVERIFIED,CIS_NGINX_Benchmark_v3.0.0,manual,38,manual — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_11_Benchmark_v1.0.0_ARCHIVE,postgres_sql,34,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_PostgreSQL_10_Benchmark_v1.0.0_ARCHIVE,postgres_sql,34,postgres_sql — needs a live target to validate
+UNVERIFIED,CIS_IBM_z_OS_V2R5_with_RACF_Benchmark_v1.1.0,manual,33,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Solaris_11.1_Benchmark_v1.0.0_Archive,manual,30,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Solaris_11_Benchmark_v1.1.0_Archive,manual,25,manual — needs a live target to validate
+UNVERIFIED,CIS_MongoDB_Benchmark_v1.0.0_ARCHIVE,manual,22,manual — needs a live target to validate
+UNVERIFIED,CIS_IBM_Z/OS_WITH_RACF_v1.0.0,manual,21,manual — needs a live target to validate
+UNVERIFIED,CIS_Palo_Alto_Firewall_10_Benchmark_v1.3.0,manual,18,manual — needs a live target to validate
+UNVERIFIED,CIS_AWS_FOUNDATIONS_v3.0,aws_readonly,18,aws_readonly — needs a live target to validate
+UNVERIFIED,CIS_MongoDB7_Benchmark_v1.2.0_PDF,manual,17,manual — needs a live target to validate
+UNVERIFIED,CIS_MongoDB8_Benchmark_v1.0.0,manual,17,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_MySQL_Community_Server_8.4_Benchmark_v1.1.0,manual,17,manual — needs a live target to validate
+UNVERIFIED,CIS_VMWARE_ESXI_8.0_v1.3.0,windows_winrm,17,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_MongoDB_4_Benchmark_v1.0.0_ARCHIVE,manual,16,manual — needs a live target to validate
+UNVERIFIED,CIS_MONGODB_6_v1.0.0,manual,16,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_MySQL_Community_Server_5.7_Benchmark_v2.0.0_ARCHIVE,manual,16,manual — needs a live target to validate
+UNVERIFIED,CIS_MONGODB_5_BENCHMARK_v1.2.0_ARCHIVE,manual,16,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_MySQL_Community_Server_5.6_Benchmark_v2.0.0_ARCHIVE,manual,15,manual — needs a live target to validate
+UNVERIFIED,CIS_MongoDB_3.6_Benchmark_v1.1.0_ARCHIVE,manual,15,manual — needs a live target to validate
+UNVERIFIED,CIS_Apache_Cassandra_4.1_v1.0.0_PDF,manual,13,manual — needs a live target to validate
+UNVERIFIED,CIS_IBM_DB2_9_Benchmark,manual,13,manual — needs a live target to validate
+UNVERIFIED,CIS_Apache_Cassandra_4.0_Benchmark_v1.3.0_PDF,manual,12,manual — needs a live target to validate
+UNVERIFIED,CIS_APACHE_CASSANDRA_3.11_Benchmark_v1.1.0_ARCHIVE,manual,12,manual — needs a live target to validate
+UNVERIFIED,CIS_Apache_Cassandra_5.0_Benchmark_v1.1.0_PDF,manual,12,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Azure_Storage_Services_Benchmark_v1.0.0,windows_winrm,10,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_IBM_DB2_10_Benchmark,manual,7,manual — needs a live target to validate
+UNVERIFIED,CIS_DigitalOcean_Services_Benchmark_v1.0.0,manual,7,manual — needs a live target to validate
+UNVERIFIED,CIS_CIS_Alibaba_Cloud_Foundation_Benchmark_v2.0.0,manual,7,manual — needs a live target to validate
+UNVERIFIED,CIS_IBM_DB2_11_v1.2.0,manual,6,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Azure_Foundations_Benchmark_v6.0.0,windows_winrm,6,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_IBM_DB2_12.1_v1.0.0,manual,6,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Azure_Database_Services_Benchmark_v2.0.0,windows_winrm,6,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_Google_Cloud_Platform_Foundation_Benchmark_v4.0.0,manual,5,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Cloud_Infrastructure_Foundations_Benchmark_v3.1.0,manual,5,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_Database_Server_11_-_11g_R2_Benchmark_v1.0.0_ARCHIVE,manual,4,manual — needs a live target to validate
+UNVERIFIED,CIS_Microsoft_Azure_Compute_Services_Benchmark_v2.0.0,windows_winrm,4,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_IBM_Cloud_Foundations_Benchmark_v2.0.0,manual,3,manual — needs a live target to validate
+UNVERIFIED,CIS_GOOGLE_CHROMEOS_v1.1.0,manual,3,manual — needs a live target to validate
+UNVERIFIED,CIS_IBM_DB2_13_for_z_OS_v1.0.0,manual,3,manual — needs a live target to validate
+UNVERIFIED,CIS_Oracle_SaaS_Cloud_Applications_Benchmark_v1.0.0,manual,2,manual — needs a live target to validate
+UNVERIFIED,CIS_IBM_CICS_Transaction_Server_6.1_Benchmark_v1.1.0,manual,2,manual — needs a live target to validate
+UNVERIFIED,CIS_MICROSOFT_SHAREPOINT_2016_v1.1.0,windows_winrm,1,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_MICROSOFT_SHAREPOINT_2019_v1.0.0,windows_winrm,1,windows_winrm — needs a live target to validate
+UNVERIFIED,CIS_pfSense_Firewall_Benchmark_v1.1.0,netdev_ssh,1,netdev_ssh — needs a live target to validate

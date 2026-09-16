@@ -916,6 +916,14 @@ export const discoveryApi = {
   disconnectDevice: (assetId: number) =>
     apiClient.post(`/discovery/devices/${assetId}/disconnect`),
   connectProgress: () => apiClient.get('/discovery/connect-progress'),
+  // AI-assisted "why is this device in this state + what do I do" — diagnosis is
+  // deterministic (never hallucinated), AI only rewords it (skipped if no key).
+  explainDevice: (observationId: number, ai = true) =>
+    apiClient.get<{ state: string; severity: string; headline: string; why: string; steps: string[]; safe_to_retry: boolean; lockout_risk: boolean; facts: Record<string, unknown>; ai_used: boolean }>(
+      `/discovery/devices/${observationId}/explain`, { params: { ai } }),
+  explainNameless: (count: number, ai = true) =>
+    apiClient.get<{ state: string; severity: string; headline: string; why: string; steps: string[]; ai_used: boolean }>(
+      '/discovery/explain-nameless', { params: { count, ai } }),
   // kind: 'winrm' tries Windows devices only, 'ssh' Linux only.
   // runId scopes the sweep to one run (matches the queue's run filter).
   connectAllDiscovered: (kind?: 'winrm' | 'ssh', runId?: number) =>
@@ -924,9 +932,13 @@ export const discoveryApi = {
     }),
   // Run the ticked saved login(s) against the specific devices ticked.
   // Empty/null credentialIds = backend auto-picks the best match per device.
-  connectSelected: (observationIds: number[], credentialIds?: number[] | null) =>
+  // method: 'host' (WinRM/SSH by type, default) | 'wmi' (Windows over DCOM/135,
+  // reuses the WinRM login) | 'snmp' (community string over UDP/161).
+  connectSelected: (observationIds: number[], credentialIds?: number[] | null,
+                    opts?: { method?: 'auto' | 'host' | 'wmi' | 'snmp'; community?: string }) =>
     apiClient.post('/discovery/connect-selected',
-      { observation_ids: observationIds, credential_ids: credentialIds ?? null }),
+      { observation_ids: observationIds, credential_ids: credentialIds ?? null,
+        method: opts?.method, community: opts?.community }),
   // Read a DHCP server's real lease table (via a saved credential) and fold the
   // hostnames + vendor-class onto discovered devices. A real SSH/WinRM read of
   // the router — never invents a name.
@@ -3977,6 +3989,24 @@ export const integrationsApi = {
     apiClient.post(`/integrations/connections/${id}/test`),
   triggerSync: (id: number) =>
     apiClient.post(`/integrations/connections/${id}/sync`),
+  // Flow 1 (we host the scanner): create + launch a scan on OUR scan engine
+  // against the given targets, wait for it, then pull the findings.
+  triggerHostedScan: (id: number, data: { targets: string; scan_name?: string; policy_id?: string; credential_profile_ids?: number[] }) =>
+    apiClient.post(`/integrations/connections/${id}/scan-and-sync`, data),
+  getScanPolicies: (id: number) =>
+    apiClient.get(`/integrations/connections/${id}/scan-policies`),
+  getScanCredentials: (id: number) =>
+    apiClient.get(`/integrations/connections/${id}/scan-credentials`),
+  listHostedScans: (id: number, params?: Record<string, unknown>) =>
+    apiClient.get(`/integrations/connections/${id}/hosted-scans`, { params }),
+  getHostedScan: (runId: number) =>
+    apiClient.get(`/integrations/hosted-scans/${runId}`),
+  stopHostedScan: (runId: number) =>
+    apiClient.post(`/integrations/hosted-scans/${runId}/stop`),
+  // Removes the scan session from history (a running scan is stopped first);
+  // findings already filed to assets are kept.
+  deleteHostedScan: (runId: number) =>
+    apiClient.delete(`/integrations/hosted-scans/${runId}`),
   getSyncHistory: (id: number, params?: Record<string, unknown>) =>
     apiClient.get(`/integrations/connections/${id}/history`, { params }),
   getAuditLog: (id: number, params?: Record<string, unknown>) =>

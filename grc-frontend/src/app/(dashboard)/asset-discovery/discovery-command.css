@@ -121,10 +121,13 @@
 .disc-cc .page-line h2{font-size:18px}.disc-cc .page-line p{font-size:11.5px;color:var(--muted);margin-top:4px}
 .disc-cc .pill{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap}
 .disc-cc .pill-green{background:var(--mint-soft);color:var(--mint2)}.disc-cc .pill-amber{background:var(--amber-soft);color:var(--amber)}.disc-cc .pill-red{background:var(--red-soft);color:var(--red)}.disc-cc .pill-blue{background:var(--slate-soft);color:var(--slate)}.disc-cc .pill-gray{background:#EDF1EF;color:var(--muted)}
-.disc-cc .toolbar{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
-.disc-cc .input{height:36px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink2);padding:0 12px;font-size:11.5px;min-width:210px;flex:1}
-.disc-cc .toolbar .select{min-width:120px;font-weight:500}
+/* One compact bar: filters on the left, actions pushed right. Tight padding so
+   it doesn't feel bulky; wraps cleanly on narrow widths. */
+.disc-cc .toolbar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.disc-cc .input{height:32px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink2);padding:0 11px;font-size:11.5px;min-width:180px;flex:1}
+.disc-cc .toolbar .select{min-width:118px;font-weight:500;height:32px}
 .disc-cc .toolbar .push{margin-left:auto}
+.disc-cc .toolbar .btn{height:32px}
 .disc-cc .method-filter{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px}
 .disc-cc .method-filter button{border:0;background:transparent;border-radius:8px;height:30px;padding:0 14px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer}
 .disc-cc .method-filter button.active{background:var(--card);color:var(--mint2);box-shadow:var(--shadow-sm)}
