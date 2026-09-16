@@ -375,7 +375,8 @@ def _sweep_targets(
 # routed range look "open" on that port — a scan artifact, not a real host. The
 # per-host probe can't tell the difference (the connect genuinely succeeds), so
 # we detect it at the RANGE level: any port answered by a large majority of a
-# big scope is discounted, and a host left with no genuine evidence is dropped.
+# big scope is discounted, and a host left with no genuine evidence is relabelled
+# a "firewall echo" — kept and visible, never hidden, so the operator still decides.
 _ARTIFACT_MIN_HOSTS = 24       # only engage on a big scope (a /24-ish sweep)
 _ARTIFACT_FRACTION = 0.5       # "open on > half the range" == a proxy, not a host
 
@@ -386,13 +387,15 @@ _ARTIFACT_FRACTION = 0.5       # "open on > half the range" == a proxy, not a ho
 _PROBE_TIMEOUT = float(os.getenv("DISCOVERY_PROBE_TIMEOUT", "2.5"))
 
 
-def _drop_firewall_artifacts(
+def _flag_firewall_artifacts(
     findings: List[Dict[str, Any]], hosts_swept: int
 ) -> List[Dict[str, Any]]:
-    """Remove firewall SYN-proxy ghosts (see note above). Real hosts keep their
-    genuine ports; a host whose ONLY evidence was an artifact port is dropped. A
-    small/targeted scope is returned untouched — a high hit-rate there is
-    legitimate, not a proxy."""
+    """Neutralise firewall SYN-proxy ghosts WITHOUT hiding anything. Strip the
+    range-wide artifact port, re-classify each host by its REAL ports, and tag a
+    host left with no genuine evidence as a firewall echo (device_type
+    'firewall_echo', firewall_only=True) so the UI can categorise / filter it.
+    Every address stays visible — the operator still chooses what to adopt. A
+    small/targeted scope is returned untouched (a high hit-rate is legit there)."""
     if hosts_swept < _ARTIFACT_MIN_HOSTS:
         return findings
     from collections import Counter
@@ -406,21 +409,24 @@ def _drop_firewall_artifacts(
     }
     if not artifact:
         return findings
-    kept: List[Dict[str, Any]] = []
     for f in findings:
         orig = f.get("open_ports") or []
         real = [p for p in orig if p not in artifact]
+        if real == orig:
+            continue                               # not touched by the artifact port
         fp = f.get("fingerprint") or {}
+        f["open_ports"] = real
+        fp.update(_classify_fp(real, fp))          # re-derive type from REAL ports
         name = f.get("hostname")
-        # Keep only on evidence a firewall CANNOT fake for the whole subnet:
-        # a real (non-artifact) open port, a UDP service, a MAC, or a real name.
-        if real or fp.get("udp_services") or f.get("mac") or (name and name != f.get("ip")):
-            if real != orig:                       # artifact port stripped -> re-classify
-                f["open_ports"] = real
-                fp.update(_classify_fp(real, fp))
-                f["fingerprint"] = fp
-            kept.append(f)
-    return kept
+        # Nothing a firewall can't fake for the whole subnet remains -> it was
+        # only the echo. Label it plainly so it is never mistaken for a real
+        # VoIP phone, and never auto-adopted — but keep it visible.
+        if not (real or fp.get("udp_services") or f.get("mac") or (name and name != f.get("ip"))):
+            fp["device_type"] = "firewall_echo"
+            fp["confidence"] = 0.0
+            f["firewall_only"] = True
+        f["fingerprint"] = fp
+    return findings
 
 
 def _run_job(
@@ -449,8 +455,9 @@ def _run_job(
         rate_limit_per_min=rate_limit_per_min, fingerprinter=fingerprinter,
     )
     # A SIP/IPS/LB that SYN-proxies a port for the whole subnet ghosts every
-    # address; discount range-wide artifact ports and drop the phantom hosts.
-    findings = _drop_firewall_artifacts(findings, len(targets))
+    # address; discount range-wide artifact ports and relabel the echoes (kept,
+    # not dropped) so the UI can categorise/filter them.
+    findings = _flag_firewall_artifacts(findings, len(targets))
 
     # ── ARP-based liveness enrichment ───────────────────────────────────────
     # The TCP sweep above resolved ARP for the hosts it touched. Reading the
@@ -992,12 +999,16 @@ if __name__ == "__main__":  # pragma: no cover — quick self-check for the ghos
             "fingerprint": {"udp_services": []}, "mac": None} for i in range(1, _n + 1)]
     _fs[0]["open_ports"] = [5060, 22, 80]   # a real server
     _fs[1]["open_ports"] = [5060, 445]      # a real box
-    _kept = _drop_firewall_artifacts(
+    _out = _flag_firewall_artifacts(
         [dict(f, fingerprint=dict(f["fingerprint"])) for f in _fs], _n)
-    assert len(_kept) == 2, f"expected 2 real hosts, got {len(_kept)}"
-    assert all(5060 not in k["open_ports"] for k in _kept), "artifact 5060 not stripped"
-    # A small scope with a high hit-rate is legitimate — never filtered.
+    assert len(_out) == _n, "nothing should be dropped — everything stays visible"
+    _real = [f for f in _out if not f.get("firewall_only")]
+    _echo = [f for f in _out if f.get("firewall_only")]
+    assert len(_real) == 2 and len(_echo) == _n - 2, f"got {len(_real)} real / {len(_echo)} echo"
+    assert all(5060 not in f["open_ports"] for f in _out), "artifact 5060 not stripped"
+    assert all(f["fingerprint"].get("device_type") == "firewall_echo" for f in _echo), "echo unlabelled"
+    # A small scope with a high hit-rate is legitimate — untouched.
     _small = [{"ip": f"10.0.0.{i}", "hostname": None, "open_ports": [445],
                "fingerprint": {}, "mac": None} for i in range(3)]
-    assert len(_drop_firewall_artifacts(_small, 3)) == 3, "small scope must not be filtered"
+    assert len(_flag_firewall_artifacts(_small, 3)) == 3, "small scope must not be filtered"
     print("executor firewall-artifact self-check OK")
