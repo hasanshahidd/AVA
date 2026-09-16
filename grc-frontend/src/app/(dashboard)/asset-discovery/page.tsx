@@ -906,6 +906,7 @@ function rdOsFromName(name?: string | null): string | null {
 const RD_SERVICE_ROLE = new Set(['database', 'directory', 'cluster']);
 function rdType(o: any): string {
   const dt = o.device_type;
+  if (dt === 'firewall_echo') return 'Firewall echo';   // SIP/IPS proxy echo — not a real device
   const os = o.os_guess || o.asset_os_family || rdOsFromName(o.device_name || o.host_name);
   const osl = os ? (RD_OS[os] || _cap(os)) : null;
   if (dt && RD_DTYPE[dt] && dt !== 'host' && !(RD_SERVICE_ROLE.has(dt) && osl)) return RD_DTYPE[dt];
@@ -921,6 +922,7 @@ type RdTier = 'identified' | 'partial' | 'dark';
 // type — so those are "partial" (amber), never green. This keeps the dot and
 // the Type badge from ever disagreeing (no more green "Unknown").
 function rdTier(o: any): RdTier {
+  if (o.device_type === 'firewall_echo') return 'dark';                // proxy echo — always de-emphasised, never green
   const t = rdType(o);
   if (t !== 'Unknown' && t !== '—') return 'identified';               // type/OS confirmed
   if (o.host_name || o.device_name || o.vendor || (o.open_ports || []).length) return 'partial';  // found, type unknown
