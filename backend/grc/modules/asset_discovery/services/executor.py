@@ -385,6 +385,11 @@ _ARTIFACT_FRACTION = 0.5       # "open on > half the range" == a proxy, not a ho
 # the firewall's local SYN-proxy still answers fast. Default 2.5s; override with
 # DISCOVERY_PROBE_TIMEOUT for very high-latency links.
 _PROBE_TIMEOUT = float(os.getenv("DISCOVERY_PROBE_TIMEOUT", "2.5"))
+# Sweep concurrency. 32 parallel probes saturate a thin VPN/IPsec tunnel — the
+# flood inflates latency so even OPEN ports time out (real hosts then mis-read as
+# dead / firewall echoes) and the tunnel goes unusable mid-scan. Lower it (e.g. 8)
+# for a high-latency tunnel so probes stay reliable. Override DISCOVERY_MAX_WORKERS.
+_MAX_WORKERS = int(os.getenv("DISCOVERY_MAX_WORKERS", "32"))
 
 
 def _flag_firewall_artifacts(
@@ -736,7 +741,7 @@ def execute_run(
     *,
     probe: Optional[ProbeFn] = None,
     timeout_s: float = _PROBE_TIMEOUT,
-    max_workers: int = 32,
+    max_workers: int = _MAX_WORKERS,
     fingerprinter: Optional[FingerprintFn] = None,
 ) -> DiscoveryRun:
     """Execute a previously-created run: a job per include scope, probe each,
@@ -982,7 +987,7 @@ def start_run(
     user=None,
     probe: Optional[ProbeFn] = None,
     timeout_s: float = _PROBE_TIMEOUT,
-    max_workers: int = 32,
+    max_workers: int = _MAX_WORKERS,
 ) -> DiscoveryRun:
     """Synchronous create-then-execute. Used by scheduled tasks (which are
     already off the request path) and by tests that want a deterministic,
