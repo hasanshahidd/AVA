@@ -663,7 +663,10 @@ def _run_job(
         db.add(DiscoveryObservation(
             tenant_id=run.tenant_id, run_id=run.id, job_id=job.id,
             source="cidr", observed_at=now,
-            host_name=f.get("hostname"), ip_address=f["ip"], mac_address=f.get("mac"),
+            # NetBIOS / reverse-DNS name from the fingerprint is the fallback when
+            # the raw TCP probe learned no name — this is what fills a Windows
+            # host's computer name for the credential-free (adopt) path.
+            host_name=f.get("hostname") or fp.get("hostname"), ip_address=f["ip"], mac_address=f.get("mac"),
             # probed_ports records what this sweep actually checked, so a later
             # step can tell "WinRM was closed" from "we never looked". Without
             # it, observations written by an older build would be wrongly read
