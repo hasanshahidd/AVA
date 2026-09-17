@@ -101,6 +101,21 @@ NETWORK_SWEEP_PORTS: tuple = (
 WINRM_PORTS = (5985, 5986)
 SSH_PORT = 22
 
+# SPEED: the pure database/service ports (Postgres/MySQL/MSSQL/Oracle/K8s/LDAP/
+# Mongo/Redis/Elasticsearch). A real box running one of these ALSO answers a
+# presence port (SSH/RDP/SMB/web) — nobody administers a DB host with zero
+# remote login — so we only probe these on a host that already showed life.
+# That skips ~10 dead 2.5s timeouts on every empty address in a /24, which is
+# almost all of them. Presence ports keep 5060 (SIP): the client firewall
+# SYN-proxies it for the whole subnet, so a 5060 echo is enough to keep a ghost
+# VISIBLE + labelled (don't-drop rule) but NOT enough to trigger the DB sweep.
+# ponytail: heuristic gate — a box exposing ONLY a raw DB port and no
+# SSH/RDP/SMB/web/SNMP would be missed; if that ever appears, drop it back into
+# the presence tuple. One runnable check lives in the module self-test.
+_SERVICE_ONLY_PORTS = frozenset({5432, 3306, 1433, 1521, 6443, 389, 636, 27017, 6379, 9200})
+_PRESENCE_PORTS: tuple = tuple(p for p in NETWORK_SWEEP_PORTS if p not in _SERVICE_ONLY_PORTS)
+_SERVICE_PORTS_ORDERED: tuple = tuple(p for p in NETWORK_SWEEP_PORTS if p in _SERVICE_ONLY_PORTS)
+
 # Type of the injectable probe: (ip, port, timeout_s) -> result dict with a
 # 'status' of 'reachable'|'unreachable' and optional 'hostname'/'rtt_ms'.
 ProbeFn = Callable[[str, int, float], Dict[str, Any]]
@@ -305,17 +320,35 @@ def _sweep_host(
     if cancelled is not None and cancelled():
         return None
     open_ports: List[int] = []
-    hostname = None
-    rtt = None
-    for port in NETWORK_SWEEP_PORTS:
-        try:
-            res = probe(ip, port, timeout_s)
-        except Exception:  # noqa: BLE001 — a probe error is a non-answer
-            continue
-        if res.get("status") == "reachable":
-            open_ports.append(port)
-            hostname = hostname or res.get("hostname")
-            rtt = rtt if rtt is not None else res.get("rtt_ms")
+    meta: Dict[str, Any] = {}   # first hostname / rtt seen, across both phases
+
+    def _scan(ports) -> bool:
+        """Probe each port, recording opens. Returns True if cancelled mid-scan."""
+        for port in ports:
+            if cancelled is not None and cancelled():
+                return True
+            try:
+                res = probe(ip, port, timeout_s)
+            except Exception:  # noqa: BLE001 — a probe error is a non-answer
+                continue
+            if res.get("status") == "reachable":
+                open_ports.append(port)
+                if res.get("hostname") and not meta.get("hostname"):
+                    meta["hostname"] = res.get("hostname")
+                if res.get("rtt_ms") is not None and meta.get("rtt_ms") is None:
+                    meta["rtt_ms"] = res.get("rtt_ms")
+        return False
+
+    # Phase 1 — presence + identity ports (everything except the raw DB ports).
+    if _scan(_PRESENCE_PORTS):
+        return None
+    # Phase 2 — raw DB/service ports ONLY if a REAL presence port answered. A lone
+    # 5060 (the firewall SIP echo) does not count, so ghost addresses skip these
+    # 10 extra timeouts — the bulk of the speedup on a mostly-empty /24.
+    if any(p != 5060 for p in open_ports) and _scan(_SERVICE_PORTS_ORDERED):
+        return None
+    hostname = meta.get("hostname")
+    rtt = meta.get("rtt_ms")
     # Protocol-aware fingerprint. Runs even when NO TCP port answered, because an
     # SNMP-only router or a DNS box has no open TCP port yet must still be found.
     try:
@@ -1050,3 +1083,20 @@ if __name__ == "__main__":  # pragma: no cover — quick self-check for the ghos
                "fingerprint": {}, "mac": None} for i in range(3)]
     assert len(_flag_firewall_artifacts(_small, 3)) == 3, "small scope must not be filtered"
     print("executor firewall-artifact self-check OK")
+
+    # ── Two-phase sweep gate: DB ports only after a REAL presence port ────────
+    def _mk_probe(open_set):
+        dialed: List[int] = []
+        def _p(ip, port, t):
+            dialed.append(port)
+            return {"status": "reachable"} if port in open_set else {"status": "closed"}
+        return _p, dialed
+    _pe, _de = _mk_probe({5060})            # firewall echo ONLY
+    _re = _sweep_host("10.0.0.9", _pe, 0.0)
+    assert _re and _re["open_ports"] == [5060], f"echo host must stay visible: {_re}"
+    assert not any(p in _SERVICE_ONLY_PORTS for p in _de), "DB ports must be skipped for a 5060-only ghost"
+    _pr, _dr = _mk_probe({22, 5060})        # real Linux box (+ the echo)
+    _rr = _sweep_host("10.0.0.10", _pr, 0.0)
+    assert _rr and 22 in _rr["open_ports"], "real host lost its SSH port"
+    assert set(_SERVICE_ONLY_PORTS).issubset(set(_dr)), "DB ports must be probed once a presence port answered"
+    print("executor two-phase sweep self-check OK")
