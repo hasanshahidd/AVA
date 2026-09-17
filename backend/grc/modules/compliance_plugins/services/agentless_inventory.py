@@ -110,6 +110,7 @@ try {
     serial_number = "$($bios.SerialNumber)"
     assigned_user = "$($cs.UserName)"
     fqdn          = "$fqdn"
+    host_name     = "$($cs.Name)"
     primary_mac   = "$($net.MACAddress)"
   }
 } catch {}
