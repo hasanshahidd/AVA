@@ -465,6 +465,7 @@ function Campaigns({ onConnect }: { onConnect?: () => void }) {
 
   const run = useMutation({ mutationFn: (id: number) => discoveryApi.runNow(id), onSuccess: () => qc.invalidateQueries({ queryKey: ['disc-runs-active'] }) });
   const del = useMutation({ mutationFn: (id: number) => discoveryApi.deleteCampaign(id), onSuccess: refresh });
+  const stop = useMutation({ mutationFn: (runId: number) => discoveryApi.cancelRun(runId), onSuccess: refresh });
 
   const list = campaigns.data ?? [];
   const [methodView, setMethodView] = useState<'network' | 'easm'>('network');
@@ -528,7 +529,7 @@ function Campaigns({ onConnect }: { onConnect?: () => void }) {
                   <div className="campaign-actions">
                     <span className={'pill ' + (lr?.status === 'succeeded' ? 'pill-green' : lr?.status === 'failed' ? 'pill-red' : 'pill-gray')}>{lr ? lr.status : 'Idle'}</span>
                     {active ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span style={{ position: 'relative', display: 'inline-block', width: 90, height: 6, borderRadius: 3, background: 'var(--line)', overflow: 'hidden' }}><span className="disc-scan-bar" style={{ position: 'absolute', top: 0, height: '100%', width: '42%', borderRadius: 3, background: 'var(--slate)' }} /></span><span style={{ fontSize: 11, color: 'var(--slate)', fontWeight: 700 }}>Scanning…</span></span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span style={{ position: 'relative', display: 'inline-block', width: 90, height: 6, borderRadius: 3, background: 'var(--line)', overflow: 'hidden' }}><span className="disc-scan-bar" style={{ position: 'absolute', top: 0, height: '100%', width: '42%', borderRadius: 3, background: 'var(--slate)' }} /></span><span style={{ fontSize: 11, color: 'var(--slate)', fontWeight: 700 }}>Scanning…</span><button className="btn btn-sm btn-secondary" disabled={stop.isPending} onClick={() => { const rid = active?.id; if (rid && confirm('Stop this scan? Hosts already found are kept.')) stop.mutate(rid); }} title="Stop this scan" style={{ color: 'var(--red)', fontWeight: 700 }}>■ Stop</button></span>
                     ) : (
                       <button className="btn btn-sm btn-secondary" disabled={run.isPending} onClick={() => run.mutate(c.id)}><Play size={11} style={{ marginRight: 4, verticalAlign: -1 }} />Run now</button>
                     )}

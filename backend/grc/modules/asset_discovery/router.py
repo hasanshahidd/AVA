@@ -529,6 +529,29 @@ def delete_run(
     return None
 
 
+@router.post("/runs/{run_id}/cancel", status_code=200)
+def cancel_run(
+    run_id: int,
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+    _perm: bool = Depends(_require_discover),
+):
+    """Stop a running scan ASAP. Cooperative: signals the in-process sweep to
+    short-circuit its remaining probes, and marks the run 'cancelled' so the UI
+    updates immediately. Still 200 (a no-op) if the run already finished."""
+    tid = get_user_primary_tenant(current_user, db)
+    run = db.query(DiscoveryRun).filter(
+        DiscoveryRun.id == run_id, DiscoveryRun.tenant_id == tid).first()
+    if run is None:
+        raise HTTPException(404, "run not found")
+    from .services.executor import request_cancel
+    signalled = request_cancel(run_id)
+    if run.status in ("running", "queued"):
+        run.status = "cancelled"
+        db.commit()
+    return {"cancelled": True, "was_active": signalled}
+
+
 # ── Scope endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/campaigns/{campaign_id}/scopes", status_code=201)

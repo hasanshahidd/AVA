@@ -28,6 +28,7 @@ import csv
 import ipaddress
 import logging
 import os
+import threading as _thr
 import re
 import subprocess
 import sys
@@ -292,6 +293,7 @@ def _sweep_host(
     ip: str, probe: ProbeFn, timeout_s: float,
     fingerprinter: FingerprintFn = noop_fingerprint,
     mac: Optional[str] = None,
+    cancelled: Optional[Callable[[], bool]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Probe one host: TCP presence across NETWORK_SWEEP_PORTS, then a
     protocol-aware fingerprint (SNMP/DNS over UDP, SSH/HTTP banners). Returns a
@@ -300,6 +302,8 @@ def _sweep_host(
 
     ``fingerprinter`` is injectable and defaults to a no-op so unit tests do no
     real network I/O; production passes ``fingerprint.fingerprint_host``."""
+    if cancelled is not None and cancelled():
+        return None
     open_ports: List[int] = []
     hostname = None
     rtt = None
@@ -332,6 +336,7 @@ def _sweep_targets(
     targets: List[str], *, probe: ProbeFn, timeout_s: float, max_workers: int,
     rate_limit_per_min: Optional[int] = None,
     fingerprinter: FingerprintFn = noop_fingerprint,
+    cancelled: Optional[Callable[[], bool]] = None,
 ) -> List[Dict[str, Any]]:
     """Probe a list of hosts concurrently and return the reachable ones.
 
@@ -344,8 +349,10 @@ def _sweep_targets(
         return findings
 
     def _probe_batch(batch: List[str]) -> None:
+        if cancelled is not None and cancelled():
+            return
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futs = {pool.submit(_sweep_host, ip, probe, timeout_s, fingerprinter): ip for ip in batch}
+            futs = {pool.submit(_sweep_host, ip, probe, timeout_s, fingerprinter, cancelled=cancelled): ip for ip in batch}
             for fut in as_completed(futs):
                 res = fut.result()
                 if res:
@@ -390,6 +397,22 @@ _PROBE_TIMEOUT = float(os.getenv("DISCOVERY_PROBE_TIMEOUT", "2.5"))
 # dead / firewall echoes) and the tunnel goes unusable mid-scan. Lower it (e.g. 8)
 # for a high-latency tunnel so probes stay reliable. Override DISCOVERY_MAX_WORKERS.
 _MAX_WORKERS = int(os.getenv("DISCOVERY_MAX_WORKERS", "32"))
+
+# In-process cancel signals, keyed by run_id. Deleting the campaign/run row alone
+# never stopped a scan — the background sweep thread kept probing. A Stop button
+# now sets this event; the sweep polls it and short-circuits its remaining probes,
+# so the scan actually halts within a probe-timeout or two. The cancel endpoint
+# runs in the SAME process as the sweep, so a plain dict + threading.Event suffices.
+_CANCEL_EVENTS: "Dict[int, _thr.Event]" = {}
+
+
+def request_cancel(run_id: int) -> bool:
+    """Signal a running sweep to stop ASAP. True if a live run was signalled."""
+    ev = _CANCEL_EVENTS.get(run_id)
+    if ev is not None:
+        ev.set()
+        return True
+    return False
 
 
 def _flag_firewall_artifacts(
@@ -439,6 +462,7 @@ def _run_job(
     exclusions: Set[str], *, probe: ProbeFn, timeout_s: float, max_workers: int,
     rate_limit_per_min: Optional[int] = None,
     fingerprinter: FingerprintFn = noop_fingerprint,
+    cancelled: Optional[Callable[[], bool]] = None,
 ) -> int:
     """Probe one job's targets and write an observation per reachable host.
     Returns the number of hosts seen. Raises on a target set that's too large so
@@ -458,6 +482,7 @@ def _run_job(
     findings = _sweep_targets(
         targets, probe=probe, timeout_s=timeout_s, max_workers=max_workers,
         rate_limit_per_min=rate_limit_per_min, fingerprinter=fingerprinter,
+        cancelled=cancelled,
     )
     # A SIP/IPS/LB that SYN-proxies a port for the whole subnet ghosts every
     # address; discount range-wide artifact ports and relabel the echoes (kept,
@@ -780,6 +805,8 @@ def execute_run(
     run.status = "running"
     run.started_at = datetime.utcnow()
     db.commit()
+    cancel_ev = _thr.Event()
+    _CANCEL_EVENTS[run_id] = cancel_ev
 
     include_scopes = [s for s in campaign.scopes if not s.exclude]
     rate_limit = campaign.rate_limit_hosts_per_min
@@ -796,6 +823,8 @@ def execute_run(
     errors: List[str] = []
 
     for scope in include_scopes:
+        if cancel_ev.is_set():
+            break
         # ad_ou scopes are accepted by config but have no network executor yet.
         # domain scopes are EASM seeds — they run the outside-in collector, not
         # the network sweep (which would expand a domain to zero IPs).
@@ -833,7 +862,8 @@ def execute_run(
                 else:
                     seen = _run_job(db, run, job, scope, exclusions,
                                     probe=probe, timeout_s=timeout_s, max_workers=max_workers,
-                                    rate_limit_per_min=rate_limit, fingerprinter=fp_fn)
+                                    rate_limit_per_min=rate_limit, fingerprinter=fp_fn,
+                                    cancelled=cancel_ev.is_set)
             db.commit()  # release the savepoint's work to the run
             total_hosts += seen
             # observations for this job = its findings (host_seen == obs written)
@@ -858,7 +888,9 @@ def execute_run(
     # Honest status: failed only if NOTHING succeeded; otherwise succeeded with
     # per-job errors recorded on the job rows and summarised here.
     any_ok = any(j.status == "succeeded" for j in run.jobs)
-    if errors and not any_ok:
+    if cancel_ev.is_set():
+        run.status = "cancelled"
+    elif errors and not any_ok:
         run.status = "failed"
     else:
         run.status = "succeeded"
@@ -871,6 +903,7 @@ def execute_run(
     campaign.last_run_at = run.finished_at
 
     db.commit()
+    _CANCEL_EVENTS.pop(run_id, None)
 
     # Resolve this run's observations into assets: confident matches auto-merge,
     # unknown hosts auto-create as 'discovered', ambiguous go to the review
