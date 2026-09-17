@@ -1160,6 +1160,15 @@ function Runs() {
   const [open, setOpen] = useState<number | null>(null);
   const [method, setMethod] = useState<'all' | 'network' | 'easm'>('all');
   const [q, setQ] = useState('');
+  const qc = useQueryClient();
+  const delRun = useMutation({
+    mutationFn: (id: number) => discoveryApi.deleteRun(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['disc-runs-all'] });
+      qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] });
+      qc.invalidateQueries({ queryKey: ['disc-inbox'] });
+    },
+  });
   const rowMethod = (r: any) => (methodById.get(r.campaign_id) === 'external' ? 'easm' : 'network');
   const dur = (r: any) => {
     if (!r.finished_at || !r.created_at) return '—';
@@ -1200,7 +1209,11 @@ function Runs() {
                         <td>{r.hosts_seen} {m === 'easm' ? 'hostnames' : 'devices'}</td>
                         <td>{(r.in_inventory ?? 0) > 0 ? `${r.in_inventory} adopted` : (r.assets_new ?? 0) > 0 ? `${r.assets_new} new` : 'Connect or adopt'}</td>
                         <td>{r.awaiting_login ?? 0}</td>
-                        <td>{dur(r)}</td>
+                        <td>{dur(r)}
+                          <button title="Delete this scan"
+                            onClick={(e) => { e.stopPropagation(); if (confirm(`Delete run #${r.id}? This removes the scan record and its discovered devices — adopted assets stay in inventory.`)) delRun.mutate(r.id); }}
+                            style={{ marginLeft: 10, border: 'none', background: 'transparent', cursor: 'pointer', color: '#b91c1c', fontSize: 14 }}>🗑</button>
+                        </td>
                       </tr>
                       {open === r.id && (
                         <tr className="row-detail"><td colSpan={9} style={{ padding: 0 }}>
@@ -2007,6 +2020,9 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
   const [ftype, setFtype] = useState('');
   const [fstatus, setFstatus] = useState('');
   const [runFilter, setRunFilter] = useState<number | undefined>(undefined);
+  // A type filter from one tab can hide everything on another (e.g. "Windows host"
+  // has no matches under Adopt-only). Reset it whenever the tab changes.
+  useEffect(() => { setFtype(''); }, [seg]);
   const [openFor, setOpenFor] = useState<number | null>(null);
   const [explainFor, setExplainFor] = useState<number | null>(null);
   // The active view ('login' | 'adopt' | 'inventory' | 'all') is chosen by the
@@ -2084,6 +2100,15 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
     mutationFn: (id: number) => discoveryApi.resolve(id, 'ignore'),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); qc.invalidateQueries({ queryKey: ['disc-inbox'] }); },
   });
+  // Delete the whole selected run (its devices go with it; adopted assets stay).
+  const delRunQ = useMutation({
+    mutationFn: (id: number) => discoveryApi.deleteRun(id),
+    onSuccess: () => {
+      setRunFilter(undefined);
+      qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] });
+      qc.invalidateQueries({ queryKey: ['disc-runs-all'] });
+    },
+  });
   useEffect(() => { if (connecting && pending === 0) setConnecting(false); }, [connecting, pending]);
 
   // ── DHCP name enrichment ──────────────────────────────────────────────────
@@ -2103,18 +2128,20 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
     : attemptOf(d) ? 'attempt'       // Windows/Linux/service — selectable to try, port NOT confirmed
     : isIdentified(d) ? 'identified'
     : 'silent';
-  const types = Array.from(new Set(devices.map(discType))).sort();
   // Segment = the primary split into separate views.
   const segMatch = (d: any) => seg === 'all' ? true
     : seg === 'inventory' ? d.in_inventory
     : seg === 'adopt' ? (nonTerminal(d) && !attemptOf(d))
     : (nonTerminal(d) && attemptOf(d));   // 'login'
+  // Type-filter options come from the CURRENT tab's devices only, so a pick can't
+  // dead-end (e.g. "Windows host" never appears under Adopt-only).
+  const types = Array.from(new Set(devices.filter(segMatch).map(discType))).sort();
   const shown = devices.filter((d) => {
     if (!segMatch(d)) return false;
     if (fstatus && qStatus(d) !== fstatus) return false;
     if (ftype && discType(d) !== ftype) return false;
     if (search.trim()) {
-      const hay = [d.name, d.host_name, d.ip_address, d.vendor, discType(d)].filter(Boolean).join(' ').toLowerCase();
+      const hay = [d.name, d.host_name, d.ip_address, d.mac_address, d.vendor, discType(d), ...(d.other_ips || []), ...(d.other_macs || [])].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(search.toLowerCase())) return false;
     }
     return true;
@@ -2155,6 +2182,11 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
             <option value="">All runs · {devices.length}</option>
             {runs.map((r) => <option key={r.run_id} value={String(r.run_id)}>{(r.is_latest ? 'Latest · ' : '') + 'Run #' + r.run_id}</option>)}
           </select>
+        )}
+        {runFilter != null && (
+          <button className="btn btn-secondary" title="Delete this run" disabled={delRunQ.isPending}
+            onClick={() => { if (window.confirm(`Delete Run #${runFilter}? This removes the scan and its discovered devices — adopted assets stay in inventory.`)) delRunQ.mutate(runFilter); }}
+            style={{ color: '#b91c1c' }}>🗑 Delete run</button>
         )}
         <select className="select" value={ftype} onChange={(e) => setFtype(e.target.value)}>
           <option value="">All types</option>

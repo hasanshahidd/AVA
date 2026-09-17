@@ -885,6 +885,7 @@ export const discoveryApi = {
   updateCampaign: (id: number, data: Record<string, unknown>) =>
     apiClient.patch(`/discovery/campaigns/${id}`, data),
   deleteCampaign: (id: number) => apiClient.delete(`/discovery/campaigns/${id}`),
+  deleteRun: (runId: number) => apiClient.delete(`/discovery/runs/${runId}`),
   addScope: (id: number, data: { kind: string; value: string; exclude?: boolean; note?: string }) =>
     apiClient.post(`/discovery/campaigns/${id}/scopes`, data),
   deleteScope: (scopeId: number) => apiClient.delete(`/discovery/scopes/${scopeId}`),

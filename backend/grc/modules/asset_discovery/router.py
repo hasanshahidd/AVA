@@ -509,6 +509,26 @@ def delete_campaign(
     return None
 
 
+@router.delete("/runs/{run_id}", status_code=204)
+def delete_run(
+    run_id: int,
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+    _perm: bool = Depends(_require_discover),
+):
+    """Delete ONE discovery run (a single scan). Its jobs + observations cascade
+    (delete-orphan). Assets already adopted from it stay in inventory — deleting
+    the scan record never removes an asset."""
+    tid = get_user_primary_tenant(current_user, db)
+    run = db.query(DiscoveryRun).filter(
+        DiscoveryRun.id == run_id, DiscoveryRun.tenant_id == tid).first()
+    if run is None:
+        raise HTTPException(404, "run not found")
+    db.delete(run)  # jobs + observation_rows cascade
+    db.commit()
+    return None
+
+
 # ── Scope endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/campaigns/{campaign_id}/scopes", status_code=201)
