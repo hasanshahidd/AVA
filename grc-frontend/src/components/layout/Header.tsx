@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, LogOut, UserCircle, Users, Search, Loader2, Sparkles } from 'lucide-react';
+import { ChevronDown, LogOut, UserCircle, Users, Search, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { apiClient, searchApi } from '@/lib/api';
 import { GuideToggle } from '@/components/guide';
@@ -53,6 +53,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/auditor-portal/statutory-audit': { title: 'Statutory Audit', subtitle: 'Register and track regulator requirements and audit observations' },
   '/assets': { title: 'IT Asset Inventory', subtitle: 'Manage and track IT assets with CIA ratings and valuations.', section: 'Cybersecurity Assurance' },
   '/asset-discovery': { title: 'IT Asset Discovery', subtitle: 'Find devices on the network, decide what to adopt, and see what changed.', section: 'Cybersecurity Assurance' },
+  '/risk-posture': { title: 'Assets Risk Posture', subtitle: 'Risk = weighted blend of vulnerabilities, hardening, control gap and business impact' },
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },
   '/integrations/connections': { title: 'Scanner Connections', subtitle: 'Manage vulnerability scanner connections and sync schedules.' },
   '/integrations/exceptions': { title: 'Integration Exceptions', subtitle: 'Review and manage integration exceptions.' },
@@ -89,15 +90,6 @@ export default function Header() {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  const [chatQ, setChatQ] = useState('');
-
-  const submitChat = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const q = chatQ.trim();
-    router.push(q ? `/complychat?q=${encodeURIComponent(q)}` : '/complychat');
-    setChatQ('');
-  };
 
   // Real workflow in-app notifications
   const { data: notifData, refetch: refetchNotifs } = useQuery({
@@ -202,24 +194,6 @@ export default function Header() {
       </div>
 
       <div className="ml-3 flex items-center gap-2.5">
-        {/* Ava Assist — global AI assistant, as a wide input (replaces the
-            old search bar). Type a question and hit Enter to open the chat. */}
-        <form onSubmit={submitChat} className="relative hidden md:block">
-          <Sparkles size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-base)]" />
-          <input
-            value={chatQ}
-            onChange={(e) => setChatQ(e.target.value)}
-            placeholder="Ask Ava Assist anything…"
-            aria-label="Ask Ava Assist"
-            className="h-8 w-64 rounded-md border border-[var(--color-base)]/30 bg-[var(--color-base)]/5 pl-7 pr-8 text-xs text-[var(--color-text)] placeholder:text-[var(--color-muted)] transition-colors focus:w-80 focus:border-[var(--color-base)]/60 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-base)]/30"
-          />
-          <button type="submit" aria-label="Send" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-base)] hover:bg-[var(--color-base)]/10">
-            <ChevronRight size={14} />
-          </button>
-        </form>
-
-        {/* Issues moved into the sidebar "Issue & Incident Management" module. */}
-
         {/* Guide mode — toggles small numbered markers on key UI elements. */}
         <GuideToggle />
 
