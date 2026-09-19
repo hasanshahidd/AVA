@@ -192,6 +192,11 @@ app.include_router(risks_router)
 app.include_router(governance_router)
 app.include_router(documents_router)
 app.include_router(assets_router)
+
+# Smart asset import (Excel/CSV mapping wizard) — isolated module: grc/modules/asset_import
+from grc.modules.asset_import.router import router as asset_import_router
+app.include_router(asset_import_router)
+
 app.include_router(dashboard_router)
 app.include_router(enriched_dashboard_router)
 app.include_router(advanced_erm_router)
