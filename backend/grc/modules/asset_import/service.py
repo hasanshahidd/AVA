@@ -21,6 +21,31 @@ from . import mapping as M
 _VALID_TYPE = {"application", "infrastructure", "data", "cloud", "third_party"}
 _MAX_ROWS = 5000  # ponytail: v1 cap; raise + stream when a client needs more
 
+# Canonical field -> real ITAsset column when they differ. `owner` is a
+# RELATIONSHIP, so it must NEVER be set directly (assigning a string to it throws
+# "'str' object has no attribute '_sa_instance_state'") — route to owner_name, etc.
+_COLUMN_ALIAS = {
+    "owner": "owner_name",
+    "mac_address": "primary_mac",
+    "confidentiality": "confidentiality_rating",
+    "integrity": "integrity_rating",
+    "availability": "availability_rating",
+}
+_ASSET_COLUMNS = None
+
+
+def _asset_columns():
+    """Real mapped COLUMNS of ITAsset (never relationships), cached + lazy so the
+    mapper is fully configured. We only ever setattr fields in this set."""
+    global _ASSET_COLUMNS
+    if _ASSET_COLUMNS is None:
+        try:
+            from sqlalchemy import inspect as _si
+            _ASSET_COLUMNS = {c.key for c in _si(ITAsset).columns}
+        except Exception:  # noqa: BLE001
+            _ASSET_COLUMNS = set()
+    return _ASSET_COLUMNS
+
 
 # ── file parsing ─────────────────────────────────────────────────────────────
 def _load_grid(content: bytes, filename: str) -> List[List[Any]]:
@@ -83,6 +108,7 @@ def _stash(asset: ITAsset, key: str, val: Any) -> None:
 
 
 def _apply(asset: ITAsset, rec: Dict[str, Any], normalize_os) -> None:
+    cols = _asset_columns()
     for f, v in rec.items():
         if f == "asset_type":
             v = v if v in _VALID_TYPE else "infrastructure"
@@ -91,11 +117,12 @@ def _apply(asset: ITAsset, rec: Dict[str, Any], normalize_os) -> None:
                 v = normalize_os(str(v)) or v
             except Exception:  # noqa: BLE001
                 pass
-        if hasattr(asset, f):
-            setattr(asset, f, v)
+        col = _COLUMN_ALIAS.get(f, f)
+        if col in cols:               # only ever set real columns, never relationships
+            setattr(asset, col, v)
         else:
-            _stash(asset, f, v)
-    if hasattr(asset, "asset_type") and not getattr(asset, "asset_type", None):
+            _stash(asset, f, v)       # unknown/extra field -> platform_properties JSON
+    if "asset_type" in cols and not getattr(asset, "asset_type", None):
         asset.asset_type = "infrastructure"
 
 
@@ -150,40 +177,42 @@ def commit(db: Session, tenant_id: int, content: bytes, filename: str,
                 errors.append(f"Row {rn}: no name / hostname / IP — skipped")
                 continue
             rec.setdefault("name", str(ident))
+            # per-row savepoint: a bad row rolls back alone, the batch survives
+            with db.begin_nested():
+                q = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id)
+                existing = q.filter(func.lower(ITAsset.name) == str(rec["name"]).lower()).first()
+                if not existing and rec.get("host_name"):
+                    existing = q.filter(ITAsset.host_name == rec["host_name"]).first()
+                if not existing and rec.get("ip_address"):
+                    existing = q.filter(ITAsset.ip_address == rec["ip_address"]).first()
 
-            q = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id)
-            existing = q.filter(func.lower(ITAsset.name) == str(rec["name"]).lower()).first()
-            if not existing and rec.get("host_name"):
-                existing = q.filter(ITAsset.host_name == rec["host_name"]).first()
-            if not existing and rec.get("ip_address"):
-                existing = q.filter(ITAsset.ip_address == rec["ip_address"]).first()
-
-            if existing:
-                if dupe_strategy != "update":
-                    skipped += 1
-                    continue
-                _apply(existing, rec, normalize_os_string)
-                _tag(existing, batch, filename, created=False)
-                if recompute_for_asset:
-                    try:
-                        recompute_for_asset(db, existing)
-                    except Exception:  # noqa: BLE001
-                        pass
-                updated += 1
-            else:
-                asset = ITAsset(tenant_id=tenant_id)
-                _apply(asset, rec, normalize_os_string)
-                if hasattr(asset, "origin_source"):
-                    asset.origin_source = "import"
-                _tag(asset, batch, filename, created=True)
-                db.add(asset)
-                db.flush()
-                if recompute_for_asset:
-                    try:
-                        recompute_for_asset(db, asset)
-                    except Exception:  # noqa: BLE001
-                        pass
-                created += 1
+                if existing:
+                    if dupe_strategy != "update":
+                        skipped += 1
+                    else:
+                        _apply(existing, rec, normalize_os_string)
+                        _tag(existing, batch, filename, created=False)
+                        db.flush()
+                        if recompute_for_asset:
+                            try:
+                                recompute_for_asset(db, existing)
+                            except Exception:  # noqa: BLE001
+                                pass
+                        updated += 1
+                else:
+                    asset = ITAsset(tenant_id=tenant_id)
+                    _apply(asset, rec, normalize_os_string)
+                    if hasattr(asset, "origin_source"):
+                        asset.origin_source = "import"
+                    _tag(asset, batch, filename, created=True)
+                    db.add(asset)
+                    db.flush()
+                    if recompute_for_asset:
+                        try:
+                            recompute_for_asset(db, asset)
+                        except Exception:  # noqa: BLE001
+                            pass
+                    created += 1
         except Exception as e:  # noqa: BLE001 — one bad row must not kill the batch
             errors.append(f"Row {rn}: {e}")
 
