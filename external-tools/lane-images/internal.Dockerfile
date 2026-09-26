@@ -34,34 +34,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # --- Explicit installs: guarantee every named internal/AD/host tool present ---
 # (many overlap the metapackages above; listed so nothing is missing)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      # exploitation frameworks
+# Explicit internal/AD/host arsenal — installed PER-PACKAGE so a name dropped or
+# renamed in Kali (or a Go tool not in apt: kerbrute/chisel/ligolo-ng) is SKIPPED
+# (logged), not fatal. The kali-tools-* metapackages above cover the bulk; the core
+# exploit tools (metasploit/netexec/impacket/evil-winrm/hydra/hashcat) are stable
+# apt packages and install normally.
+RUN apt-get update && for p in \
       metasploit-framework \
-      # discovery / enumeration
-      nmap \
-      smbmap smbclient \
-      samba-common-bin \
-      enum4linux enum4linux-ng \
-      ldap-utils \
-      nbtscan \
-      onesixtyone \
-      snmp snmp-mibs-downloader \
-      # AD / SMB / WinRM tradecraft
-      netexec \
-      impacket-scripts \
-      evil-winrm \
-      responder \
-      certipy-ad \
-      kerbrute \
-      # windows resources (mimikatz, etc.)
-      windows-resources \
-      # password attacks
-      hydra medusa \
-      hashcat john \
-      # pivoting / tunneling
+      nmap smbmap smbclient samba-common-bin enum4linux enum4linux-ng ldap-utils nbtscan onesixtyone snmp snmp-mibs-downloader \
+      netexec impacket-scripts evil-winrm responder certipy-ad kerbrute windows-resources \
+      hydra medusa hashcat john \
       chisel ligolo-ng proxychains4 sshuttle \
-      # runtime deps for pip/pipx tooling + hexstrike
-      python3 python3-pip python3-venv pipx git curl \
+      python3 python3-pip python3-venv pipx git curl ; do \
+        apt-get install -y --no-install-recommends "$p" || echo "SKIP (unavailable in Kali): $p" ; \
+      done \
     && rm -rf /var/lib/apt/lists/*
 
 # snmp-check ships in the snmp-check pkg on some rolling snapshots; ensure it.

@@ -33,28 +33,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Explicit web recon + exploit arsenal (named so nothing silently goes missing).
 # Grouped by function; one group per layer for cache + clear failure attribution.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      sqlmap commix wpscan nikto nuclei joomscan davtest cadaver skipfish \
-      whatweb wafw00f dalfox \
-    && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Explicit web recon + exploit arsenal (named so nothing silently goes missing).
+# Installed PER-PACKAGE so a name that's been dropped/renamed in Kali is SKIPPED
+# (logged), not fatal — the kali-tools-web metapackage above already covers most,
+# and the core exploit tools (sqlmap/nuclei/commix/…) are stable apt packages.
+RUN apt-get update && for p in \
+      sqlmap commix wpscan nikto nuclei joomscan davtest cadaver skipfish whatweb wafw00f dalfox \
       ffuf gobuster feroxbuster dirb dirbuster wfuzz arjun \
-    && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
       sslscan sslyze testssl.sh \
-    && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      httpx-toolkit katana gau waybackurls \
-    && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      subfinder amass assetfinder dnsenum dnsrecon fierce sublist3r dnsutils \
-    && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
+      httpx-toolkit katana \
+      subfinder amass dnsenum dnsrecon fierce sublist3r dnsutils \
       hydra medusa patator \
+      seclists wordlists ; do \
+        apt-get install -y --no-install-recommends "$p" || echo "SKIP (unavailable in Kali): $p" ; \
+      done \
     && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      seclists wordlists \
-    && rm -rf /var/lib/apt/lists/*
+
+# gau / waybackurls / assetfinder are Go tools (NOT apt packages) — build them with
+# `go install` (golang-go is installed above) into /usr/local/bin. Best-effort: a
+# passive URL-discovery tool failing to build must not sink the whole image.
+RUN for m in \
+      github.com/lc/gau/v2/cmd/gau@latest \
+      github.com/tomnomnom/waybackurls@latest \
+      github.com/tomnomnom/assetfinder@latest ; do \
+        GOBIN=/usr/local/bin go install "$m" || echo "SKIP (go build failed): $m" ; \
+      done
 
 # nuclei signature templates (data the nuclei binary reads at scan time).
 RUN nuclei -update-templates || true
