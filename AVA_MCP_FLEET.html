@@ -1,0 +1,263 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AVA Pentest — MCP Fleet</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e2e8f0;--find:#2563eb;--exp:#dc2626;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;padding:24px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 18px}
+.kpis{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
+.kpi b{font-size:20px} .kpi span{color:var(--mut);font-size:12px;display:block}
+.lane{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:16px}
+.lane-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}
+.lane-h h3{margin:0;font-size:16px} .net{background:#eef2ff;color:#4338ca;border-radius:999px;padding:2px 10px;font-size:12px}
+.creds{border-radius:999px;padding:2px 10px;font-size:12px;background:#f1f5f9;color:#475569}
+.creds.required{background:#fef3c7;color:#92400e} .creds.optional{background:#e0f2fe;color:#075985}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.grp h4{margin:0 0 8px;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.grp.find h4{color:var(--find)} .grp.exploit h4{color:var(--exp)}
+.gc{background:#f1f5f9;color:#475569;border-radius:999px;padding:1px 7px;font-size:11px}
+.mcp{border:1px solid var(--line);border-left:3px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.grp.find .mcp.on{border-left-color:var(--find)} .grp.exploit .mcp.on{border-left-color:var(--exp)}
+.mcp.off{opacity:.62;background:#fbfcfd}
+.mcp-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap} .mcp-n{font-weight:600}
+.repo{color:var(--mut);font-size:11px;font-family:ui-monospace,monospace;margin:2px 0}
+.cnt{font-size:12px;color:var(--mut);margin:4px 0}
+.tools{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.tool{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:1px 7px;font-size:11px;font-family:ui-monospace,monospace}
+.tool.none{background:none;border:none;color:#94a3b8;font-style:italic}
+.note{color:var(--mut);font-size:11.5px;margin-top:6px;font-style:italic}
+.b{font-size:9.5px;font-weight:700;letter-spacing:.03em;border-radius:5px;padding:1px 6px}
+.b.live{background:#dcfce7;color:#166534} .b.planned{background:#f1f5f9;color:#94a3b8}
+.b.kind{background:#eef2ff;color:#4338ca} .b.gated{background:#fef3c7;color:#92400e}
+.foot{color:var(--mut);font-size:12px;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+</style></head><body><div class="wrap">
+<h1>AVA Pentest — MCP Fleet</h1>
+<p class="sub">Every scanning (FIND) and EXPLOIT MCP the router can select, per lane. Generated from the live fleet contract (reports/fleet.json). <b>LIVE</b> = wired to execute; <b>PLANNED</b> = shown greyed, not installed. Tool lists are the curated allowlist; the count is the full tool count.</p>
+<div class="kpis">
+  <div class="kpi"><b>6</b><span>lanes</span></div>
+  <div class="kpi"><b>11</b><span>find MCPs (10 live)</span></div>
+  <div class="kpi"><b>20</b><span>exploit MCPs (5 live)</span></div>
+</div>
+<section class="lane">
+      <div class="lane-h"><h3>External / Web</h3>
+        <span class="net">external</span>
+        <span class="creds optional">creds: optional</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">2</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">HexStrike AI</span><span class="b live">LIVE</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">0x4m4/hexstrike-ai</div>
+      <div class="cnt"><b>150</b> tools</div>
+      <div class="tools"><span class="tool">nmap_scan</span><span class="tool">nuclei_scan</span><span class="tool">httpx_scan</span><span class="tool">katana_scan</span><span class="tool">ffuf_scan</span><span class="tool">gobuster_scan</span><span class="tool">sqlmap_scan</span><span class="tool">nikto_scan</span><span class="tool">wpscan_analyze</span><span class="tool">+140 more</span></div>
+      <div class="note">dual-use; loopback; CVE-gated</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Burp MCP</span><span class="b planned">PLANNED</span><span class="b kind">MCP</span></div>
+      <div class="repo">PortSwigger/mcp-server</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">proxy</span><span class="tool">repeater</span><span class="tool">scanner (manual)</span></div>
+      <div class="note">needs Burp Suite running</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT <span class="gc">4</span></h4><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">SQLMap (mcp-for-security)</span><span class="b planned">PLANNED</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">cyproxio/mcp-for-security</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">sqlmap_scan</span><span class="tool">commix</span><span class="tool">+21 web tools</span></div>
+      <div class="note">23 sub-MCPs; needs node20 rebuild</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Commix</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">commixproject/commix</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">command-injection</span><span class="tool">os-shell</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">XSStrike</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">s0md3v/XSStrike</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">xss-detect</span><span class="tool">xss-exploit</span><span class="tool">fuzz</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Nuclei (exploit templates)</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">projectdiscovery/nuclei</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">cve-templates</span><span class="tool">fuzzing</span><span class="tool">dast</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div></div></div>
+    </section><section class="lane">
+      <div class="lane-h"><h3>Internal — Host / Network</h3>
+        <span class="net">internal</span>
+        <span class="creds optional">creds: optional</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">3</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">HexStrike AI</span><span class="b live">LIVE</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">0x4m4/hexstrike-ai</div>
+      <div class="cnt"><b>150</b> tools</div>
+      <div class="tools"><span class="tool">nmap_scan</span><span class="tool">nuclei_scan</span><span class="tool">naabu_scan</span><span class="tool">smb_enum</span><span class="tool">httpx_scan</span><span class="tool">+145 more</span></div>
+      <div class="note">LIVE network scanner — runs on-box, reaches internal hosts</div>
+    </div><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Nessus MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">Cyreslab-AI/nessus-mcp-server</div>
+      <div class="cnt"><b>7</b> tools</div>
+      <div class="tools"><span class="tool">list_scans</span><span class="tool">launch_scan</span><span class="tool">get_findings</span><span class="tool">export</span><span class="tool">+3</span></div>
+      <div class="note">credentialed CVE inventory (enterprise; not live-wired)</div>
+    </div><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">OpenVAS / GVM MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">…/openvas-mcp-server</div>
+      <div class="cnt"><b>81</b> tools</div>
+      <div class="tools"><span class="tool">gvm targets</span><span class="tool">tasks</span><span class="tool">results</span><span class="tool">reports</span><span class="tool">+77</span></div>
+      <div class="note">Greenbone; calls need gvmd (not live-wired)</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT <span class="gc">4</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">NetExec MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">…/netexec-mcp</div>
+      <div class="cnt"><b>5</b> tools</div>
+      <div class="tools"><span class="tool">smb_enum</span><span class="tool">spray</span><span class="tool">exec</span><span class="tool">dump</span><span class="tool">lateral</span></div>
+      <div class="note">nxc; recon read-only by default</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Metasploit msfmcpd</span><span class="b planned">PLANNED</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">rapid7/metasploit-framework</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">search</span><span class="tool">use</span><span class="tool">set</span><span class="tool">exploit</span><span class="tool">sessions</span></div>
+      <div class="note">cloned; needs disk + bundle install</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Impacket MCP</span><span class="b planned">PLANNED</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">fortra/impacket</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">psexec</span><span class="tool">wmiexec</span><span class="tool">secretsdump</span><span class="tool">smbexec</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Responder</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">lgandx/Responder</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">llmnr-poison</span><span class="tool">nbt-ns</span><span class="tool">capture-hashes</span></div>
+      <div class="note">planned — feeds the credential-harvest loop</div>
+    </div></div></div>
+    </section><section class="lane">
+      <div class="lane-h"><h3>Internal — Active Directory</h3>
+        <span class="net">internal</span>
+        <span class="creds required">creds: required</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">1</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">BloodHound MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">MorDavid/BloodHound-MCP-AI</div>
+      <div class="cnt"><b>75</b> tools</div>
+      <div class="tools"><span class="tool">attack paths</span><span class="tool">kerberoast</span><span class="tool">DCSync targets</span><span class="tool">ACLs</span><span class="tool">+71</span></div>
+      <div class="note">needs Neo4j (running)</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT <span class="gc">5</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">AdStrike</span><span class="b live">LIVE</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">…/adstrike</div>
+      <div class="cnt"><b>53</b> tools</div>
+      <div class="tools"><span class="tool">kerberoast</span><span class="tool">asreproast</span><span class="tool">dcsync</span><span class="tool">certipy</span><span class="tool">evil-winrm</span><span class="tool">+48</span></div>
+      <div class="note">impacket/certipy bundle</div>
+    </div><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Hashcat MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span><span class="b gated">GATED</span></div>
+      <div class="repo">…/hashcat-mcp</div>
+      <div class="cnt"><b>23</b> tools</div>
+      <div class="tools"><span class="tool">crack</span><span class="tool">identify_hash</span><span class="tool">wordlist</span><span class="tool">rules</span><span class="tool">+19</span></div>
+      <div class="note">password cracking — feeds exploit</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Certipy (AD CS)</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">ly4k/Certipy</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">esc1-esc8</span><span class="tool">cert-theft</span><span class="tool">shadow-creds</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Coercer</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">p0dalirius/Coercer</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">petitpotam</span><span class="tool">printerbug</span><span class="tool">authn-coerce</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">ntlmrelayx</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">fortra/impacket</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">ntlm-relay</span><span class="tool">ldap-relay</span><span class="tool">adcs-relay</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div></div></div>
+    </section><section class="lane">
+      <div class="lane-h"><h3>Cloud (Entra / AWS / Azure)</h3>
+        <span class="net">cloud</span>
+        <span class="creds required">creds: required</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">3</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">roadrecon MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">…/roadrecon-mcp</div>
+      <div class="cnt"><b>9</b> tools</div>
+      <div class="tools"><span class="tool">entra_enum</span><span class="tool">users</span><span class="tool">apps</span><span class="tool">roles</span><span class="tool">+5</span></div>
+      <div class="note">Entra enum</div>
+    </div><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Steampipe MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">turbot/steampipe-mcp</div>
+      <div class="cnt"><b>5</b> tools</div>
+      <div class="tools"><span class="tool">query</span><span class="tool">aws_*</span><span class="tool">azure_*</span><span class="tool">gcp_*</span></div>
+      <div class="note">cloud posture via SQL</div>
+    </div><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Prowler</span><span class="b live">LIVE</span><span class="b kind">CLI</span></div>
+      <div class="repo">prowler-cloud/prowler</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">aws</span><span class="tool">azure</span><span class="tool">gcp</span><span class="tool">kubernetes</span><span class="tool">m365</span></div>
+      <div class="note">CLI scanner v5.43</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT <span class="gc">4</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">GraphRunner</span><span class="b live">LIVE</span><span class="b kind">PS</span><span class="b gated">GATED</span></div>
+      <div class="repo">dafthack/GraphRunner</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">Invoke-*</span><span class="tool">token abuse</span><span class="tool">app consent</span></div>
+      <div class="note">PowerShell; Entra/M365 attack</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">Pacu</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">RhinoSecurityLabs/pacu</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">aws-priv-esc</span><span class="tool">enum</span><span class="tool">backdoor-detect</span></div>
+      <div class="note">cloned build-gap; AWS exploitation</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">roadtx</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">dirkjanm/ROADtools</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">token-request</span><span class="tool">device-code</span><span class="tool">prt-abuse</span></div>
+      <div class="note">installed CLI; Entra token abuse</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">MicroBurst</span><span class="b planned">PLANNED</span><span class="b kind">PS</span><span class="b gated">GATED</span></div>
+      <div class="repo">NetSPI/MicroBurst</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">azure-enum</span><span class="tool">storage</span><span class="tool">runbook-abuse</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div></div></div>
+    </section><section class="lane">
+      <div class="lane-h"><h3>Code / SAST</h3>
+        <span class="net">code</span>
+        <span class="creds na">creds: na</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">1</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Semgrep MCP</span><span class="b live">LIVE</span><span class="b kind">MCP</span></div>
+      <div class="repo">semgrep/mcp</div>
+      <div class="cnt"><b>1</b> tools</div>
+      <div class="tools"><span class="tool">semgrep_scan</span></div>
+      <div class="note">SAST validate-only</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT</h4><div class="empty">— none —</div></div></div>
+    </section><section class="lane">
+      <div class="lane-h"><h3>Container / K8s</h3>
+        <span class="net">container</span>
+        <span class="creds optional">creds: optional</span></div>
+      <div class="cols"><div class="grp find"><h4>FIND — scanning <span class="gc">1</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Trivy</span><span class="b live">LIVE</span><span class="b kind">CLI</span></div>
+      <div class="repo">aquasecurity/trivy</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">image</span><span class="tool">fs</span><span class="tool">config</span><span class="tool">k8s</span><span class="tool">sbom</span></div>
+      <div class="note">CLI scanner v0.74</div>
+    </div></div><div class="grp exploit"><h4>EXPLOIT <span class="gc">3</span></h4><div class="mcp on">
+      <div class="mcp-h"><span class="mcp-n">Peirates</span><span class="b live">LIVE</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">inguardians/peirates</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">container escape</span><span class="tool">sa token</span><span class="tool">kubelet</span></div>
+      <div class="note">CLI v1.1.33</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">kdigger</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span><span class="b gated">GATED</span></div>
+      <div class="repo">quarkslab/kdigger</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">node-escape</span><span class="tool">cap-check</span><span class="tool">sa-abuse</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div><div class="mcp off">
+      <div class="mcp-h"><span class="mcp-n">kube-hunter</span><span class="b planned">PLANNED</span><span class="b kind">CLI</span></div>
+      <div class="repo">aquasecurity/kube-hunter</div>
+      <div class="cnt"><b>0</b> tools</div>
+      <div class="tools"><span class="tool">k8s-recon</span><span class="tool">cve-probe</span></div>
+      <div class="note">planned — not installed (disk)</div>
+    </div></div></div>
+    </section>
+<div class="foot">The brain (PentestGPT) chooses ONE find MCP at plan time and ONE exploit MCP per confirmed-exploitable finding, always from that lane's list above, constrained by the deny gate + human approval. Credentialed vs uncredentialed is a deterministic router decision per lane (see each lane's creds tag).</div>
+</div></body></html>

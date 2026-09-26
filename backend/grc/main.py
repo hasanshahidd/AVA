@@ -196,6 +196,12 @@ app.include_router(assets_router)
 # Smart asset import (Excel/CSV mapping wizard) — isolated module: grc/modules/asset_import
 from grc.modules.asset_import.router import router as asset_import_router
 app.include_router(asset_import_router)
+# SBP (State Bank of Pakistan) offsite IT-asset inventory — isolated module: grc/modules/sbp_inventory
+from grc.modules.sbp_inventory.router import router as sbp_inventory_router
+app.include_router(sbp_inventory_router)
+# AI Pentest assessments (isolated module: grc/modules/pentest)
+from grc.modules.pentest.router import router as pentest_router
+app.include_router(pentest_router)
 
 app.include_router(dashboard_router)
 app.include_router(enriched_dashboard_router)
@@ -273,6 +279,27 @@ def on_startup():
     except Exception:  # noqa: BLE001
         import logging as _logging
         _logging.getLogger(__name__).warning("hosted-scan resume-on-startup skipped", exc_info=True)
+
+    # Same for AVA pentest Find scans (grc_pentest_scan_jobs): their worker thread dies on restart
+    # too, so re-drive nessus/openvas and fail the in-process ones with a clear reason instead of
+    # leaving them stuck 'running'.
+    try:
+        from grc.modules.pentest.service import resume_inflight_scans
+        resume_inflight_scans(os.getenv("AVA_TENANT_SLUG", "ava"))
+    except Exception:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).warning("pentest resume-on-startup skipped", exc_info=True)
+
+    # Auto-start the pentest MCP fleet's PERSISTENT backends (HexStrike's :8888 server, and the
+    # Greenbone/OpenVAS stack when built) so scanners are available without a manual restart — a WSL
+    # restart otherwise kills them. Non-blocking (daemon thread) + fault-tolerant.
+    if os.getenv("DISABLE_PENTEST_FLEET_AUTOSTART", "").strip().lower() not in ("1", "true", "yes", "on"):
+        try:
+            from grc.modules.pentest.fleet_lifecycle import ensure_fleet_up
+            ensure_fleet_up()
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).warning("pentest fleet auto-start skipped", exc_info=True)
 
 
 @app.on_event("shutdown")

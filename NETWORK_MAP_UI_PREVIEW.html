@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Map Preview</title>
+<style>
+  /* App-style tokens (mirrors the discovery page's --as-* palette) */
+  :root{
+    --as-bg:#eef1f5; --as-card:#ffffff; --as-ink:#141a22; --as-secondary:#3f4a57;
+    --as-muted:#586675; --as-faint:#8b96a5; --as-border:#dbe1e9; --as-row:#eef2f6;
+    --as-subtle:#f5f8fb; --as-track:#e9edf2;
+    --as-blue:#1d4ed8; --as-blue-bg:#e5edfd; --as-green:#15803d; --as-amber:#b45309;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 12px 30px -16px rgba(16,24,40,.20);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --as-bg:#0d1218; --as-card:#151c25; --as-ink:#e6edf4; --as-secondary:#c2cdda;
+      --as-muted:#9aa7b6; --as-faint:#66738a; --as-border:#252f3b; --as-row:#1b2530;
+      --as-subtle:#121a23; --as-track:#1b2530;
+      --as-blue:#7aa5f7; --as-blue-bg:#132039; --as-green:#4ade80; --as-amber:#e8b563;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 14px 34px -16px rgba(0,0,0,.6);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--as-bg); color:var(--as-ink);
+    font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
+    padding:26px 16px 54px}
+  .wrap{max-width:1080px; margin:0 auto}
+  .eyebrow{font-size:11px; font-weight:750; letter-spacing:.1em; text-transform:uppercase; color:var(--as-blue)}
+  h1{font-size:clamp(21px,3vw,27px); margin:.25em 0 .1em; letter-spacing:-.02em}
+  .sub{color:var(--as-muted); margin:0 0 20px; max-width:640px; font-size:14px}
+
+  /* toolbar + segmented toggles */
+  .toolbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px}
+  .seg{display:inline-flex; background:var(--as-track); border:1px solid var(--as-border); border-radius:10px; padding:3px}
+  .seg button{border:0; background:transparent; color:var(--as-muted); font:inherit; font-weight:650; font-size:13px;
+    padding:7px 13px; border-radius:7px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap}
+  .seg button.active{background:var(--as-card); color:var(--as-ink); box-shadow:var(--shadow)}
+  .seg.small button{font-size:12px; padding:6px 11px}
+  .spacer{flex:1}
+  .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--as-muted)}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .legend i{width:10px; height:10px; border-radius:3px; flex:none}
+  #detailToggle.off{opacity:.35; pointer-events:none}
+
+  /* map */
+  .clusters{display:flex; flex-wrap:wrap; gap:16px}
+  .cluster{flex:1; min-width:300px; background:var(--as-card); border:1px solid var(--as-border);
+    border-radius:14px; padding:12px 14px 6px; box-shadow:var(--shadow)}
+  .cluster .chd{display:flex; align-items:center; gap:8px; margin-bottom:2px}
+  .cluster .chd .cidr{font:650 13px ui-monospace,Menlo,Consolas,monospace; color:var(--as-ink)}
+  .cluster .chd .cnt{font-size:11.5px; color:var(--as-faint); margin-left:auto}
+  .cluster svg{width:100%; height:auto; display:block; overflow:visible}
+
+  .nbox{fill:var(--as-card); stroke-width:1.8}
+  .node{cursor:pointer}
+  .node:hover .nbox{filter:brightness(.98)}
+  .node.sel .nbox{stroke-width:2.8}
+  .nemoji{font-size:14px}
+  .nname{font:650 9px ui-monospace,Menlo,monospace; fill:var(--as-ink)}
+  .nip{font:9px ui-monospace,Menlo,monospace; fill:var(--as-faint)}
+  .edge{stroke:var(--as-green); stroke-width:2.2; fill:none}
+  .edge.inferred{stroke:var(--as-blue); stroke-dasharray:5 4}
+
+  .detailbar{margin-top:12px; padding:12px 14px; border:1px solid var(--as-border); border-radius:11px;
+    background:var(--as-subtle); font-size:13px; color:var(--as-secondary); min-height:20px}
+  .detailbar b{color:var(--as-ink)}
+  .detailbar .k{color:var(--as-faint); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-right:5px}
+  .detailbar code{font-family:ui-monospace,Menlo,monospace; background:var(--as-track); border:1px solid var(--as-border); padding:1px 6px; border-radius:5px}
+
+  /* list */
+  table{width:100%; border-collapse:collapse; background:var(--as-card); border:1px solid var(--as-border); border-radius:12px; overflow:hidden; box-shadow:var(--shadow)}
+  th{ text-align:left; padding:10px 13px; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--as-muted); font-weight:700; background:var(--as-subtle); border-bottom:1px solid var(--as-border); white-space:nowrap}
+  td{padding:10px 13px; border-bottom:1px solid var(--as-row); color:var(--as-secondary); font-size:13px}
+  tr:last-child td{border-bottom:0}
+  td .mono{font-family:ui-monospace,Menlo,monospace}
+  .pill{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:650; padding:3px 9px; border-radius:999px; border:1px solid var(--as-border); background:var(--as-subtle)}
+  .hidden{display:none}
+  .foot{margin-top:22px; font-size:12px; color:var(--as-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Asset Discovery</div>
+  <h1>Network map</h1>
+  <p class="sub">The devices a sweep found, drawn as the network they actually are — grouped by subnet, each host linked to its gateway. Toggle <b>Detailed</b> to preview the switch-level tree that SNMP adds in Phase&nbsp;2.</p>
+
+  <div class="toolbar">
+    <div class="seg" id="viewToggle">
+      <button data-view="map" class="active">◱&nbsp; Map</button>
+      <button data-view="list">≣&nbsp; List</button>
+    </div>
+    <div class="seg small" id="detailToggle">
+      <button data-mode="simple" class="active">Simple · now</button>
+      <button data-mode="detailed">Detailed · SNMP</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="legend">
+      <span><i style="background:var(--as-amber)"></i>Gateway</span>
+      <span><i style="background:var(--as-blue)"></i>Switch</span>
+      <span><i style="background:var(--as-faint)"></i>Host / device</span>
+    </span>
+  </div>
+
+  <div id="mapView">
+    <div class="clusters" id="clusters"></div>
+    <div class="detailbar" id="detailbar">Click any device to see how it connects.</div>
+  </div>
+
+  <div id="listView" class="hidden"></div>
+
+  <p class="foot">Preview on sample data. Live, this reads <code style="font-family:ui-monospace">/discovery/topology</code> — the endpoint built in Phase&nbsp;1 — and renders with React Flow inside the discovery page.</p>
+</div>
+
+<script>
+const SUBNETS = [
+  { cidr:'10.0.0.0/24', devices:[
+    {ip:'10.0.0.1',  name:'FortiGate-60F',   type:'firewall', role:'gateway'},
+    {ip:'10.0.0.2',  name:'Cisco-SW-A',      type:'switch'},
+    {ip:'10.0.0.3',  name:'Cisco-SW-B',      type:'switch'},
+    {ip:'10.0.0.50', name:'DESKTOP-A1B2C3',  type:'pc',      switch:'10.0.0.2'},
+    {ip:'10.0.0.51', name:'LAPTOP-HR-07',    type:'laptop',  switch:'10.0.0.2'},
+    {ip:'10.0.0.60', name:'HP-LaserJet-4200',type:'printer', switch:'10.0.0.3'},
+    {ip:'10.0.0.61', name:'SRV-APP-01',      type:'server',  switch:'10.0.0.3'},
+  ]},
+  { cidr:'10.0.10.0/24', devices:[
+    {ip:'10.0.10.1',  name:'MikroTik-GW2', type:'router', role:'gateway'},
+    {ip:'10.0.10.2',  name:'Cisco-SW-C',   type:'switch'},
+    {ip:'10.0.10.40', name:'CAM-LOBBY-1',  type:'camera', switch:'10.0.10.2'},
+    {ip:'10.0.10.41', name:'VOIP-2003',    type:'voip',   switch:'10.0.10.2'},
+  ]},
+];
+
+const META = {
+  firewall:{icon:'🛡️', label:'Firewall',  accent:'var(--as-amber)'},
+  router:  {icon:'🌐', label:'Router',    accent:'var(--as-amber)'},
+  gateway: {icon:'🌐', label:'Gateway',   accent:'var(--as-amber)'},
+  switch:  {icon:'🔀', label:'Switch',    accent:'var(--as-blue)'},
+  pc:      {icon:'🖥️', label:'Windows PC',accent:'var(--as-faint)'},
+  laptop:  {icon:'💻', label:'Laptop',    accent:'var(--as-faint)'},
+  printer: {icon:'🖨️', label:'Printer',   accent:'var(--as-faint)'},
+  server:  {icon:'🗄️', label:'Server',    accent:'var(--as-faint)'},
+  camera:  {icon:'📷', label:'IP camera', accent:'var(--as-faint)'},
+  voip:    {icon:'☎️', label:'VoIP phone',accent:'var(--as-faint)'},
+};
+const meta = t => META[t] || {icon:'❓', label:'Unknown', accent:'var(--as-faint)'};
+
+let mode = 'simple';                 // simple = Phase 1 star · detailed = Phase 2 tree
+let selected = null;
+const NW = 96, NH = 48;              // node box size
+
+// Compute node positions + edges for one subnet, per mode.
+function layout(subnet){
+  const gw = subnet.devices.find(d => d.role === 'gateway');
+  const rest = subnet.devices.filter(d => d !== gw);
+  const nodes = {}, edges = [];
+  const place = (d, x, y) => { nodes[d.ip] = {...d, x, y}; };
+
+  if (mode === 'simple'){
+    // Star — every device links straight to the gateway (what Phase 1 knows).
+    const W = Math.max(340, rest.length * 84);
+    place(gw, W/2, 40);
+    const step = W / (rest.length + 1);
+    rest.forEach((d, i) => { place(d, step*(i+1), 176); edges.push([d.ip, gw.ip, 'inferred']); });
+    return { nodes, edges, W, H: 210 };
+  }
+
+  // Detailed — endpoints sit under their real switch; switches under the gateway.
+  const switches = rest.filter(d => d.type === 'switch');
+  const endpoints = rest.filter(d => d.type !== 'switch');
+  let x = 60; const gap = 92;
+  switches.forEach(sw => {
+    const eps = endpoints.filter(e => e.switch === sw.ip);
+    const xs = [];
+    (eps.length ? eps : [null]).forEach(e => { if (e){ place(e, x, 232); xs.push(x); edges.push([e.ip, sw.ip, 'measured']); } x += gap; });
+    const sx = xs.length ? xs.reduce((a,b)=>a+b,0)/xs.length : x;
+    place(sw, sx, 132);
+    edges.push([sw.ip, gw.ip, 'measured']);
+  });
+  // Any endpoint whose switch we didn't see → straight to the gateway (honest).
+  endpoints.filter(e => !switches.some(s => s.ip === e.switch)).forEach(e => {
+    place(e, x, 232); edges.push([e.ip, gw.ip, 'inferred']); x += gap;
+  });
+  const W = Math.max(340, x);
+  place(gw, W/2, 44);
+  return { nodes, edges, W, H: 266 };
+}
+
+function nodeSVG(n){
+  const m = meta(n.type), x = n.x - NW/2, y = n.y - NH/2;
+  const sel = selected === n.ip ? ' sel' : '';
+  return `<g class="node${sel}" data-ip="${n.ip}">
+    <rect class="nbox" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" style="stroke:${m.accent}"/>
+    <text class="nemoji" x="${n.x}" y="${y+17}" text-anchor="middle">${m.icon}</text>
+    <text class="nname" x="${n.x}" y="${y+30}" text-anchor="middle">${n.name.length>14?n.name.slice(0,13)+'…':n.name}</text>
+    <text class="nip" x="${n.x}" y="${y+41}" text-anchor="middle">${n.ip}</text>
+  </g>`;
+}
+
+function clusterSVG(subnet){
+  const L = layout(subnet);
+  const lines = L.edges.map(([a,b,kind]) => {
+    const s = L.nodes[a], t = L.nodes[b];
+    const cls = kind === 'inferred' ? 'edge inferred' : 'edge';
+    return `<path class="${cls}" d="M${s.x},${s.y-NH/2} C ${s.x},${(s.y+t.y)/2} ${t.x},${(s.y+t.y)/2} ${t.x},${t.y+NH/2}"/>`;
+  }).join('');
+  const nodes = Object.values(L.nodes).map(nodeSVG).join('');
+  return `<div class="cluster">
+    <div class="chd"><span class="cidr">${subnet.cidr}</span><span class="cnt">${subnet.devices.length} devices</span></div>
+    <svg viewBox="0 0 ${L.W} ${L.H}" role="img" aria-label="Topology of ${subnet.cidr}">${lines}${nodes}</svg>
+  </div>`;
+}
+
+function connectsTo(subnet){
+  // Map each device -> what it connects to, in the current mode (for list + detail).
+  const out = {};
+  const L = layout(subnet);
+  L.edges.forEach(([a,b]) => { out[a] = b; });
+  return out;
+}
+
+function renderMap(){
+  document.getElementById('clusters').innerHTML = SUBNETS.map(clusterSVG).join('');
+  document.querySelectorAll('.node').forEach(g => g.addEventListener('click', () => {
+    selected = g.dataset.ip; renderMap(); showDetail(selected);
+  }));
+}
+
+function findDevice(ip){
+  for (const s of SUBNETS){ const d = s.devices.find(x=>x.ip===ip); if (d) return {d, subnet:s}; }
+  return null;
+}
+
+function showDetail(ip){
+  const bar = document.getElementById('detailbar');
+  const hit = findDevice(ip);
+  if (!hit){ bar.innerHTML = 'Click any device to see how it connects.'; return; }
+  const {d, subnet} = hit, m = meta(d.type);
+  const to = connectsTo(subnet)[ip];
+  const toDev = to ? findDevice(to).d : null;
+  bar.innerHTML =
+    `<b>${m.icon} ${d.name}</b> &nbsp;<code>${d.ip}</code> &nbsp;·&nbsp; <span class="k">Type</span>${m.label}` +
+    ` &nbsp;·&nbsp; <span class="k">Subnet</span><code>${subnet.cidr}</code>` +
+    (toDev
+       ? ` &nbsp;·&nbsp; <span class="k">Connects to</span><b>${meta(toDev.type).icon} ${toDev.name}</b> <code>${toDev.ip}</code>`
+       : ` &nbsp;·&nbsp; <span class="k">Role</span>subnet gateway (map root)`);
+}
+
+function renderList(){
+  const rows = SUBNETS.flatMap(s => {
+    const conn = connectsTo(s);
+    return s.devices.map(d => {
+      const m = meta(d.type);
+      const t = conn[d.ip] ? findDevice(conn[d.ip]).d : null;
+      return `<tr>
+        <td><span style="font-size:15px">${m.icon}</span> <b style="color:var(--as-ink)">${d.name}</b></td>
+        <td class="mono">${d.ip}</td>
+        <td><span class="pill">${m.label}</span></td>
+        <td class="mono" style="color:var(--as-faint)">${s.cidr}</td>
+        <td>${t ? `<span class="mono">${t.name}</span> <span style="color:var(--as-faint)" class="mono">${t.ip}</span>` : '<span style="color:var(--as-faint)">— gateway —</span>'}</td>
+      </tr>`;
+    });
+  }).join('');
+  document.getElementById('listView').innerHTML =
+    `<table><thead><tr><th>Device</th><th>IP</th><th>Type</th><th>Subnet</th><th>Connects to</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// toggles
+document.getElementById('viewToggle').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#viewToggle button').forEach(x=>x.classList.toggle('active', x===b));
+  const map = b.dataset.view === 'map';
+  document.getElementById('mapView').classList.toggle('hidden', !map);
+  document.getElementById('listView').classList.toggle('hidden', map);
+  document.getElementById('detailToggle').classList.toggle('off', !map);
+});
+document.getElementById('detailToggle').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#detailToggle button').forEach(x=>x.classList.toggle('active', x===b));
+  mode = b.dataset.mode;
+  renderMap(); renderList(); if (selected) showDetail(selected);
+});
+
+renderMap(); renderList();
+</script>
+</body>
+</html>

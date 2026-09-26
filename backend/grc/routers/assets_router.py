@@ -314,6 +314,14 @@ def list_assets(
 
     query = db.query(ITAsset).filter(ITAsset.tenant_id.in_(user_tenants))
 
+    # Transient AI-Pentest ad-hoc targets (status='adhoc' + last_seen_source='pentest-adhoc') are
+    # not inventory — hide them from the managed asset list (and therefore from the pentest target
+    # picker, which reads /assets). coalesce keeps NULL columns (normal assets) in the result.
+    query = query.filter(
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    )
+
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
         query = query.filter(ITAsset.tenant_id == tenant_id)

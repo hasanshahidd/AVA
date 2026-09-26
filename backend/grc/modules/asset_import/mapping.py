@@ -16,6 +16,7 @@ truly bizarre files is a later enhancement; this covers the real-world 95%.
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 # Our target fields. `syn` = header aliases; `required` only on name.
@@ -47,13 +48,13 @@ CANONICAL_FIELDS: Dict[str, Dict[str, Any]] = {
                                 "confidentiality level", "info class", "data sensitivity"]},
     "owner":           {"label": "Owner",
                         "syn": ["owner", "asset owner", "responsible", "custodian", "contact",
-                                "assigned to", "owner email", "poc", "steward"]},
+                                "owner email", "poc", "steward"]},
     "location":        {"label": "Location",
                         "syn": ["location", "site", "datacenter", "data center", "region",
                                 "facility", "building", "rack"]},
     "business_function": {"label": "Business function",
-                        "syn": ["business function", "function", "department", "business unit",
-                                "service", "role", "application role", "dept", "division"]},
+                        "syn": ["business function", "function", "business unit",
+                                "service", "role", "application role"]},
     "confidentiality": {"label": "Confidentiality (C)",
                         "syn": ["confidentiality", "conf", "cia c", "c rating"]},
     "integrity":       {"label": "Integrity (I)",
@@ -65,10 +66,77 @@ CANONICAL_FIELDS: Dict[str, Dict[str, Any]] = {
     "lifecycle_state": {"label": "Lifecycle",
                         "syn": ["lifecycle", "lifecycle state", "lifecycle stage", "phase",
                                 "stage of life"]},
+    # ── ITAM parity: hardware / procurement / org (all real ITAsset columns) ──
+    "serial_number":   {"label": "Serial number",
+                        "syn": ["serial", "serial number", "serial no", "sn", "service tag", "serial #"]},
+    "manufacturer":    {"label": "Manufacturer",
+                        "syn": ["manufacturer", "make", "brand", "oem"]},
+    "model":           {"label": "Model",
+                        "syn": ["model", "model number", "model name", "model no"]},
+    "vendor":          {"label": "Vendor",
+                        "syn": ["vendor", "supplier", "provider", "reseller"]},
+    "department":      {"label": "Department",
+                        "syn": ["department", "dept", "division", "org unit", "organizational unit", "cost center"]},
+    "assigned_user":   {"label": "Assigned user",
+                        "syn": ["assigned user", "assigned to", "end user", "primary user", "used by", "assignee", "user"]},
+    "owning_team":     {"label": "Owning team",
+                        "syn": ["owning team", "team", "support group", "group", "managed by", "responsible team"]},
+    "purchase_cost":   {"label": "Purchase cost",
+                        "syn": ["purchase cost", "cost", "price", "purchase price", "acquisition cost", "capex", "unit cost"]},
+    "valuation":       {"label": "Asset value",
+                        "syn": ["valuation", "asset value", "value", "replacement cost", "book value"]},
+    "purchase_date":   {"label": "Purchase date",
+                        "syn": ["purchase date", "purchased", "purchased on", "acquired", "acquisition date",
+                                "buy date", "po date", "date purchased"]},
+    "warranty_expiry": {"label": "Warranty expiry",
+                        "syn": ["warranty expiry", "warranty", "warranty expiration", "warranty end",
+                                "warranty until", "warranty date"]},
+    "eol_date":        {"label": "End-of-life date",
+                        "syn": ["eol", "eol date", "end of life", "end of support", "eos",
+                                "decommission date", "retirement date"]},
+    "cpu_cores":       {"label": "CPU cores",
+                        "syn": ["cpu cores", "cores", "cpu", "vcpu", "vcpus", "processors", "cpu count", "core count"]},
+    "memory_gb":       {"label": "Memory (GB)",
+                        "syn": ["memory gb", "memory", "ram", "ram gb", "memory (gb)", "ram (gb)"]},
+    "storage_gb":      {"label": "Storage (GB)",
+                        "syn": ["storage gb", "storage", "disk", "disk gb", "disk size", "storage (gb)",
+                                "hdd", "ssd", "capacity gb"]},
     "description":     {"label": "Description / notes",
                         "syn": ["description", "notes", "comment", "comments", "details",
                                 "remarks", "note"]},
 }
+
+# ── Vulnerability import fields (Phase 2) ────────────────────────────────────
+VULN_FIELDS: Dict[str, Dict[str, Any]] = {
+    "title":       {"label": "Title", "required": True,
+                    "syn": ["title", "name", "vulnerability", "vuln", "finding", "issue",
+                            "summary", "plugin name", "vulnerability name", "vuln title"]},
+    "severity":    {"label": "Severity", "required": True,
+                    "syn": ["severity", "risk", "risk level", "threat level", "priority", "rating"]},
+    "cvss_score":  {"label": "CVSS score",
+                    "syn": ["cvss", "cvss score", "cvss base score", "base score", "cvss3", "cvss v3"]},
+    "cve_id":      {"label": "CVE",
+                    "syn": ["cve", "cve id", "cve number", "cve reference"]},
+    "cwe_id":      {"label": "CWE",
+                    "syn": ["cwe", "cwe id", "weakness"]},
+    "affected_host": {"label": "Affected host / asset",
+                    "syn": ["host", "hostname", "host name", "affected host", "ip", "ip address",
+                            "asset", "affected asset", "target", "device", "affected system", "fqdn"]},
+    "affected_component": {"label": "Component / port / URL",
+                    "syn": ["component", "affected component", "service", "port", "url", "endpoint", "location"]},
+    "description": {"label": "Description",
+                    "syn": ["description", "details", "synopsis", "finding description", "summary",
+                            "notes", "note", "comment", "comments", "observation", "finding details"]},
+    "recommendation": {"label": "Recommendation / remediation",
+                    "syn": ["recommendation", "remediation", "solution", "fix", "mitigation", "resolution"]},
+}
+
+FIELD_SETS = {"asset": CANONICAL_FIELDS, "vuln": VULN_FIELDS}
+
+
+def fields_for(kind: str) -> Dict[str, Dict[str, Any]]:
+    return FIELD_SETS.get(kind or "asset", CANONICAL_FIELDS)
+
 
 _IPV4 = re.compile(r"^\s*(\d{1,3}\.){3}\d{1,3}\s*$")
 _MAC = re.compile(r"^\s*([0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2}\s*$")
@@ -80,24 +148,34 @@ def _norm(s: Any) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(s if s is not None else "").lower()).strip()
 
 
-# reverse index: normalized synonym -> canonical field (first writer wins)
-_SYN_INDEX: Dict[str, str] = {}
-for _f, _spec in CANONICAL_FIELDS.items():
-    _SYN_INDEX.setdefault(_norm(_f), _f)
-    for _s in _spec["syn"]:
-        _SYN_INDEX.setdefault(_norm(_s), _f)
+# reverse index: normalized synonym -> canonical field, per field-set (cached)
+_SYN_CACHE: Dict[int, Dict[str, str]] = {}
 
 
-def detect_header_row(grid: List[List[Any]], scan: int = 15) -> int:
+def _syn_index(fields: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
+    got = _SYN_CACHE.get(id(fields))
+    if got is None:
+        got = {}
+        for _f, _spec in fields.items():
+            got.setdefault(_norm(_f), _f)
+            for _s in _spec["syn"]:
+                got.setdefault(_norm(_s), _f)
+        _SYN_CACHE[id(fields)] = got
+    return got
+
+
+def detect_header_row(grid: List[List[Any]], scan: int = 15,
+                      fields: Optional[Dict[str, Dict[str, Any]]] = None) -> int:
     """Index of the row most likely to be the header. Clients prepend titles /
     logos / blank rows, so header != row 0 in the real world. We score each of
     the first `scan` rows by how many cells look like known field names."""
+    idx = _syn_index(fields or CANONICAL_FIELDS)
     best_i, best_score = 0, -1.0
     for i, row in enumerate(grid[:scan]):
         cells = [c for c in row if str(c if c is not None else "").strip()]
         if not cells:
             continue
-        known = sum(1 for c in row if _norm(c) in _SYN_INDEX)
+        known = sum(1 for c in row if _norm(c) in idx)
         shortish = sum(1 for c in cells if len(str(c)) <= 40)
         # known-field cells dominate; a fuller, short-text row breaks ties
         score = known * 3 + len(cells) * 0.1 + shortish * 0.05
@@ -131,24 +209,27 @@ def _infer_from_values(values: List[Any]) -> Optional[str]:
     return None
 
 
-def guess_mapping(headers: List[Any], columns: Optional[List[List[Any]]] = None) -> Dict[str, Dict[str, Any]]:
+def guess_mapping(headers: List[Any], columns: Optional[List[List[Any]]] = None,
+                  fields: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Dict[str, Any]]:
     """{source_header: {field, confidence 0..1, why}} — field=None means unmapped."""
+    fields = fields or CANONICAL_FIELDS
+    idx = _syn_index(fields)
     columns = columns or [[] for _ in headers]
     out: Dict[str, Dict[str, Any]] = {}
     taken: Dict[str, float] = {}  # field -> best confidence already assigned
-    for idx, h in enumerate(headers):
+    for i, h in enumerate(headers):
         key = str(h)
         nh = _norm(h)
         field, conf, why = None, 0.0, "no match — set manually"
         if not nh:
             out[key] = {"field": None, "confidence": 0.0, "why": "blank header"}
             continue
-        if nh in _SYN_INDEX:
-            field, conf, why = _SYN_INDEX[nh], 0.98, "exact header match"
+        if nh in idx:
+            field, conf, why = idx[nh], 0.98, "exact header match"
         else:
             best_f, best_ov = None, 0.0
             htok = set(nh.split())
-            for syn, f in _SYN_INDEX.items():
+            for syn, f in idx.items():
                 stok = set(syn.split())
                 if not stok:
                     continue
@@ -158,8 +239,8 @@ def guess_mapping(headers: List[Any], columns: Optional[List[List[Any]]] = None)
             if best_f and best_ov >= 0.5:
                 field, conf, why = best_f, round(0.5 + 0.3 * best_ov, 2), "header keyword match"
             else:
-                inferred = _infer_from_values(columns[idx] if idx < len(columns) else [])
-                if inferred:
+                inferred = _infer_from_values(columns[i] if i < len(columns) else [])
+                if inferred and inferred in fields:   # only accept an inferred field valid for this kind
                     field, conf, why = inferred, 0.55, "matched by column values"
         # if two columns claim the same field, keep the stronger one mapped
         if field and taken.get(field, 0.0) >= conf:
@@ -192,6 +273,42 @@ for _canon, _aliases in _TYPE_SYN.items():
         _TYPE[_norm(_a)] = _canon
 
 
+def _parse_date(raw: Any) -> Optional[datetime]:
+    """Best-effort date parse. openpyxl (data_only) already yields datetime for
+    real date cells; CSV strings go through numeric + month-name formats.
+    ponytail: all-≤12 numeric dates are assumed DD/MM (intl); real Excel date
+    cells arrive as datetime and skip the ambiguity entirely."""
+    if isinstance(raw, datetime):
+        return raw
+    if isinstance(raw, date):
+        return datetime(raw.year, raw.month, raw.day)
+    s = str(raw).strip()
+    if not s:
+        return None
+    s = re.sub(r"[ T]\d{1,2}:\d{2}(:\d{2})?.*$", "", s).strip()  # drop a trailing time only
+    parts = re.split(r"[/\-.]", s)
+    if len(parts) == 3 and all(p.isdigit() for p in parts):
+        a, b, c = (int(p) for p in parts)
+        if a >= 1000:                              # YYYY-MM-DD
+            y, m, d = a, b, c
+        else:
+            y = c if c >= 1000 else (2000 + c if c < 100 else c)
+            if a > 12 and b <= 12:   d, m = a, b   # unambiguous DD/MM
+            elif b > 12 and a <= 12: m, d = a, b   # unambiguous MM/DD
+            else:                    d, m = a, b   # ambiguous -> DD/MM
+        try:
+            return datetime(y, m, d)
+        except ValueError:
+            return None
+    for fmt in ("%d %b %Y", "%d %B %Y", "%b %d %Y", "%b %d, %Y", "%B %d, %Y",
+                "%d-%b-%Y", "%d %b, %Y", "%B %d %Y"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 def normalize_value(field: str, raw: Any) -> Any:
     """Coerce a raw cell into our canonical value. Unknown enum -> None so the
     row's validation can flag it rather than smuggling garbage into the DB."""
@@ -202,6 +319,17 @@ def normalize_value(field: str, raw: Any) -> Any:
         return None
     if field == "criticality":
         return _CRIT.get(s.lower())
+    if field == "severity":
+        return {"critical": "critical", "crit": "critical", "c": "critical", "4": "critical",
+                "5": "critical", "high": "high", "h": "high", "3": "high", "medium": "medium",
+                "med": "medium", "m": "medium", "moderate": "medium", "2": "medium",
+                "low": "low", "l": "low", "1": "low", "info": "info", "informational": "info",
+                "information": "info", "none": "info", "0": "info"}.get(s.lower())
+    if field == "cvss_score":
+        try:
+            return round(float(str(s).split()[0]), 1)
+        except (ValueError, TypeError):
+            return None
     if field == "asset_type":
         n = _norm(s)
         if n in _TYPE:
@@ -237,6 +365,20 @@ def normalize_value(field: str, raw: Any) -> Any:
                 "retired": "retired", "disposed": "retired"}.get(s.lower())
     if field == "environment":
         return s.lower()  # free-ish text; keep normalized case
+    if field in ("purchase_cost", "valuation"):
+        m = re.search(r"-?\d[\d,]*\.?\d*", s.replace(" ", ""))
+        try:
+            return float(m.group(0).replace(",", "")) if m else None
+        except ValueError:
+            return None
+    if field in ("cpu_cores", "memory_gb", "storage_gb"):
+        m = re.search(r"\d[\d,]*\.?\d*", s)
+        try:
+            return int(round(float(m.group(0).replace(",", "")))) if m else None
+        except ValueError:
+            return None
+    if field in ("purchase_date", "warranty_expiry", "eol_date"):
+        return _parse_date(raw)
     return s
 
 
@@ -281,7 +423,29 @@ def _demo() -> None:
     assert normalize_value("confidentiality", "5") == 5
     rec = apply_mapping(headers, grid[4], {h: m[h]["field"] for h in map(str, headers)})
     assert rec["name"] == "Web Front" and rec["ip_address"] == "10.0.0.6" and rec["criticality"] == "critical", rec
-    print("mapping self-check OK")
+    # ── vuln field-set ──
+    vh = ["Finding", "Risk", "CVE Number", "CVSS", "Affected IP", "Remediation"]
+    vcols = [["SQLi"], ["High"], ["CVE-2024-1"], ["9.8"], ["10.0.0.5"], ["patch it"]]
+    vg = {h: guess_mapping(vh, vcols, fields=VULN_FIELDS)[h]["field"] for h in vh}
+    assert vg == {"Finding": "title", "Risk": "severity", "CVE Number": "cve_id",
+                  "CVSS": "cvss_score", "Affected IP": "affected_host", "Remediation": "recommendation"}, vg
+    assert normalize_value("severity", "Informational") == "info"
+    assert normalize_value("severity", "H") == "high"
+    assert normalize_value("cvss_score", "9.8") == 9.8
+    # ── ITAM fields: header mapping + number/date normalization ──
+    ah = ["Serial No", "RAM (GB)", "Disk", "vCPUs", "Purchase Date", "Vendor", "Assigned To", "Cost"]
+    ag = {h: guess_mapping(ah, fields=CANONICAL_FIELDS)[h]["field"] for h in ah}
+    assert ag == {"Serial No": "serial_number", "RAM (GB)": "memory_gb", "Disk": "storage_gb",
+                  "vCPUs": "cpu_cores", "Purchase Date": "purchase_date", "Vendor": "vendor",
+                  "Assigned To": "assigned_user", "Cost": "purchase_cost"}, ag
+    assert normalize_value("purchase_cost", "$1,250.50") == 1250.5
+    assert normalize_value("memory_gb", "16 GB") == 16
+    assert normalize_value("cpu_cores", "8 vCPU") == 8
+    assert normalize_value("purchase_date", "2023-06-15") == datetime(2023, 6, 15)
+    assert normalize_value("warranty_expiry", "15/06/2023") == datetime(2023, 6, 15)  # DD/MM
+    assert normalize_value("eol_date", "12/31/2025") == datetime(2025, 12, 31)        # MM/DD (day>12)
+    assert normalize_value("purchase_date", "Jun 15, 2023") == datetime(2023, 6, 15)
+    print("mapping self-check OK (asset + vuln + ITAM)")
 
 
 if __name__ == "__main__":

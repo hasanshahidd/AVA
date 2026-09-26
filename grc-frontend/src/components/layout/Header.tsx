@@ -54,6 +54,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/assets': { title: 'IT Asset Inventory', subtitle: 'Manage and track IT assets with CIA ratings and valuations.', section: 'Cybersecurity Assurance' },
   '/asset-discovery': { title: 'IT Asset Discovery', subtitle: 'Find devices on the network, decide what to adopt, and see what changed.', section: 'Cybersecurity Assurance' },
   '/risk-posture': { title: 'Assets Risk Posture', subtitle: 'Risk = weighted blend of vulnerabilities, hardening, control gap and business impact' },
+  '/pentest': { title: 'AI Pentest' },
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },
   '/integrations/connections': { title: 'Scanner Connections', subtitle: 'Manage vulnerability scanner connections and sync schedules.' },
   '/integrations/exceptions': { title: 'Integration Exceptions', subtitle: 'Review and manage integration exceptions.' },
@@ -184,7 +185,7 @@ export default function Header() {
           }
           return (
             <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-sm font-semibold text-[var(--color-text)] truncate leading-none">{info.title}</span>
+              <span className="text-[15px] font-bold text-[var(--color-text)] truncate leading-none">{info.title}</span>
               {info.subtitle && (
                 <span className="hidden xl:block text-[11px] text-[var(--color-muted)] truncate">{info.subtitle}</span>
               )}

@@ -858,6 +858,39 @@ _LINUX_FAMS = ("linux", "ubuntu", "debian", "rhel", "centos", "rocky", "almalinu
                "oraclelinux", "amazonlinux", "sles", "suse")
 
 
+@router.get("/topology")
+def network_topology(
+    run_id: Optional[int] = Query(
+        default=None, description="Scope the map to one discovery run; omit for the current state across all runs."),
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+):
+    """Nodes + edges for the network map.
+
+    Nodes are the DISCOVERED DEVICES (deduped observations) — the same set the
+    Overview radar / Connect / Review queues show — so every device a sweep found
+    appears here, not just the ones promoted to inventory. Edges are computed on
+    read: the SNMP-measured switch tree (LLDP/CDP/FDB) where a device answered, and
+    the inferred /24 gateway star everywhere else. `measured` flags them apart so
+    the UI draws solid vs dashed. Read-only.
+    """
+    from .services.network_topology import build_topology_view
+
+    tid = get_user_primary_tenant(current_user, db)
+    view = build_topology_view(db, tid, run_id)
+    nodes = [{
+        "id": n["id"],
+        "label": n["name"],
+        "ip": n["ip"],
+        "type": n["type"],
+        "subnet": n["subnet"],
+        "in_inventory": n["in_inventory"],
+    } for n in view["nodes"]]
+    edges = [{"source": e["source"], "target": e["target"], "measured": e["measured"]}
+             for e in view["edges"]]
+    return {"nodes": nodes, "edges": edges}
+
+
 @router.get("/discovered-devices")
 def list_discovered_devices(
     run_id: Optional[int] = Query(
@@ -1928,13 +1961,31 @@ def connect_selected(
 
                 # "Try anyway": re-check the login port LIVE (not the stale sweep), so a
                 # host that just had WinRM enabled connects, and a truly-off one fails in
-                # ~2s as unreachable (a connection error, never an auth lockout).
+                # a probe-timeout or two as unreachable (a connection error, never an auth
+                # lockout). Uses the SAME timeout budget as the sweep — a tighter one here
+                # made a WinRM host the sweep saw over a slow tunnel read "not reachable".
                 login_ports = (5985, 5986) if transport == "windows" else (22,)
+                _seen_ports = (o.raw or {}).get("open_ports") if isinstance(o.raw, dict) else None
+                logger.warning("login-sweep: host=%r ip=%s transport=%s method=%s ticked_logins=%d "
+                               "open_ports_seen=%s -> live re-check ports %s",
+                               o.host_name, o.ip_address, transport, m, len(fps),
+                               _seen_ports, login_ports)
                 if not _live_open(o.ip_address, login_ports):
                     svc = "WinRM (5985/5986)" if transport == "windows" else "SSH (22)"
-                    o.resolution_note = (f"{svc} is not reachable on {o.ip_address} right now — the host "
-                                         f"answered discovery but remote login is disabled or firewalled. "
-                                         f"Enable it (or the agent) and try again.")
+                    # Tell "login service down" apart from "scanner can't reach this host at all":
+                    # re-probe ONE baseline port the sweep saw open. Dead too = a route/vantage gap
+                    # (open-ports were recorded on a different network) — no login/timeout change fixes it.
+                    _baseline = next((p for p in (_seen_ports or []) if p not in login_ports), None)
+                    if _baseline is not None and not _live_open(o.ip_address, [_baseline]):
+                        o.resolution_note = (f"no network route to {o.ip_address} from this scanner — its "
+                                             f"previously-open port {_baseline} does not answer either. Those "
+                                             f"ports were seen from a different network; this scanner is on a "
+                                             f"different subnet and can't reach it. Run discovery/login from a "
+                                             f"collector on the host's network (or connect this box to it).")
+                    else:
+                        o.resolution_note = (f"{svc} is not reachable on {o.ip_address} right now — the host "
+                                             f"answered discovery but remote login is disabled or firewalled. "
+                                             f"Enable it (or the agent) and try again.")
                     wdb.commit(); _sweep_update(tid, done=1, unreachable=1); continue
                 if forced_id_list:
                     # Only the ticked logins of THIS device's kind; highest

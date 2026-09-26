@@ -986,6 +986,22 @@ def execute_run(
         except Exception:
             logger.exception("discovery: rollback after domain-hierarchy failure failed for run %s", run.id)
 
+    # Network topology: walk the discovered network gear over SNMP (LLDP/CDP/FDB)
+    # and store the neighbour tables on each device's observation, so the Network
+    # map (built on read from discovered devices) can draw the measured switch
+    # tree. Best-effort — a silent switch just keeps the inferred gateway star, and
+    # a failure never fails the run.
+    try:
+        from .network_topology import collect_snmp_topology
+        collect_snmp_topology(db, run.tenant_id)
+        db.commit()
+    except Exception:
+        logger.exception("discovery: SNMP topology collection failed for run %s", run.id)
+        try:
+            db.rollback()
+        except Exception:
+            logger.exception("discovery: rollback after SNMP topology failure failed for run %s", run.id)
+
     # Host-centric collapse: when several EASM DNS names resolve to ONE machine
     # (same IP + same apex domain), fold them into a single host asset with the
     # other names as dns_aliases, so findings live once per machine. Guarded —

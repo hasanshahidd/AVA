@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -181,22 +182,38 @@ def typed_credentials_dict(kind: str, ip: str, port: int, username: str,
     return d
 
 
-def live_port_open(ip: Optional[str], ports, timeout: float = 2.0) -> bool:
+# Same budget the discovery sweep uses (executor._PROBE_TIMEOUT). The live
+# re-check MUST be at least as patient as the sweep that recorded the port open,
+# or a WinRM host the sweep saw at 2.5s over a VPN/IPsec tunnel fails this
+# "try anyway" re-check as "service not reachable" — the exact false negative.
+# Kept on the same DISCOVERY_PROBE_TIMEOUT knob so cranking it fixes BOTH paths.
+_LIVE_PORT_TIMEOUT = float(os.getenv("DISCOVERY_PROBE_TIMEOUT", "2.5"))
+
+
+def live_port_open(ip: Optional[str], ports, timeout: float = _LIVE_PORT_TIMEOUT) -> bool:
     """Fresh TCP check of the login port RIGHT NOW — overrides the (possibly stale)
     sweep result. This is what makes "try anyway" real: a box whose WinRM the sweep
     marked closed but that has since been enabled will connect, and a box that's
-    truly off fails in ~2s (not a 65s WinRM handshake timeout), reported as
-    'unreachable' — a connection error, never a bad-password lockout.
+    truly off fails in a probe-timeout or two (not a 65s WinRM handshake timeout),
+    reported as 'unreachable' — a connection error, never a bad-password lockout.
     """
     import socket
     if not ip:
+        logger.warning("live_port_open: no IP given (ports=%s) -> not reachable", list(ports))
         return False
+    errs = []
     for p in ports:
         try:
             with socket.create_connection((str(ip), int(p)), timeout=timeout):
+                logger.info("live_port_open: %s:%s OPEN (timeout=%.1fs)", ip, p, timeout)
                 return True
-        except OSError:
+        except OSError as e:  # diagnostic: name the exact reason each port failed
+            errs.append(f"{p}={type(e).__name__}:{e}")
             continue
+    # ponytail: diagnostic WARNING (always visible) — refused/timed-out=service off or firewalled,
+    # 'no route'/'unreachable'=vantage can't reach this LAN (needs a collector on-net, not a timeout bump)
+    logger.warning("live_port_open: %s NOT reachable on %s (timeout=%.1fs) [%s]",
+                   ip, list(ports), timeout, "; ".join(errs))
     return False
 
 

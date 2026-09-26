@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Topology Architecture</title>
+<style>
+  :root{
+    --bg:#eef1f5; --card:#ffffff; --ink:#141a22; --muted:#586675; --faint:#8b96a5;
+    --border:#dce2ea; --line:#c3ccd7; --track:#e9edf2; --mono:#0f172a;
+    --done:#15803d; --done-bg:#dcfce7; --done-br:#a5e0bb;
+    --p1:#1d4ed8;   --p1-bg:#dbeafe;   --p1-br:#a8c4f4;
+    --p2:#b45309;   --p2-bg:#fbeecd;   --p2-br:#eecd92;
+    --p3:#7c3aed;   --p3-bg:#ece7fe;   --p3-br:#cabdf5;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 10px 28px -14px rgba(16,24,40,.22);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0d1218; --card:#151c25; --ink:#e6edf4; --muted:#9aa7b6; --faint:#68758a;
+      --border:#252f3b; --line:#334150; --track:#1b2530; --mono:#c7d2df;
+      --done:#4ade80; --done-bg:#102a1b; --done-br:#215338;
+      --p1:#7aa5f7;   --p1-bg:#132039;   --p1-br:#2a4272;
+      --p2:#e8b563;   --p2-bg:#2c2110;   --p2-br:#5a4322;
+      --p3:#b69cf8;   --p3-bg:#221a3a;   --p3-br:#42356e;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
+    padding:28px 16px 56px;
+  }
+  .wrap{max-width:1120px; margin:0 auto}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+
+  /* header */
+  .eyebrow{font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--p1)}
+  h1{font-size:clamp(22px,3.4vw,30px); margin:.28em 0 .12em; letter-spacing:-.02em; line-height:1.15}
+  .sub{color:var(--muted); font-size:15px; max-width:720px; margin:0 0 18px}
+  .legend{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:26px}
+  .lg{font-size:12px; font-weight:650; padding:5px 11px; border-radius:999px; border:1px solid; display:inline-flex; align-items:center; gap:7px}
+  .lg::before{content:""; width:9px; height:9px; border-radius:50%; background:currentColor; flex:none}
+  .lg.done{color:var(--done); background:var(--done-bg); border-color:var(--done-br)}
+  .lg.p1{color:var(--p1); background:var(--p1-bg); border-color:var(--p1-br)}
+  .lg.p2{color:var(--p2); background:var(--p2-bg); border-color:var(--p2-br)}
+  .lg.p3{color:var(--p3); background:var(--p3-bg); border-color:var(--p3-br)}
+
+  .grid{display:grid; grid-template-columns:1.15fr .85fr; gap:22px; align-items:start}
+  @media (max-width:860px){ .grid{grid-template-columns:1fr} }
+
+  .panel-title{font-size:12px; font-weight:750; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); margin:0 0 14px}
+
+  /* pipeline */
+  .flow{position:relative}
+  .stage{display:grid; grid-template-columns:34px 1fr; gap:14px; position:relative; padding-bottom:16px}
+  .rail{display:flex; flex-direction:column; align-items:center}
+  .rail .dot{width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:13px; font-weight:750; color:#fff; flex:none; box-shadow:var(--shadow); z-index:1}
+  .rail .stem{width:2px; flex:1; background:var(--line); margin-top:4px; border-radius:2px}
+  .stage:last-child .rail .stem{display:none}
+  .stage.done .dot{background:var(--done)}
+  .stage.p1 .dot{background:var(--p1)}
+  .stage.p2 .dot{background:var(--p2)}
+  .stage.p3 .dot{background:var(--p3)}
+
+  .card{background:var(--card); border:1px solid var(--border); border-radius:13px; padding:14px 16px; box-shadow:var(--shadow)}
+  .stage .card{border-left-width:3px}
+  .stage.done .card{border-left-color:var(--done)}
+  .stage.p1 .card{border-left-color:var(--p1)}
+  .stage.p2 .card{border-left-color:var(--p2)}
+  .stage.p3 .card{border-left-color:var(--p3)}
+  .hd{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:5px}
+  .hd h3{margin:0; font-size:15.5px; letter-spacing:-.01em}
+  .tag{font-size:10.5px; font-weight:750; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:6px; margin-left:auto}
+  .tag.done{color:var(--done); background:var(--done-bg)}
+  .tag.p1{color:var(--p1); background:var(--p1-bg)}
+  .tag.p2{color:var(--p2); background:var(--p2-bg)}
+  .tag.p3{color:var(--p3); background:var(--p3-bg)}
+  .card code.file{display:inline-block; font-size:12px; color:var(--mono); background:var(--track); border:1px solid var(--border); padding:2px 7px; border-radius:6px; margin-bottom:7px}
+  .card p{margin:0; color:var(--muted); font-size:13.5px}
+  .card p .hi{color:var(--ink); font-weight:600}
+
+  .split{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
+  .split .card{flex:1; min-width:210px; box-shadow:none}
+
+  /* aside cards */
+  .side .card{margin-bottom:18px; padding:16px}
+  .side h3{margin:0 0 3px; font-size:15px}
+  .side .cap{color:var(--muted); font-size:13px; margin:0 0 12px}
+
+  /* topology svg */
+  .topo{width:100%; height:auto; display:block}
+  .tl{display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; font-size:12px; color:var(--muted)}
+  .tl span{display:inline-flex; align-items:center; gap:7px}
+  .tl .swatch{width:22px; height:0; border-top:2.5px solid var(--done); flex:none}
+  .tl .swatch.dash{border-top-style:dashed; border-color:var(--p1)}
+
+  /* signals list */
+  .sig{display:flex; gap:11px; padding:10px 0; border-top:1px dashed var(--border)}
+  .sig:first-of-type{border-top:0; padding-top:2px}
+  .sig .badge{font-size:10px; font-weight:750; letter-spacing:.03em; text-transform:uppercase; padding:3px 7px; border-radius:6px; height:fit-content; white-space:nowrap}
+  .sig.free .badge{color:var(--p1); background:var(--p1-bg)}
+  .sig.snmp .badge{color:var(--p2); background:var(--p2-bg)}
+  .sig b{font-size:13.5px}
+  .sig p{margin:2px 0 0; font-size:12.5px; color:var(--muted)}
+  .sig code{font-size:11.5px; color:var(--mono)}
+
+  .edge-note{font-size:12.5px; color:var(--muted); margin-top:12px; padding-top:12px; border-top:1px dashed var(--border)}
+  .edge-note code{background:var(--track); border:1px solid var(--border); padding:1px 6px; border-radius:5px; color:var(--mono); font-size:11.5px}
+
+  .foot{color:var(--faint); font-size:12px; text-align:center; margin-top:34px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">CyberAssurance · Asset Discovery</div>
+  <h1>Network Topology — Architecture &amp; Build Plan</h1>
+  <p class="sub">Today discovery finds every device on its own. This is how those independent IPs become a real map — <b>this&nbsp;PC → this&nbsp;switch → that&nbsp;switch → the&nbsp;router</b> — reusing the pipeline that already exists.</p>
+
+  <div class="legend">
+    <span class="lg done">Already built</span>
+    <span class="lg p1">Phase&nbsp;1 · free, ships now</span>
+    <span class="lg p2">Phase&nbsp;2 · SNMP-accurate</span>
+    <span class="lg p3">Phase&nbsp;3 · map view</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ─────────── LEFT: the pipeline ─────────── -->
+    <section>
+      <p class="panel-title">Discovery pipeline · what runs, in order</p>
+      <div class="flow">
+
+        <div class="stage done">
+          <div class="rail"><span class="dot">1</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>Network sweep</h3><span class="tag done">Built</span></div>
+            <code class="file">executor.py · _sweep_host()</code>
+            <p>Every host probed <span class="hi">independently</span> — TCP ports, protocol fingerprint (SNMP/DNS/banners), and the scanner's own ARP table for silent hosts. Classifies routers / switches / printers / hosts. <span class="hi">No links between devices yet</span> — this is the gap.</p>
+          </div>
+        </div>
+
+        <div class="stage done">
+          <div class="rail"><span class="dot">2</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>Observations</h3><span class="tag done">Built</span></div>
+            <code class="file">DiscoveryObservation.raw&#123;&#125;</code>
+            <p>One evidence row per device: <code class="mono">ip, mac, open_ports, device_type, os_guess, vendor</code>. Lands as <span class="hi">pending</span> — nothing is an asset yet.</p>
+          </div>
+        </div>
+
+        <div class="stage done">
+          <div class="rail"><span class="dot">3</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>Resolve → Inventory</h3><span class="tag done">Built</span></div>
+            <code class="file">resolver.py · resolve_run()</code>
+            <p>Observations become canonical <span class="hi">ITAsset</span> rows (merge / create / review). Every device now has a stable id to hang edges off.</p>
+          </div>
+        </div>
+
+        <div class="stage done">
+          <div class="rail"><span class="dot">4</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>Post-run link builders</h3><span class="tag done">Pattern exists</span></div>
+            <code class="file">executor.py · execute_run() → link_domain_hierarchy()</code>
+            <p>After each run, builders write edges idempotently. <span class="hi">DNS lineage already does this</span> (<code class="mono">subdomain_of</code>). Network topology is the <span class="hi">same shape</span> — a new sibling builder.</p>
+            <div class="split">
+              <div class="card" style="border-left:3px solid var(--done)">
+                <div class="hd"><h3 style="font-size:13.5px">domain_hierarchy</h3><span class="tag done">Built</span></div>
+                <p style="font-size:12.5px"><code class="mono">subdomain_of</code> edges — apex ↔ subdomain.</p>
+              </div>
+              <div class="card" style="border-left:3px solid var(--p1)">
+                <div class="hd"><h3 style="font-size:13.5px">network_topology</h3><span class="tag p1">New · P1</span></div>
+                <p style="font-size:12.5px"><code class="mono">connects_to</code> / <code class="mono">member_of</code> — subnet + gateway.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stage done">
+          <div class="rail"><span class="dot">5</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>Edge store</h3><span class="tag done">Reused as-is</span></div>
+            <code class="file">AssetRelationship (grc_asset_relationships)</code>
+            <p>Directed, typed edges. The vocabulary <span class="hi">already includes</span> <code class="mono">connects_to</code> and <code class="mono">member_of</code> — <span class="hi">no schema change</span>. Edges show on each device's Relationships tab for free.</p>
+          </div>
+        </div>
+
+        <div class="stage p2">
+          <div class="rail"><span class="dot">6</span><span class="stem"></span></div>
+          <div class="card">
+            <div class="hd"><h3>SNMP neighbor walks</h3><span class="tag p2">Phase 2</span></div>
+            <code class="file">snmp.py · add LLDP / CDP / bridge-FDB walks</code>
+            <p>Reuses the existing GETNEXT machinery (already walks <code class="mono">ifTable</code>). Reads the switches themselves for <span class="hi">measured</span> links: switch↔switch↔router and endpoint-MAC→switch-port. This is the true "PC plugged into that switch." <span class="hi">Needs SNMP read on the gear</span> (campaigns already collect communities).</p>
+          </div>
+        </div>
+
+        <div class="stage p3">
+          <div class="rail"><span class="dot">7</span></div>
+          <div class="card">
+            <div class="hd"><h3>Topology API + Map view</h3><span class="tag p3">Phase 3</span></div>
+            <code class="file">/discovery/topology → React Flow "Network map" tab</code>
+            <p>New endpoint returns <code class="mono">&#123;nodes, edges&#125;</code> from AssetRelationship. Rendered with <span class="hi">React Flow</span> — the same graph stack already used by the asset TrajectoryMap. New tab on the discovery page.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────── RIGHT: result + how ─────────── -->
+    <aside class="side">
+
+      <div class="card">
+        <h3>What the map shows</h3>
+        <p class="cap">The flat device list, drawn as the network it actually is.</p>
+        <svg class="topo" viewBox="0 0 400 300" role="img" aria-label="Sample network topology from router to switches to endpoints">
+          <defs>
+            <style>
+              .box{fill:var(--card); stroke:var(--border); stroke-width:1.5}
+              .lbl{font:600 10.5px ui-monospace,Menlo,Consolas,monospace; fill:var(--ink)}
+              .sub{font:9px -apple-system,system-ui,sans-serif; fill:var(--faint)}
+              .solid{stroke:var(--done); stroke-width:2.4; fill:none}
+              .dash{stroke:var(--p1); stroke-width:2; fill:none; stroke-dasharray:5 4}
+            </style>
+          </defs>
+
+          <!-- subnet grouping (Phase 1, free) -->
+          <rect x="10" y="14" width="380" height="272" rx="14" fill="none" stroke="var(--p1)" stroke-width="1.3" stroke-dasharray="3 5" opacity=".55"/>
+          <text x="20" y="28" class="sub" style="fill:var(--p1); font-weight:700">subnet 10.0.0.0/24 · member_of</text>
+
+          <!-- edges: measured (solid) -->
+          <path class="solid" d="M200,58 L120,104"/>
+          <path class="solid" d="M200,58 L280,104"/>
+          <path class="solid" d="M120,138 L78,200"/>
+          <path class="solid" d="M120,138 L162,200"/>
+          <path class="solid" d="M280,138 L238,200"/>
+          <path class="solid" d="M280,138 L322,200"/>
+
+          <!-- router -->
+          <rect class="box" x="152" y="38" width="96" height="34" rx="8" style="stroke:var(--p2); stroke-width:2"/>
+          <text x="200" y="52" text-anchor="middle" class="lbl">Router</text>
+          <text x="200" y="64" text-anchor="middle" class="sub">gateway · 10.0.0.1</text>
+
+          <!-- switches -->
+          <rect class="box" x="76" y="104" width="88" height="34" rx="8" style="stroke:var(--p1); stroke-width:2"/>
+          <text x="120" y="118" text-anchor="middle" class="lbl">Switch A</text>
+          <text x="120" y="130" text-anchor="middle" class="sub">10.0.0.2</text>
+
+          <rect class="box" x="236" y="104" width="88" height="34" rx="8" style="stroke:var(--p1); stroke-width:2"/>
+          <text x="280" y="118" text-anchor="middle" class="lbl">Switch B</text>
+          <text x="280" y="130" text-anchor="middle" class="sub">10.0.0.3</text>
+
+          <!-- endpoints -->
+          <rect class="box" x="44" y="200" width="68" height="30" rx="7"/>
+          <text x="78" y="219" text-anchor="middle" class="lbl">PC</text>
+          <rect class="box" x="128" y="200" width="68" height="30" rx="7"/>
+          <text x="162" y="219" text-anchor="middle" class="lbl">Laptop</text>
+          <rect class="box" x="204" y="200" width="68" height="30" rx="7"/>
+          <text x="238" y="219" text-anchor="middle" class="lbl">Printer</text>
+          <rect class="box" x="288" y="200" width="68" height="30" rx="7"/>
+          <text x="322" y="219" text-anchor="middle" class="lbl">Server</text>
+
+          <!-- inferred fallback edge example (Phase 1) -->
+          <path class="dash" d="M78,230 Q40,150 168,72" opacity=".5"/>
+          <text x="24" y="168" class="sub" style="fill:var(--p1)">inferred</text>
+        </svg>
+        <div class="tl">
+          <span><i class="swatch"></i> measured link · LLDP/CDP/FDB (P2)</span>
+          <span><i class="swatch dash"></i> inferred · subnet + gateway (P1)</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Where the links come from</h3>
+        <p class="cap">Three signals, cheapest first.</p>
+
+        <div class="sig free">
+          <span class="badge">P1 · free</span>
+          <div><b>Subnet membership</b>
+            <p>Every IP → its CIDR. All hosts on <code>10.0.0.0/24</code> share a broadcast domain → <code>member_of</code> a subnet node. Zero new probing.</p></div>
+        </div>
+
+        <div class="sig free">
+          <span class="badge">P1 · free</span>
+          <div><b>Default gateway</b>
+            <p>The device fingerprinted as router/firewall (or sitting at <code>.1</code>) is the subnet's uplink → every host <code>connects_to</code> it. Draws the star.</p></div>
+        </div>
+
+        <div class="sig snmp">
+          <span class="badge">P2 · SNMP</span>
+          <div><b>Neighbor + bridge tables</b>
+            <p>LLDP / CDP give switch↔switch↔router. The bridge FDB maps each endpoint MAC to a switch port — the real <span style="color:var(--ink);font-weight:600">PC→switch</span> edge.</p></div>
+        </div>
+
+        <div class="edge-note">
+          <b>The honest limit:</b> true "which switch port" is only knowable from the gear over SNMP. Phase&nbsp;1 gives a correct router/subnet map from data already in hand; Phase&nbsp;2 upgrades those edges to measured wherever a switch answers SNMP.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Reused, not rebuilt</h3>
+        <p class="cap">Why this is small.</p>
+        <p style="font-size:13px; color:var(--muted); margin:0">
+          Edge table <span style="color:var(--ink)">✓</span> · edge API <span style="color:var(--ink)">✓</span> ·
+          post-run builder pattern <span style="color:var(--ink)">✓</span> · React Flow graph <span style="color:var(--ink)">✓</span>.
+          New work = one edge-builder file, some SNMP OID walks, one endpoint, one tab.
+        </p>
+      </div>
+
+    </aside>
+  </div>
+
+  <p class="foot">CyberAssurance · Asset Discovery — network topology architecture · draft for review</p>
+</div>
+</body>
+</html>

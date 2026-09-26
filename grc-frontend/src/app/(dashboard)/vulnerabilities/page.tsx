@@ -17,6 +17,7 @@ import NcaVulnQuickAddModal from '@/components/vulnerabilities/NcaVulnQuickAddMo
 // zero extra network calls.
 import VulnerabilityDashboardPage from './dashboard/page';
 import { VulnsWorkspace } from './_workspace/VulnsWorkspace';
+import { SmartImportWizard } from '../assets/_import/SmartImportWizard';
 import type { Vulnerability } from './_workspace/lib';
 import {
   Upload,
@@ -268,6 +269,7 @@ export default function VulnerabilitiesPage() {
   const [bulkUploadState, setBulkUploadState] = useState<'idle'|'uploading'|'done'|'error'>('idle');
   const [bulkUploadMsg, setBulkUploadMsg] = useState<string|null>(null);
   const bulkFileRef = useRef<HTMLInputElement>(null);
+  const [showSmartImport, setShowSmartImport] = useState(false);
   // Template chooser shown before the file picker opens. 'standard' uses the
   // generic vuln-management bulk endpoint; 'nca' parses the NCA template
   // client-side and posts each row to /vulnerabilities/nca.
@@ -1077,6 +1079,7 @@ export default function VulnerabilitiesPage() {
             setBulkTemplateChoice(registerType === 'nca' ? 'nca' : 'standard');
             setShowBulkChooser(true);
           }}
+          onImport={() => setShowSmartImport(true)}
           onAdd={() => {
             // NCA register → NCA-specific add modal; Standard → Add slide-over.
             if (registerType === 'nca') setIsNcaAddOpen(true);
@@ -1089,6 +1092,17 @@ export default function VulnerabilitiesPage() {
 
         {/* legacy inline toolbar + table removed — superseded by VulnsWorkspace */}
       </div>
+
+      {showSmartImport && (
+        <SmartImportWizard
+          kind="vuln"
+          onClose={() => setShowSmartImport(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+            queryClient.invalidateQueries({ queryKey: ['vuln-dashboard'] });
+          }}
+        />
+      )}
 
       {/* Add Vulnerability Slide-over — dimmed backdrop so the page behind stays visible but recedes */}
       {isModalOpen && (

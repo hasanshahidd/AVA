@@ -1,0 +1,88 @@
+# external-tools manifest — the pinned download sources for the MCP fleet.
+# Verified 2026-09-22 by an 8-agent audit (each MCP checked against its real repo, tools, and CVEs).
+# tools/install_mcps.py reads this to clone/pin. The engine NEVER imports these — it only speaks MCP to them.
+#
+# status:  present = cloned  |  clone = pull when we build that lane  |  drop = do NOT use (reason)  |  build = no MCP exists, we write it
+# trust:   official = vendor-authored  |  community = unvetted single-author  |  + gate = must sit behind the human gate + sandbox
+#
+# ⚠ FLEET-WIDE RULE (from the audit): PentestGPT runs both roles at FULL_ACCESS and several exploit MCPs
+#   have unauth-RCE-class endpoints with NO built-in guardrail. Container/VM isolation is MANDATORY, not optional.
+
+brain:
+  pentestgpt:
+    repo: https://github.com/GreyDGL/PentestGPT
+    status: present            # external-tools/PentestGPT/pentestgpt_agent/
+    install: "cd external-tools/PentestGPT/pentestgpt_agent && uv sync --extra all"
+    trust: community + gate     # runs Supervisor+Executor at SandboxPolicy.FULL_ACCESS — sandbox mandatory
+    note: >
+      THE wiring bug lives here: both UnifiedAgent(...) built with NO tool server, so the executor sees
+      "Found 0 tools". FIX = feed HexStrike via CodexConfig(config_overrides=['mcp_servers.hexstrike.command=...',
+      'mcp_servers.hexstrike.args=[...]']) — there is NO SDK `tools=` kwarg (my earlier note was wrong).
+  unified-agent:
+    repo: https://github.com/PentestGPT-Project/UnifedAgentWrapper
+    status: present            # pulled transitively by the uv sync above (v0.3.0)
+    note: use this installed 0.3.0 — the root PentestGPT/unified_agent/ copy is the OBSOLETE compat copy.
+
+external:
+  hexstrike:
+    repo: https://github.com/0x4m4/hexstrike-ai
+    commit: d689933ff579d839c676c82b231f8e98326c5f04
+    status: present            # external-tools/hexstrike-ai/  — the primary external hands
+    verdict: MATCHES           # ~70 real CLI tools wrapped; recon+web+cloud+binary
+    transport: "stdio (hexstrike_mcp.py) -> HTTP REST to hexstrike_server.py Flask :8888"
+    install: "python3 hexstrike_server.py  (bind 127.0.0.1:8888 ONLY)  then  python3 hexstrike_mcp.py --server http://127.0.0.1:8888"
+    trust: community + HARD GATE
+    cve: >
+      CVE-2026-90620 unauth RCE (/api/command runs subprocess.Popen shell=True, no auth) + /api/python/execute RCE.
+      The advisory covers commit d689933 = OUR checkout, so this clone IS vulnerable. NEVER expose :8888;
+      loopback only; ephemeral sandbox; disable /api/command + /api/python/execute; route typed /api/tools/* only.
+  burp:
+    repo: https://github.com/PortSwigger/mcp-server
+    status: present            # cloned to external-tools/burp-mcp/  (web FIND — see mismatch, NOT auto-exploit)
+    verdict: PARTIAL           # crafts requests + reads existing issues; NO automated Active Scan (issue #63)
+    transport: "SSE http 127.0.0.1:9876; stdio via bundled proxy JAR. Requires Burp running + gradlew embedProxyJar."
+    trust: official            # highest-trust web MCP; keep loopback-bound
+  cyproxio-sqlmap:
+    repo: https://github.com/cyproxio/mcp-for-security
+    status: present            # cloned to external-tools/mcp-for-security/  (bundles ~22 tool MCPs incl sqlmap)
+    verdict: MATCHES           # sqlmap-mcp: full arbitrary sqlmap incl --file-read/--file-write/--os-shell RCE
+    transport: "stdio; cd sqlmap-mcp && npm install && npm run build; node build/index.js sqlmap"
+    trust: community(MIT, archived) + HARD GATE   # unrestricted sqlmap_args passthrough — allowlist + gate + sandbox
+  # available but NOT cloned (redundant with HexStrike's own recon):
+  pd-tools-mcp:   { repo: https://github.com/intelligent-ears/pd-tools-mcp, status: skip, why: "redundant w/ HexStrike; value = naabu+dnsx+bug_bounty_workflow; community, ~4 commits" }
+  nuclei-mcp:     { repo: https://github.com/addcontent/nuclei-mcp, status: skip, why: "redundant w/ HexStrike; prefer this over crazyMarky if ever wanted" }
+  sqlmap-mohdhaji87: { repo: https://github.com/mohdhaji87/SQLMap-MCP, status: drop, why: "no license, abandoned, rated 19/100 Dangerous — use cyproxio instead" }
+
+internal-host:
+  nessus:    { repo: https://github.com/Cyreslab-AI/nessus-mcp-server, status: clone, trust: "community; MOCK MODE by default = FABRICATED findings unless NESSUS_* keys set", note: "AVA already has native nessus_adapter.py — this is redundant; verify keys before trusting output" }
+  openvas:   { repo: https://github.com/greenbone-hive/openvas-mcp-server, status: clone, trust: "official (Greenbone); AGPL; auth required; run read-only toolset for find-only" }
+  metasploit: { repo: https://github.com/rapid7/metasploit-framework, status: clone, path: msfmcpd, trust: "OFFICIAL Rapid7 — read-only by default; exploit tools GATED behind --enable-dangerous-actions", note: "THIS is the disabled-by-default msfmcpd — the pinned one" }
+  metasploit-fork: { repo: https://github.com/GH05TCREW/MetasploitMCP, status: drop, why: "run_exploit ON by default, no auth, no gate — contradicts our design; use official msfmcpd" }
+  netexec:   { repo: https://github.com/mpgn/NetExec-mcp, status: clone, install: "pipx install netexec-mcp", trust: "semi-official (mpgn = core NetExec dev); NXC_MODE defaults read-only 'recon'; gate promotion to loot/full" }
+
+internal-ad:
+  bloodhound: { repo: https://github.com/MorDavid/BloodHound-MCP-AI, status: clone, trust: "community; read-only Cypher = lowest AD blast radius", note: "needs BloodHound CE + populated Neo4j; README clone URL is a placeholder" }
+  adstrike:   { repo: https://github.com/capture0x/AdStrike, status: clone, trust: "community + HARD GATE; 53 tools wrapping impacket/certipy/responder/rubeus/kerbrute/evil-winrm; highest AD blast radius; Linux-only", note: "the single most capable AD-exploit server" }
+  praetor:    { repo: https://github.com/TyrusRC/praetor, status: skip, why: "~80% redundant with AdStrike+Hashcat; brand-new/least-tested; dual-lane Burp+AD" }
+  evil-winrm-mcp: { repo: https://github.com/schwarztim/sec-evil-winrm-mcp, status: drop, why: "ARCHIVED; SSHes to a separate remote Kali box; evil-winrm already bundled in AdStrike" }
+  hashcat:    { repo: https://github.com/MorDavid/Hashcat-MCP, status: clone, trust: "community; local hashcat wrapper (low network risk); validate mask/rule inputs", note: "NTLM -m1000 + Kerberos -m13100/18200 cover NTDS/Kerberoast; redundant if Praetor used" }
+
+cloud:
+  prowler:    { repo: https://github.com/prowler-cloud/prowler, status: clone, path: prowler/mcp_server, trust: "OFFICIAL (Prowler Inc); auth-gated; read-only + non-destructive mgmt", note: "needs a Prowler backend + API key; bonus attack-path analysis" }
+  steampipe:  { repo: https://github.com/turbot/steampipe-mcp, status: clone, install: "npx -y @turbot/steampipe-mcp", trust: "OFFICIAL (Turbot); read-only SQL; low risk" }
+  roadrecon-mcp: { repo: https://github.com/atomicchonk/roadrecon_mcp_server, status: clone, trust: "community; ENUM-ONLY Entra (belongs on cloud FIND)", note: "the audit found this — my plan had missed it; needs ROADrecon GUI on :5000" }
+
+container:
+  trivy:      { repo: https://github.com/aquasecurity/trivy-mcp, status: clone, install: "trivy plugin install mcp", trust: "OFFICIAL (Aqua); find-only; safest server in the fleet — nothing to build" }
+
+code:
+  semgrep:    { repo: https://github.com/semgrep/mcp, status: clone, install: "uvx semgrep-mcp", trust: "OFFICIAL (Semgrep); find-only SAST", note: "standalone repo ARCHIVED 2026-10-28 — pin the package version / prefer the CLI-embedded server" }
+  gitleaks:   { repo: null, status: build, why: "no first-party MCP; community wrappers or Apify SaaS that EXFILTRATES the repo. Wrap the gitleaks CLI locally: `gitleaks detect --report-format json` in a thin stdio wrapper. Additive to Trivy's secrets pass." }
+
+# ── BUILD GAPS — no MCP exists, AVA authors these (all HARD-GATE, OFF by default) ──
+build_gaps:
+  pacu:       { tool: https://github.com/RhinoSecurityLabs/pacu, lane: cloud-exploit, note: "wrap a CURATED SUBSET of modules (not the whole framework); keep enum(read) separable from exploit(write); high blast radius" }
+  roadtx:     { tool: https://github.com/dirkjanm/ROADtools, lane: cloud-exploit, note: "roadtx = token exchange/PRT abuse/device reg — the real Entra exploit gap" }
+  graphrunner: { tool: https://github.com/dafthack/GraphRunner, lane: cloud-exploit, note: "dafthack/BHIS, NOT dirkjanm (plan attribution was wrong); PowerShell M365/Graph post-ex" }
+  peirates:   { tool: https://github.com/inguardians/peirates, lane: internal-host, note: "container ESCAPE (runtime host exploit); OFFICIAL InGuardians, actively maintained; preferred escape base — wrap escape primitives, NO unauth exec endpoint" }
+  # NOT kubesploit — it's a full HTTP/2 C2 framework (standing-C2 = out of our assurance scope).

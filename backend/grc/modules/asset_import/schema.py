@@ -13,6 +13,7 @@ class CanonicalField(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     filename: str
+    kind: str = "asset"
     header_row: int
     columns: List[str]
     row_count: int
@@ -20,6 +21,7 @@ class AnalyzeResponse(BaseModel):
     # source_header -> {field, confidence, why}
     suggested_mapping: Dict[str, Dict[str, Any]]
     canonical_fields: List[CanonicalField]
+    ai_available: bool = False
 
 
 class CommitResponse(BaseModel):

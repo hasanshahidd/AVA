@@ -18,6 +18,7 @@ import { discoveryApi } from '@/lib/api';
 import { useTabParam } from '@/lib/useTabParam';
 import ConnectWizardPage, { PLATFORMS, PLATFORM_GROUPS, type Platform } from '../admin/integrations/connect/page';
 import AgentsAdminPage from '../admin/agents/page';
+import NetworkMap from './_NetworkMap';
 import '../assets/_suite/asset-suite.css';
 import './discovery-antimetal.css';
 import './discovery-command.css';
@@ -28,11 +29,12 @@ import './discovery-command.css';
 // 'score' (the standalone attack-surface scorecard) was removed — external
 // assets and their hygiene grade live in the IT Asset Inventory and on the
 // asset's own Overview, not in a separate Discovery page.
-type Tab = 'overview' | 'discover' | 'connections' | 'inbox' | 'runs';
+type Tab = 'overview' | 'discover' | 'map' | 'connections' | 'inbox' | 'runs';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview',    label: 'Overview' },
   { id: 'discover',    label: 'Discovery' },
+  { id: 'map',         label: 'Network map' },
   { id: 'runs',        label: 'Scan history' },
   { id: 'connections', label: 'Connections' },
   { id: 'inbox',       label: 'Review queue' },
@@ -2575,6 +2577,7 @@ export default function AssetDiscoveryPage() {
       {tab === 'connections' && <ConnectionsTab />}
       {tab === 'inbox' && <InboxView />}
       {tab === 'runs' && <Runs />}
+      {tab === 'map' && <NetworkMap />}
     </div>
   );
 }

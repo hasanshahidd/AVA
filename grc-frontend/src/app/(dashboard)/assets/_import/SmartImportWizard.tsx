@@ -5,14 +5,19 @@
 // column mapping (by header names AND by sniffing values); the user confirms,
 // previews, and imports. Provenance batch id enables one-click Undo. Isolated:
 // the only edit to existing code is the Import button in page.tsx pointing here.
-import React, { useMemo, useState } from 'react';
-import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Download, ArrowRight, ArrowLeft, Undo2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Download, FileDown, ArrowRight, ArrowLeft, Undo2, Clock, Sparkles } from 'lucide-react';
 import { assetsApi } from '@/lib/api';
-import { assetImportApi, AnalyzeResult, CommitResult } from './api';
+import { assetImportApi, AnalyzeResult, CommitResult, ValidateResult, HistoryItem } from './api';
 
 type Step = 'upload' | 'map' | 'preview' | 'result';
 
-export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function SumPill({ n, label, cls }: { n: number; label: string; cls: string }) {
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}><b>{n}</b> {label}</span>;
+}
+
+export function SmartImportWizard({ onClose, onSuccess, kind = 'asset' }: { onClose: () => void; onSuccess: () => void; kind?: 'asset' | 'vuln' }) {
+  const isVuln = kind === 'vuln';
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -26,6 +31,31 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
 
   const [result, setResult] = useState<CommitResult | null>(null);
   const [undone, setUndone] = useState(false);
+
+  // ── validation (dry-run) + import history ────────────────────────────────
+  const [validation, setValidation] = useState<ValidateResult | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [hist, setHist] = useState<HistoryItem[]>([]);
+  const [undoingBatch, setUndoingBatch] = useState<string | null>(null);
+
+  // ── AI-assisted mapping (LLM fallback for weird columns) ─────────────────
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiOverlay, setAiOverlay] = useState<Record<string, { confidence: string; why: string }>>({});
+  const [aiNote, setAiNote] = useState<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    try { const { data } = await assetImportApi.history(kind); setHist(data.items || []); }
+    catch { /* history is non-critical — never block the wizard on it */ }
+  }, [kind]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const undoBatch = async (batchId: string) => {
+    setUndoingBatch(batchId);
+    setError(null);
+    try { await assetImportApi.undo(batchId, kind); await loadHistory(); onSuccess(); }
+    catch (e: any) { setError(e?.response?.data?.detail || 'Undo failed.'); }
+    finally { setUndoingBatch(null); }
+  };
 
   // ── step 1: upload + analyze ────────────────────────────────────────────
   const pickFile = (f: File | null) => {
@@ -43,11 +73,13 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
     setBusy(true);
     setError(null);
     try {
-      const { data } = await assetImportApi.analyze(file);
+      const { data } = await assetImportApi.analyze(file, kind);
       setAnalysis(data);
       const init: Record<string, string> = {};
       data.columns.forEach((c) => { init[c] = data.suggested_mapping[c]?.field || ''; });
       setMapping(init);
+      setAiOverlay({});
+      setAiNote(null);
       setStep('map');
     } catch (e: any) {
       setError(e?.response?.data?.detail || 'Could not read the file.');
@@ -58,7 +90,7 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
 
   // ── mapping helpers ─────────────────────────────────────────────────────
   const mappedFields = useMemo(() => new Set(Object.values(mapping).filter(Boolean)), [mapping]);
-  const hasIdentity = ['name', 'host_name', 'ip_address'].some((f) => mappedFields.has(f));
+  const hasIdentity = (isVuln ? ['title'] : ['name', 'host_name', 'ip_address']).some((f) => mappedFields.has(f));
   const mappedCount = mappedFields.size;
 
   const setCol = (col: string, field: string) => {
@@ -70,6 +102,41 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
       }
       return next;
     });
+  };
+
+  // ── AI assist: ask the LLM to map columns the rules couldn't place ────────
+  const runAiMap = async () => {
+    if (!analysis) return;
+    setAiBusy(true);
+    setAiNote(null);
+    try {
+      const samples: Record<string, unknown[]> = {};
+      analysis.columns.forEach((c) => {
+        samples[c] = analysis.sample_rows
+          .map((r) => r[c])
+          .filter((v) => v != null && String(v).trim() !== '')
+          .slice(0, 3);
+      });
+      const { data } = await assetImportApi.aiMap(kind, analysis.columns, samples);
+      if (!data.ai_used) { setAiNote(data.error || 'AI is not available.'); return; }
+      const overlay: Record<string, { confidence: string; why: string }> = {};
+      Object.entries(data.mapping).forEach(([col, s]) => { overlay[col] = { confidence: s.confidence, why: s.why }; });
+      const next = { ...mapping };
+      let n = 0;
+      Object.entries(data.mapping).forEach(([col, s]) => {
+        if (s.field) {
+          for (const k of Object.keys(next)) if (k !== col && next[k] === s.field) next[k] = '';
+          next[col] = s.field; n++;
+        }
+      });
+      setMapping(next);
+      setAiOverlay(overlay);
+      setAiNote(`AI reviewed ${analysis.columns.length} columns and mapped ${n}.`);
+    } catch (e: any) {
+      setAiNote(e?.response?.data?.detail || 'AI mapping failed.');
+    } finally {
+      setAiBusy(false);
+    }
   };
 
   // ── step 3: preview (client-side, raw values; server normalizes on import) ─
@@ -89,6 +156,40 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
     });
   }, [analysis, mapping, previewCols]);
 
+  // ── validate (dry-run) on entering preview + when dupe strategy changes ───
+  const runValidate = useCallback(async (strategy: 'skip' | 'update') => {
+    if (!file || !analysis) return;
+    setValidating(true);
+    try {
+      const colmap: Record<string, string | null> = {};
+      Object.entries(mapping).forEach(([col, field]) => { colmap[col] = field || null; });
+      const { data } = await assetImportApi.validate(
+        file, colmap, { dupe_strategy: strategy, header_row: analysis.header_row }, kind);
+      setValidation(data);
+    } catch { setValidation(null); }
+    finally { setValidating(false); }
+  }, [file, analysis, mapping, kind]);
+
+  const goPreview = async () => { setStep('preview'); runValidate(dupe); };
+  const setDupeAndRevalidate = (s: 'skip' | 'update') => { setDupe(s); runValidate(s); };
+
+  const rowsWithIssues = useMemo(
+    () => (validation?.rows || []).filter((r) => r.issues.length > 0),
+    [validation]);
+
+  const downloadIssues = () => {
+    const rows = rowsWithIssues;
+    if (!rows.length) return;
+    const esc = (x: unknown) => `"${String(x ?? '').replace(/"/g, '""')}"`;
+    const csv = ['row,identity,action,level,field,message',
+      ...rows.flatMap((r) => r.issues.map((i) =>
+        [r.row, r.identity ?? '', r.action, i.level, i.field, i.message].map(esc).join(',')))].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `import-issues-${kind}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── step 4: commit ──────────────────────────────────────────────────────
   const commit = async () => {
     if (!file || !analysis) return;
@@ -100,10 +201,11 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
       const { data } = await assetImportApi.commit(file, colmap, {
         dupe_strategy: dupe,
         header_row: analysis.header_row,
-      });
+      }, kind);
       setResult(data);
       setStep('result');
       if (data.created + data.updated > 0) onSuccess();
+      loadHistory();
     } catch (e: any) {
       setError(e?.response?.data?.detail || 'Import failed.');
     } finally {
@@ -115,7 +217,7 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
     if (!result) return;
     setBusy(true);
     try {
-      await assetImportApi.undo(result.batch_id);
+      await assetImportApi.undo(result.batch_id, kind);
       setUndone(true);
       onSuccess();
     } catch (e: any) {
@@ -133,7 +235,7 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
         {/* header + step rail */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
           <div>
-            <h2 className="text-base font-semibold text-black">Import IT Assets</h2>
+            <h2 className="text-base font-semibold text-black">Import {isVuln ? 'Vulnerabilities' : 'IT Assets'}</h2>
             <p className="mt-0.5 text-xs text-gray-500">
               {(['upload', 'map', 'preview', 'result'] as Step[]).map((s, i) => (
                 <span key={s} className={step === s ? 'font-semibold text-blue-600' : ''}>
@@ -159,11 +261,13 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
                 <div className="flex items-start gap-3">
                   <FileSpreadsheet className="mt-0.5 h-5 w-5 text-blue-600" />
                   <div>
-                    <p className="text-sm font-medium text-black">Upload your asset list — any layout works.</p>
-                    <p className="mt-1">We’ll auto-detect your columns and map them to the inventory fields; you confirm before anything is saved. No template required.</p>
-                    <button onClick={() => assetsApi.downloadTemplate()} className="mt-2 inline-flex items-center gap-1 font-medium text-blue-600 hover:underline">
-                      <Download size={13} /> Download our template (optional)
-                    </button>
+                    <p className="text-sm font-medium text-black">Upload your {isVuln ? 'findings' : 'asset'} list — any layout works.</p>
+                    <p className="mt-1">We’ll auto-detect your columns and map them to the {isVuln ? 'vulnerability' : 'inventory'} fields; you confirm before anything is saved. No template required.{isVuln ? ' Findings auto-link to matching assets by host/IP.' : ''}</p>
+                    {!isVuln && (
+                      <button onClick={() => assetsApi.downloadTemplate()} className="mt-2 inline-flex items-center gap-1 font-medium text-blue-600 hover:underline">
+                        <Download size={13} /> Download our template (optional)
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -189,16 +293,49 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
                   </div>
                 )}
               </div>
+
+              {hist.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500"><Clock size={13} /> Recent imports</p>
+                  <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                    {hist.map((h) => (
+                      <div key={h.batch_id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-black">{h.filename}</p>
+                          <p className="text-xs text-gray-500">
+                            {h.count} {isVuln ? 'finding' : 'asset'}{h.count === 1 ? '' : 's'}
+                            {h.created_at ? ` · ${new Date(h.created_at).toLocaleString()}` : ''}
+                          </p>
+                        </div>
+                        <button onClick={() => undoBatch(h.batch_id)} disabled={undoingBatch === h.batch_id}
+                          className="inline-flex flex-none items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                          {undoingBatch === h.batch_id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />} Undo
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
           {/* ── MAP ────────────────────────────────────────────────── */}
           {step === 'map' && analysis && (
             <>
-              <p className="mb-3 text-sm text-gray-600">
-                Found <b>{analysis.row_count}</b> rows. Confirm how your columns map to the inventory fields —
-                we’ve pre-filled our best guess. Set anything you don’t want to <i>Ignore</i>.
-              </p>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <p className="text-sm text-gray-600">
+                  Found <b>{analysis.row_count}</b> rows. Confirm how your columns map to the {isVuln ? 'vulnerability' : 'inventory'} fields —
+                  we’ve pre-filled our best guess. Set anything you don’t want to <i>Ignore</i>.
+                </p>
+                {analysis.ai_available && (
+                  <button onClick={runAiMap} disabled={aiBusy}
+                    className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                    title="Let AI map the columns the rules couldn't place">
+                    {aiBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} AI assist
+                  </button>
+                )}
+              </div>
+              {aiNote && <p className="mb-3 flex items-center gap-1.5 text-xs text-purple-700"><Sparkles size={13} /> {aiNote}</p>}
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -214,7 +351,11 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
                         <tr key={col}>
                           <td className="p-2.5 align-top">
                             <div className="font-medium text-black">{col}</div>
-                            {sug?.field && <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${chip}`}>{Math.round(conf * 100)}% · {sug.why}</span>}
+                            {aiOverlay[col] ? (
+                              <span className="mt-1 inline-block rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700">{aiOverlay[col].why}</span>
+                            ) : sug?.field ? (
+                              <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${chip}`}>{Math.round(conf * 100)}% · {sug.why}</span>
+                            ) : null}
                           </td>
                           <td className="p-2.5 align-top text-xs text-gray-500">{samples.map((s, i) => <div key={i} className="truncate max-w-[160px]">{String(s)}</div>)}</td>
                           <td className="p-2.5 align-top">
@@ -233,7 +374,7 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
                 </table>
               </div>
               {!hasIdentity && (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-700"><AlertCircle size={14} /> Map at least one column to <b>Asset name</b> (or Hostname / IP) to continue.</p>
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-700"><AlertCircle size={14} /> {isVuln ? <>Map a column to <b>Title</b> to continue.</> : <>Map at least one column to <b>Asset name</b> (or Hostname / IP) to continue.</>}</p>
               )}
             </>
           )}
@@ -241,10 +382,55 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
           {/* ── PREVIEW ────────────────────────────────────────────── */}
           {step === 'preview' && analysis && (
             <>
-              <p className="mb-3 text-sm text-gray-600">
-                Preview of the first {previewRows.length} of <b>{analysis.row_count}</b> rows as they’ll import.
-                Values are normalized on save (e.g. “H” → High).
-              </p>
+              {/* validation summary — a real dry-run of what commit will do */}
+              <div className="mb-3">
+                {validating ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 size={15} className="animate-spin" /> Checking your data…</div>
+                ) : validation ? (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <SumPill n={validation.summary.create} label="to create" cls="bg-green-100 text-green-700" />
+                    {validation.summary.update > 0 && <SumPill n={validation.summary.update} label="to update" cls="bg-blue-100 text-blue-700" />}
+                    <SumPill n={validation.summary.skip} label="to skip" cls="bg-gray-100 text-gray-600" />
+                    {validation.summary.error > 0 && <SumPill n={validation.summary.error} label="error" cls="bg-red-100 text-red-700" />}
+                    {isVuln && (validation.summary.linked ?? 0) > 0 && <SumPill n={validation.summary.linked!} label="auto-link" cls="bg-teal-100 text-teal-700" />}
+                    <span className="text-xs text-gray-400">of {validation.row_count} rows</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Preview of your data as it’ll import. Values are normalized on save (e.g. “H” → High).</p>
+                )}
+              </div>
+
+              {/* dedupe strategy — drives the counts above (re-checks on change) */}
+              <div className="mb-3 rounded-lg border border-gray-200 bg-slate-50 p-3">
+                <p className="mb-2 text-xs font-medium text-gray-600">{isVuln ? 'When a row matches an existing finding (by title + host):' : 'When a row matches an existing asset (by name / hostname / IP):'}</p>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-1.5"><input type="radio" checked={dupe === 'skip'} onChange={() => setDupeAndRevalidate('skip')} /> Skip it</label>
+                  <label className="flex items-center gap-1.5"><input type="radio" checked={dupe === 'update'} onChange={() => setDupeAndRevalidate('update')} /> Update it in place</label>
+                </div>
+              </div>
+
+              {/* data-quality issues + downloadable report */}
+              {rowsWithIssues.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50">
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-amber-800"><AlertTriangle size={14} /> {rowsWithIssues.length} row{rowsWithIssues.length === 1 ? '' : 's'} need a look</p>
+                    <button onClick={downloadIssues} className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline"><FileDown size={13} /> Download report</button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto border-t border-amber-200 px-3 py-2 text-xs">
+                    {rowsWithIssues.slice(0, 50).map((r) => (
+                      <div key={r.row} className="py-0.5">
+                        <span className="font-medium text-gray-700">Row {r.row}{r.identity ? ` · ${r.identity}` : ''}:</span>{' '}
+                        {r.issues.map((iss, k) => (
+                          <span key={k} className={iss.level === 'error' ? 'text-red-600' : 'text-amber-700'}>{iss.message}{k < r.issues.length - 1 ? '; ' : ''}</span>
+                        ))}
+                      </div>
+                    ))}
+                    {rowsWithIssues.length > 50 && <div className="mt-1 text-gray-400">… and {rowsWithIssues.length - 50} more (in the report)</div>}
+                  </div>
+                </div>
+              )}
+
+              {/* sample rows exactly as they'll import */}
               <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -256,13 +442,6 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="mt-4 rounded-lg border border-gray-200 bg-slate-50 p-3">
-                <p className="mb-2 text-xs font-medium text-gray-600">When a row matches an existing asset (by name / hostname / IP):</p>
-                <div className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-1.5"><input type="radio" checked={dupe === 'skip'} onChange={() => setDupe('skip')} /> Skip it</label>
-                  <label className="flex items-center gap-1.5"><input type="radio" checked={dupe === 'update'} onChange={() => setDupe('update')} /> Update it in place</label>
-                </div>
               </div>
             </>
           )}
@@ -313,7 +492,7 @@ export function SmartImportWizard({ onClose, onSuccess }: { onClose: () => void;
               </button>
             )}
             {step === 'map' && (
-              <button onClick={() => setStep('preview')} disabled={!hasIdentity} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={goPreview} disabled={!hasIdentity} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
                 Preview {mappedCount} field{mappedCount === 1 ? '' : 's'} <ArrowRight size={15} />
               </button>
             )}
