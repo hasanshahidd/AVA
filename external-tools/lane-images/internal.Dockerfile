@@ -22,15 +22,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_BREAK_SYSTEM_PACKAGES=1 \
     PATH="/opt/hexstrike/.venv/bin:/root/.local/bin:${PATH}"
 
-# --- Kali metapackages: the bulk internal arsenal -----------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      kali-tools-exploitation \
-      kali-tools-windows-resources \
-      kali-tools-passwords \
-      kali-tools-information-gathering \
-      kali-tools-post-exploitation \
-      kali-tools-vulnerability \
-    && rm -rf /var/lib/apt/lists/*
+# SLIM: the six `kali-tools-*` metapackages (hundreds of tools, many GUI/heavy →
+# ~15GB+) are INTENTIONALLY OMITTED so the image fits a normal droplet. The engine
+# fires only the explicit CLI arsenal installed below (metasploit / netexec /
+# impacket / evil-winrm / hydra / hashcat / responder / …) — that's all it needs.
+# Metasploit itself (~1.5GB) is the one unavoidably large piece.
 
 # --- Explicit installs: guarantee every named internal/AD/host tool present ---
 # (many overlap the metapackages above; listed so nothing is missing)

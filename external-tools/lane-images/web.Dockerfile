@@ -26,10 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       golang-go ruby build-essential libssl-dev libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Breadth: the whole Kali web metapackage (~100+ tools).
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      kali-tools-web \
-    && rm -rf /var/lib/apt/lists/*
+# SLIM: the full `kali-tools-web` metapackage (~100+ tools incl. Burp Suite, ZAP,
+# Maltego, wine, Java GUI apps → ~10GB) is INTENTIONALLY OMITTED so the image is
+# deployable on a normal droplet. The engine only fires the explicit CLI arsenal
+# installed below — that's the whole point. Re-add `kali-tools-web` here only if you
+# have a big host and genuinely want the full interactive Kali web toolset.
 
 # Explicit web recon + exploit arsenal (named so nothing silently goes missing).
 # Grouped by function; one group per layer for cache + clear failure attribution.
