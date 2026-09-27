@@ -44,7 +44,8 @@ def asset_row(asset_id: int, db: Session = Depends(get_db), current_user: GRCUse
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
     return {"asset_id": asset.id, "asset_name": getattr(asset, "name", None),
-            "fields": service.build_row(db, tid, asset)}
+            "fields": service.build_row(db, tid, asset),
+            "sources": service.scan_sources(db, tid, asset.id)}
 
 
 @router.patch("/asset/{asset_id}")
@@ -55,7 +56,8 @@ def save_row(asset_id: int, values: dict = Body(...),
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
     data = service.set_stored(db, tid, asset_id, values or {}, user=getattr(current_user, "email", None))
-    return {"asset_id": asset_id, "saved": len(data), "fields": service.build_row(db, tid, asset)}
+    return {"asset_id": asset_id, "saved": len(data), "fields": service.build_row(db, tid, asset),
+            "sources": service.scan_sources(db, tid, asset_id)}
 
 
 @router.get("/export.xlsx")

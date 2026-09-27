@@ -1,33 +1,63 @@
 'use client';
 
-// SBP (State Bank of Pakistan) offsite IT-asset inventory — the 52-field
-// regulatory return, per asset. Auto-derived fields (OS, IP, subnet, DMZ, EDR,
-// VA counts, obsolescence) are read-only; stored + reason fields are editable.
-// Backend: grc/modules/sbp_inventory  (GET/PATCH /sbp-inventory/asset/{id}).
+// SBP Offsite IT Asset Inventory — the State Bank of Pakistan 52-field regulatory
+// return, as a tab on the asset. NOT a separate store: it reads the SAME asset
+// data (discovery + credentialed connect + vuln/pentest scans + vendor patch
+// feeds) and lays it into the bank's exact format; anything can be corrected
+// here and is kept in a small side-table. Backend: grc/modules/sbp_inventory.
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Save, Download, CheckCircle2, Sparkles } from 'lucide-react';
+import {
+  Loader2, Save, Download, CheckCircle2, Sparkles, Landmark, Fingerprint, Cpu,
+  Database, ShieldCheck, Clock, Plug, Bug, Crosshair, FileText, ChevronDown, RefreshCw,
+  ArrowUpRight,
+} from 'lucide-react';
 import apiClient from '@/lib/api';
 
 type Field = {
   key: string; letter: string; label: string; group: string;
   src: string; editable: boolean; value: any; auto_value: any; overridden: boolean;
 };
+type Sources = {
+  va_findings: number; va_lanes: Record<string, number>; pt_findings: number;
+  exploit_runs: number; exploits_confirmed: number; synced_at: string;
+};
 
-const isYesNo = (label: string) => /yes\s*\/\s*no/i.test(label);
-const ynOptions = (label: string) => /not applicable|n\/a/i.test(label)
-  ? ['', 'Yes', 'No', 'Not Applicable'] : ['', 'Yes', 'No'];
+const GROUP_ICON: Record<string, any> = {
+  'Identity': Fingerprint, 'OS & Patching': Cpu, 'Database': Database,
+  'Security Controls': ShieldCheck, 'Obsolescence': Clock, 'Integration': Plug,
+  'Vulnerability Assessment': Bug, 'Penetration Testing': Crosshair,
+  'Justifications': FileText,
+};
+const IND = '#4F46E5';
+const isYesNo = (l: string) => /yes\s*\/\s*no/i.test(l);
+// "(Yes/No/NA)" and "If Database" columns can legitimately be Not Applicable
+const ynOpts = (l: string) => /not applicable|n\/a|\bna\b|if database/i.test(l) ? ['', 'Yes', 'No', 'Not Applicable'] : ['', 'Yes', 'No'];
+const filledVal = (v: any) => v !== '' && v !== null && v !== undefined;
+
+function Badge({ kind }: { kind: 'auto' | 'edited' }) {
+  const auto = kind === 'auto';
+  return (
+    <span title={auto ? "Auto-filled by Ava from this asset's scans and vendor feeds" : 'Changed by an analyst — overrides the auto value'}
+      className="flex-none rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+      style={auto ? { background: '#EEF0FF', color: IND } : { background: '#FEF3C7', color: '#92400E' }}>
+      {auto ? 'auto' : 'edited'}
+    </span>
+  );
+}
 
 export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['sbp-asset', assetId],
     queryFn: async () => (await apiClient.get(`/sbp-inventory/asset/${assetId}`)).data as
-      { asset_id: number; asset_name: string; fields: Field[] },
+      { asset_id: number; asset_name: string; fields: Field[]; sources?: Sources },
   });
 
   const save = useMutation({
@@ -49,75 +79,156 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
     } finally { setExporting(false); }
   };
 
+  const fields = data?.fields || [];
+  const src = data?.sources;
+  const curVal = (f: Field) => (edits[f.key] ?? (f.value ?? ''));
+
   const groups = useMemo(() => {
     const g: Record<string, Field[]> = {};
-    (data?.fields || []).forEach((f) => { (g[f.group] ||= []).push(f); });
+    fields.forEach((f) => { (g[f.group] ||= []).push(f); });
     return g;
-  }, [data]);
+  }, [fields]);
 
-  if (isLoading) return <div className="flex items-center gap-2 p-6 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading SBP inventory…</div>;
-  if (error) return <div className="p-6 text-sm text-red-600">Could not load the SBP inventory for this asset.</div>;
+  const stats = useMemo(() => {
+    const filled = fields.filter((f) => filledVal(curVal(f))).length;
+    const auto = fields.filter((f) => filledVal(f.value) && !f.overridden).length;
+    const total = fields.length || 52;
+    return { filled, auto, total, pct: total ? Math.round((filled / total) * 100) : 0 };
+  }, [fields, edits]);
+
+  if (isLoading) return <div className="flex items-center gap-2 p-8 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading SBP inventory…</div>;
+  if (error) return <div className="p-8 text-sm text-red-600">Could not load the SBP inventory for this asset.</div>;
 
   const dirty = Object.keys(edits).length > 0;
+  const syncedAt = src?.synced_at ? new Date(src.synced_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+  const lanes = src ? Object.entries(src.va_lanes).map(([k, n]) => `${k} ${n}`).join(', ') : '';
+
+  // where the VA / PT columns come from, shown on those two sections
+  const groupSource: Record<string, React.ReactNode> = src ? {
+    'Vulnerability Assessment': (
+      <>Synced from <b>{src.va_findings}</b> scanner finding{src.va_findings === 1 ? '' : 's'}{lanes ? ` (${lanes})` : ''}
+        {' · '}<Link href={`/assets/${assetId}?tab=vulnerabilities`} className="inline-flex items-center gap-0.5 font-semibold" style={{ color: IND }}>View findings<ArrowUpRight size={11} /></Link></>
+    ),
+    'Penetration Testing': (
+      <>Synced from <b>{src.pt_findings}</b> PentestGPT finding{src.pt_findings === 1 ? '' : 's'} + <b>{src.exploit_runs}</b> exploit run{src.exploit_runs === 1 ? '' : 's'} ({src.exploits_confirmed} confirmed)
+        {' · '}<Link href="/pentest" className="inline-flex items-center gap-0.5 font-semibold" style={{ color: IND }}>Open AI Pentest<ArrowUpRight size={11} /></Link></>
+    ),
+  } : {};
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold text-black">SBP Offsite IT Asset Inventory</h3>
-          <p className="mt-0.5 text-xs text-gray-500">State Bank of Pakistan 52-field return. <Sparkles size={11} className="mb-0.5 inline text-blue-600" /> auto-filled fields come from Ava's scans; the rest are yours to complete.</p>
+    <div className="space-y-4">
+      {/* ── header: title + completion + actions ── */}
+      <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-indigo-50/70 to-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl text-white" style={{ background: IND }}>
+              <Landmark size={22} />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-semibold text-gray-900">SBP Offsite IT Asset Inventory</h3>
+              <p className="mt-0.5 text-xs text-gray-500">State Bank of Pakistan · 52-field regulatory return · <Sparkles size={11} className="mb-0.5 inline" style={{ color: IND }} /> auto-filled from this asset's scans and vendor patch feeds — correct anything, then Save. Export gives the bank's exact file.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => refetch()} disabled={isFetching}
+              title="Re-pull the latest vulnerability-scan and AI-pentest results, scan telemetry and vendor patch data"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              <RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} /> {isFetching ? 'Syncing…' : 'Sync from scans'}
+            </button>
+            <button onClick={exportXlsx} disabled={exporting}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download size={15} />} Export
+            </button>
+            <button onClick={() => save.mutate()} disabled={!dirty || save.isPending}
+              title={dirty ? 'Save your corrections' : 'Nothing to save — change any field first'}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: IND }}>
+              {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
+              {saved ? 'Saved' : `Save${dirty ? ` (${Object.keys(edits).length})` : ''}`}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={exportXlsx} disabled={exporting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download size={15} />} Export full inventory
-          </button>
-          <button onClick={() => save.mutate()} disabled={!dirty || save.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
-            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-            {saved ? 'Saved' : `Save${dirty ? ` (${Object.keys(edits).length})` : ''}`}
-          </button>
+        {/* completion meter */}
+        <div className="mt-4">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-medium text-gray-700">{stats.filled} of {stats.total} fields filled</span>
+            <span className="text-gray-500">
+              <b style={{ color: IND }}>{stats.auto}</b> auto-filled · {stats.total - stats.filled} blank
+              {syncedAt && <> · synced {syncedAt}</>}
+              {!dirty && <> · Save activates when you change a field</>}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div className="h-full rounded-full transition-all" style={{ width: `${stats.pct}%`, background: IND }} />
+          </div>
         </div>
       </div>
 
-      {Object.entries(groups).map(([group, fields]) => (
-        <div key={group} className="overflow-hidden rounded-lg border border-gray-200">
-          <div className="border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">{group}</div>
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-gray-100">
-              {fields.map((f) => {
-                const val = edits[f.key] ?? (f.value ?? '');
-                return (
-                  <tr key={f.key}>
-                    <td className="w-1/2 px-4 py-2 align-top text-gray-700">
-                      <span className="text-gray-400 mr-1">{f.letter}</span>{f.label}
-                    </td>
-                    <td className="px-4 py-2 align-top">
-                      {f.editable ? (
-                        isYesNo(f.label) ? (
-                          <select value={val} onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
-                            className="w-full max-w-xs rounded-md border border-gray-300 px-2 py-1 text-sm">
-                            {ynOptions(f.label).map((o) => <option key={o} value={o}>{o || '—'}</option>)}
-                          </select>
+      {/* ── grouped section cards ── */}
+      {Object.entries(groups).map(([group, gf]) => {
+        const Icon = GROUP_ICON[group] || FileText;
+        const gFilled = gf.filter((f) => filledVal(curVal(f))).length;
+        const isOpen = !collapsed[group];
+        return (
+          <div key={group} className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <button onClick={() => setCollapsed((c) => ({ ...c, [group]: !c[group] }))}
+              className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-gray-50">
+              <div className="flex items-center gap-2.5">
+                <Icon size={16} style={{ color: IND }} />
+                <span className="text-sm font-semibold text-gray-800">{group}</span>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">{gFilled}/{gf.length}</span>
+              </div>
+              <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+            </button>
+            {isOpen && groupSource[group] && (
+              <div className="border-t border-gray-100 bg-indigo-50/40 px-5 py-2 text-[11.5px] text-gray-600">
+                <RefreshCw size={11} className="mb-0.5 mr-1 inline" style={{ color: IND }} />{groupSource[group]}
+              </div>
+            )}
+            {isOpen && (
+              <div className="divide-y divide-gray-100 border-t border-gray-100">
+                {gf.map((f) => {
+                  const v = curVal(f);
+                  const blankEditable = f.editable && !filledVal(v);
+                  const edited = f.overridden || f.key in edits;
+                  const badge = edited ? <Badge kind="edited" /> : filledVal(f.value) ? <Badge kind="auto" /> : null;
+                  return (
+                    <div key={f.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-4 px-5 py-2.5">
+                      <div className="flex items-baseline gap-2 text-sm text-gray-600">
+                        <span className="text-[10px] font-semibold uppercase text-gray-300">{f.letter}</span>
+                        <span>{f.label}</span>
+                      </div>
+                      <div>
+                        {f.editable ? (
+                          <div className="flex items-center gap-2">
+                            {isYesNo(f.label) ? (
+                              <select value={v} onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
+                                className={`w-full max-w-[240px] rounded-lg border px-2.5 py-1.5 text-sm ${blankEditable ? 'border-amber-300 bg-amber-50/40 text-gray-500' : 'border-gray-300 text-gray-900'}`}>
+                                {ynOpts(f.label).map((o) => <option key={o} value={o}>{o || '— select —'}</option>)}
+                              </select>
+                            ) : (
+                              <input value={v} onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
+                                placeholder={filledVal(f.auto_value) ? String(f.auto_value) : '— add —'}
+                                className={`w-full rounded-lg border px-2.5 py-1.5 text-sm ${blankEditable ? 'border-amber-300 bg-amber-50/40' : 'border-gray-300 text-gray-900'}`} />
+                            )}
+                            {badge}
+                          </div>
                         ) : (
-                          <input value={val} onChange={(e) => setEdits({ ...edits, [f.key]: e.target.value })}
-                            placeholder={f.auto_value ? String(f.auto_value) : '—'}
-                            className="w-full max-w-md rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                        )
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-black">
-                          {f.value !== '' && f.value != null ? String(f.value) : <span className="text-gray-300">—</span>}
-                          <span title="Auto-filled by Ava" className="rounded bg-blue-50 px-1 py-0.5 text-[9px] font-semibold uppercase text-blue-600">auto</span>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ))}
+                          <span className="inline-flex items-center gap-2">
+                            {filledVal(f.value)
+                              ? <span className="text-sm font-medium text-gray-900">{String(f.value)}</span>
+                              : <span className="text-sm text-gray-300">—</span>}
+                            {badge}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -17,14 +17,14 @@ from typing import Dict, List
 # (key, column-letter, label, group, src)
 FIELDS: List[tuple] = [
     ("asset_name",              "A",  "Asset/ Application Name",                    "Identity",          "asset:name"),
-    ("application_description", "B",  "Application Description",                    "Identity",          "asset:description"),
+    ("application_description", "B",  "Application Description",                    "Identity",          "derived"),
     ("server_description",      "C",  "Server Description",                         "Identity",          "derived"),
     ("classification",          "D",  "Application/Asset Classification",           "Identity",          "derived"),
     ("ip_address",              "E",  "IP Address",                                "Identity",          "asset:ip_address"),
     ("subnet",                  "F",  "Subnet [A, B, C,..]",                       "Identity",          "derived"),
     ("primary_dr",              "G",  "Primary/DR",                                "Identity",          "derived"),
     ("public_facing_dmz",       "H",  "Public Facing /DMZ",                        "Identity",          "derived"),
-    ("environment",             "I",  "Environment (Production, Dev, UAT)",        "Identity",          "asset:environment"),
+    ("environment",             "I",  "Environment (Production, Dev, UAT)",        "Identity",          "derived"),
     ("web_app_server",          "J",  "Web/App Servers",                           "Identity",          "derived"),
     ("database_server",         "K",  "Database Server",                           "Identity",          "derived"),
     ("virtual_patching",        "L",  "Virtual Patching Implemented (Yes/No/NA)",  "OS & Patching",     "derived"),
@@ -32,12 +32,12 @@ FIELDS: List[tuple] = [
     ("last_os_patch",           "N",  "Last OS patch",                             "OS & Patching",     "derived"),
     ("last_os_patch_date",      "O",  "Last OS Patch Release Date",                "OS & Patching",     "derived"),
     ("latest_os_patch",         "P",  "Latest OS Patch",                           "OS & Patching",     "derived"),
-    ("latest_os_patch_date",    "Q",  "Latest OS Patch Release Date",              "OS & Patching",     "stored"),
+    ("latest_os_patch_date",    "Q",  "Latest OS Patch Release Date",              "OS & Patching",     "derived"),
     ("dbms_version",            "R",  "DBMS version (if database)",                "Database",          "derived"),
     ("last_db_patch",           "S",  "Last DB patch (if database)",               "Database",          "derived"),
-    ("last_db_patch_date",      "T",  "Last DB patch release date (if database)",  "Database",          "stored"),
+    ("last_db_patch_date",      "T",  "Last DB patch release date (if database)",  "Database",          "derived"),
     ("latest_db_patch",         "U",  "Latest DB patch (if database)",             "Database",          "derived"),
-    ("latest_db_patch_date",    "V",  "Latest DB patch release date (if database)","Database",          "stored"),
+    ("latest_db_patch_date",    "V",  "Latest DB patch release date (if database)","Database",          "derived"),
     ("dlp",                     "W",  "DLP (Yes/No)",                              "Security Controls", "derived"),
     ("xdr_edr",                 "X",  "XDR / EDR (Yes/No)",                        "Security Controls", "derived"),
     ("db_monitoring",           "Y",  "Database Monitoring - If Database (Yes/No)","Security Controls", "derived"),
@@ -92,9 +92,44 @@ OVERRIDABLE_DERIVED = {"web_app_server", "database_server", "xdr_edr",
                        "last_pt_date", "pt_open_critical", "pt_days_critical_open",
                        "pt_open_high", "pt_days_high_open",
                        "reason_web_app", "reason_db_server",
-                       "reason_db_patch", "reason_os_patch"}
+                       "reason_db_patch", "reason_os_patch",
+                       # vendor patch feeds (Microsoft SUG / endoflife.date / MariaDB):
+                       "latest_os_patch_date", "latest_db_patch_date", "last_db_patch_date",
+                       # drafted/defaulted from scan evidence — analyst may refine:
+                       "application_description", "environment"}
 STORABLE_KEYS = STORED_KEYS | OVERRIDABLE_DERIVED
-HEADERS = [f[2] for f in FIELDS]  # exact template header row, in order
+HEADERS = [f[2] for f in FIELDS]  # clean display labels (for the UI), in order
+
+# The bank's EXACT header row, verbatim from the official template (preserving
+# their spacing, line breaks, typos e.g. "vulnerabilites", and the duplicated
+# VA/PT column names). The export MUST use these so SBP's ingestion accepts the
+# file — never the cleaned-up display labels above.
+EXPORT_HEADERS = [
+    "Asset/ Application Name", "Application Description", "Server Description",
+    "Application/Asset Classification", "IP Address", "Subnet\n[A, B, C,..]",
+    "Primary/DR", "Public Facing /DMZ", "Environment\n(Production, Dev, UAT)",
+    "Web/App Servers", "Database Server",
+    "Virtual Patching  Implemented (Yes / No / Not Applicable)", "OS with version",
+    "Last OS patch", "Last OS Patch Release Date", "Latest OS Patch",
+    "Latest OS Patch Release Date", "DBMS version \n(if database)",
+    "Last DB patch\n(if database)", "Last DB patch\nrelease date (if database)",
+    "Latest DB patch\n(if database)", "Latest DB patch release date\n(if database)",
+    "DLP\n(Yes / No)", "XDR / EDR (Yes/No)", "Database Monitoring - If Database (Yes/No)",
+    "SIEM Coverage (Yes / No)", "Status of Obsolescence (Y/N)",
+    "Obsolete since (no. of days)", "Obsolence Timeline",
+    "Integrated with BMC (Yes / No / Not Applicable)", "Date of Last VA Performed",
+    "No. of open Critical vulnerabilites", "No. of days since critical vulnerability is open",
+    "No. of open High level vulnerabilites", "No. of days since High vulnerability is open",
+    "Date of Last PT performed", "No. of open Critical vulnerabilites",
+    "No. of days since critical vulnerability is open", "No. of open High level vulnerabilites",
+    "No. of days since High vulnerability is open", "Reason  Obsolence OS Category",
+    "Reason for Not Integrated with BMC", "Reason for Virtual Patching Not Implemented",
+    "Reason for XDR / EDR Not Installed", "Reason for DLP", "Reason for Public Facing / DMZ",
+    "Reason for Web/App Servers", "Reason for Database Server",
+    "Reason for Database Monitoring", " DB patch Reason", "SIEM Coverage Reason",
+    "Reason for OS Patch",
+]
+assert len(EXPORT_HEADERS) == len(FIELDS) == 52, (len(EXPORT_HEADERS), len(FIELDS))
 
 
 def field_meta() -> List[Dict]:
