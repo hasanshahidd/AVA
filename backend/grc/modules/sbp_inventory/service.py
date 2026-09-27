@@ -220,6 +220,30 @@ def _ext_web(a: ITAsset) -> bool:
                                     or ep.get("scheme") or ep.get("title")))
 
 
+# Deep host sections a credentialed connect writes onto platform_properties.
+_HOST_READ_SECTIONS = ("identity", "os", "security_products", "defender",
+                       "cpu", "memory", "storage", "services", "windows_update")
+
+
+def is_external_only(a: ITAsset) -> bool:
+    """An internet-facing asset seen ONLY from the outside — no credentialed host
+    read, so the host-internal SBP columns (OS, DBMS, EDR, DLP, SIEM, patching,
+    obsolescence) can't be observed. Detected from the same signals the probe
+    path uses (internet_facing + no OS/software/services/deep-section telemetry),
+    not a new flag: the moment a credentialed connect lands any host data this is
+    False and normal derivation takes over."""
+    if not getattr(a, "internet_facing", False):
+        return False
+    if _os(a) or _software(a) or _services(a):
+        return False
+    pp = getattr(a, "platform_properties", None) or {}
+    if isinstance(pp, dict) and any(
+            isinstance(pp.get(s), dict) and pp[s].get("status") == "discovered"
+            for s in _HOST_READ_SECTIONS):
+        return False
+    return True
+
+
 # First line of the note the vulnerability-scanner sync writes into
 # ITAsset.description (integrations sync_service) — machine text, not the asset's.
 _SYNC_NOTE = "Auto-synced from vulnerability scanner"
@@ -504,35 +528,47 @@ def _obsolescence_timeline(a: ITAsset) -> str:
     return f"EOL {eol.strftime('%Y-%m-%d')} ({(eol - now).days} days remaining)"
 
 
-# VA vs PT (confirmed with the pentest-engine session, Sep 27 2026):
-#  * The finding's LANE (Vulnerability.source) says which tool FOUND it — not the
-#    link note, which the orchestrator stamps "AI pentest scan" on EVERY link.
-#    Substring "pentestgpt" = PT; everything else = VA. Deliberately NO scanner
-#    allowlist: find lanes are being de-branded to generic slugs
-#    ("ai-pentest:scanner") and merged into union forms ("…:hexstrike+zap").
-#  * A scanner finding the pentest then PROVED (grc_pentest_exploit_results
-#    row, confirmed + CVE-specific) is ALSO a PT finding — found by VA,
-#    exploited by PT — so it legitimately appears in both sections.
-#  * "Last PT performed" = latest exploit run that actually ENGAGED the host:
-#    "executed" (tool ran; confirmed says whether it proved the vuln) and
-#    "confirmed-vulnerable" (Metasploit check proved it). "not-exploitable" is
-#    dual-source — a pure classification (nothing ran) OR a Metasploit check that
-#    RAN and came back safe (technique "Metasploit check — …") — only the latter
-#    counts. needs-verification / manual / exploitable-unarmed / no-tool / error
-#    fired nothing at the host. finding_id = str(vuln.id), else the CVE, else "".
-_PT_LANES = ("pentestgpt",)
-_PT_RAN = {"executed", "confirmed-vulnerable"}
+# VA vs PT (authoritative model, pentest-engine owner, Sep 28 2026):
+#  * VA = EVERY Vulnerability linked to the asset, from ANY source (a scanner
+#    lane like openvas/nessus AND a pentestgpt-sourced finding). `source` only
+#    says which tool FOUND it; it never removes a finding from VA.
+#  * PT "was performed" = the asset has ≥1 PentestExploitResult row (any
+#    persisted row means a real technique ran). "Last PT performed" =
+#    MAX(PentestExploitResult.created_at) — never derived from a vuln's source
+#    or a scan-job object. The proven (confirmed=True, LLM-verified) results
+#    drive the critical/high counts, keyed by the RESULT's own severity and
+#    deduped by finding_id. External/EASM assets link the same way (asset_id),
+#    so PT populates for them too once web exploits record result rows.
+#    PentestExploitResult.status ∈ {executed|error|needs-creds|no-tool|manual|
+#    blocked}; `confirmed` is a separate boolean — there is NO
+#    "confirmed-vulnerable" status.
 _CLOSED = {"remediated", "resolved", "closed", "verified", "fixed", "false_positive"}
 
 
-def _is_pt(source: Optional[str]) -> bool:
-    return any(lane in (source or "").lower() for lane in _PT_LANES)
+def _pt_block(runs) -> Dict[str, Any]:
+    """The 5 Penetration-Testing columns from the asset's exploit-result rows.
+    All blank ('No pentests yet') when the asset has none; otherwise AJ = the
+    latest run, and the confirmed results' own severities drive AK/AM (distinct
+    by finding_id)."""
+    dates = [r.created_at for r in runs if getattr(r, "created_at", None)]
+    if not runs:
+        return {"last_pt_date": "", "pt_open_critical": "", "pt_days_critical_open": "",
+                "pt_open_high": "", "pt_days_high_open": ""}
+    now = datetime.utcnow()
+    proven = [r for r in runs if r.confirmed]  # confirmed=True = proven with evidence
 
+    def proven_dates(sev: str) -> list:  # distinct proven findings of this severity
+        by_id: Dict[str, Any] = {}
+        for r in proven:
+            if (r.severity or "").lower() == sev:
+                by_id[str(r.finding_id or id(r))] = r.created_at
+        return list(by_id.values())
 
-def _pt_ran(run) -> bool:
-    st = (run.status or "").lower()
-    return st in _PT_RAN or (st == "not-exploitable" and
-                             (run.technique or "").lower().startswith("metasploit check"))
+    days = lambda ds: _NA if not ds else ((now - min(d for d in ds if d)).days if any(ds) else "")
+    crit, high = proven_dates("critical"), proven_dates("high")
+    return {"last_pt_date": _d(max(dates)) if dates else "",
+            "pt_open_critical": len(crit), "pt_days_critical_open": days(crit),
+            "pt_open_high": len(high), "pt_days_high_open": days(high)}
 
 
 def _scan_block(rows, pre: str, date_key: str, activity=()) -> Dict[str, Any]:
@@ -558,15 +594,10 @@ def _scan_block(rows, pre: str, date_key: str, activity=()) -> Dict[str, Any]:
 
 
 def _split_scans(rows, runs=()) -> Dict[str, Any]:
-    ran = [r for r in runs if _pt_ran(r)]
-    # a generic credentialed proof (cve_specific False) proves access, not THIS
-    # finding; an ad-hoc finding may be keyed by its CVE instead of the vuln id
-    proven = {str(r.finding_id) for r in runs
-              if r.confirmed and r.cve_specific is not False and r.finding_id}
-    pt = [r for r in rows if _is_pt(r.source) or str(r.id) in proven
-          or (getattr(r, "cve_id", None) or "") in proven]
-    out = _scan_block([r for r in rows if not _is_pt(r.source)], "va", "last_va_date")
-    out.update(_scan_block(pt, "pt", "last_pt_date", [r.created_at for r in ran]))
+    # VA = every linked vulnerability, from ANY source (incl. pentestgpt findings);
+    # PT is driven entirely by the asset's PentestExploitResult rows.
+    out = _scan_block(rows, "va", "last_va_date")
+    out.update(_pt_block(runs))
     return out
 
 
@@ -578,14 +609,16 @@ def scan_sources(db: Session, tenant_id: int, asset_id: int) -> Dict[str, Any]:
     """Where this asset's VA / PT columns come from — shown beside the Sync
     button so the analyst sees exactly what was pulled in."""
     rows, runs = _scan_rows(db, tenant_id, asset_id)
-    va = [r for r in rows if not _is_pt(r.source)]
     lanes: Dict[str, int] = {}
-    for r in va:  # "ai-pentest:openvas" -> "openvas"
+    for r in rows:  # ALL vulns are VA now; "ai-pentest:openvas" -> "openvas"
         lane = (r.source or "manual").split(":")[-1]
         lanes[lane] = lanes.get(lane, 0) + 1
-    return {"va_findings": len(va), "va_lanes": lanes,
-            "pt_findings": sum(1 for r in rows if _is_pt(r.source)),
-            "exploit_runs": len([r for r in runs if _pt_ran(r)]),
+    tested = {str(r.finding_id) for r in runs if r.finding_id}
+    return {"va_findings": len(rows), "va_lanes": lanes,
+            # findings that were exploit-tested (any persisted result row)
+            "pt_findings": sum(1 for r in rows if str(r.id) in tested
+                               or (getattr(r, "cve_id", None) or "") in tested),
+            "exploit_runs": len(runs),
             "exploits_confirmed": sum(1 for r in runs if r.confirmed),
             "synced_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"}
 
@@ -600,9 +633,8 @@ def _scan_rows(db: Session, tenant_id: int, asset_id: int) -> tuple:
         .all()
     )
     runs = (
-        db.query(PentestExploitResult.finding_id, PentestExploitResult.status,
-                 PentestExploitResult.technique, PentestExploitResult.confirmed,
-                 PentestExploitResult.cve_specific, PentestExploitResult.created_at)
+        db.query(PentestExploitResult.finding_id, PentestExploitResult.severity,
+                 PentestExploitResult.confirmed, PentestExploitResult.created_at)
         .filter(PentestExploitResult.tenant_id == tenant_id,
                 PentestExploitResult.asset_id == asset_id)
         .all()
@@ -798,6 +830,17 @@ _REASON_TEXT = {
     "reason_siem":                "No SIEM log-forwarding agent was detected in the latest software inventory — status to be confirmed by the asset owner.",
 }
 
+# On an external-only (outside-in) asset the host-internal columns aren't
+# observable, so their VALUE stays blank and their reason says why + how to fix.
+_EXTERNAL_REASON = ("External/internet-facing web asset — not observable from an "
+                    "outside-in scan; connect the asset with credentials to populate.")
+# reason keys for the host-internal columns blanked on an external-only asset
+# (OS+patch, DBMS+patch, DLP, EDR, DB-monitoring, SIEM, obsolescence). NOT the
+# outside-in-observable ones: public/DMZ, web-server, WAF/virtual-patching, BMC.
+_EXTERNAL_HOST_REASONS = {"reason_os_patch", "reason_db_patch", "reason_dlp",
+                          "reason_no_xdr_edr", "reason_db_monitoring", "reason_siem",
+                          "reason_obsolete_os"}
+
 
 def _open_ch(va: Dict[str, Any]) -> Optional[int]:
     """Open critical+high VA findings; None when no VA is evidenced."""
@@ -896,6 +939,17 @@ def _edr_reason(a: ITAsset) -> str:
 
 
 def _reason_value(key: str, a: ITAsset, va: Optional[Dict[str, Any]] = None) -> str:
+    """The derived reason, with one fallback: on an external-only asset a
+    host-internal column that can't be seen outside-in gets the 'connect with
+    credentials' note in place of a blank. Precedence (stored override, applied
+    in build_row) > derived reason > this external note."""
+    val = _reason_derived(key, a, va)
+    if not val and key in _EXTERNAL_HOST_REASONS and is_external_only(a):
+        return _EXTERNAL_REASON
+    return val
+
+
+def _reason_derived(key: str, a: ITAsset, va: Optional[Dict[str, Any]] = None) -> str:
     """Tri-state: the gap-tied draft when the DETECTED gap is real; 'Not
     Applicable' when the condition is known NOT to hold (control present / not a
     DB / not obsolete / not public / patch-current); '' when unknown."""
@@ -998,7 +1052,10 @@ def build_row(db: Session, tenant_id: int, asset: ITAsset,
     """All 52 fields — or, for one section's Sync ('va' / 'pt'), only that
     section's fields, read from the scan tables alone (no vendor-feed calls)."""
     va = _scan_blocks(db, tenant_id, asset.id)
-    if not section:
+    # An external-only asset has no host read, so the OS/DB patch columns stay
+    # blank (their reason carries the external note) — and we skip the vendor
+    # feeds / patch-reference queries that could only produce host-internal data.
+    if not section and not is_external_only(asset):
         # latest patch = the VENDOR's newest release (feed); a scanner's required-KB
         # reference is the fallback when the feed is unreachable
         prod = _msrc_product(asset)
@@ -1110,9 +1167,12 @@ def _selftest() -> None:
     easm = A(internet_facing=True, security_posture={}, detected_software_json=[],
              name="adfs.superior.edu.pk")
     assert _edr(easm) == "" and _detect(easm, _DLP_SIGS) == "" and _detect(easm, _VPATCH_SIGS) == ""
-    assert _reason_value("reason_no_xdr_edr", easm) == ""   # unknown ≠ No
-    assert _reason_value("reason_dlp", easm) == ""
-    assert _reason_value("reason_no_virtual_patching", easm) == ""
+    # VALUES stay blank (never a fabricated No); the host-internal REASONS now say
+    # why + how to fix, because this is an external-only (outside-in) asset
+    assert is_external_only(easm)
+    assert _reason_value("reason_no_xdr_edr", easm) == _EXTERNAL_REASON
+    assert _reason_value("reason_dlp", easm) == _EXTERNAL_REASON
+    assert _reason_value("reason_no_virtual_patching", easm) == ""   # WAF is observable outside-in
 
     # EXTERNAL (outside-in / EASM) asset: no host read, but the probe gives real
     # facts — a live web service, its app name (title), server, and a fronting WAF.
@@ -1141,6 +1201,36 @@ def _selftest() -> None:
     assert _is_web(dead) == "" and _base_value("web_app_server", dead, {}) == ""
     assert _reason_value("reason_public_dmz", easm)          # public IP → fires
     assert _integrated_bmc(easm) == "No"
+
+    # EXTERNAL-ONLY asset: host-internal columns can't be seen outside-in, so they
+    # stay BLANK and their reason says to connect with credentials; probe-derived
+    # columns still fill (the tab is working, not empty), and nothing is fabricated.
+    extonly = A(internet_facing=True, name="adfs.superior.edu.pk",
+                platform_properties={"external_probe": {
+                    "live": True, "status_code": 200, "scheme": "https",
+                    "server": "Microsoft-IIS/10.0", "title": "ADFS Sign-In"}})
+    assert is_external_only(extonly)
+    for k in ("os_with_version", "dbms_version", "last_os_patch", "last_os_patch_date",
+              "xdr_edr", "dlp", "db_monitoring", "siem_coverage", "obsolescence_status",
+              "obsolete_since_days", "obsolescence_timeline"):
+        assert _base_value(k, extonly, {}) == "", (k, _base_value(k, extonly, {}))
+    for k in _EXTERNAL_HOST_REASONS:
+        assert _reason_value(k, extonly) == _EXTERNAL_REASON, (k, _reason_value(k, extonly))
+    # probe-derived fields STILL fill, and observable-outside-in reasons are NOT the note
+    assert _base_value("web_app_server", extonly, {}) == "Internet-facing web service"
+    assert _base_value("application_description", extonly, {}) == "ADFS Sign-In"
+    assert _base_value("public_facing_dmz", extonly, {}) == "Yes"
+    assert _reason_value("reason_public_dmz", extonly) not in ("", _EXTERNAL_REASON)
+    assert _reason_value("reason_web_app", extonly) != _EXTERNAL_REASON
+    # a VA scan on the external asset fills VA columns but NOT the OS-patch value/reason note swap
+    assert _reason_value("reason_os_patch", extonly, {"last_va_date": "2026-09-26",
+                         "va_open_critical": 2, "va_open_high": 0}) == _EXTERNAL_REASON
+    # the moment a credentialed read lands, the gate is OFF → real derivation, not the note
+    cred = A(internet_facing=True, os_version="Microsoft Windows Server 2022 Datacenter",
+             detected_software_json=[{"name": "nginx"}])
+    assert not is_external_only(cred)
+    assert _base_value("os_with_version", cred, {}) == "Microsoft Windows Server 2022 Datacenter"
+    assert _reason_value("reason_no_xdr_edr", cred) != _EXTERNAL_REASON
 
     # BMC-sourced asset → Yes (future case).
     assert _integrated_bmc(A(source_system="bmc_helix")) == "Yes"
@@ -1178,10 +1268,14 @@ def _selftest() -> None:
     assert _reason_value("reason_os_patch", osd, {**scanned, "va_open_critical": 2, "va_open_high": 1})
     assert _reason_value("reason_os_patch", osd, {**scanned, "va_open_critical": 0, "va_open_high": 0}) == _NA
     assert _reason_value("reason_os_patch", osd, {"va_open_critical": 0}) == ""  # never scanned
-    # OS unknown (an outside-in asset): no OS-patch claim either way, even when scanned
+    # external-only (outside-in) asset: OS not visible → OS-patch reason is the
+    # external note, never a fabricated patch-currency claim, for either count.
+    # (The plain derived path still returns "" when the OS is unknown — asserted
+    # via _reason_derived — so a non-external OS-unknown asset stays blank.)
     for n in (3, 0):
-        assert _reason_value("reason_os_patch", A(internet_facing=True),
-                             {**scanned, "va_open_critical": n, "va_open_high": 0}) == "", n
+        va_n = {**scanned, "va_open_critical": n, "va_open_high": 0}
+        assert _reason_derived("reason_os_patch", A(internet_facing=True), va_n) == ""
+        assert _reason_value("reason_os_patch", A(internet_facing=True), va_n) == _EXTERNAL_REASON, n
     assert _reason_value("reason_db_patch", A(platform_kind="server"), {"va_open_high": 5}) == ""  # unknown role
 
     # server-role product matching — real installed-software / service names
@@ -1325,53 +1419,39 @@ def _selftest() -> None:
     assert _reason_value("reason_obsolete_os", live) == _NA
     assert _base_value("obsolescence_status", A(), {}) == ""        # unknown OS stays blank
 
-    # VA vs PT: split by LANE — a scanner finding is VA even inside a pentest run
+    # VA = every linked vuln from ANY source; PT is driven ONLY by exploit results
     R_ = lambda sev, src, st="open", d=3, i=0, cve=None: NS(
         id=i, cve_id=cve, severity=sev, status=st, source=src,
         discovered_at=now - timedelta(days=d), last_seen=None)
-    split = _split_scans([R_("critical", "ai-pentest:openvas"), R_("high", "ai-pentest:zap"),
-                          R_("high", "nessus", st="in_progress"),
-                          R_("critical", "ai-pentest:hexstrike", st="remediated"),
-                          R_("medium", "ai-pentest:pentestgpt"), R_("info", "ai-pentest:pentestgpt")])
-    assert (split["va_open_critical"], split["va_open_high"]) == (1, 2), split  # remediated excluded
-    assert (split["pt_open_critical"], split["pt_open_high"]) == (0, 0), split  # PT ran, none crit/high
-    assert split["pt_days_critical_open"] == _NA and isinstance(split["va_days_critical_open"], int)
-    assert split["last_pt_date"] and split["last_va_date"]
-    none_pt = _split_scans([R_("high", "nessus")])
-    assert none_pt["pt_open_critical"] == "" and none_pt["last_pt_date"] == ""  # never ran ≠ clean
+    X = lambda fid, sev="high", conf=True, d=1: NS(
+        finding_id=fid, severity=sev, confirmed=conf, created_at=now - timedelta(days=d))
+    vulns = [R_("critical", "ai-pentest:openvas", i=101),
+             R_("high", "nessus", st="in_progress", i=102),
+             R_("critical", "ai-pentest:hexstrike", st="remediated", i=103),
+             R_("high", "ai-pentest:pentestgpt", i=104),     # a pentestgpt-SOURCED vuln
+             R_("info", "ai-pentest:pentestgpt", i=105)]
+    # (a) pentestgpt-sourced vulns are VA (not excluded); with NO exploit result, PT is empty
+    va = _split_scans(vulns)
+    assert (va["va_open_critical"], va["va_open_high"]) == (1, 2), va   # remediated closed; pentestgpt high counts
+    assert va["last_va_date"] and isinstance(va["va_days_critical_open"], int)
+    assert va["last_pt_date"] == "" and va["pt_open_critical"] == "", va  # "No pentests yet"
     assert _split_scans([])["va_open_critical"] == ""
-    # de-branded + union find lanes stay VA (no scanner allowlist to rot)
-    u = _split_scans([R_("high", "ai-pentest:scanner"), R_("high", "ai-pentest:hexstrike+zap")])
-    assert u["va_open_high"] == 2 and u["last_pt_date"] == "", u
-    # exploit runs (grc_pentest_exploit_results): a scanner finding the pentest
-    # PROVED is a PT finding too — found by VA, exploited by PT
-    X = lambda fid, st="executed", ok=True, cve=True, d=1, tech="": NS(
-        finding_id=fid, status=st, technique=tech, confirmed=ok, cve_specific=cve,
-        created_at=now - timedelta(days=d))
-    scan = [R_("critical", "ai-pentest:openvas", i=101),
-            R_("high", "ai-pentest:zap", i=102, cve="CVE-2026-1111")]
-    p = _split_scans(scan, [X("101")])
-    assert (p["va_open_critical"], p["pt_open_critical"], p["pt_open_high"]) == (1, 1, 0), p
-    assert p["last_pt_date"] == _d(now - timedelta(days=1)), p  # the run dates the PT
-    # a Metasploit check that PROVED it ("confirmed-vulnerable") is a PT that ran
-    m = _split_scans(scan, [X("101", st="confirmed-vulnerable")])
-    assert m["pt_open_critical"] == 1 and m["last_pt_date"], m
-    # a generic credentialed proof proves access, not THIS finding
-    assert _split_scans(scan, [X("101", cve=False)])["pt_open_critical"] == 0
-    # a web exploit that RAN without proof (executed, unconfirmed) dates the PT, 0 open
-    q = _split_scans(scan, [X("102", ok=False)])
-    assert q["last_pt_date"] and q["pt_open_high"] == 0 and q["pt_days_high_open"] == _NA, q
-    # "not-exploitable" is dual-source: only a Metasploit check that RAN engaged the host
-    assert _split_scans(scan, [X("102", st="not-exploitable", ok=False)])["last_pt_date"] == ""
-    assert _split_scans(scan, [X("102", st="not-exploitable", ok=False,
-                                 tech="Metasploit check — target appears safe")])["last_pt_date"]
-    # nothing fired at the host -> NOT a PT performed
-    assert _split_scans(scan, [X("101", st=s, ok=False) for s in (
-        "needs-verification", "manual", "exploitable-unarmed", "no-tool", "error",
-        "blocked")])["last_pt_date"] == ""
-    # an ad-hoc proof keyed by CVE still maps; an empty finding_id never matches
-    assert _split_scans(scan, [X("CVE-2026-1111")])["pt_open_high"] == 1
-    assert _split_scans(scan, [X("")])["pt_open_critical"] == 0
+    # (b) a PentestExploitResult row => PT was performed; last-PT = MAX(created_at),
+    # confirmed=True + the RESULT's own severity drive AK/AM, deduped by finding_id
+    pt = _split_scans(vulns, [X("101", sev="critical", d=1), X("104", sev="high", d=2)])
+    assert pt["last_pt_date"] == _d(now - timedelta(days=1)), pt
+    assert (pt["pt_open_critical"], pt["pt_open_high"]) == (1, 1), pt
+    assert isinstance(pt["pt_days_critical_open"], int) and pt["pt_days_high_open"] >= 0, pt
+    assert (pt["va_open_critical"], pt["va_open_high"]) == (1, 2), pt   # VA unchanged by PT
+    # an exploit run that proved NOTHING (confirmed=False) still dates the PT, 0 crit/high
+    unconf = _split_scans(vulns, [X("101", sev="critical", conf=False)])
+    assert unconf["last_pt_date"] and unconf["pt_open_critical"] == 0, unconf
+    assert unconf["pt_days_critical_open"] == _NA, unconf
+    # distinct by finding_id: two confirmed results on the SAME finding count once
+    assert _split_scans(vulns, [X("101", "critical"), X("101", "critical", d=4)])["pt_open_critical"] == 1
+    # external/EASM assets populate PT the same way (asset_id linking, no special path)
+    ext_pt = _split_scans([R_("high", "ai-pentest:zap", i=201)], [X("201", sev="high")])
+    assert ext_pt["pt_open_high"] == 1 and ext_pt["last_pt_date"], ext_pt
 
     # vendor-feed plumbing (pure parts — no network in the selftest)
     lap = A(os_version="Microsoft Windows 11 Pro 25H2", os_build="25H2",

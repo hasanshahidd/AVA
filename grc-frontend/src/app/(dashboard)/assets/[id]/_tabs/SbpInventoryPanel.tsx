@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Save, Download, CheckCircle2, Sparkles, Landmark, Fingerprint, Cpu,
   Database, ShieldCheck, Clock, Plug, Bug, Crosshair, FileText, ChevronDown, RefreshCw,
-  ArrowUpRight,
+  ArrowUpRight, Globe,
 } from 'lucide-react';
 import apiClient from '@/lib/api';
 
@@ -66,7 +66,7 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['sbp-asset', assetId],
     queryFn: async () => (await apiClient.get(`/sbp-inventory/asset/${assetId}`)).data as
-      { asset_id: number; asset_name: string; fields: Field[]; sources?: Sources },
+      { asset_id: number; asset_name: string; fields: Field[]; sources?: Sources; external?: boolean },
   });
 
   const save = useMutation({
@@ -148,8 +148,8 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
         {' · '}<Link href={`/assets/${assetId}?tab=vulnerabilities`} className="inline-flex items-center gap-0.5 font-semibold" style={{ color: IND }}>View findings<ArrowUpRight size={11} /></Link></>
     ),
     'Penetration Testing': (
-      <>{src.pt_findings || src.exploit_runs
-          ? <>Synced from <b>{src.pt_findings}</b> PentestGPT finding{src.pt_findings === 1 ? '' : 's'} + <b>{src.exploit_runs}</b> exploit run{src.exploit_runs === 1 ? '' : 's'} ({src.exploits_confirmed} confirmed)</>
+      <>{src.exploit_runs
+          ? <>Synced from <b>{src.exploit_runs}</b> exploit run{src.exploit_runs === 1 ? '' : 's'} (<b>{src.exploits_confirmed}</b> confirmed)</>
           : 'No pentests yet'}
         {' · '}<Link href="/pentest" className="inline-flex items-center gap-0.5 font-semibold" style={{ color: IND }}>Open AI Pentest<ArrowUpRight size={11} /></Link></>
     ),
@@ -167,6 +167,12 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
             <div>
               <h3 className="text-[15px] font-semibold text-gray-900">SBP Offsite IT Asset Inventory</h3>
               <p className="mt-0.5 text-xs text-gray-500">State Bank of Pakistan · 52-field regulatory return · <Sparkles size={11} className="mb-0.5 inline" style={{ color: IND }} /> auto-filled from this asset's scans and vendor patch feeds — correct anything, then Save. Export gives the bank's exact file.</p>
+              {data?.external && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+                  <Globe size={12} className="flex-none" />
+                  External (outside-in) — host-internal fields populate after a credentialed connect
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

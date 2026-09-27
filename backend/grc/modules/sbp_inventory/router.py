@@ -48,6 +48,7 @@ def asset_row(asset_id: int, section: Optional[str] = Query(None, pattern="^(va|
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
     return {"asset_id": asset.id, "asset_name": getattr(asset, "name", None),
+            "external": service.is_external_only(asset),
             "fields": service.build_row(db, tid, asset, section),
             "sources": service.scan_sources(db, tid, asset.id)}
 
