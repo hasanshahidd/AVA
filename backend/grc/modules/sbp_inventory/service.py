@@ -202,8 +202,39 @@ def _is_db(a: ITAsset) -> str:
     return _role(a, _DB_RX, "database")
 
 
+def _ep(a: ITAsset) -> Dict[str, Any]:
+    """The external (outside-in / EASM) probe facts stored on an internet-facing
+    asset — server header, page title, WAF/CDN, TLS, hosting — or {}. This is the
+    ONLY host evidence an external asset has (no credentialed software/OS read)."""
+    pp = getattr(a, "platform_properties", None) or {}
+    ep = pp.get("external_probe") if isinstance(pp, dict) else None
+    return ep if isinstance(ep, dict) else {}
+
+
+def _ext_web(a: ITAsset) -> bool:
+    """True when the probe shows the host actually SERVED HTTP(S) — a live
+    web/application server proven from outside (not merely a resolvable name)."""
+    ep = _ep(a)
+    return bool(ep.get("live") and (ep.get("status_code") or ep.get("server")
+                                    or ep.get("scheme") or ep.get("title")))
+
+
+# Generic placeholder page titles that are NOT a real application name.
+_GENERIC_TITLES = {"react app", "vue app", "app", "home", "index", "welcome",
+                   "untitled", "document", "site", "web site", "website", "200 ok"}
+
+
+def _virtual_patching(a: ITAsset) -> str:
+    """Yes when a host virtual-patching agent is installed OR a CDN/WAF fronts the
+    asset (Cloudflare/Akamai/etc. shield an unpatched origin). '' when unknown."""
+    v = _detect(a, _VPATCH_SIGS)
+    return "Yes" if (v != "Yes" and _ep(a).get("cdn_waf")) else v
+
+
 def _is_web(a: ITAsset) -> str:
     r = _role(a, _WEB_RX)
+    if r == "Yes" or _ext_web(a):   # installed web server, OR it answered HTTP outside-in
+        return "Yes"
     # a typed database-collector asset IS the DB instance, not a web server
     return "No" if (r == "" and getattr(a, "platform_kind", None) == "database") else r
 
@@ -261,12 +292,20 @@ def _web_apps(a: ITAsset) -> list:
 def _app_desc(a: ITAsset) -> str:
     """What the asset's APPLICATION is — not its data tier — as a factual draft
     from the detected server products ('' when nothing is known)."""
+    # external host: the probe's page title IS the application's name
+    ep = _ep(a)
+    title = str(ep.get("title") or "").strip()
+    if title and title.lower() not in _GENERIC_TITLES:
+        return title
     apps = _web_apps(a)
     if apps:
         return "; ".join(f"{l} — {w}" if w else f"{l} ({r})" for l, r, w in apps)
     dbs = list(dict.fromkeys(_product_line(n, v) for n, v in _db_engines(a)))
     if dbs:
         return f"Database server hosting {', '.join(dbs)}"
+    if _ext_web(a):  # served HTTP but no readable title -> factual generic
+        srv = str(ep.get("server") or "").strip()
+        return f"Internet-facing web service{f' fronted by {srv}' if srv else ''}"
     osv = _os(a)
     if osv and (_software(a) or _services(a)):
         if re.search(r"windows (7|8|8\.1|10|11)\b|mac ?os", osv.lower()):
@@ -362,7 +401,22 @@ def _server_desc(a: ITAsset) -> str:
         hw.append(f"{a.storage_gb} GB disk")
     if hw:
         parts.append(", ".join(hw))
-    return " · ".join(parts)
+    if parts:
+        return " · ".join(parts)
+    # external host with no credentialed read: describe it from the probe
+    ep = _ep(a)
+    if _ext_web(a) or ep.get("server"):
+        bits = []
+        if ep.get("server"):
+            bits.append(f"Server: {ep['server']}")
+        if ep.get("scheme"):
+            bits.append(str(ep["scheme"]).upper()
+                        + (f" ({ep['tls_version']})" if ep.get("tls_version") else ""))
+        host = ep.get("asn_org") or ep.get("ip_region")
+        if host:
+            bits.append(f"hosted on {host}")
+        return " · ".join(bits)
+    return ""
 
 
 # Obsolescence: vendor END OF SUPPORT — the date security updates stop.
@@ -794,6 +848,13 @@ def _role_reason(a: ITAsset, web: bool) -> str:
     state = _is_web(a) if web else _is_db(a)
     if state != "Yes":
         return _NA if state == "No" else ""
+    # external web asset: evidence is the outside-in probe, not installed software
+    if web and not _role_evidence(a, _WEB_RX) and _ext_web(a):
+        ep = _ep(a)
+        served = f"served HTTP {ep.get('status_code')}" if ep.get("status_code") else "responded to an HTTP request"
+        srv = f", server '{ep['server']}'" if ep.get("server") else ""
+        return (f"Internet-facing web service — {served}{srv} in Ava's external "
+                f"(outside-in) scan. Classification to be confirmed by the asset owner.")
     what = ([f"{l} ({r})" for l, r, _w in _web_apps(a)] if web
             else list(dict.fromkeys(_product_line(n, v) for n, v in _db_engines(a))))
     rx = _WEB_RX if web else _DB_RX
@@ -846,7 +907,7 @@ def _reason_value(key: str, a: ITAsset, va: Optional[Dict[str, Any]] = None) -> 
     if key == "reason_public_dmz":
         return tri(_YN(bool(getattr(a, "internet_facing", False))), _REASON_TEXT[key])
     control = {"reason_not_bmc": _integrated_bmc,
-               "reason_no_virtual_patching": lambda x: _detect(x, _VPATCH_SIGS),
+               "reason_no_virtual_patching": _virtual_patching,
                "reason_dlp": lambda x: _detect(x, _DLP_SIGS),
                "reason_siem": lambda x: _detect(x, _SIEM_SIGS)}.get(key)
     if not control:
@@ -879,7 +940,10 @@ def _base_value(key: str, a: ITAsset, va: Dict[str, Any]) -> Any:
                 if d == "Yes" else d)
     if key == "web_app_server":    # WHICH server, and whether web or application
         w = _is_web(a)
-        return "; ".join(f"{l} ({r})" for l, r, _w in _web_apps(a)) if w == "Yes" else w
+        if w != "Yes":
+            return w
+        apps = _web_apps(a)
+        return "; ".join(f"{l} ({r})" for l, r, _w in apps) if apps else "Internet-facing web service"
     if key == "obsolescence_status":
         eol = _eol(a)
         return "" if not eol else ("Y" if eol <= datetime.utcnow() else "N")
@@ -888,7 +952,7 @@ def _base_value(key: str, a: ITAsset, va: Dict[str, Any]) -> Any:
         if not eol:
             return ""
         return (datetime.utcnow() - eol).days if eol <= datetime.utcnow() else _NA
-    if key == "virtual_patching":  return _detect(a, _VPATCH_SIGS)
+    if key == "virtual_patching":  return _virtual_patching(a)
     if key == "integrated_bmc":    return _integrated_bmc(a)
     if key == "primary_dr":        return _primary_dr(a)
     if key == "last_os_patch":     return _win_last_patch(a)[0]
@@ -1017,6 +1081,32 @@ def _selftest() -> None:
     assert _reason_value("reason_no_xdr_edr", easm) == ""   # unknown ≠ No
     assert _reason_value("reason_dlp", easm) == ""
     assert _reason_value("reason_no_virtual_patching", easm) == ""
+
+    # EXTERNAL (outside-in / EASM) asset: no host read, but the probe gives real
+    # facts — a live web service, its app name (title), server, and a fronting WAF.
+    ext = A(internet_facing=True, name="alumniportal.superior.edu.pk",
+            platform_properties={"external_probe": {
+                "live": True, "status_code": 200, "scheme": "https", "server": "cloudflare",
+                "title": "Superior University Alumni Community", "cdn_waf": "Cloudflare",
+                "tls_version": "TLSv1.3", "asn_org": "CLOUDFLARENET"}})
+    assert _is_web(ext) == "Yes"                                        # it answered HTTP
+    assert _base_value("web_app_server", ext, {}) == "Internet-facing web service"
+    assert _base_value("application_description", ext, {}) == "Superior University Alumni Community"
+    assert _virtual_patching(ext) == "Yes"                             # Cloudflare WAF fronts it
+    assert _base_value("virtual_patching", ext, {}) == "Yes"
+    assert _reason_value("reason_no_virtual_patching", ext) == _NA     # control present
+    sd = _base_value("server_description", ext, {})
+    assert "cloudflare" in sd and "HTTPS" in sd and "TLSv1.3" in sd, sd
+    assert "outside-in" in _reason_value("reason_web_app", ext)        # honest evidence source
+    assert _base_value("public_facing_dmz", ext, {}) == "Yes" and _base_value("primary_dr", ext, {}) == "Primary"
+    # a generic placeholder title is NOT used as the app description
+    spa = A(internet_facing=True, platform_properties={"external_probe": {
+        "live": True, "status_code": 200, "server": "nginx", "title": "React App"}})
+    assert _base_value("application_description", spa, {}) == "Internet-facing web service fronted by nginx"
+    assert _virtual_patching(spa) == ""                                # no WAF detected -> unknown, not No
+    # a NON-live external name (never answered) is NOT asserted a web server
+    dead = A(internet_facing=True, platform_properties={"external_probe": {"live": False, "https_available": True}})
+    assert _is_web(dead) == "" and _base_value("web_app_server", dead, {}) == ""
     assert _reason_value("reason_public_dmz", easm)          # public IP → fires
     assert _integrated_bmc(easm) == "No"
 
