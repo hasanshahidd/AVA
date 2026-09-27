@@ -199,6 +199,9 @@ app.include_router(asset_import_router)
 # SBP (State Bank of Pakistan) offsite IT-asset inventory — isolated module: grc/modules/sbp_inventory
 from grc.modules.sbp_inventory.router import router as sbp_inventory_router
 app.include_router(sbp_inventory_router)
+# Performance (exec) dashboard read-only aggregates — isolated module: grc/modules/exec_dashboard
+from grc.modules.exec_dashboard.router import router as exec_dashboard_router
+app.include_router(exec_dashboard_router)
 # AI Pentest assessments (isolated module: grc/modules/pentest)
 from grc.modules.pentest.router import router as pentest_router
 app.include_router(pentest_router)

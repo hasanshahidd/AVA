@@ -130,11 +130,6 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => refetch()} disabled={isFetching}
-              title="Re-pull the latest vulnerability-scan and AI-pentest results, scan telemetry and vendor patch data"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-              <RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} /> {isFetching ? 'Syncing…' : 'Sync from scans'}
-            </button>
             <button onClick={exportXlsx} disabled={exporting}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download size={15} />} Export
@@ -153,7 +148,6 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
             <span className="font-medium text-gray-700">{stats.filled} of {stats.total} fields filled</span>
             <span className="text-gray-500">
               <b style={{ color: IND }}>{stats.auto}</b> auto-filled · {stats.total - stats.filled} blank
-              {syncedAt && <> · synced {syncedAt}</>}
               {!dirty && <> · Save activates when you change a field</>}
             </span>
           </div>
@@ -180,8 +174,17 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
               <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
             </button>
             {isOpen && groupSource[group] && (
-              <div className="border-t border-gray-100 bg-indigo-50/40 px-5 py-2 text-[11.5px] text-gray-600">
-                <RefreshCw size={11} className="mb-0.5 mr-1 inline" style={{ color: IND }} />{groupSource[group]}
+              // VA / PT run later and get re-run — so these two sections carry
+              // their own Sync: it re-pulls the vulnerability / pentest records.
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-indigo-50/40 px-5 py-2 text-[11.5px] text-gray-600">
+                <span>{groupSource[group]}{syncedAt && <> · synced {syncedAt}</>}</span>
+                <button onClick={() => refetch()} disabled={isFetching}
+                  title={`Pull the latest ${group === 'Penetration Testing' ? 'AI-pentest findings and exploit runs' : 'vulnerability-scan findings'} for this asset`}
+                  className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-white px-2.5 py-1 text-[11.5px] font-semibold disabled:opacity-50"
+                  style={{ color: IND }}>
+                  <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} />
+                  {isFetching ? 'Syncing…' : 'Sync'}
+                </button>
               </div>
             )}
             {isOpen && (
