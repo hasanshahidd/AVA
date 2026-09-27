@@ -76,23 +76,35 @@ export const alpha = (hex: string, a: number) => {
 };
 
 /* ---------- primitives ---------- */
-export const cardCls = 'flex min-w-0 flex-col rounded-[14px] border border-[#E2E5EC] bg-white p-[18px] shadow-[0_1px_2px_rgba(16,24,40,.04)]';
+/** The one subtle card shadow used by every surface on the page. */
+export const CARD_SHADOW = 'shadow-[0_1px_2px_rgba(16,24,40,.06),0_4px_14px_rgba(16,24,40,.08)]';
+export const cardCls = `flex min-w-0 flex-col rounded-[14px] border border-[#E2E5EC] bg-white p-[18px] ${CARD_SHADOW}`;
 const linkCls = 'inline-flex shrink-0 items-center gap-1 rounded-md text-[12px] font-semibold text-[#005B96] hover:text-[#014A81] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005B96]';
+const iconLinkCls = 'grid h-[24px] w-[24px] shrink-0 place-items-center rounded-full text-[#005B96] hover:bg-[#F6F7FB] hover:text-[#014A81] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005B96]';
 
-export function Card({ title, sub, href, cta = 'Open', aside, className = '', children }: {
-  title: string; sub?: ReactNode; href?: string; cta?: string; aside?: ReactNode; className?: string; children: ReactNode;
+/**
+ * Cards sit in equal-height grid rows, so the body is a flex column that fills the card:
+ * lists/charts distribute into it and empty / loading / error states centre in it — no
+ * stretched white bottom, no hole beside a short card. `busy` dims the body while its
+ * data refetches. `ctaIcon` = arrow-only link for narrow tiles (label kept as aria/tooltip).
+ * Title/sub sizes carry `!` because `.compact-density main h2` (globals.css) outranks utilities.
+ */
+export function Card({ title, sub, href, cta = 'Open', ctaIcon, aside, busy, className = '', children }: {
+  title: string; sub?: ReactNode; href?: string; cta?: string; ctaIcon?: boolean; aside?: ReactNode; busy?: boolean; className?: string; children: ReactNode;
 }) {
   return (
-    <section className={`${cardCls} ${className}`} aria-label={title}>
+    <section className={`${cardCls} ${className}`} aria-label={title} aria-busy={busy || undefined}>
       <div className="mb-3 flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 text-[13.5px] font-semibold leading-[1.3] text-[#0F172A]">{title}</h2>
+          <h2 className="m-0 font-semibold text-[#0F172A] !text-[13.5px] !leading-[1.3]">{title}</h2>
           {sub && <p className="m-0 mt-0.5 text-[11.5px] leading-[1.45] text-[#64748B]">{sub}</p>}
         </div>
         {aside}
-        {href && <Link href={href} className={linkCls}>{cta}<ArrowRight size={13} aria-hidden /></Link>}
+        {href && (ctaIcon
+          ? <Link href={href} className={iconLinkCls} aria-label={cta} title={cta}><ArrowRight size={14} aria-hidden /></Link>
+          : <Link href={href} className={linkCls}>{cta}<ArrowRight size={13} aria-hidden /></Link>)}
       </div>
-      {children}
+      <div className={`flex min-h-0 flex-1 flex-col transition-opacity duration-200 ${busy ? 'opacity-50' : ''}`}>{children}</div>
     </section>
   );
 }
@@ -119,7 +131,7 @@ export const Skel = ({ h = 12, w = '100%', className = '' }: { h?: number; w?: n
 
 export function Loading({ rows = 4, note }: { rows?: number; note?: string }) {
   return (
-    <div className="flex flex-1 flex-col gap-2.5" role="status" aria-live="polite">
+    <div className="flex flex-1 flex-col justify-center gap-2.5" role="status" aria-live="polite">
       {Array.from({ length: rows }, (_, i) => <Skel key={i} h={i ? 12 : 22} w={i ? `${92 - i * 11}%` : '45%'} />)}
       {note && <p className="m-0 mt-1 text-[11.5px] text-[#64748B]">{note}</p>}
       <span className="sr-only">Loading</span>

@@ -7,15 +7,17 @@
  */
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Bot, ClipboardCheck, Globe, Radar, Target } from 'lucide-react';
+import { Bot, Building2, ClipboardCheck, Globe, Radar, Target } from 'lucide-react';
 import { AgeMatrix, BarList, PartLegend, StackBar, type BarRow, type Part } from './charts';
 import {
   BAND, Card, Empty, Eyebrow, Figure, GRADE, Loading, Pill, SEV, SEV_ORDER, Skel, T, Unavailable,
-  fmtDay, fmtWhen, nfmt, pctOf, plural, share, toBand, utc, type Sev, type Tone,
+  alpha, fmtDay, fmtWhen, nfmt, pctOf, plural, share, toBand, utc, type Sev, type Tone,
 } from './kit';
 
 /* ---------- API shapes (only the fields this page reads) ---------- */
-export type Qs<X> = { data?: X | null; isLoading: boolean; isError: boolean };
+export type Qs<X> = { data?: X | null; isLoading: boolean; isError: boolean; isFetching?: boolean };
+/** A card is "busy" while any of its queries refetches over data already shown (Refresh). */
+export const busyOf = (...qs: Qs<unknown>[]) => qs.some((q) => !!q.isFetching && !q.isLoading);
 export type TopAsset = { asset_id: number; name: string; internet_facing: boolean; open: number } & Record<Sev, number>;
 export type ExecSummary = {
   findings: {
@@ -66,15 +68,17 @@ export const isExternalAsset = (a: RiskAsset) => a.mode === 'easm' || /external|
 const sevParts = (by: Record<Sev, number>, keepZero = true): Part[] =>
   SEV_ORDER.map((s) => ({ key: s, label: SEV[s].label, n: by?.[s] ?? 0, c: SEV[s].c })).filter((p) => keepZero || p.n > 0);
 
-/* A label · value · share row list — for counts that are not parts of one whole. */
-function StatRows({ rows }: { rows: { label: ReactNode; n: number; of?: number; muted?: boolean }[] }) {
+/* A label · value · share row list — for counts that are not parts of one whole.
+   One line per row at any width (label truncates, full text in the tooltip); numbers
+   right-aligned in fixed tabular columns. `fill` spreads the rows over the card height. */
+function StatRows({ rows, fill }: { rows: { label: ReactNode; tip?: string; n: number; of?: number }[]; fill?: boolean }) {
   return (
-    <ul className="m-0 flex list-none flex-col p-0">
+    <ul className={`m-0 flex list-none flex-col p-0 ${fill ? 'flex-1 justify-between' : ''}`}>
       {rows.map((r, i) => (
-        <li key={i} className="flex items-baseline gap-2 border-b border-[#F1F3F7] py-[6px] text-[12px] last:border-0">
-          <span className="min-w-0 flex-1 text-[#334155]">{r.label}</span>
-          <b className="font-semibold tabular-nums text-[#0F172A]">{nfmt(r.n)}</b>
-          <span className="w-[34px] text-right text-[11px] tabular-nums text-[#94A3B8]">{r.of ? share(r.n, r.of) : ''}</span>
+        <li key={i} className="flex items-baseline gap-1.5 border-b border-[#F1F3F7] py-[6px] text-[12px] last:border-0" title={r.tip ?? (typeof r.label === 'string' ? r.label : undefined)}>
+          <span className="min-w-0 flex-1 truncate text-[#334155]">{r.label}</span>
+          <b className="min-w-[28px] shrink-0 text-right font-semibold tabular-nums text-[#0F172A]">{nfmt(r.n)}</b>
+          <span className="w-[30px] shrink-0 text-right text-[11px] tabular-nums text-[#94A3B8]">{r.of ? share(r.n, r.of) : ''}</span>
         </li>
       ))}
     </ul>
@@ -82,74 +86,70 @@ function StatRows({ rows }: { rows: { label: ReactNode; n: number; of?: number; 
 }
 
 /* =============== Vulnerabilities =============== */
-const TOOL: Record<string, string> = { openvas: 'OpenVAS', zap: 'OWASP ZAP', hexstrike: 'HexStrike', nessus: 'Nessus', pentestgpt: 'PentestGPT', nuclei: 'Nuclei', scanner: 'Scanner', manual: 'Manual / import' };
-const sourceLabel = (s: string) => {
-  const [lane, tool] = s.includes(':') ? s.split(':', 2) : ['', s];
-  const name = TOOL[tool.toLowerCase()] ?? tool;
-  return lane === 'ai-pentest' ? `${name} · AI Pentest` : name;
+// C-level view groups findings by ASSESSMENT TYPE, never by scan engine (tool names stay hidden).
+const assessmentOf = (source: string): string => {
+  const s = source.toLowerCase();
+  if (s.includes('pentestgpt')) return 'Penetration test';
+  if (s.includes('zap')) return 'Web application scan';
+  return 'Vulnerability scan'; // openvas / nessus / hexstrike / nuclei / scanner …
 };
 
+/* Four one-idea tiles (severity · exploitability · age · assessment type) in their own
+   equal-height row. The age matrix gets 1.3× width so its six columns always fit; the
+   four tiles share one register link, so each carries an arrow-only CTA (keeps every
+   title on one line at ≥1366px). */
 export function VulnExposure({ q }: { q: Qs<ExecSummary> }) {
   const f = q.data?.findings;
-  let body: ReactNode;
-  if (q.isLoading) body = <Loading rows={7} />;
-  else if (!f) body = <Unavailable what="Finding metrics" href="/vulnerabilities" />;
-  else if (f.open === 0) body = <Empty icon={<Globe size={16} />} title="No open findings" body={f.total ? `All ${nfmt(f.total)} recorded findings are resolved or accepted.` : 'Nothing has been scanned or imported yet.'} href="/scan-flows" cta="Run a vulnerability scan" />;
-  else {
-    const parts = sevParts(f.by_severity);
-    const intel = f.intel_checked > 0;
-    const sources: BarRow[] = f.by_source.map((s) => ({ key: s.source, label: sourceLabel(s.source), n: s.open, title: s.source }));
-    body = (
-      <div className="flex flex-col gap-5">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <div className="mb-2 flex items-baseline justify-between gap-2"><Eyebrow>Severity mix</Eyebrow><span className="text-[11.5px] text-[#64748B]">{plural(f.open, 'open finding')}</span></div>
-            <StackBar parts={parts} label="Open findings by severity" />
-            <div className="mt-3"><PartLegend parts={parts} total={f.open} /></div>
-          </div>
-          <div>
-            <Eyebrow className="mb-1">Exposure &amp; exploit signals</Eyebrow>
-            <StatRows rows={[
-              { label: 'On internet-facing assets', n: f.internet_exposed, of: f.open },
-              { label: 'Carry a CVE', n: f.with_cve, of: f.open },
-              ...(intel ? [
-                { label: <>Public exploit available <span className="text-[#94A3B8]">(of {nfmt(f.intel_checked)} checked)</span></>, n: f.public_exploit },
-                { label: 'CISA KEV — exploited in the wild', n: f.kev },
-                { label: 'EPSS ≥ 10% (likely exploited)', n: f.high_epss },
-              ] : []),
-            ]} />
-            {!intel && (
-              <p className="m-0 mt-2 rounded-[10px] bg-[#F6F7FB] px-3 py-2 text-[11.5px] leading-[1.5] text-[#475569]">
-                {f.with_cve
-                  ? <>Exploit intel not checked yet — 0 of {nfmt(f.with_cve)} CVE findings enriched, so KEV, public-exploit and EPSS status are <b className="font-semibold">unknown</b>, not zero.</>
-                  : <>No open finding carries a CVE, so KEV / EPSS exploit intel doesn&rsquo;t apply.</>}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          <div>
-            <Eyebrow className="mb-1">Age since first detected</Eyebrow>
-            <AgeMatrix data={f.age_by_severity} ages={AGES} />
-          </div>
-          <div>
-            <Eyebrow className="mb-2">Where open findings come from</Eyebrow>
-            <BarList rows={sources} labelWidth={138} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const busy = busyOf(q);
+  const one = (body: ReactNode) => <Card title="Vulnerability exposure" href="/vulnerabilities" cta="Register" busy={busy} className="md:col-span-2 xl:col-span-12">{body}</Card>;
+  if (q.isLoading) return one(<Loading rows={5} />);
+  if (!f) return one(<Unavailable what="Finding metrics" href="/vulnerabilities" />);
+  if (f.open === 0) return one(<Empty icon={<Globe size={16} />} title="No open findings" body={f.total ? `All ${nfmt(f.total)} findings are resolved or accepted.` : 'Nothing scanned or imported yet.'} href="/scan-flows" cta="Run a scan" />);
+  const parts = sevParts(f.by_severity);
+  const intel = f.intel_checked > 0;
+  const byAssessment: Record<string, number> = {};
+  for (const s of f.by_source) { const k = assessmentOf(s.source); byAssessment[k] = (byAssessment[k] ?? 0) + s.open; }
+  const sources: BarRow[] = Object.entries(byAssessment).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ key: label, label, n }));
+  const tile = { href: '/vulnerabilities', cta: 'Open vulnerability register', ctaIcon: true, busy };
   return (
-    <Card title="Vulnerability exposure" sub="Open findings only — severity, exploitability signals, age and source" href="/vulnerabilities" cta="Open register" className="md:col-span-2 xl:col-span-7">
-      {body}
-    </Card>
+    <div className="grid grid-cols-1 gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-12 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
+      <Card title="Findings by severity" sub={plural(f.open, 'open finding')} {...tile}>
+        <StackBar parts={parts} label="Open findings by severity" />
+        <div className="mt-3 flex flex-1 flex-col"><PartLegend parts={parts} total={f.open} fill /></div>
+      </Card>
+      <Card title="Exploitability signals" sub="Share of open findings" {...tile}>
+        <StatRows fill={intel} rows={[
+          { label: 'Internet-facing assets', tip: 'Open findings on internet-facing assets', n: f.internet_exposed, of: f.open },
+          { label: 'Carry a CVE', n: f.with_cve, of: f.open },
+          ...(intel ? [
+            { label: <>Public exploit <span className="text-[#94A3B8]">(of {nfmt(f.intel_checked)})</span></>, tip: `Public exploit available (of ${nfmt(f.intel_checked)} checked)`, n: f.public_exploit },
+            { label: 'CISA KEV — in the wild', n: f.kev },
+            { label: 'EPSS ≥ 10%', n: f.high_epss },
+          ] : []),
+        ]} />
+        {!intel && (
+          <div className="mt-auto pt-2">
+            <p className="m-0 rounded-[10px] bg-[#F6F7FB] px-3 py-2 text-[11px] leading-[1.5] text-[#475569]">
+              {f.with_cve
+                ? <>Exploit intel not run yet — KEV / EPSS status is <b className="font-semibold">unknown</b>, not zero.</>
+                : <>No open finding carries a CVE.</>}
+            </p>
+          </div>
+        )}
+      </Card>
+      <Card title="Finding age" sub="Open findings by days since first detected" {...tile}>
+        <div className="-mx-1 flex-1"><AgeMatrix data={f.age_by_severity} ages={AGES} /></div>
+      </Card>
+      <Card title="Findings by assessment" sub="Open findings by scan type" {...tile}>
+        <BarList rows={sources} stacked fill />
+      </Card>
+    </div>
   );
 }
 
 /* =============== Most exposed assets (joined with Risk Posture) =============== */
-const th: React.CSSProperties = { padding: '7px 10px', fontSize: 10.5, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase', color: T.muted, background: T.subtle, borderBottom: `1px solid ${T.border}`, whiteSpace: 'nowrap' };
-const td: React.CSSProperties = { padding: '8px 10px', fontSize: 12.5, color: T.text, borderBottom: '1px solid #F1F3F7', verticalAlign: 'middle' };
+const th: React.CSSProperties = { padding: '6px 8px', fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: T.muted, background: T.subtle, borderBottom: `1px solid ${T.border}`, whiteSpace: 'nowrap' };
+const td: React.CSSProperties = { padding: '7px 8px', fontSize: 12, color: T.text, borderBottom: '1px solid #F1F3F7', verticalAlign: 'middle' };
 
 export function TopAssets({ q, risk }: { q: Qs<ExecSummary>; risk: Qs<RiskDash> }) {
   const rows = q.data?.top_assets ?? [];
@@ -159,14 +159,24 @@ export function TopAssets({ q, risk }: { q: Qs<ExecSummary>; risk: Qs<RiskDash> 
   else if (!q.data) body = <Unavailable what="Asset exposure" href="/assets" />;
   else if (!rows.length) body = <Empty icon={<Globe size={16} />} title="No open findings are linked to an asset" body="Findings appear here once scans link them to inventory assets." href="/assets" cta="Open inventory" />;
   else body = (
-    <div className="-mx-[18px] -mb-[6px] overflow-x-auto">
-      <table className="w-full min-w-[420px]" style={{ borderCollapse: 'collapse' }}>
+    <div className="-mx-[14px] -mb-[6px] flex-1">
+      {/* table-fixed + colgroup: numeric columns hold their width, the asset name
+          takes the rest and truncates, so the Risk band never gets clipped and the
+          card never scrolls horizontally at any desktop width. h-full: rows share any
+          extra height when the row is stretched to its taller neighbour. */}
+      <table className="h-full w-full table-fixed" style={{ borderCollapse: 'collapse' }}>
+        <colgroup>
+          <col />
+          <col style={{ width: 44 }} />
+          <col style={{ width: 80 }} />
+          <col style={{ width: 124 }} />
+        </colgroup>
         <thead>
           <tr>
-            <th scope="col" style={{ ...th, textAlign: 'left', paddingLeft: 18 }}>Asset</th>
+            <th scope="col" style={{ ...th, textAlign: 'left', paddingLeft: 14 }}>Asset</th>
             <th scope="col" style={{ ...th, textAlign: 'right' }}>Open</th>
-            <th scope="col" style={{ ...th, textAlign: 'left' }}>Critical · High</th>
-            <th scope="col" style={{ ...th, textAlign: 'left', paddingRight: 18 }}>Risk</th>
+            <th scope="col" style={{ ...th, textAlign: 'left' }}>Crit · High</th>
+            <th scope="col" style={{ ...th, textAlign: 'left', paddingRight: 14 }}>Risk</th>
           </tr>
         </thead>
         <tbody>
@@ -175,21 +185,21 @@ export function TopAssets({ q, risk }: { q: Qs<ExecSummary>; risk: Qs<RiskDash> 
             const b = r ? BAND[toBand(r.band?.label, r.score)] : null;
             return (
               <tr key={a.asset_id}>
-                <td style={{ ...td, paddingLeft: 18, maxWidth: 220 }}>
+                <td style={{ ...td, paddingLeft: 14 }}>
                   <Link href={`/assets/${a.asset_id}`} className="block truncate font-semibold text-[#0F172A] hover:text-[#005B96]" title={a.name}>{a.name}</Link>
-                  {a.internet_facing && <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-medium text-[#64748B]"><Globe size={11} aria-hidden />Internet-facing</span>}
+                  {a.internet_facing && <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-medium text-[#64748B]"><Globe size={11} aria-hidden className="shrink-0" />Internet-facing</span>}
                 </td>
                 <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{nfmt(a.open)}</td>
                 <td style={td}>
-                  <span className="inline-flex items-center gap-3 tabular-nums" aria-label={`${a.critical} critical, ${a.high} high`}>
+                  <span className="inline-flex items-center gap-2 tabular-nums" aria-label={`${a.critical} critical, ${a.high} high`}>
                     {(['critical', 'high'] as Sev[]).map((s) => (
-                      <span key={s} className="inline-flex items-center gap-1.5" style={{ color: a[s] ? T.text : T.faint, fontWeight: a[s] ? 600 : 400 }}>
+                      <span key={s} className="inline-flex items-center gap-1" style={{ color: a[s] ? T.text : T.faint, fontWeight: a[s] ? 600 : 400 }}>
                         <i aria-hidden className="inline-block h-[8px] w-[8px] rounded-full" style={{ background: a[s] ? SEV[s].c : '#E2E8F0' }} />{a[s]}
                       </span>
                     ))}
                   </span>
                 </td>
-                <td style={{ ...td, paddingRight: 18 }}>
+                <td style={{ ...td, paddingRight: 14 }}>
                   {risk.isLoading ? <Skel h={16} w={82} /> : b && r ? <Pill tone={b}>{b.label} · {r.score == null ? '—' : r.score.toFixed(0)}</Pill> : <span className="text-[11.5px] text-[#94A3B8]">—</span>}
                 </td>
               </tr>
@@ -200,7 +210,7 @@ export function TopAssets({ q, risk }: { q: Qs<ExecSummary>; risk: Qs<RiskDash> 
     </div>
   );
   return (
-    <Card title="Most exposed assets" sub="Worst open findings first · risk band from Assets Risk Posture" href="/assets" cta="Open inventory" className="xl:col-span-5">
+    <Card title="Most exposed assets" sub="Worst open findings first · risk band" href="/assets" cta="Open inventory" busy={busyOf(q)} className="md:col-span-2 xl:col-span-8">
       {body}
     </Card>
   );
@@ -234,11 +244,11 @@ export function AttackSurface({ devices, easm }: { devices: Qs<Devices>; easm: Q
   ].filter((s) => s.n > 0);
 
   return (
-    <Card title="Attack surface" sub="What discovery has found vs what is under management, and the outside-in grade" href="/asset-discovery" cta="Open Discovery" className="xl:col-span-4">
+    <Card title="Attack surface" sub="Discovered vs managed" href="/asset-discovery" cta="Open Discovery" busy={busyOf(devices, easm)} className="xl:col-span-4">
       {devices.isLoading ? <Loading rows={4} /> : !devices.data ? <Unavailable what="Discovery" href="/asset-discovery" /> : total === 0 ? (
         <Empty compact icon={<Radar size={16} />} title="Nothing discovered yet" body="Run a network sweep or an external (EASM) scan to map the attack surface." href="/asset-discovery" cta="Start discovery" />
       ) : (
-        <div>
+        <div className="flex flex-1 flex-col justify-between">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
             <Figure label="Under management" value={`${pctOf(inInv, total)}%`} sub={`${nfmt(inInv)} of ${nfmt(total)} discovered`} />
             <Figure label="Not yet managed" value={nfmt(total - inInv)} sub={ready ? `${nfmt(ready)} ready to connect` : 'none ready to connect'} />
@@ -250,7 +260,7 @@ export function AttackSurface({ devices, easm }: { devices: Qs<Devices>; easm: Q
           </p>
         </div>
       )}
-      <div className="mt-4 border-t border-[#F1F3F7] pt-3">
+      <div className="mt-3 flex flex-col border-t border-[#F1F3F7] pt-3">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <Eyebrow>External posture (EASM)</Eyebrow>
           {es && graded > 0 && <span className="text-[11.5px] text-[#64748B]">avg <b className="font-semibold text-[#0F172A]">{es.avg_grade ?? '—'}</b> · {es.avg_score ?? '—'}/100</span>}
@@ -286,17 +296,17 @@ export function InventoryHealth({ inv, assets }: { inv: Qs<Inventory>; assets: Q
   else if (!d) body = <Unavailable what="Inventory score" href="/assets" />;
   else if (d.no_data || p?.score == null) body = <Empty icon={<ClipboardCheck size={16} />} title="No assets yet" body="Adopt discovered devices or import a register to start scoring the inventory." href="/asset-discovery" cta="Bring assets in" />;
   else body = (
-    <div>
+    <div className="flex flex-1 flex-col">
       <div className="flex items-center gap-3">
-        <p className="m-0 text-[28px] font-semibold leading-none text-[#0F172A]">{p.score.toFixed(1)}<span className="ml-1 text-[12px] font-medium text-[#94A3B8]">/100</span></p>
+        <p className="m-0 text-[24px] font-semibold leading-none text-[#0F172A]">{p.score.toFixed(1)}<span className="ml-1 text-[12px] font-medium text-[#94A3B8]">/100</span></p>
         {p.grade && <Pill tone={GRADE_TONE[p.grade] ?? SEV.info}>{GRADE_TONE[p.grade]?.label ?? p.grade}</Pill>}
         <span className="ml-auto text-[11px] text-[#64748B]">target {target}</span>
       </div>
-      <div className="mt-3.5">
-        <BarList max={100} target={target} labelWidth={150}
+      <div className="mt-3.5 flex flex-1 flex-col">
+        <BarList max={100} target={target} labelWidth={150} fill
           rows={(p.components ?? []).map((c) => ({ key: c.key, label: c.label, n: c.score == null ? null : c.score, c: c.score == null ? undefined : vsTarget(c.score, c.target ?? target), value: c.score == null ? undefined : c.score.toFixed(1), title: `${c.label}: weight ${Math.round(c.weight * 100)}%` }))} />
       </div>
-      <p className="m-0 mt-2 flex items-center gap-1.5 text-[10.5px] text-[#94A3B8]"><i aria-hidden className="inline-block h-[10px] w-[2px] rounded-[1px] bg-[#0F172A] opacity-50" />target · bars green at target, amber from 50, red below 50</p>
+      <p className="m-0 mt-2 flex items-center gap-1.5 text-[10.5px] text-[#94A3B8]"><i aria-hidden className="inline-block h-[10px] w-[2px] rounded-[1px] bg-[#0F172A] opacity-50" />target · green ≥ target, red &lt; 50</p>
       {aq && (
         <div className="mt-3 grid grid-cols-3 gap-3 border-t border-[#F1F3F7] pt-3">
           <Figure label="No owner" value={nfmt(aq.assets_without_owner)} sub={`of ${nfmt(d.counts?.assets)}`} />
@@ -308,7 +318,7 @@ export function InventoryHealth({ inv, assets }: { inv: Qs<Inventory>; assets: Q
     </div>
   );
   return (
-    <Card title="Inventory health" sub="Inventory performance score and its components against target" href="/assets" cta="Open inventory" className="xl:col-span-4">
+    <Card title="Inventory health" sub="Performance score vs target" href="/assets" cta="Open inventory" busy={busyOf(inv, assets)} className="xl:col-span-4">
       {body}
     </Card>
   );
@@ -321,29 +331,31 @@ export function PenTest({ q }: { q: Qs<ExecSummary> }) {
   let body: ReactNode;
   if (q.isLoading) body = <Loading rows={5} />;
   else if (!pt) body = <Unavailable what="Pentest results" href="/pentest" />;
-  else if (!pt.findings.total && !ex?.runs) body = <Empty icon={<Bot size={16} />} title="No AI pentest yet" body="PentestGPT findings and validated exploits appear here after the first engagement." href="/pentest" cta="Start an AI pentest" />;
+  else if (!pt.findings.total && !ex?.runs) body = <Empty icon={<Bot size={16} />} title="No AI pentest yet" body="Penetration-test findings and validated exploits appear here after the first engagement." href="/pentest" cta="Start an AI pentest" />;
   else {
     const parts = sevParts(pt.findings.by_severity, false);
     body = (
-      <div>
+      <div className="flex flex-1 flex-col">
         <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-          <Figure label="PentestGPT findings" value={nfmt(pt.findings.open)} sub={`open of ${nfmt(pt.findings.total)} raised`} />
+          <Figure label="Penetration-test findings" value={nfmt(pt.findings.open)} sub={`open of ${nfmt(pt.findings.total)} raised`} />
           <Figure label="Targets tested" value={nfmt(pt.targets)} sub={pt.last_finding_at ? `last finding ${fmtDay(utc(pt.last_finding_at))}` : undefined} />
         </div>
         {pt.findings.open > 0 && (
           <>
-            <div className="mt-3"><StackBar parts={parts} label="Open PentestGPT findings by severity" /></div>
+            <div className="mt-3"><StackBar parts={parts} label="Open penetration-test findings by severity" /></div>
             <div className="mt-2.5"><PartLegend parts={parts} total={pt.findings.open} cols={2} /></div>
           </>
         )}
-        <div className="mt-4 border-t border-[#F1F3F7] pt-3">
+        {/* flex-1: this section takes any height the row adds, so its empty state fills
+            the card instead of leaving a white bottom */}
+        <div className="mt-3 flex flex-1 flex-col border-t border-[#F1F3F7] pt-3">
           <Eyebrow className="mb-2">Exploit validation</Eyebrow>
           {ex == null ? (
             <p className="m-0 text-[11.5px] text-[#64748B]">Exploit results aren&rsquo;t provisioned on this tenant yet.</p>
           ) : ex.runs === 0 ? (
             <Empty compact title="No exploit runs yet" body="Nothing has been proven exploitable or ruled out — approved exploit runs from AI Pentest record their proof here." href="/pentest" cta="Open AI Pentest" />
           ) : (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="my-auto grid grid-cols-3 gap-3">
               <Figure label="Findings tested" value={nfmt(ex.findings_tested)} sub={`${plural(ex.runs, 'run')}`} />
               <Figure label="Confirmed" value={<span style={{ color: ex.confirmed ? SEV.critical.ink : T.text }}>{nfmt(ex.confirmed)}</span>} sub="exploitable" />
               <Figure label="Access proven" value={nfmt(ex.access_proven)} sub={ex.last_run_at ? `last ${fmtDay(utc(ex.last_run_at))}` : undefined} />
@@ -354,7 +366,7 @@ export function PenTest({ q }: { q: Qs<ExecSummary> }) {
     );
   }
   return (
-    <Card title="Penetration testing" sub="AI-led findings (PentestGPT) and exploit validation" href="/pentest" cta="Open AI Pentest" className="xl:col-span-4">
+    <Card title="Penetration testing" sub="AI findings · exploit validation" href="/pentest" cta="Open AI Pentest" busy={busyOf(q)} className="xl:col-span-4">
       {body}
     </Card>
   );
@@ -366,6 +378,11 @@ const DIM: Record<string, string> = {
   hygiene: 'Exposure hygiene', exploitability: 'Exploitability', exposure: 'Internet exposure', business: 'Business impact', subdomains: 'Subdomain exposure',
 };
 const titleCase = (s: string) => s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// Two groups, two accents from the product palette: brand blue (outside-in) · slate (internal).
+const GROUP = {
+  ext: { Icon: Globe, c: T.base, ink: T.strong, bg: alpha(T.base, 0.07) },
+  int: { Icon: Building2, c: '#475569', ink: '#1E293B', bg: '#F1F5F9' },
+};
 
 function drivers(list: RiskAsset[], dims: string[]): BarRow[] {
   return dims.map((k) => {
@@ -386,25 +403,38 @@ export function RiskDrivers({ risk }: { risk: Qs<RiskDash> }) {
     const int = d.assets.filter((a) => !isExternalAsset(a));
     const extDims = Array.from(new Set(ext.flatMap((a) => a.known_dimensions ?? [])));
     const intDims = Object.keys(d.weights ?? {}).length ? Object.keys(d.weights ?? {}) : Array.from(new Set(int.flatMap((a) => a.known_dimensions ?? [])));
+    const weights = Object.entries(d.weights ?? {}).sort((a, b) => b[1] - a[1]).map(([k, w]) => `${DIM[k] ?? k} ${Math.round(w * 100)}%`).join(' · ');
     const groups = [
-      { key: 'ext', title: `External assets · ${nfmt(ext.length)}`, rows: drivers(ext, extDims), note: 'fixed outside-in model' },
-      { key: 'int', title: `Internal assets · ${nfmt(int.length)}`, rows: drivers(int, intDims), note: `tunable weights: ${Object.entries(d.weights ?? {}).sort((a, b) => b[1] - a[1]).map(([k, w]) => `${DIM[k] ?? k} ${Math.round(w * 100)}%`).join(' · ')}` },
+      { key: 'ext' as const, label: 'External assets', count: ext.length, rows: drivers(ext, extDims), note: 'outside-in model', tip: 'Fixed outside-in scoring model for internet-facing assets' },
+      { key: 'int' as const, label: 'Internal assets', count: int.length, rows: drivers(int, intDims), note: 'tunable weights', tip: weights ? `Tunable weights: ${weights}` : undefined },
     ].filter((g) => g.rows.length && (g.key === 'ext' ? ext.length : int.length));
     const max = Math.max(1, ...groups.flatMap((g) => g.rows.map((r) => r.n ?? 0)));
     body = (
-      <div className="flex flex-col gap-4">
-        {groups.map((g) => (
-          <div key={g.key}>
-            <div className="mb-2 flex items-baseline justify-between gap-2"><Eyebrow>{g.title}</Eyebrow><span className="text-[10.5px] text-[#94A3B8]">avg points</span></div>
-            <BarList rows={g.rows} max={max} labelWidth={150} />
-            <p className="m-0 mt-1.5 text-[10.5px] leading-[1.45] text-[#94A3B8]">{g.note}</p>
-          </div>
-        ))}
+      <div className="flex flex-1 flex-col gap-3">
+        {groups.map((g) => {
+          const s = GROUP[g.key];
+          return (
+            <div key={g.key} className="flex flex-1 flex-col">
+              {/* Group header = a different class of element from the driver rows: tinted
+                  band + accent rule + icon + count badge, in the group's own accent. */}
+              <div className="flex items-center gap-2 rounded-[8px] py-[6px] pl-3 pr-2.5" style={{ background: s.bg, boxShadow: `inset 3px 0 0 ${s.c}` }}>
+                <s.Icon size={14} aria-hidden className="shrink-0" style={{ color: s.c }} />
+                <h3 className="m-0 whitespace-nowrap font-semibold !text-[12px] !leading-[1.3]" style={{ color: s.ink }}>{g.label}</h3>
+                <span className="shrink-0 rounded-full bg-white px-[7px] text-[10.5px] font-semibold leading-[18px] tabular-nums" style={{ color: s.c }} title={plural(g.count, 'asset')}>{nfmt(g.count)}</span>
+                <span className="ml-auto min-w-0 truncate text-[10.5px] text-[#64748B]" title={g.tip}>{g.note}</span>
+              </div>
+              {/* top drivers only (already sorted desc) — exec view drops the near-zero / not-measured tail */}
+              <div className="flex flex-1 flex-col pl-3 pt-2.5">
+                <BarList rows={g.rows.filter((r) => (r.n ?? 0) > 0).slice(0, 4)} max={max} labelWidth={140} color={s.c} fill />
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
   return (
-    <Card title="What drives the risk score" sub="Average points each dimension adds to an asset’s 0–100 risk score (measured assets only)" href="/risk-posture" cta="Open Risk Posture" className="xl:col-span-4">
+    <Card title="What drives the risk score" sub="Avg points per dimension" href="/risk-posture" cta="Open Risk Posture" busy={busyOf(risk)} className="xl:col-span-4">
       {body}
     </Card>
   );
@@ -428,18 +458,18 @@ export function CisCompliance({ q }: { q: Qs<CisOverview> }) {
       { key: 'unscanned', label: 'Not scanned', n: t.unscanned, c: '#CBD5E1' },
     ];
     body = (
-      <div>
+      <div className="flex flex-1 flex-col">
         <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
           <Figure label="Average pass rate" value={`${Math.round(t.avg_pass_rate)}%`} sub="passed ÷ (passed + failed)" />
           <Figure label="Assets scanned" value={`${nfmt(t.scanned)} / ${nfmt(t.assets)}`} sub={`${nfmt(t.total_rules)} rules in library`} />
         </div>
-        <div className="mt-3"><StackBar parts={parts} label="CIS scan coverage" /></div>
+        <div className="mt-auto pt-3"><StackBar parts={parts} label="CIS scan coverage" /></div>
         <div className="mt-2.5"><PartLegend parts={parts} total={t.assets} /></div>
       </div>
     );
   }
   return (
-    <Card title="CIS benchmark compliance" sub="Configuration hardening measured against CIS benchmarks" href="/assets?tab=cis" cta="Open CIS" className="xl:col-span-4">
+    <Card title="CIS benchmark compliance" sub="Hardening vs CIS benchmarks" href="/assets?tab=cis" cta="Open CIS" busy={busyOf(q)} className="xl:col-span-6">
       {body}
     </Card>
   );
@@ -473,7 +503,7 @@ export function CtemProgramme({ q }: { q: Qs<Ctem> }) {
     </ul>
   );
   return (
-    <Card title="CTEM programme" sub="Continuous threat-exposure management scopes and cycles" href="/vulnerabilities/ctem-scopes" cta="Open CTEM" className="xl:col-span-4">
+    <Card title="CTEM programme" sub="Exposure-management scopes & cycles" href="/vulnerabilities/ctem-scopes" cta="Open CTEM" busy={busyOf(q)} className="xl:col-span-6">
       {body}
     </Card>
   );

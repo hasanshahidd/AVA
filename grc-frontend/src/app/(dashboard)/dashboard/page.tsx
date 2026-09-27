@@ -13,19 +13,19 @@
  * Each query is independent, so a slow (risk posture scores every asset live) or failing
  * module only affects its own card. recharts is mocked here → charts are inline SVG/CSS.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, AlertTriangle, ArrowRight, Boxes, Bug, ClipboardCheck, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
 import apiClient, { compliancePluginsApi, discoveryApi, riskPostureApi } from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import {
-  BAND, BAND_ORDER, Card, Empty, Eyebrow, FONT, Figure, Key, Loading, Pill, Skel, T, Unavailable,
+  BAND, BAND_ORDER, CARD_SHADOW, Card, Empty, Eyebrow, FONT, Figure, Key, Loading, Pill, Skel, T, Unavailable,
   alpha, nfmt, pctOf, plural, toBand, type Band,
 } from './_components/kit';
 import { FlowChart, Gauge, NEW_C, PartLegend, RES_C, Sparkline, StackBar, type Part, type Week } from './_components/charts';
 import {
-  AttackSurface, CisCompliance, CtemProgramme, InventoryHealth, PenTest, RiskDrivers, TopAssets, VulnExposure, isExternalAsset,
+  AttackSurface, CisCompliance, CtemProgramme, InventoryHealth, PenTest, RiskDrivers, TopAssets, VulnExposure, busyOf, isExternalAsset,
   type AssetsDash, type CisOverview, type Ctem, type Devices, type Easm, type ExecSummary, type Inventory, type Qs, type RiskDash,
 } from './_components/lenses';
 
@@ -69,8 +69,10 @@ export default function PerformancePage() {
   const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1 });
   const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1 });
   const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1 });
-  const mine = [summary, trends, risk, inv, assets, cis, easm, devices, ctem];
+  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem];
   const fetching = mine.some((q) => q.isFetching);
+  // Sources that failed on their last attempt (inventory's fetcher returns null instead of throwing).
+  const failed = mine.filter((q) => q.isError).length + (inv.isSuccess && inv.data === null ? 1 : 0);
 
   const F = summary.data?.findings;
   const I = inv.data;
@@ -96,23 +98,34 @@ export default function PerformancePage() {
     return { weeks, added, resolved, mttr: t.summary?.mttr_days_within_window ?? null };
   }, [trends.data]);
 
-  const updated = Math.max(0, ...mine.map((q) => q.dataUpdatedAt || 0));
-  const refresh = () => ALL_KEYS.forEach((queryKey) => qc.invalidateQueries({ queryKey }));
+  // "Live data" moves only once EVERY source has settled — not when the first fast one lands
+  // while risk posture (scores every asset live, ~8s) is still computing.
+  const latest = Math.max(0, ...mine.map((q) => q.dataUpdatedAt || 0));
+  const [updated, setUpdated] = useState(0);
+  useEffect(() => { if (!fetching && latest) setUpdated(latest); }, [fetching, latest]);
+  // One click refetches every source on the page — active or not, loaded or errored — and
+  // marks the shared keys stale for the module pages too.
+  const refresh = () => { ALL_KEYS.forEach((queryKey) => qc.invalidateQueries({ queryKey, refetchType: 'all' })); };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-4 pb-6 text-[#0F172A]" style={{ fontFamily: FONT }}>
+    <div data-exec-dash className="mx-auto flex w-full max-w-[1950px] flex-col gap-3 pb-5 text-[#0F172A]" style={{ fontFamily: FONT, zoom: 0.8 /* one knob: page at 80% so a window shows more; max-w = 1560/0.8 */ }}>
+      {/* Slightly greyer canvas on this page only, so the white cards lift off it. */}
+      <style>{'main:has([data-exec-dash]){background:#EDF0F5}'}</style>
       <h1 className="sr-only">Performance — executive cyber posture</h1>
 
       {/* ── Executive summary ── */}
-      <section aria-label="Executive summary" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[14px] border border-[#E2E5EC] bg-white px-[18px] py-[14px] shadow-[0_1px_2px_rgba(16,24,40,.04)]" style={{ borderLeft: `3px solid ${T.base}` }}>
+      <section aria-label="Executive summary" className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] border border-[#E2E5EC] bg-white px-4 py-3 ${CARD_SHADOW}`} style={{ borderLeft: `3px solid ${T.base}` }}>
         <div className="min-w-0 flex-1 basis-[260px]">
           <Eyebrow>Executive summary</Eyebrow>
-          <p className="m-0 mt-1 text-[15px] leading-[1.55] text-[#0F172A]" aria-live="polite">
-            {summarySentence({ loading: inv.isLoading || summary.isLoading || trends.isLoading, assetsN, openN, critHigh, exposed: F?.internet_exposed ?? null, flow })}
+          <p className="m-0 mt-0.5 text-[13.5px] leading-[1.5] text-[#0F172A]" aria-live="polite">
+            {summarySentence({ loading: inv.isLoading || summary.isLoading || trends.isLoading, assetsN, openN, critHigh, flow })}
           </p>
         </div>
         <div className="flex items-center gap-3 text-[11.5px] text-[#64748B]">
-          <span>{updated ? `Live data · ${new Date(updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading live data…'}</span>
+          <span aria-live="polite">
+            {updated ? `Live data · ${new Date(updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading live data…'}
+            {!fetching && failed > 0 && <span className="ml-2 inline-flex"><Warn>{plural(failed, 'source')} didn&rsquo;t respond</Warn></span>}
+          </span>
           <button type="button" onClick={refresh} disabled={fetching}
             className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#E2E5EC] bg-white px-3 text-[12px] font-semibold text-[#334155] hover:bg-[#F6F7FB] disabled:cursor-default disabled:opacity-70">
             <RefreshCw size={13} aria-hidden className={fetching ? 'animate-spin' : ''} style={{ color: T.base }} />{fetching ? 'Refreshing' : 'Refresh'}
@@ -121,45 +134,51 @@ export default function PerformancePage() {
       </section>
 
       {/* ── Hero: risk posture · 90-day flow ── */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
         <PostureHero risk={risk} assetsN={assetsN} />
         <FlowCard q={trends} flow={flow} history={history.data?.series ?? null} historyLoading={history.isLoading} />
       </div>
 
       {/* ── KPI strip ── */}
-      <nav aria-label="Key indicators" className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-        <Kpi icon={<Boxes size={15} />} label="Assets under management" href="/assets" loading={inv.isLoading && assets.isLoading}
+      <nav aria-label="Key indicators" className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <Kpi icon={<Boxes size={15} />} label="Assets under management" href="/assets" loading={inv.isLoading && assets.isLoading} busy={busyOf(inv, assets)}
           value={nfmt(assetsN)}
           sub={I?.attention_queue ? (I.attention_queue.assets_without_owner ? <Warn>{nfmt(I.attention_queue.assets_without_owner)} without an owner</Warn> : 'every asset has an owner') : 'in the IT asset inventory'} />
-        <Kpi icon={<Bug size={15} />} label="Open critical & high" href="/vulnerabilities" loading={summary.isLoading && inv.isLoading}
+        <Kpi icon={<Bug size={15} />} label="Open critical & high" href="/vulnerabilities" loading={summary.isLoading && inv.isLoading} busy={busyOf(summary)}
           value={nfmt(critHigh)}
           sub={F ? `${nfmt(F.by_severity.critical)} critical · ${nfmt(F.by_severity.high)} high` : openN != null ? `of ${nfmt(openN)} open findings` : 'findings unavailable'} />
-        <Kpi icon={<Globe size={15} />} label="Internet-exposed findings" href="/vulnerabilities" loading={summary.isLoading}
+        <Kpi icon={<Globe size={15} />} label="Internet-exposed findings" href="/vulnerabilities" loading={summary.isLoading} busy={busyOf(summary)}
           value={F ? nfmt(F.internet_exposed) : '—'}
           sub={F ? (F.open ? `${pctOf(F.internet_exposed, F.open)}% of ${nfmt(F.open)} open findings` : 'no open findings') : 'unavailable'} />
-        <Kpi icon={<ShieldAlert size={15} />} label="External posture grade" href="/asset-discovery" loading={easm.isLoading}
+        <Kpi icon={<ShieldAlert size={15} />} label="External posture grade" href="/asset-discovery" loading={easm.isLoading} busy={busyOf(easm)}
           value={easm.data?.summary?.graded ? (easm.data.summary.avg_grade ?? '—') : '—'}
           sub={easm.data?.summary?.graded
             ? `avg ${easm.data.summary.avg_score ?? '—'}/100 · ${nfmt(easm.data.summary.graded)} of ${nfmt(easm.data.summary.total)} hosts graded`
             : easm.data ? <Cta>No external scan yet · Run one</Cta> : 'unavailable'} />
-        <Kpi icon={<Activity size={15} />} label="Severe & elevated risk" href="/risk-posture" loading={risk.isLoading} loadingNote="scoring assets…"
+        <Kpi icon={<Activity size={15} />} label="Severe & elevated risk" href="/risk-posture" loading={risk.isLoading} loadingNote="scoring assets…" busy={busyOf(risk)}
           value={risk.data?.summary ? nfmt((risk.data.summary.by_band.severe ?? 0) + (risk.data.summary.by_band.elevated ?? 0)) : '—'}
           sub={risk.data?.summary ? `${nfmt(risk.data.summary.by_band.severe ?? 0)} severe · ${nfmt(risk.data.summary.by_band.elevated ?? 0)} elevated of ${nfmt(risk.data.summary.asset_count)}` : 'unavailable'} />
-        <Kpi icon={<ClipboardCheck size={15} />} label="CIS benchmark coverage" href="/assets?tab=cis" loading={cis.isLoading}
+        <Kpi icon={<ClipboardCheck size={15} />} label="CIS benchmark coverage" href="/assets?tab=cis" loading={cis.isLoading} busy={busyOf(cis)}
           value={cis.data?.totals?.scanned ? `${Math.round(cis.data.totals.avg_pass_rate)}%` : '—'}
           sub={cis.data?.totals
             ? (cis.data.totals.scanned ? `pass rate · ${nfmt(cis.data.totals.scanned)} of ${nfmt(cis.data.totals.assets)} assets scanned` : <Cta>No CIS scan yet · Run a CIS scan</Cta>)
             : 'unavailable'} />
       </nav>
 
-      {/* ── Module lenses ── */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
+      {/* ── Module lenses ──
+         Every 12-col row sums to 12 (no empty cell): row 1 = the four vuln tiles (their own
+         full-width sub-grid); row 2 = Most-exposed (8) + Attack-surface (4); row 3 = the three
+         mid cards (4·3); row 4 = CIS (6) + CTEM (6). Rows STRETCH (equal heights, common
+         baseline, no hole beside a short card) and each Card body is a flex column its content
+         fills — lists spread, tables grow, empty / loading / error states centre in the full
+         height — so there is no white card bottom either, in any state. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12">
         <VulnExposure q={summary} />
         <TopAssets q={summary} risk={risk} />
         <AttackSurface devices={devices} easm={easm} />
         <InventoryHealth inv={inv} assets={assets} />
-        <PenTest q={summary} />
         <RiskDrivers risk={risk} />
+        <PenTest q={summary} />
         <CisCompliance q={cis} />
         <CtemProgramme q={ctem} />
       </div>
@@ -168,8 +187,8 @@ export default function PerformancePage() {
 }
 
 /* ---------- executive sentence (plain template over live numbers) ---------- */
-function summarySentence({ loading, assetsN, openN, critHigh, exposed, flow }: {
-  loading: boolean; assetsN: number | null; openN: number | null; critHigh: number | null; exposed: number | null;
+function summarySentence({ loading, assetsN, openN, critHigh, flow }: {
+  loading: boolean; assetsN: number | null; openN: number | null; critHigh: number | null;
   flow: { added: number; resolved: number } | null;
 }): ReactNode {
   if (loading) return <Skel h={16} w="80%" className="my-1" />;
@@ -177,16 +196,15 @@ function summarySentence({ loading, assetsN, openN, critHigh, exposed, flow }: {
   const B = ({ children }: { children: ReactNode }) => <b className="font-semibold">{children}</b>;
   const across = assetsN != null ? <> across <B>{nfmt(assetsN)}</B> assets</> : null;
   const lead = critHigh ? <><B>{nfmt(critHigh)}</B> critical or high {critHigh === 1 ? 'finding is' : 'findings are'} open{across}</> : <>No critical or high findings are open{across}</>;
-  const exp = exposed != null && openN ? <>; <B>{pctOf(exposed, openN)}%</B> of the {nfmt(openN)} open findings sit on internet-facing assets</> : null;
   let trend: ReactNode = null;
   if (flow) {
     const { added, resolved } = flow;
-    trend = !added && !resolved ? <>; nothing was opened or resolved in the last 90 days</>
-      : !resolved ? <>; <B>none</B> has been resolved in the last 90 days ({nfmt(added)} new)</>
-        : resolved >= added ? <>; the backlog shrank by <B>{nfmt(resolved - added)}</B> over 90 days ({nfmt(resolved)} resolved vs {nfmt(added)} new)</>
-          : <>; the backlog grew by <B>{nfmt(added - resolved)}</B> over 90 days ({nfmt(added)} new vs {nfmt(resolved)} resolved)</>;
+    trend = !added && !resolved ? <>; none opened or resolved in 90 days</>
+      : !resolved ? <>; <B>none</B> resolved in 90 days ({nfmt(added)} new)</>
+        : resolved >= added ? <>; backlog down <B>{nfmt(resolved - added)}</B> in 90 days ({nfmt(resolved)} resolved vs {nfmt(added)} new)</>
+          : <>; backlog up <B>{nfmt(added - resolved)}</B> in 90 days ({nfmt(added)} new vs {nfmt(resolved)} resolved)</>;
   }
-  return <>{lead}{exp}{trend}.</>;
+  return <>{lead}{trend}.</>;
 }
 
 /* ---------- KPI tile ---------- */
@@ -195,23 +213,25 @@ const Warn = ({ children }: { children: ReactNode }) => (
 );
 const Cta = ({ children }: { children: ReactNode }) => <span className="font-semibold text-[#005B96]">{children} →</span>;
 
-function Kpi({ icon, label, value, sub, href, loading, loadingNote }: {
-  icon: ReactNode; label: string; value: ReactNode; sub: ReactNode; href: string; loading?: boolean; loadingNote?: string;
+function Kpi({ icon, label, value, sub, href, loading, loadingNote, busy }: {
+  icon: ReactNode; label: string; value: ReactNode; sub: ReactNode; href: string; loading?: boolean; loadingNote?: string; busy?: boolean;
 }) {
   return (
-    <Link href={href} className="group flex min-w-0 flex-col rounded-[14px] border border-[#E2E5EC] bg-white px-[14px] py-[12px] shadow-[0_1px_2px_rgba(16,24,40,.04)] transition hover:border-[#C7D2E4] hover:shadow-[0_4px_14px_rgba(16,24,40,.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005B96]">
+    <Link href={href} aria-busy={busy || undefined} className={`group relative flex min-w-0 flex-col rounded-[12px] border border-[#E2E5EC] bg-white px-3 py-2.5 ${CARD_SHADOW} transition hover:-translate-y-px hover:border-[#C7D2E4] hover:shadow-[0_8px_22px_rgba(16,24,40,.12)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005B96]`}>
       <span className="flex items-center gap-2 text-[11.5px] font-medium text-[#64748B]">
         <span aria-hidden className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px]" style={{ background: alpha(T.base, 0.08), color: T.base }}>{icon}</span>
-        <span className="min-w-0 flex-1 leading-[1.25]">{label}</span>
-        <ArrowRight size={13} aria-hidden className="shrink-0 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
+        {/* two-line slot: 1- and 2-line labels keep every tile's value on the same baseline
+            (the corner arrow is out of flow so the label keeps its width at 1366px) */}
+        <span className="flex min-h-[29px] min-w-0 flex-1 items-center pr-3 leading-[1.25]">{label}</span>
       </span>
+      <ArrowRight size={13} aria-hidden className="absolute right-2.5 top-3 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
       {loading ? (
         <span className="mt-2.5 flex flex-col gap-1.5"><Skel h={24} w="45%" /><span className="text-[11px] text-[#94A3B8]">{loadingNote ?? 'loading…'}</span></span>
       ) : (
-        <>
-          <span className="mt-2 text-[26px] font-semibold leading-[1.1] text-[#0F172A]">{value}</span>
+        <span className={`flex flex-col transition-opacity duration-200 ${busy ? 'opacity-50' : ''}`}>
+          <span className="mt-1.5 text-[22px] font-semibold leading-[1.1] text-[#0F172A]">{value}</span>
           <span className="mt-1 text-[11.5px] leading-[1.4] text-[#64748B]">{sub}</span>
-        </>
+        </span>
       )}
     </Link>
   );
@@ -238,7 +258,7 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
 
   let body: ReactNode;
   if (risk.isLoading) body = (
-    <div className="flex flex-wrap items-center gap-6">
+    <div className="flex flex-1 flex-wrap items-center gap-6">
       <div className="relative max-w-full shrink-0"><Gauge value={null} color={T.faint} label="Risk posture loading" /></div>
       <div className="min-w-0 flex-1 basis-[220px]"><Loading rows={5} note={`Scoring ${assetsN != null ? plural(assetsN, 'asset') : 'every asset'} live from scan, hardening and business-impact signals — this takes a few seconds.`} /></div>
     </div>
@@ -246,12 +266,12 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
   else if (!d || !s) body = <Unavailable what="Risk posture" href="/risk-posture" />;
   else if (!s.scored_count || s.avg_score == null) body = <Empty icon={<Activity size={16} />} title="No asset has a risk score yet" body="Scores appear once assets carry scan, hardening or business-impact data." href="/risk-posture" cta="Open Risk Posture" />;
   else body = (
-    <div className="flex flex-wrap items-start gap-x-7 gap-y-4">
-      <div className="flex max-w-full shrink-0 flex-col items-center">
+    <div className="flex flex-1 flex-wrap items-stretch gap-x-7 gap-y-4">
+      <div className="flex max-w-full shrink-0 flex-col items-center justify-center">
         <div className="relative max-w-full">
           <Gauge value={s.avg_score} color={tone.c} label={`Average asset risk ${s.avg_score.toFixed(1)} of 100, band ${tone.label}`} />
           <div className="pointer-events-none absolute inset-x-0 bottom-[24px] flex flex-col items-center">
-            <span className="text-[36px] font-semibold leading-none text-[#0F172A]">{s.avg_score.toFixed(1)}</span>
+            <span className="text-[30px] font-semibold leading-none text-[#0F172A]">{s.avg_score.toFixed(1)}</span>
             <span className="mt-1 text-[10.5px] text-[#94A3B8]">avg risk / 100</span>
           </div>
         </div>
@@ -262,12 +282,12 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
           </p>
         )}
       </div>
-      <div className="min-w-0 flex-1 basis-[250px]">
+      <div className="flex min-w-0 flex-1 basis-[250px] flex-col">
         <div className="mb-2 flex items-baseline justify-between gap-2"><Eyebrow>Assets by risk band</Eyebrow><span className="text-[11.5px] text-[#64748B]">{nfmt(s.scored_count)} of {nfmt(s.asset_count)} scored</span></div>
         <StackBar parts={parts} label="Assets by risk band" height={14} />
         <div className="mt-2.5"><PartLegend parts={parts} total={s.asset_count} cols={2} /></div>
         {x && x.top.length > 0 && (
-          <div className="mt-4">
+          <div className="mt-auto pt-4">
             <Eyebrow className="mb-1.5">Highest risk</Eyebrow>
             <ol className="m-0 flex list-none flex-col p-0">
               {x.top.map((a) => {
@@ -290,7 +310,7 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
     </div>
   );
   return (
-    <Card title="Risk posture" sub="Mean of every asset’s 0–100 risk score — higher is worse" href="/risk-posture" cta="Open Risk Posture" className="xl:col-span-7">
+    <Card title="Risk posture" sub="Mean asset risk · 0–100, higher is worse" href="/risk-posture" cta="Open Risk Posture" busy={busyOf(risk)} className="xl:col-span-7">
       {body}
     </Card>
   );
@@ -309,15 +329,15 @@ function FlowCard({ q, flow, history, historyLoading }: {
     <div className="flex flex-1 flex-col">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Figure label="New" value={nfmt(flow.added)} sub="first detected" />
-        <Figure label="Resolved" value={nfmt(flow.resolved)} sub="closed in window" />
+        <Figure label="Resolved" value={nfmt(flow.resolved)} sub="closed" />
         <Figure label="Net change" value={`${flow.added - flow.resolved > 0 ? '+' : ''}${nfmt(flow.added - flow.resolved)}`} sub="open backlog" />
-        <Figure label="MTTR" value={flow.mttr == null ? '—' : `${Math.round(flow.mttr)}d`} sub={flow.mttr == null ? 'nothing resolved yet' : 'mean time to remediate'} />
+        <Figure label="MTTR" value={flow.mttr == null ? '—' : `${Math.round(flow.mttr)}d`} sub={flow.mttr == null ? 'none resolved' : 'mean time to fix'} />
       </div>
       <FlowChart weeks={flow.weeks} />
-      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[#334155]">
+      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-[11.5px] text-[#334155]">
         <span className="inline-flex items-center gap-1.5"><Key c={NEW_C} />New findings</span>
         <span className="inline-flex items-center gap-1.5"><Key c={RES_C} />Resolved</span>
-        <span className="ml-auto inline-flex items-center gap-2 text-[11px] text-[#64748B]">
+        <span className="ml-auto inline-flex items-center gap-2 whitespace-nowrap text-[11px] text-[#64748B]">
           Open backlog history:
           {historyLoading ? <Skel h={10} w={60} /> : pts.length >= 2
             ? <Sparkline points={pts} width={96} height={22} label={`Open findings over the last ${pts.length} daily snapshots, latest ${pts[pts.length - 1]}`} />
@@ -327,7 +347,7 @@ function FlowCard({ q, flow, history, historyLoading }: {
     </div>
   );
   return (
-    <Card title="Is it improving?" sub="Findings opened vs resolved per week, last 90 days" href="/vulnerabilities" cta="Open register" className="xl:col-span-5">
+    <Card title="Is it improving?" sub="Opened vs resolved · last 90 days" href="/vulnerabilities" cta="Open register" busy={busyOf(q)} className="xl:col-span-5">
       {body}
     </Card>
   );

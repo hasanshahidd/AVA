@@ -48,10 +48,10 @@ export function StackBar({ parts, label, height = 12 }: { parts: Part[]; label: 
   );
 }
 
-/** Legend rows for a StackBar: key · label · count · share. */
-export function PartLegend({ parts, total, cols = 1 }: { parts: (Part & { hint?: string })[]; total: number; cols?: number }) {
+/** Legend rows for a StackBar: key · label · count · share. `fill` spreads the rows over the card height. */
+export function PartLegend({ parts, total, cols = 1, fill }: { parts: (Part & { hint?: string })[]; total: number; cols?: number; fill?: boolean }) {
   return (
-    <ul className="m-0 grid list-none gap-x-5 gap-y-1.5 p-0" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
+    <ul className={`m-0 grid list-none gap-x-5 gap-y-1.5 p-0 ${fill ? 'flex-1 content-between' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
       {parts.map((p) => (
         <li key={p.key} className="flex min-w-0 items-center gap-2 text-[12px]">
           <i aria-hidden className="inline-block h-[9px] w-[9px] shrink-0 rounded-[2px]" style={{ background: p.c }} />
@@ -64,28 +64,47 @@ export function PartLegend({ parts, total, cols = 1 }: { parts: (Part & { hint?:
   );
 }
 
-/* ---------- labelled horizontal bars, optional target tick ---------- */
+/* ---------- labelled horizontal bars, optional target tick ----------
+   The track never drops below 40px: under width pressure the label truncates (full text
+   in the tooltip) instead of the bar collapsing to a sliver. `stacked` puts the label +
+   value above a full-width bar (narrow cards). A not-measured row stays ONE line at any
+   width: dashed empty track + muted "—", reason in the tooltip and the a11y label.
+   `fill` spreads the rows over the card height. */
 export type BarRow = { key: string; label: ReactNode; n: number | null; c?: string; value?: string; title?: string };
-export function BarList({ rows, max, target, color = T.base, labelWidth = 132, missing = 'Not measured yet' }: {
-  rows: BarRow[]; max?: number; target?: number; color?: string; labelWidth?: number; missing?: string;
+export function BarList({ rows, max, target, color = T.base, labelWidth = 132, missing = 'Not measured yet', stacked, fill }: {
+  rows: BarRow[]; max?: number; target?: number; color?: string; labelWidth?: number; missing?: string; stacked?: boolean; fill?: boolean;
 }) {
   const top = max ?? Math.max(1, ...rows.map((r) => r.n ?? 0));
+  // sizing differs by mode: flex-1 in a row; w-full when stacked (flex-1 in the stacked
+  // row's column axis would zero the 8px height)
+  const track = (r: BarRow, size: string) => (r.n == null ? (
+    <span role="img" aria-label={missing} className={`block h-[8px] shrink-0 rounded-[4px] border border-dashed border-[#CBD5E1] ${size}`} />
+  ) : (
+    <span className={`relative block h-[8px] shrink-0 rounded-[4px] bg-[#EEF1F5] ${size}`}>
+      <i className="absolute inset-y-0 left-0 block rounded-r-[4px]" style={{ width: `${Math.min(100, (r.n / top) * 100)}%`, minWidth: r.n > 0 ? 3 : 0, background: r.c ?? color }} />
+      {target != null && <i aria-hidden className="absolute -bottom-[3px] -top-[3px] block w-[2px] rounded-[1px] bg-[#0F172A] opacity-50" style={{ left: `calc(${Math.min(100, (target / top) * 100)}% - 1px)` }} />}
+    </span>
+  ));
+  const value = (r: BarRow, cls = '') => (
+    <b className={`shrink-0 text-right tabular-nums ${r.n == null ? 'font-medium text-[#94A3B8]' : 'font-semibold text-[#0F172A]'} ${cls}`}>{r.n == null ? '—' : (r.value ?? nfmt(r.n))}</b>
+  );
   return (
-    <ul className="m-0 flex list-none flex-col gap-[9px] p-0">
-      {rows.map((r) => (
-        <li key={r.key} className="flex items-center gap-2.5 text-[12px]" title={r.title}>
-          <span className="shrink-0 truncate text-[#334155]" style={{ width: labelWidth }}>{r.label}</span>
-          {r.n == null ? (
-            <span className="flex-1 text-[11.5px] italic text-[#94A3B8]">{missing}</span>
-          ) : (
-            <span className="relative block h-[8px] flex-1 overflow-visible rounded-[4px] bg-[#EEF1F5]">
-              <i className="absolute inset-y-0 left-0 block rounded-r-[4px]" style={{ width: `${Math.min(100, (r.n / top) * 100)}%`, minWidth: r.n > 0 ? 3 : 0, background: r.c ?? color }} />
-              {target != null && <i aria-hidden className="absolute -bottom-[3px] -top-[3px] block w-[2px] rounded-[1px] bg-[#0F172A] opacity-50" style={{ left: `calc(${Math.min(100, (target / top) * 100)}% - 1px)` }} />}
-            </span>
-          )}
-          <b className="w-[46px] shrink-0 text-right font-semibold tabular-nums text-[#0F172A]">{r.n == null ? '—' : (r.value ?? nfmt(r.n))}</b>
-        </li>
-      ))}
+    <ul className={`m-0 flex list-none flex-col p-0 ${stacked ? 'gap-3' : 'gap-[9px]'} ${fill ? 'flex-1 justify-between' : ''}`}>
+      {rows.map((r) => {
+        const tip = [r.title ?? (typeof r.label === 'string' ? r.label : null), r.n == null ? missing : null].filter(Boolean).join(' — ') || undefined;
+        return stacked ? (
+          <li key={r.key} className="flex flex-col gap-1.5 text-[12px]" title={tip}>
+            <span className="flex items-baseline gap-2"><span className="min-w-0 flex-1 truncate text-[#334155]">{r.label}</span>{value(r)}</span>
+            {track(r, 'w-full')}
+          </li>
+        ) : (
+          <li key={r.key} className="flex items-center gap-2.5 text-[12px]" title={tip}>
+            <span className="min-w-0 truncate text-[#334155]" style={{ flex: `0 1 ${labelWidth}px` }}>{r.label}</span>
+            {track(r, 'min-w-[40px] flex-1')}
+            {value(r, 'w-[46px]')}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -151,7 +170,9 @@ export function FlowChart({ weeks }: { weeks: Week[] }) {
       </div>
       <details className="mt-2 text-[11.5px] text-[#64748B]">
         <summary className="cursor-pointer select-none font-medium text-[#005B96]">View as table</summary>
-        <table className="mt-2 w-full border-collapse">
+        {/* capped + scrolls, so opening it can't blow up the hero row's height */}
+        <div className="mt-2 max-h-[168px] overflow-y-auto">
+        <table className="w-full border-collapse">
           <thead><tr>{['Week', 'New', 'Resolved', 'Net'].map((h, i) => <th key={h} scope="col" style={{ ...thS, textAlign: i ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
           <tbody>
             {weeks.map((w) => (
@@ -164,6 +185,7 @@ export function FlowChart({ weeks }: { weeks: Week[] }) {
             ))}
           </tbody>
         </table>
+        </div>
       </details>
     </div>
   );
@@ -172,19 +194,29 @@ export function FlowChart({ weeks }: { weeks: Week[] }) {
 const thS: React.CSSProperties = { padding: '5px 8px', fontSize: 10.5, fontWeight: 600, color: T.muted, background: T.subtle, borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase', letterSpacing: '.04em' };
 const tdS: React.CSSProperties = { padding: '5px 8px', fontSize: 11.5, color: T.text, borderBottom: '1px solid #F1F3F7', fontVariantNumeric: 'tabular-nums' };
 
-/* ---------- severity × age matrix (open findings, age since first detection) ---------- */
+/* ---------- severity × age matrix (open findings, days since first detection) ----------
+   table-fixed + colgroup: the table is exactly its card's width (never wider) — the
+   severity and Total columns hold fixed widths and the four day buckets share the rest,
+   with compact "0–7 … 90+" headers (full label in the tooltip). Fits a ~220px body.
+   h-full lets the rows grow when the tile is stretched to its row's height. */
 export function AgeMatrix({ data, ages }: { data: Record<string, Record<string, number>>; ages: string[] }) {
   const cell = (s: Sev, a: string) => data?.[s]?.[a] ?? 0;
   const max = Math.max(1, ...SEV_ORDER.flatMap((s) => ages.map((a) => cell(s, a))));
-  const head: React.CSSProperties = { padding: '0 4px 4px', fontSize: 10.5, fontWeight: 600, color: T.muted, background: 'transparent', border: 0, textAlign: 'center', whiteSpace: 'nowrap' };
+  const head: React.CSSProperties = { padding: '0 1px 4px', fontSize: 10, fontWeight: 600, color: T.muted, background: 'transparent', border: 0, textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'bottom' };
+  const num: React.CSSProperties = { padding: '5px 1px', fontSize: 12, fontVariantNumeric: 'tabular-nums', border: 0 };
   return (
-    <table className="w-full" style={{ borderCollapse: 'separate', borderSpacing: 3 }}>
-      <caption className="sr-only">Open findings by severity and age since first detected</caption>
+    <table className="h-full w-full table-fixed" style={{ borderCollapse: 'separate', borderSpacing: 2 }}>
+      <caption className="sr-only">Open findings by severity and days since first detected</caption>
+      <colgroup>
+        <col style={{ width: 68 }} />
+        {ages.map((a) => <col key={a} />)}
+        <col style={{ width: 38 }} />
+      </colgroup>
       <thead>
         <tr>
           <th scope="col" style={{ ...head, textAlign: 'left' }}>Severity</th>
-          {ages.map((a) => <th key={a} scope="col" style={head}>{a.replace(' days', 'd')}</th>)}
-          <th scope="col" style={head}>Total</th>
+          {ages.map((a) => <th key={a} scope="col" style={head} title={a}>{a.replace(' days', '').replace('-', '–')}</th>)}
+          <th scope="col" style={{ ...head, textAlign: 'right', paddingRight: 2 }}>Total</th>
         </tr>
       </thead>
       <tbody>
@@ -192,17 +224,17 @@ export function AgeMatrix({ data, ages }: { data: Record<string, Record<string, 
           const row = ages.map((a) => cell(s, a));
           return (
             <tr key={s}>
-              <th scope="row" style={{ padding: '0 6px 0 0', fontSize: 12, fontWeight: 500, color: T.ink2, textAlign: 'left', whiteSpace: 'nowrap', background: 'transparent', border: 0 }}>
-                <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-[9px] w-[9px] rounded-[2px]" style={{ background: SEV[s].c }} />{SEV[s].label}</span>
+              <th scope="row" style={{ padding: 0, fontSize: 12, fontWeight: 500, color: T.ink2, textAlign: 'left', whiteSpace: 'nowrap', background: 'transparent', border: 0 }}>
+                <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-[9px] w-[9px] shrink-0 rounded-[2px]" style={{ background: SEV[s].c }} />{SEV[s].label}</span>
               </th>
               {row.map((n, i) => (
                 <td key={ages[i]} title={`${SEV[s].label}, ${ages[i]}: ${n}`}
-                  style={{ padding: '6px 4px', borderRadius: 6, textAlign: 'center', fontSize: 12, fontWeight: n ? 600 : 400, fontVariantNumeric: 'tabular-nums', border: 0,
+                  style={{ ...num, borderRadius: 6, textAlign: 'center', fontWeight: n ? 600 : 400,
                     background: n ? alpha(SEV[s].c, 0.1 + 0.18 * (n / max)) : T.subtle, color: n ? SEV[s].ink : T.faint }}>
                   {n ? nfmt(n) : '·'}
                 </td>
               ))}
-              <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: T.text, border: 0, background: 'transparent' }}>{nfmt(row.reduce((x, y) => x + y, 0))}</td>
+              <td style={{ ...num, paddingRight: 2, textAlign: 'right', fontWeight: 600, color: T.text, background: 'transparent' }}>{nfmt(row.reduce((x, y) => x + y, 0))}</td>
             </tr>
           );
         })}
