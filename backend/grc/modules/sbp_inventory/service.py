@@ -4,6 +4,7 @@ template .xlsx. No writes to ITAsset — stored values live in SbpAssetInventory
 """
 from __future__ import annotations
 
+import html
 import io
 import re
 from datetime import datetime
@@ -219,6 +220,10 @@ def _ext_web(a: ITAsset) -> bool:
                                     or ep.get("scheme") or ep.get("title")))
 
 
+# First line of the note the vulnerability-scanner sync writes into
+# ITAsset.description (integrations sync_service) — machine text, not the asset's.
+_SYNC_NOTE = "Auto-synced from vulnerability scanner"
+
 # Generic placeholder page titles that are NOT a real application name.
 _GENERIC_TITLES = {"react app", "vue app", "app", "home", "index", "welcome",
                    "untitled", "document", "site", "web site", "website", "200 ok"}
@@ -292,9 +297,11 @@ def _web_apps(a: ITAsset) -> list:
 def _app_desc(a: ITAsset) -> str:
     """What the asset's APPLICATION is — not its data tier — as a factual draft
     from the detected server products ('' when nothing is known)."""
-    # external host: the probe's page title IS the application's name
+    # external host: the probe's page title IS the application's name. Decoded
+    # twice: titles stored before the probe decoded them, and CMSs that
+    # double-encode ('&amp;#8211;' -> '&#8211;' -> '–').
     ep = _ep(a)
-    title = str(ep.get("title") or "").strip()
+    title = html.unescape(html.unescape(str(ep.get("title") or ""))).strip()
     if title and title.lower() not in _GENERIC_TITLES:
         return title
     apps = _web_apps(a)
@@ -389,7 +396,10 @@ def _server_desc(a: ITAsset) -> str:
     osv = _os(a)
     if osv:
         parts.append(osv)
-    mk = " ".join(str(x) for x in (getattr(a, "manufacturer", None), getattr(a, "model", None)) if x)
+    mf, model = (str(getattr(a, c, None) or "").strip() for c in ("manufacturer", "model"))
+    if model.lower().startswith(mf.lower()):
+        mf = ""  # the model already names its maker: "HP" + "HP EliteBook 840 G8"
+    mk = " ".join(x for x in (mf, model) if x)
     if mk:
         parts.append(mk)
     hw = []
@@ -815,8 +825,8 @@ def _os_patch_reason(a: ITAsset, va: Dict[str, Any]) -> str:
         return (f"Microsoft's latest security update {latest} (released {rel}) is not "
                 f"installed; the newest installed security update is {last_kb}"
                 f"{f' (released {last_rel})' if last_rel else ''}.{found} {_OWNER}")
-    if n is None:
-        return ""  # no vendor feed and no scan -> unknown
+    if n is None or not _os(a):
+        return ""  # no vendor feed and no scan, or OS unknown (outside-in) -> unknown
     return f"Patch-currency review recommended —{found} {_OWNER}" if n else _NA
 
 
@@ -874,8 +884,11 @@ def _edr_reason(a: ITAsset) -> str:
     stopped = [e for e in _edr_agents(a) if not e.get("running")]
     if stopped:
         e = stopped[0]
-        head = (f"{e.get('product') or 'An EDR/XDR agent'} is installed but its service "
-                f"({e.get('service') or 'agent'}) is {str(e.get('status') or 'not running').lower()}"
+        # not "installed": Defender for Endpoint's Sense service ships with every
+        # Windows 10/11 — a stopped Sense means not onboarded (or not running)
+        head = (f"{e.get('product') or 'An EDR/XDR agent'} is not onboarded or not running "
+                f"({e.get('service') or 'agent'} service "
+                f"{str(e.get('status') or 'not running').lower()})"
                 " — EDR/XDR protection is not active.")
     else:
         head = "No XDR/EDR agent was detected in the latest scan."
@@ -921,7 +934,9 @@ def _base_value(key: str, a: ITAsset, va: Dict[str, Any]) -> Any:
     if key == "asset_name":        return getattr(a, "name", None) or ""
     if key == "ip_address":        return getattr(a, "ip_address", None) or ""
     if key == "application_description":  # the asset's own text wins; else a factual draft
-        return getattr(a, "description", None) or _app_desc(a)
+        own = str(getattr(a, "description", None) or "")
+        # ...but not the scanner sync's "Auto-synced from vulnerability scanner…" note
+        return own if own and not own.startswith(_SYNC_NOTE) else _app_desc(a)
     if key == "environment":       return _environment(a)
     if key == "subnet":            return _subnet(getattr(a, "ip_address", None))
     if key == "public_facing_dmz": return _YN(bool(getattr(a, "internet_facing", False)))
@@ -974,27 +989,37 @@ def get_stored(db: Session, tenant_id: int, asset_id: int) -> Dict[str, Any]:
     return dict(row.data or {}) if row else {}
 
 
-def build_row(db: Session, tenant_id: int, asset: ITAsset) -> List[Dict[str, Any]]:
+# The two sections that get re-run carry their own Sync (GET asset/{id}?section=).
+SCAN_SECTIONS = {"va": "Vulnerability Assessment", "pt": "Penetration Testing"}
+
+
+def build_row(db: Session, tenant_id: int, asset: ITAsset,
+              section: Optional[str] = None) -> List[Dict[str, Any]]:
+    """All 52 fields — or, for one section's Sync ('va' / 'pt'), only that
+    section's fields, read from the scan tables alone (no vendor-feed calls)."""
     va = _scan_blocks(db, tenant_id, asset.id)
-    # latest patch = the VENDOR's newest release (feed); a scanner's required-KB
-    # reference is the fallback when the feed is unreachable
-    prod = _msrc_product(asset)
-    osu = vendor_feeds.latest_windows_update(prod) if prod else None
-    va["latest_os_patch"] = osu[0] if osu else _required_patch(db, tenant_id, asset.id, "os")
-    va["latest_os_patch_date"] = osu[1] if osu else ""
-    kb = _win_last_patch(asset)[0]
-    va["last_os_patch_date"] = (vendor_feeds.windows_kb_release_date(kb)
-                                if kb.upper().startswith("KB") else "")
-    cur = _db_currency(asset)
-    va["db_currency"] = cur
-    va["latest_db_patch"] = ("; ".join(f"{c['label']} {c['latest']}" for c in cur)
-                             or _required_patch(db, tenant_id, asset.id, "db", asset))
-    va["latest_db_patch_date"] = (cur[0]["date"] if len(cur) == 1 else
-                                  "; ".join(f"{c['label']} {c['date']}" for c in cur if c["date"]))
-    va["last_db_patch_date"] = _installed_db_release(cur)
+    if not section:
+        # latest patch = the VENDOR's newest release (feed); a scanner's required-KB
+        # reference is the fallback when the feed is unreachable
+        prod = _msrc_product(asset)
+        osu = vendor_feeds.latest_windows_update(prod) if prod else None
+        va["latest_os_patch"] = osu[0] if osu else _required_patch(db, tenant_id, asset.id, "os")
+        va["latest_os_patch_date"] = osu[1] if osu else ""
+        kb = _win_last_patch(asset)[0]
+        va["last_os_patch_date"] = (vendor_feeds.windows_kb_release_date(kb)
+                                    if kb.upper().startswith("KB") else "")
+        cur = _db_currency(asset)
+        va["db_currency"] = cur
+        va["latest_db_patch"] = ("; ".join(f"{c['label']} {c['latest']}" for c in cur)
+                                 or _required_patch(db, tenant_id, asset.id, "db", asset))
+        va["latest_db_patch_date"] = (cur[0]["date"] if len(cur) == 1 else
+                                      "; ".join(f"{c['label']} {c['date']}" for c in cur if c["date"]))
+        va["last_db_patch_date"] = _installed_db_release(cur)
     stored = get_stored(db, tenant_id, asset.id)
     out: List[Dict[str, Any]] = []
     for (key, letter, label, group, src) in R.FIELDS:
+        if section and group != SCAN_SECTIONS[section]:
+            continue
         base = "" if src == "reason" else _base_value(key, asset, va)
         ov = stored.get(key)
         overridden = ov is not None and str(ov) != ""
@@ -1026,10 +1051,17 @@ def set_stored(db: Session, tenant_id: int, asset_id: int,
     return data
 
 
+def _in_inventory(a: ITAsset) -> bool:
+    """The inventory list's own filter (assets_router list_assets): transient
+    AI-Pentest ad-hoc targets are not inventory, so never in the bank file."""
+    return ((getattr(a, "status", None) or "") != "adhoc"
+            and (getattr(a, "last_seen_source", None) or "") != "pentest-adhoc")
+
+
 def export_rows(db: Session, tenant_id: int) -> List[List[Any]]:
     assets = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id).order_by(ITAsset.id).all()
     rows = []
-    for a in assets:
+    for a in filter(_in_inventory, assets):
         by_key = {f["key"]: f["value"] for f in build_row(db, tenant_id, a)}
         rows.append([by_key.get(k, "") for (k, *_r) in R.FIELDS])
     return rows
@@ -1142,9 +1174,14 @@ def _selftest() -> None:
     assert _is_db(A(platform_kind="database")) == "Yes" and _is_web(A(platform_kind="database")) == "No"
     # dynamic patch-currency reason: fires only on a real open critical/high count
     scanned = {"last_va_date": "2026-09-26"}
-    assert _reason_value("reason_os_patch", A(), {**scanned, "va_open_critical": 2, "va_open_high": 1})
-    assert _reason_value("reason_os_patch", A(), {**scanned, "va_open_critical": 0, "va_open_high": 0}) == _NA
-    assert _reason_value("reason_os_patch", A(), {"va_open_critical": 0}) == ""  # never scanned
+    osd = A(os_version="Microsoft Windows 11 Pro 25H2")
+    assert _reason_value("reason_os_patch", osd, {**scanned, "va_open_critical": 2, "va_open_high": 1})
+    assert _reason_value("reason_os_patch", osd, {**scanned, "va_open_critical": 0, "va_open_high": 0}) == _NA
+    assert _reason_value("reason_os_patch", osd, {"va_open_critical": 0}) == ""  # never scanned
+    # OS unknown (an outside-in asset): no OS-patch claim either way, even when scanned
+    for n in (3, 0):
+        assert _reason_value("reason_os_patch", A(internet_facing=True),
+                             {**scanned, "va_open_critical": n, "va_open_high": 0}) == "", n
     assert _reason_value("reason_db_patch", A(platform_kind="server"), {"va_open_high": 5}) == ""  # unknown role
 
     # server-role product matching — real installed-software / service names
@@ -1229,7 +1266,9 @@ def _selftest() -> None:
         "defender": {"data": {"antivirus_enabled": True, "realtime_protection": True}}})
     assert _edr(sec(False)) == "No" and _edr(sec(True)) == "Yes"
     r = _reason_value("reason_no_xdr_edr", sec(False))
-    assert "Microsoft Defender for Endpoint is installed but its service (Sense) is stopped" in r, r
+    # Sense ships with every Windows 10/11 — stopped = not onboarded, never "installed"
+    assert "Microsoft Defender for Endpoint is not onboarded or not running (Sense service stopped)" in r, r
+    assert "installed" not in r, r
     assert "Microsoft Defender Antivirus is enabled with real-time protection" in r, r
     assert _reason_value("reason_no_xdr_edr", sec(True)) == _NA
 
@@ -1357,6 +1396,28 @@ def _selftest() -> None:
     assert mc(mssql, "Microsoft SQL Server", "16.0.1000.6")["cycle"] == "2022"  # typed collector
     assert _app_desc(office) == ""                                         # nothing served
     assert _base_value("application_description", A(description="Core banking"), {}) == "Core banking"
+    # B: the Nessus sync's note is machine text, not the asset's — fall through to the draft
+    note = "Auto-synced from vulnerability scanner\nScanner source: nessus\nTotal vulnerabilities: 12"
+    assert _base_value("application_description", A(description=note), {}) == ""
+    assert _base_value("application_description", A(description=note, detected_software_json=[
+        {"name": "nginx"}]), {}).startswith("nginx — web server"), "draft replaces the note"
+    # B: page titles are HTML-entity decoded — single AND double encoded (stored titles)
+    for t in ("Azra Naheed Medical College &#8211; Azra Naheed Medical College",
+              "Azra Naheed Medical College &amp;#8211; Azra Naheed Medical College"):
+        assert _app_desc(A(platform_properties={"external_probe": {"live": True, "title": t}})) \
+            == "Azra Naheed Medical College – Azra Naheed Medical College", t
+    assert _app_desc(A(platform_properties={"external_probe": {
+        "live": True, "title": "R&amp;D Portal"}})) == "R&D Portal"
+    # C: the maker isn't repeated when the model already names it
+    hp = _server_desc(A(manufacturer="HP", model="HP EliteBook 840 G8 Notebook PC"))
+    assert hp == "HP EliteBook 840 G8 Notebook PC", hp
+    assert _server_desc(A(manufacturer="Dell Inc.", model="Latitude 5420")) == "Dell Inc. Latitude 5420"
+    assert _server_desc(A(manufacturer="LENOVO")) == "LENOVO"
+    # export = the inventory list: AI-Pentest ad-hoc targets (either marker) never reach the bank
+    assert not _in_inventory(A(status="adhoc", last_seen_source="pentest-adhoc"))
+    assert not _in_inventory(A(status="adhoc")) and not _in_inventory(A(last_seen_source="pentest-adhoc"))
+    assert _in_inventory(A(status="active", last_seen_source="external"))  # the real EASM copy stays
+    assert _in_inventory(A(status=None, last_seen_source=None))            # NULLs = normal assets
 
     # field-count invariant: automation increased the auto set.
     auto = sum(1 for f in R.FIELDS if f[4].startswith("asset") or f[4] == "derived")

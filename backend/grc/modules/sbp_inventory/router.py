@@ -1,13 +1,15 @@
 """/sbp-inventory — State Bank of Pakistan offsite IT-asset inventory.
 
 fields          : the 52-column template spec (labels/groups/which are editable)
-asset/{id}      : the full derived+stored row for one asset
+asset/{id}      : the full derived+stored row for one asset (?section=va|pt: that section only)
 PATCH asset/{id}: save the stored/reason/override fields
 export.xlsx     : the whole tenant as the SBP submission workbook
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -38,13 +40,15 @@ def fields(current_user: GRCUser = Depends(require_auth)):
 
 
 @router.get("/asset/{asset_id}")
-def asset_row(asset_id: int, db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def asset_row(asset_id: int, section: Optional[str] = Query(None, pattern="^(va|pt)$"),
+              db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+    """section=va|pt → only that section's fields (its Sync button)."""
     tid = _tenant(current_user, db)
     asset = db.query(ITAsset).filter(ITAsset.id == asset_id, ITAsset.tenant_id == tid).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
     return {"asset_id": asset.id, "asset_name": getattr(asset, "name", None),
-            "fields": service.build_row(db, tid, asset),
+            "fields": service.build_row(db, tid, asset, section),
             "sources": service.scan_sources(db, tid, asset.id)}
 
 
