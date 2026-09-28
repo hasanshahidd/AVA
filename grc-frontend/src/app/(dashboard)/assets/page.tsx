@@ -13,6 +13,7 @@ import { AssetModal } from './AssetModal';
 import { AssetsWorkspace } from './_workspace/AssetsWorkspace';
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import InventoryRedesign from './_workspace/InventoryRedesign';
+import InventoryOverview from './_overview/InventoryOverview';
 import { SmartImportWizard } from './_import/SmartImportWizard';
 import {
   Loader2,
@@ -42,13 +43,16 @@ type CriticalityFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 export default function AssetsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Inventory ↔ CIS Benchmark tab (CIS merged in from /compliance-overview).
-  const [activeView, setActiveView] = useState<'inventory' | 'cis'>(
-    searchParams.get('tab') === 'cis' ? 'cis' : 'inventory'
-  );
-  const switchView = (v: 'inventory' | 'cis') => {
+  // Overview (default) ↔ Inventory register ↔ CIS Benchmark tab. Overview is the
+  // C-level landing; the register is one click away at ?tab=inventory. Existing
+  // deep-links to ?tab=cis (e.g. from the Performance dashboard) still resolve.
+  const [activeView, setActiveView] = useState<'overview' | 'inventory' | 'cis'>(() => {
+    const t = searchParams.get('tab');
+    return t === 'cis' ? 'cis' : t === 'inventory' ? 'inventory' : 'overview';
+  });
+  const switchView = (v: 'overview' | 'inventory' | 'cis') => {
     setActiveView(v);
-    router.replace(v === 'cis' ? '/assets?tab=cis' : '/assets', { scroll: false });
+    router.replace(v === 'overview' ? '/assets' : `/assets?tab=${v}`, { scroll: false });
   };
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('assets:asset_inventory:create');
@@ -345,12 +349,15 @@ export default function AssetsPage() {
           </div>
         </div>
         <div className="segwrap" style={{ marginTop: 9 }}>
+          <button type="button" className={activeView === 'overview' ? 'seg on' : 'seg'} onClick={() => switchView('overview')}>Overview</button>
           <button type="button" className={activeView === 'inventory' ? 'seg on' : 'seg'} onClick={() => switchView('inventory')}>Inventory</button>
           <button type="button" className={activeView === 'cis' ? 'seg on' : 'seg'} onClick={() => switchView('cis')}>CIS Benchmark</button>
         </div>
       </div>
 
-      {activeView === 'cis' ? (
+      {activeView === 'overview' ? (
+        <InventoryOverview />
+      ) : activeView === 'cis' ? (
         <CisBenchmarkView />
       ) : (
       <InventoryRedesign
