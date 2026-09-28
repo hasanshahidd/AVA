@@ -1058,6 +1058,16 @@ class ITAssetResponse(BaseModel):
     # (EASM) asset is discovery_state="unmanaged": internet-facing, evidence-only,
     # and not connectable, so the Connect button must not offer a login for it.
     discovery_state: Optional[str] = None
+    # OS / platform telemetry (already columns on ITAsset) — exposed on the list
+    # response so the inventory Overview can bucket the estate by OS and device
+    # category client-side. All optional; external/EASM assets carry no OS.
+    os_family: Optional[str] = None
+    os_version: Optional[str] = None
+    os_normalized: Optional[str] = None
+    platform_kind: Optional[str] = None
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    is_internet_facing: Optional[bool] = None
 
     class Config:
         from_attributes = True

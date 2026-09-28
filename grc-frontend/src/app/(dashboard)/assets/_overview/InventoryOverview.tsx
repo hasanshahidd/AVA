@@ -54,10 +54,63 @@ const KEYS = {
 };
 const ALL_KEYS = Object.values(KEYS);
 
-const CRIT_TONE: Record<string, Tone> = { critical: SEV.critical, high: SEV.high, medium: SEV.medium, low: SEV.low, unassigned: SEV.info };
-const CRIT_ORDER = ['critical', 'high', 'medium', 'low', 'unassigned'];
 const titleCase = (s: string) => s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 const isExternal = (a: ITAsset) => (a.origin_source || '').toLowerCase() === 'easm';
+
+// The list response now carries these OS/platform columns (schema-exposed) so the
+// estate can be bucketed by OS and device category client-side, scalable to thousands
+// (fixed buckets, never a per-asset list). ITAsset's type doesn't declare them yet.
+type AssetRow = ITAsset & { os_family?: string | null; os_version?: string | null; os_normalized?: string | null; platform_kind?: string | null; is_internet_facing?: boolean | null };
+
+/* ---- By OS: os_family first, fall back to parsing os_version. No OS = honest "not visible". ---- */
+const OS_ORDER = ['Windows', 'Linux', 'macOS', 'Network OS', 'Other OS', 'OS not visible'];
+const OS_COLOR: Record<string, string> = { Windows: '#005B96', Linux: '#047857', macOS: '#475569', 'Network OS': '#7A5CA8', 'Other OS': '#B45309', 'OS not visible': '#CBD5E1' };
+function osBucketOf(a: AssetRow): string {
+  const fam = (a.os_family || '').toLowerCase();
+  const ver = (a.os_version || a.os_normalized || '');
+  if (!fam && !ver) return 'OS not visible';
+  const s = `${fam} ${ver}`.toLowerCase();
+  if (/windows|win32|win64|microsoft/.test(s)) return 'Windows';
+  if (/ubuntu|debian|cent ?os|rhel|red ?hat|fedora|suse|rocky|alma|amazon linux|oracle linux|\blinux\b/.test(s)) return 'Linux';
+  if (/mac ?os|darwin|os x|\bosx\b/.test(s)) return 'macOS';
+  if (/nx-?os|ios[ -]?xe|junos|\beos\b|fortios|pan-?os|routeros|comware|aruba|cisco ios/.test(s)) return 'Network OS';
+  return 'Other OS';
+}
+
+/* ---- By category: platform_kind (the real typed-asset signal) first, then asset_type,
+   then OS role, then internet-facing → external. No signal = Unclassified. ---- */
+const CAT_ORDER = ['Server', 'Workstation', 'Database', 'Network device', 'Web / App', 'External / internet-facing', 'Unclassified'];
+const CAT_COLOR: Record<string, string> = { Server: '#005B96', Workstation: '#0891B2', Database: '#7A5CA8', 'Network device': '#B45309', 'Web / App': '#2563EB', 'External / internet-facing': '#64748B', Unclassified: '#CBD5E1' };
+function categoryBucketOf(a: AssetRow): string {
+  const pk = (a.platform_kind || '').toLowerCase();
+  const at = (a.asset_type || '').toLowerCase();
+  const os = osBucketOf(a);
+  const inet = !!(a.internet_facing || a.is_internet_facing);
+  if (pk === 'database') return 'Database';
+  if (pk === 'network') return 'Network device';
+  if (pk === 'server' || pk === 'cluster') return 'Server';
+  if (pk === 'workstation' || pk === 'desktop' || pk === 'client' || pk === 'endpoint') return 'Workstation';
+  if (pk === 'web' || pk === 'app' || pk === 'application') return 'Web / App';
+  if (/database|\bdb\b|sql|postgres|mysql|oracle|mssql|mongo/.test(at)) return 'Database';
+  if (/network|router|switch|firewall|gateway|\bwlc\b/.test(at) || os === 'Network OS') return 'Network device';
+  if (/\bweb\b|application|\bapp\b|http|website/.test(at)) return 'Web / App';
+  if (/server/.test(at)) return 'Server';
+  if (/workstation|laptop|desktop|endpoint/.test(at)) return 'Workstation';
+  if (os === 'Windows') return /server/.test(`${a.os_version || a.os_normalized || ''}`.toLowerCase()) ? 'Server' : 'Workstation';
+  if (os === 'macOS') return 'Workstation';
+  if (os === 'Linux') return 'Server';
+  if (os === 'Network OS') return 'Network device';
+  if (inet) return 'External / internet-facing';
+  return 'Unclassified';
+}
+
+/** Fixed-bucket rows for a breakdown BarList: only non-empty buckets, sorted desc, count + %. */
+function bucketRows(map: Record<string, number>, order: string[], color: Record<string, string>, total: number): BarRow[] {
+  return order
+    .filter((k) => (map[k] || 0) > 0)
+    .map((k) => ({ key: k, label: k, n: map[k], c: color[k], value: `${nfmt(map[k])} · ${share(map[k], total) || '0%'}` }))
+    .sort((a, b) => (b.n as number) - (a.n as number));
+}
 
 export default function InventoryOverview() {
   const qc = useQueryClient();
@@ -88,13 +141,14 @@ export default function InventoryOverview() {
     const now = Date.now();
     const soon = now + 90 * 864e5;
     const staleBefore = now - 30 * 864e5;
-    const byEnv: Record<string, number> = {}, byLife: Record<string, number> = {}, byType: Record<string, number> = {}, byCrit: Record<string, number> = {};
+    const byEnv: Record<string, number> = {}, byLife: Record<string, number> = {}, byOs: Record<string, number> = {}, byCat: Record<string, number> = {};
     let ext = 0, inet = 0, dmz = 0, envUnset = 0, noOwner = 0, critHigh = 0, stale = 0, eolPast = 0, eolSoon = 0, hasEol = 0;
-    for (const a of A) {
+    for (const a of A as AssetRow[]) {
       if (isExternal(a)) ext++;
-      const t = a.asset_type || 'unknown'; byType[t] = (byType[t] || 0) + 1;
-      const c = (a.criticality || 'unassigned').toLowerCase(); byCrit[c] = (byCrit[c] || 0) + 1;
+      const c = (a.criticality || 'unassigned').toLowerCase();
       if (c === 'critical' || c === 'high') critHigh++;
+      const ob = osBucketOf(a); byOs[ob] = (byOs[ob] || 0) + 1;
+      const cb = categoryBucketOf(a); byCat[cb] = (byCat[cb] || 0) + 1;
       if (a.internet_facing) inet++;
       if (/dmz/i.test(a.network_segment || '')) dmz++;
       if (!a.owner_id && !a.primary_owner_id) noOwner++;
@@ -106,7 +160,7 @@ export default function InventoryOverview() {
       byLife[life] = (byLife[life] || 0) + 1;
       if (a.eol_date) { hasEol++; const te = new Date(a.eol_date).getTime(); if (!Number.isNaN(te)) { if (te < now) eolPast++; else if (te < soon) eolSoon++; } }
     }
-    return { total: A.length, ext, int: A.length - ext, inet, dmz, envUnset, noOwner, critHigh, stale, byEnv, byLife, byType, byCrit, eolPast, eolSoon, hasEol };
+    return { total: A.length, ext, int: A.length - ext, inet, dmz, envUnset, noOwner, critHigh, stale, byEnv, byLife, byOs, byCat, eolPast, eolSoon, hasEol };
   }, [A]);
 
   const total = (assetsQ.data ? est.total : null) ?? inv?.counts?.assets ?? null;
@@ -279,30 +333,31 @@ function HealthHero({ q }: { q: Qs<InvOverview> }) {
   );
 }
 
-/* ---------- hero: estate composition (by type · by criticality) ---------- */
+/* ---------- hero: estate composition (by OS · by device category) ----------
+   Two truthful breakdowns bucketed from the real OS/platform signals on every asset.
+   Fixed buckets, sorted desc, count + share — scales to thousands (no per-asset list).
+   External/EASM assets carry no host OS, so "OS not visible" dominating is correct. */
 function CompositionCard({ assets, est }: { assets: Qs<ITAsset[]>; est: Est }) {
-  const types = Object.entries(est.byType).sort((a, b) => b[1] - a[1]);
-  const critParts: Part[] = CRIT_ORDER.map((k) => ({ key: k, label: titleCase(k), n: est.byCrit[k] ?? 0, c: CRIT_TONE[k].c })).filter((p) => p.n > 0);
+  const osRows = bucketRows(est.byOs, OS_ORDER, OS_COLOR, est.total);
+  const catRows = bucketRows(est.byCat, CAT_ORDER, CAT_COLOR, est.total);
   let body: ReactNode;
   if (assets.isLoading) body = <Loading rows={6} />;
   else if (!assets.data) body = <Unavailable what="Asset composition" href="/assets" />;
   else if (!est.total) body = <Empty icon={<Layers size={16} />} title="No assets yet" body="Adopt discovered devices or import a register to populate the inventory." href="/asset-discovery" cta="Bring assets in" />;
   else body = (
-    <div className="flex flex-1 flex-col">
-      <Eyebrow className="mb-2">By asset type</Eyebrow>
-      <div className="flex-1">
-        <BarList color={T.base} labelWidth={116} fill
-          rows={types.slice(0, 7).map(([k, n]): BarRow => ({ key: k, label: titleCase(k), n, value: nfmt(n) }))} />
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="flex flex-1 flex-col">
+        <div className="mb-2 flex items-baseline justify-between gap-2"><Eyebrow>By operating system</Eyebrow><span className="text-[11.5px] text-[#64748B]">{nfmt(est.total)} assets</span></div>
+        <div className="flex-1"><BarList stacked fill labelWidth={140} rows={osRows} /></div>
       </div>
-      <div className="mt-3 border-t border-[#F1F3F7] pt-3">
-        <div className="mb-2 flex items-baseline justify-between gap-2"><Eyebrow>By criticality</Eyebrow><span className="text-[11.5px] text-[#64748B]">{nfmt(est.total)} assets</span></div>
-        {critParts.length ? (<><StackBar parts={critParts} label="Assets by criticality" /><div className="mt-2.5"><PartLegend parts={critParts} total={est.total} cols={2} /></div></>)
-          : <p className="m-0 text-[11.5px] text-[#94A3B8]">No asset has a criticality tier set yet.</p>}
+      <div className="flex flex-1 flex-col border-t border-[#F1F3F7] pt-3">
+        <Eyebrow className="mb-2">By device category</Eyebrow>
+        <div className="flex-1"><BarList stacked fill labelWidth={140} rows={catRows} /></div>
       </div>
     </div>
   );
   return (
-    <Card title="Estate composition" sub="What the inventory is made of" href="/assets" cta="Open register" busy={busyOf(assets)} className="xl:col-span-5">
+    <Card title="Estate composition" sub="What the inventory is made of — by OS &amp; device type" href="/assets" cta="Open register" busy={busyOf(assets)} className="xl:col-span-5">
       {body}
     </Card>
   );
@@ -375,7 +430,7 @@ function OnboardingCard({ devices }: { devices: Qs<Devices> }) {
 }
 
 /* ---------- exposure & environment ---------- */
-type Est = { total: number; ext: number; int: number; inet: number; dmz: number; envUnset: number; noOwner: number; critHigh: number; stale: number; byEnv: Record<string, number>; byLife: Record<string, number>; byType: Record<string, number>; byCrit: Record<string, number>; eolPast: number; eolSoon: number; hasEol: number };
+type Est = { total: number; ext: number; int: number; inet: number; dmz: number; envUnset: number; noOwner: number; critHigh: number; stale: number; byEnv: Record<string, number>; byLife: Record<string, number>; byOs: Record<string, number>; byCat: Record<string, number>; eolPast: number; eolSoon: number; hasEol: number };
 function ExposureCard({ assets, est }: { assets: Qs<ITAsset[]>; est: Est }) {
   const parts: Part[] = [
     { key: 'ext', label: 'External (EASM-discovered)', n: est.ext, c: T.base },
