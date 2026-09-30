@@ -166,8 +166,141 @@ def test_enum4linux_dead_host_json_is_honest():
     assert wst.parse_tool("enum4linux", dead, "127.0.0.1", 8, "http://127.0.0.1") == []
 
 
+def test_rpcclient_null_session_users_groups_domain():
+    out = ("\tDC01           Wk Sv PDC Tim NT   \n"
+           "\tplatform_id     :\t500\n"
+           "\tos version      :\t10.0\n"
+           "Domain: CORP  Server: DC01\n"
+           "user:[Administrator] rid:[0x1f4]\n"
+           "user:[alice] rid:[0x3e8]\n"
+           "group:[Domain Admins] rid:[0x200]\n")
+    rows = wst.parse_tool("rpcclient", out, "10.10.10.5", 1, "http://10.10.10.5")
+    _assert_shape(rows)
+    users = next(r for r in rows if "users enumerable via null RPC" in r["fields"]["title"])
+    assert users["fields"]["severity"] == "medium" and "2" in users["fields"]["title"]
+    assert "alice" in users["fields"]["evidence"] and users["affected_port"] == 445
+    assert any("Domain information" in r["fields"]["title"] and "CORP" in r["fields"]["title"] for r in rows)
+    assert any(r["fields"]["title"].startswith("SMB/RPC host OS") for r in rows)
+    assert any("groups enumerable" in r["fields"]["title"] for r in rows)
+    # access-denied null session yields nothing
+    assert wst.parse_tool("rpcclient", "Cannot connect: NT_STATUS_ACCESS_DENIED\n", "h", 1, "http://h") == []
+
+
+def test_nmblookup_name_and_domain():
+    out = ("Looking up status of 10.0.0.5\n"
+           "\tDC01            <00> -         B <ACTIVE>\n"
+           "\tCORP            <1c> - <GROUP> B <ACTIVE>\n"
+           "\tCORP            <00> - <GROUP> B <ACTIVE>\n"
+           "\n\tMAC Address = 00:0C:29:AB:CD:EF\n")
+    rows = wst.parse_tool("nmblookup", out, "10.0.0.5", 2, "http://10.0.0.5")
+    _assert_shape(rows)
+    host = next(r for r in rows if r["fields"]["title"] == "NetBIOS name: DC01")
+    assert host["affected_component"] == "DC01" and host["affected_port"] == 137
+    assert "00:0C:29:AB:CD:EF" in host["fields"]["evidence"]
+    assert any("NetBIOS/AD domain: CORP" in r["fields"]["title"] for r in rows)
+    assert wst.parse_tool("nmblookup", "No reply from 10.0.0.5\n", "h", 2, "http://h") == []
+
+
+def test_smbclient_null_share_listing():
+    out = ("\n\tSharename       Type      Comment\n"
+           "\t---------       ----      -------\n"
+           "\tIPC$            IPC       Remote IPC\n"
+           "\tdata            Disk      Data share\n"
+           "\tNETLOGON        Disk      Logon server share\n")
+    rows = wst.parse_tool("smbclient", out, "10.10.10.5", 3, "http://10.10.10.5")
+    _assert_shape(rows)
+    data = next(r for r in rows if r["affected_component"] == "data")
+    assert data["fields"]["severity"] == "low" and data["affected_port"] == 445
+    ipc = next(r for r in rows if r["affected_component"] == "IPC$")
+    assert ipc["fields"]["severity"] == "info"
+    netlogon = next(r for r in rows if r["affected_component"] == "NETLOGON")
+    assert netlogon["fields"]["severity"] == "info"                      # default share
+    # denied with no share table -> nothing
+    assert wst.parse_tool("smbclient", "session setup failed: NT_STATUS_ACCESS_DENIED\n",
+                          "h", 3, "http://h") == []
+
+
+def test_snmpwalk_default_community():
+    out = ("SNMPv2-MIB::sysDescr.0 = STRING: Hardware: Intel64 Family - Windows Version 10.0\n"
+           "SNMPv2-MIB::sysName.0 = STRING: WIN-SRV\n")
+    rows = wst.parse_tool("snmpwalk", out, "10.0.0.7", 4, "http://10.0.0.7")
+    _assert_shape(rows)
+    pub = next(r for r in rows if "default community" in r["fields"]["title"])
+    assert pub["fields"]["severity"] == "low" and pub["affected_port"] == 161
+    assert "WIN-SRV" in pub["fields"]["evidence"]
+    assert wst.parse_tool("snmpwalk", "Timeout: No Response from 10.0.0.7\n", "h", 4, "http://h") == []
+
+
+def test_onesixtyone_community_spray():
+    out = ("10.0.0.7 [public] Hardware: Intel64 - Windows\n"
+           "10.0.0.7 [secret123] Hardware: Intel64 - Windows\n")
+    rows = wst.parse_tool("onesixtyone", out, "10.0.0.7", 5, "http://10.0.0.7")
+    _assert_shape(rows)
+    pub = next(r for r in rows if r["affected_component"] == "public")
+    assert pub["fields"]["severity"] == "low" and pub["affected_port"] == 161
+    guessed = next(r for r in rows if r["affected_component"] == "secret123")
+    assert guessed["fields"]["severity"] == "medium"                     # non-default community = medium
+    assert wst.parse_tool("onesixtyone", "", "h", 5, "http://h") == []
+
+
+def test_braa_snmp_walk():
+    out = ("10.0.0.7:.1.3.6.1.2.1.1.1.0:Hardware: Intel64 - Windows\n"
+           "10.0.0.7:.1.3.6.1.2.1.1.5.0:WIN-SRV\n")
+    rows = wst.parse_tool("braa", out, "10.0.0.7", 6, "http://10.0.0.7")
+    _assert_shape(rows)
+    assert any("SNMP readable via braa" in r["fields"]["title"] for r in rows)
+    assert all(r["affected_port"] == 161 for r in rows)
+    assert wst.parse_tool("braa", "no response\n", "h", 6, "http://h") == []
+
+
+def test_lookupsid_anonymous_rid_cycling():
+    out = ("[*] Brute forcing SIDs at 10.10.10.5\n"
+           "[*] Domain SID is: S-1-5-21-1111111111-2222222222-3333333333\n"
+           "500: CORP\\Administrator (SidTypeUser)\n"
+           "1000: CORP\\alice (SidTypeUser)\n"
+           "512: CORP\\Domain Admins (SidTypeGroup)\n")
+    rows = wst.parse_tool("lookupsid", out, "10.10.10.5", 7, "http://10.10.10.5")
+    _assert_shape(rows)
+    users = next(r for r in rows if "users enumerable via anonymous RID" in r["fields"]["title"])
+    assert users["fields"]["severity"] == "medium" and users["affected_port"] == 445
+    assert "Administrator" in users["fields"]["evidence"] and "alice" in users["fields"]["evidence"]
+    assert any("Domain SID disclosed" in r["fields"]["title"] for r in rows)
+    assert wst.parse_tool("lookupsid", "[-] STATUS_ACCESS_DENIED\n", "h", 7, "http://h") == []
+
+
+def test_samrdump_anonymous_users():
+    out = ("[*] Retrieving endpoint list from 10.10.10.5\n"
+           "Found domain(s):\n"
+           " . CORP\n"
+           " . Builtin\n"
+           "[*] Looking up users in domain CORP\n"
+           "Found user: Administrator, uid = 500\n"
+           "Found user: bob, uid = 1001\n")
+    rows = wst.parse_tool("samrdump", out, "10.10.10.5", 8, "http://10.10.10.5")
+    _assert_shape(rows)
+    users = next(r for r in rows if "users enumerable via anonymous SAMR" in r["fields"]["title"])
+    assert users["fields"]["severity"] == "medium" and "bob" in users["fields"]["evidence"]
+    assert any("SAMR domain(s)" in r["fields"]["title"] and "CORP" in r["fields"]["title"] for r in rows)
+    assert wst.parse_tool("samrdump", "[-] SMB SessionError: STATUS_ACCESS_DENIED\n", "h", 8, "http://h") == []
+
+
+def test_rpcdump_anonymous_epm():
+    out = ("[*] Retrieving endpoint list from 10.10.10.5\n"
+           "Protocol: [MS-RPRN]: Print System Remote Protocol\n"
+           "UUID    : 12345678-1234-abcd-ef00-0123456789ab v1.0\n"
+           "Protocol: [MS-SCMR]: Service Control Manager\n"
+           "UUID    : 367abb81-9844-35f1-ad32-98f038001003 v2.0\n")
+    rows = wst.parse_tool("rpcdump", out, "10.10.10.5", 9, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["affected_port"] == 135
+    assert "RPC endpoints enumerable" in rows[0]["fields"]["title"]
+    assert wst.parse_tool("rpcdump", "[-] Connection refused\n", "h", 9, "http://h") == []
+
+
 def test_parsers_never_raise_on_garbage():
-    everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux")
+    everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
+                "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
+                "lookupsid", "samrdump", "rpcdump")
     for name in everyone:
         assert wst.parse_tool(name, "", "h", 1, "http://h") == []            # empty -> nothing
         assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -178,7 +311,9 @@ def test_parsers_never_raise_on_garbage():
 
 def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in wst.WIN_SCAN_TOOLS}
-    assert {"netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux"} <= names
+    assert {"netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
+            "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
+            "lookupsid", "samrdump", "rpcdump"} <= names
     assert len(names) == len(wst.WIN_SCAN_TOOLS)                             # no duplicate spec name
     for spec in wst.WIN_SCAN_TOOLS:
         argv = spec["argv"]("10.10.10.5", "http://10.10.10.5")

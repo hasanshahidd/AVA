@@ -6,6 +6,8 @@ Also asserts garbage-safety (never raises / never fabricates) and that every reg
 read-only. The two wired tools are the credential-free anonymous-S3 auditors; the rest are deferred (they
 need cloud-account credentials the dispatcher can't pass).
 """
+import json
+
 import grc.modules.pentest.cloud_scan_tools as cst
 
 
@@ -98,7 +100,8 @@ _MUTATING = (" rm ", " rm -", " del ", "put-object", "put-bucket", "delete-objec
 
 def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in cst.CLOUD_SCAN_TOOLS}
-    assert names == {"festin", "s3scanner"}
+    assert names == {"festin", "s3scanner", "gcpbucketbrute", "subfinder", "dnsx",
+                     "scoutsuite", "cloudsplaining"}
     for spec in cst.CLOUD_SCAN_TOOLS:
         assert callable(spec["parse"]) and callable(spec["argv"])
         assert isinstance(spec["timeout"], int) and 0 < spec["timeout"] <= 600
@@ -122,6 +125,129 @@ def test_bucket_candidates_bounded_and_valid():
 
 
 def test_deferred_list_is_honest():
-    # the credentialed-only heavy hitters are named as deferred, not pretended-wired
-    for t in ("prowler", "scoutsuite", "cloudfox", "pmapper", "checkov", "kubescape"):
+    # still-unwired / missing / broken heavy hitters are named, not pretended-wired
+    for t in ("prowler", "cloudfox", "pmapper", "checkov", "kubescape", "pacu"):
         assert t in cst._DEFERRED_CLOUD_SCAN_TOOLS
+    # every wired spec name is ABSENT from the deferred set (no half-wiring)
+    for spec in cst.CLOUD_SCAN_TOOLS:
+        assert spec["name"] not in cst._DEFERRED_CLOUD_SCAN_TOOLS
+    # missing/broken tools carry a concrete rebuild reason
+    for t in ("prowler", "pmapper", "parliament", "cloud_enum", "CloudBrute", "trivy"):
+        assert cst._MISSING_FROM_IMAGE.get(t)
+
+
+# ---- subfinder: cloud subdomain surface -> one summary row --------------------------------------------
+def test_subfinder_summary():
+    out = "api.acme.com\nwww.acme.com\ndev.acme.com\nnot a host line\n"
+    rows = cst.parse_tool("subfinder", out, "acme.com", 10, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1
+    assert "3 subdomain" in rows[0]["fields"]["title"]
+    assert rows[0]["fields"]["severity"] == "info"
+
+
+# ---- dnsx: flag cloud-endpoint CNAMEs + records summary ----------------------------------------------
+def test_dnsx_cloud_cname_flagging():
+    out = "\n".join([
+        "acme.com [A] [1.2.3.4]",
+        "www.acme.com [CNAME] [d123.cloudfront.net]",
+        "cdn.acme.com [CNAME] [acme.blob.core.windows.net]",
+        "app.acme.com [CNAME] [acme.appspot.com]",
+    ])
+    rows = cst.parse_tool("dnsx", out, "acme.com", 11, "http://acme.com")
+    _assert_shape(rows)
+    by = {r["affected_component"]: r for r in rows if r["fields"]["severity"] == "low"}
+    assert "AWS CloudFront" in by and "Azure Blob" in by and "GCP App Engine" in by
+    # exactly one info summary row exists alongside the cloud-asset lows
+    summ = [r for r in rows if r["fields"]["severity"] == "info"]
+    assert len(summ) == 1 and "4" in summ[0]["fields"]["title"]
+
+
+# ---- gcpbucketbrute: GCS anonymous-access severity ladder --------------------------------------------
+def test_gcpbucketbrute_severity_ladder():
+    out = "\n".join([
+        "Generated 1300 bucket permutations.",
+        "",
+        "    UNAUTHENTICATED ACCESS ALLOWED: acme-public",
+        "        - UNAUTHENTICATED LISTABLE (storage.objects.list)",
+        "        - UNAUTHENTICATED READABLE (storage.objects.get)",
+        "    UNAUTHENTICATED ACCESS ALLOWED: acme-writable",
+        "        - VULNERABLE TO PRIVILEGE ESCALATION (storage.buckets.setIamPolicy)",
+        "        - UNAUTHENTICATED WRITABLE (storage.objects.create, storage.objects.delete)",
+        "    EXISTS: acme-private",
+        "",
+        "Scanned 1300 potential buckets in 2 minute(s) and 3 second(s).",
+    ])
+    rows = cst.parse_tool("gcpbucketbrute", out, "acme.com", 12, "http://acme.com")
+    _assert_shape(rows)
+    sev = {r["affected_component"]: r["fields"]["severity"] for r in rows}
+    assert sev == {"acme-public": "high", "acme-writable": "critical", "acme-private": "low"}
+    pub = next(r for r in rows if r["affected_component"] == "acme-public")
+    assert pub["affected_url"] == "https://storage.googleapis.com/acme-public"
+    assert "LISTABLE" in pub["fields"]["evidence"]
+
+
+def test_gcpbucketbrute_authenticated_is_lower_sev():
+    out = "\n".join([
+        "    AUTHENTICATED ACCESS ALLOWED: corp-data",
+        "        - AUTHENTICATED READABLE (storage.objects.get)",
+    ])
+    rows = cst.parse_tool("gcpbucketbrute", out, "corp.com", 13, "http://corp.com")
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium"
+
+
+# ---- scoutsuite: results-JS -> findings (danger/warning, flagged_items>0) -----------------------------
+def test_scoutsuite_findings_by_level():
+    js = 'scoutsuite_results =\n' + json.dumps({
+        "account_id": "123456789012",
+        "services": {
+            "s3": {"findings": {
+                "s3-bucket-world-acl": {"description": "World-accessible bucket ACL", "level": "danger",
+                                        "flagged_items": 2, "items": ["s3.buckets.a", "s3.buckets.b"]},
+                "s3-no-mfa-delete": {"description": "MFA delete off", "level": "warning",
+                                     "flagged_items": 1, "items": ["s3.buckets.c"]},
+                "s3-ok": {"description": "fine", "level": "danger", "flagged_items": 0, "items": []},
+            }},
+            "iam": {"findings": {
+                "iam-inline-policy": {"description": "Inline policy", "level": "warning",
+                                      "flagged_items": 3, "items": ["iam.users.bob"]},
+            }},
+        },
+    })
+    rows = cst.parse_tool("scoutsuite", js, "acme.com", 14, "http://acme.com")
+    _assert_shape(rows)
+    by = {r["affected_component"]: r["fields"]["severity"] for r in rows}
+    assert by == {"s3-bucket-world-acl": "high", "s3-no-mfa-delete": "medium", "iam-inline-policy": "medium"}
+    assert "s3-ok" not in by                            # flagged_items==0 -> not a finding
+
+
+# ---- cloudsplaining: IAM risk categories -> findings -------------------------------------------------
+def test_cloudsplaining_risk_categories():
+    doc = json.dumps({
+        "AdminAccess": {
+            "PrivilegeEscalation": [{"type": "CreateAccessKey"}],
+            "ResourceExposure": ["iam:PassRole"],
+            "DataExfiltration": ["s3:GetObject"],
+            "InfrastructureModification": ["ec2:RunInstances"],
+            "PrivilegeEscalationCount": 1,          # non-list -> ignored, never raises
+        },
+        "ReadOnly": {"PrivilegeEscalation": [], "ResourceExposure": [], "DataExfiltration": []},
+    })
+    rows = cst.parse_tool("cloudsplaining", doc, "acme.com", 15, "http://acme.com")
+    _assert_shape(rows)
+    sev = {r["fields"]["title"]: r["fields"]["severity"] for r in rows}
+    assert any("PrivilegeEscalation" in t and s == "critical" for t, s in sev.items())
+    assert any("ResourceExposure" in t and s == "high" for t, s in sev.items())
+    assert any("InfrastructureModification" in t and s == "medium" for t, s in sev.items())
+    # empty-list categories on ReadOnly produce nothing
+    assert all("ReadOnly" not in t for t in sev)
+
+
+# ---- new parsers are garbage-safe too ----------------------------------------------------------------
+def test_new_parsers_never_raise_on_garbage():
+    junk = ["", "   ", "not json", "{bad", "null", "[]", "{}", "\x00\xff bin",
+            "scoutsuite_results =\n{bad", '{"services": "notadict"}', "EXISTS:",
+            "    UNAUTHENTICATED ACCESS ALLOWED:"]
+    for name in ("subfinder", "dnsx", "gcpbucketbrute", "scoutsuite", "cloudsplaining"):
+        for j in junk:
+            assert cst.parse_tool(name, j, "t.com", 9, "http://t.com") == []

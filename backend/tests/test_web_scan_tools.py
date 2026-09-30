@@ -229,3 +229,115 @@ def test_finder_web_arsenal_missing_image_is_honest(monkeypatch):
                                                      "error": f"lane image ava-{lane} not built"})
     assert svc._web_scan_arsenal_rows("h", 7) == []
     assert svc._lane_find_container("web", "h", 7) == []
+
+
+# ---- P0b pass 3: content discovery + fingerprint/screenshot/endpoint/param/secret/DAST -----------------
+def test_content_discovery_summaries():
+    ferox = wst.parse_tool("feroxbuster", "200      GET http://h/admin\n200      GET http://h/login\n"
+                           "200      GET http://h/admin\n", "h", 1, "http://h")
+    _assert_shape(ferox)
+    assert len(ferox) == 1 and "2 path" in ferox[0]["fields"]["title"]      # dupe collapsed
+    gob = wst.parse_tool("gobuster", "/admin (Status: 200) [Size: 10]\n/config (Status: 301)\n",
+                         "h", 1, "http://h")
+    assert len(gob) == 1 and "2 path" in gob[0]["fields"]["title"]
+    assert "/admin" in gob[0]["fields"]["evidence"]
+    dirb = wst.parse_tool("dirb", "+ http://h/backup (CODE:200|SIZE:5)\n==> DIRECTORY: http://h/js/\n",
+                          "h", 1, "http://h")
+    assert len(dirb) == 1 and "2 path" in dirb[0]["fields"]["title"]
+    wf = wst.parse_tool("wfuzz", '000000042:   C=200      5 L\t12 W\t100 Ch\t"admin"\n'
+                        '000000043:   C=301      0 L\t2 W\t10 Ch\t"config"\n', "h", 1, "http://h")
+    assert len(wf) == 1 and "2 path" in wf[0]["fields"]["title"]
+    # the wordlist path itself must never be reported as a discovered path
+    assert wst.parse_tool("gobuster", "scanning /wordlists/Discovery/Web-Content/common.txt\n",
+                          "h", 1, "http://h") == []
+
+
+def test_webanalyze_json_tech():
+    out = ('{"Hostname":"http://h","Matches":[{"AppName":"Apache","Version":"2.4.7"},'
+           '{"AppName":"jQuery","Version":""},{"AppName":"Apache","Version":"2.4.7"}]}')
+    rows = wst.parse_tool("webanalyze", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    comps = {r["affected_component"] for r in rows}
+    assert comps == {"Apache", "jQuery"}                                    # dedup by name
+    assert any("2.4.7" in r["fields"]["title"] for r in rows)
+
+
+def test_gowitness_screenshot_artifact():
+    rows = wst.parse_tool("gowitness", "http---h.jpeg\nsome.log\n", "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "info"
+    assert "http---h.jpeg" in rows[0]["fields"]["evidence"]
+    assert wst.parse_tool("gowitness", "no image here\n", "h", 1, "http://h") == []
+
+
+def test_secretfinder_findings():
+    out = ("[ + ] URL: http://h\n"
+           "aws_access_key\t->\tAKIAIOSFODNN7EXAMPLE\n"
+           "google_api\t->\tAIzaSyA-EXAMPLEKEY\n"
+           "aws_access_key\t->\tAKIAIOSFODNN7EXAMPLE\n")
+    rows = wst.parse_tool("secretfinder", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 2                                                    # url line skipped, dupe collapsed
+    assert all(r["fields"]["severity"] == "medium" for r in rows)
+    assert {r["affected_component"] for r in rows} == {"aws_access_key", "google_api"}
+
+
+def test_jaeles_vuln_markers():
+    out = ("[verbose] scanning http://h\n"
+           "[VULN][High] - [sqli/generic-error] - http://h/item?id=1\n"
+           "[Vulnerable][medium] - [xss/reflected] - http://h/search?q=x\n"
+           "[info] nothing here http://h/ok\n")
+    rows = wst.parse_tool("jaeles", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 2
+    hi = next(r for r in rows if "sqli/generic-error" in r["fields"]["title"])
+    assert hi["fields"]["severity"] == "high" and hi["affected_url"] == "http://h/item?id=1"
+
+
+def test_linkfinder_and_url_harvest_enum():
+    lf = wst.parse_tool("linkfinder", "/api/v1/users\n/api/v1/login\nhttps://h/static/app.js\n",
+                        "h", 1, "http://h")
+    assert len(lf) == 1 and "3 endpoint" in lf[0]["fields"]["title"]
+    for slug, unit in (("paramspider", "URL"), ("waymore", "URL")):
+        rows = wst.parse_tool(slug, "http://h/a?x=1\nhttp://h/b?y=2\n", "h", 1, "http://h")
+        assert len(rows) == 1 and f"2 {unit}" in rows[0]["fields"]["title"]
+
+
+def test_new_tools_registered_and_use_wordlist():
+    names = {s["name"] for s in wst.WEB_SCAN_TOOLS}
+    newly = {"feroxbuster", "gobuster", "dirb", "dirsearch", "wfuzz", "webanalyze", "gowitness",
+             "linkfinder", "paramspider", "secretfinder", "waymore", "jaeles"}
+    assert newly <= names
+    # every content-discovery tool must reference the mounted wordlist in its argv
+    for spec in wst.WEB_SCAN_TOOLS:
+        if spec["name"] in ("feroxbuster", "gobuster", "dirb", "dirsearch", "wfuzz"):
+            assert "/wordlists/" in " ".join(spec["argv"]("h", "http://h"))
+    # all new parsers survive garbage without raising or fabricating
+    for name in newly:
+        assert wst.parse_tool(name, "", "h", 1, "http://h") == []
+        assert isinstance(wst.parse_tool(name, "\x00 junk {[", "h", 1, "http://h"), list)
+
+
+def test_wordlists_mount_added_to_docker_argv(monkeypatch):
+    monkeypatch.setattr(svc.os.path, "isdir", lambda p: True)
+    assert svc._wordlists_mount() == ["-v", "/root/wordlists:/wordlists:ro"]
+    monkeypatch.setattr(svc.os.path, "isdir", lambda p: False)
+    assert svc._wordlists_mount() == []
+
+
+def test_unwired_accounting_is_accurate():
+    """graphw00f + kiterunner are ABSENT from the deployed ava-web-scan image (verified read-only
+    2026-09-30 on d0eb2aca410a — only paramspider/waymore in pipx, `kr`/graphw00f/x8/ffuf/wpscan all
+    MISSING). They must be recorded as still-unwired (missing-from-image), never fabricated as working
+    specs — the module's contract is never-fabricate."""
+    wired = {s["name"] for s in wst.WEB_SCAN_TOOLS}
+    unwired = wst._STILL_UNWIRED_WEB_SCAN_TOOLS
+    # accurately listed as unwired...
+    for t in ("graphw00f", "kiterunner", "ffuf", "x8", "wpscan", "joomscan", "amass", "trufflehog"):
+        assert t in unwired and "missing" in unwired[t] or "installed" in unwired[t]
+    assert "missing-from-image" in unwired["graphw00f"]
+    assert "missing-from-image" in unwired["kiterunner"]
+    # ...and NOT masquerading as a working, wired tool
+    assert not ({"graphw00f", "kiterunner"} & wired)
+    # a wired/unwired name can never appear in both accountings
+    assert not (wired & set(unwired))

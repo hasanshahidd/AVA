@@ -164,9 +164,184 @@ def test_reused_web_and_tls_parsers_reachable():
         assert lst.parse_tool(n, "", "h", 1, "http://h") == []       # empty -> honest skip
 
 
+# ---- NEW: SNMP family (corroborate onesixtyone; community 'public') ------------------------------------
+def test_snmp_check_public_community():
+    out = ("[+] Try to connect to 1.2.3.4:161 using SNMPv2c and community 'public'\n\n"
+           "[*] System information:\n\n"
+           "  Hostname                      : server01\n"
+           "  Description                   : Linux server01 3.10.0\n"
+           "  Uptime system                 : 10 days\n")
+    rows = lst.parse_tool("snmp-check", out, "1.2.3.4", 1, "http://1.2.3.4")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium" and rows[0]["affected_port"] == 161
+    assert lst.parse_tool("snmp-check", "Connection refused\n", "h", 1, "http://h") == []
+
+
+def test_snmpwalk_oid_summary():
+    out = ("SNMPv2-MIB::sysDescr.0 = STRING: Linux server01 3.10.0\n"
+           "SNMPv2-MIB::sysUpTime.0 = Timeticks: (12345) 0:02:03.45\n"
+           "iso.3.6.1.2.1.1.5.0 = STRING: server01\n")
+    rows = lst.parse_tool("snmpwalk", out, "1.2.3.4", 1, "http://1.2.3.4")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "3 OIDs" in rows[0]["fields"]["title"] and rows[0]["affected_port"] == 161
+    assert lst.parse_tool("snmpwalk", "Timeout: No Response from 1.2.3.4\n", "h", 1, "http://h") == []
+
+
+def test_braa_oid_summary():
+    out = ("1.2.3.4:.1.3.6.1.2.1.1.1.0:Linux server01 3.10.0\n"
+           "1.2.3.4:.1.3.6.1.2.1.1.5.0:server01\n")
+    rows = lst.parse_tool("braa", out, "1.2.3.4", 1, "http://1.2.3.4")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["affected_port"] == 161
+    assert lst.parse_tool("braa", "no OIDs here\n", "h", 1, "http://h") == []
+
+
+# ---- NEW: SMB / RPC anonymous enumeration --------------------------------------------------------------
+def test_smbclient_anon_shares():
+    out = ("Disk|public|Public share\n"
+           "IPC|IPC$|IPC Service (Samba)\n"
+           "Printer|hp-laser|Office printer\n")
+    rows = lst.parse_tool("smbclient", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    shares = {r["affected_component"]: r for r in rows}
+    assert set(shares) == {"public", "IPC$", "hp-laser"}
+    assert shares["public"]["fields"]["severity"] == "low" and shares["public"]["affected_port"] == 445
+    assert shares["IPC$"]["fields"]["severity"] == "info"
+    # table format also parses; access denied -> nothing
+    tbl = "\tSharename       Type      Comment\n\tdata            Disk      Data share\n"
+    assert any(r["affected_component"] == "data" for r in lst.parse_tool("smbclient", tbl, "h", 1, "http://h"))
+    assert lst.parse_tool("smbclient", "session setup failed: NT_STATUS_ACCESS_DENIED\n", "h", 1,
+                          "http://h") == []
+
+
+def test_rpcclient_null_session_users():
+    out = ("        HOSTNAME       Wk Sv PrQ Unx NT SNT server (Samba 4.x)\n"
+           "        platform_id     :       500\n"
+           "user:[admin] rid:[0x3e8]\n"
+           "user:[guest] rid:[0x1f5]\n")
+    rows = lst.parse_tool("rpcclient", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    users = {r["affected_component"] for r in rows if r["affected_component"]}
+    assert {"admin", "guest"} <= users
+    assert any("null session" in r["fields"]["title"].lower() for r in rows)
+    assert all(r["affected_port"] == 445 for r in rows)
+    assert lst.parse_tool("rpcclient", "Cannot connect: NT_STATUS_ACCESS_DENIED\n", "h", 1, "http://h") == []
+
+
+# ---- NEW: exposed DB / cache no-auth checks ------------------------------------------------------------
+def test_redis_unauth_exposure():
+    out = "# Server\r\nredis_version:7.0.11\r\nos:Linux\r\n"
+    rows = lst.parse_tool("redis-cli", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "high" and rows[0]["affected_port"] == 6379
+    assert "7.0.11" in rows[0]["fields"]["title"]
+    assert lst.parse_tool("redis-cli", "NOAUTH Authentication required.\n", "h", 1, "http://h") == []
+
+
+def test_db_no_password_login():
+    myrows = lst.parse_tool("mysql", "10.5.19-MariaDB\n", "h", 1, "http://h")
+    _assert_shape(myrows)
+    assert len(myrows) == 1 and myrows[0]["fields"]["severity"] == "critical" and myrows[0]["affected_port"] == 3306
+    pgrows = lst.parse_tool("psql", "PostgreSQL 14.9 on x86_64-pc-linux-gnu\n", "h", 1, "http://h")
+    assert len(pgrows) == 1 and pgrows[0]["affected_port"] == 5432
+    # auth failure / refused -> honest skip (no fabricated finding)
+    assert lst.parse_tool("mysql", "ERROR 1045 (28000): Access denied for user 'root'@'x'\n", "h", 1,
+                          "http://h") == []
+    assert lst.parse_tool("psql", "psql: error: connection to server failed: Connection refused\n", "h", 1,
+                          "http://h") == []
+
+
+# ---- NEW: VPN / SMTP service probes ------------------------------------------------------------------
+def test_ike_scan_aggressive_mode():
+    agg = ("Starting ike-scan\n1.2.3.4  Aggressive Mode Handshake returned SA=(...)\n")
+    rows = lst.parse_tool("ike-scan", agg, "1.2.3.4", 1, "http://1.2.3.4")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium" and rows[0]["affected_port"] == 500
+    main = "1.2.3.4  Main Mode Handshake returned SA=(...)\n"
+    mrows = lst.parse_tool("ike-scan", main, "1.2.3.4", 1, "http://1.2.3.4")
+    assert len(mrows) == 1 and mrows[0]["fields"]["severity"] == "info"
+    assert lst.parse_tool("ike-scan", "0 returned handshake; 0 returned notify\n", "h", 1, "http://h") == []
+
+
+def test_smtp_user_enum_vrfy():
+    out = ("mail.h: root exists\nmail.h: admin exists\nmail.h: nosuch does not exist\n")
+    rows = lst.parse_tool("smtp-user-enum", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert {r["affected_component"] for r in rows} == {"root", "admin"}
+    assert all(r["fields"]["severity"] == "medium" and r["affected_port"] == 25 for r in rows)
+
+
+# ---- NEW: CMS scanners (honest-skip when not that CMS) -------------------------------------------------
+def test_wpscan_version_and_vuln():
+    out = ("[+] WordPress version 5.4.1 identified (Insecure, released on 2020-04-29).\n"
+           " | [!] Title: WordPress 5.4 - XSS in Block Editor\n")
+    rows = lst.parse_tool("wpscan", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert any("version 5.4.1" in r["fields"]["title"] for r in rows)
+    vuln = [r for r in rows if r["fields"]["severity"] == "high"]
+    assert vuln and "XSS in Block Editor" in vuln[0]["fields"]["title"]
+    assert lst.parse_tool("wpscan", "The remote website does not seem to be running WordPress.\n", "h", 1,
+                          "http://h") == []
+
+
+def test_joomscan_version_and_finding():
+    out = ("\x1b[34m[+] Detecting Joomla Version\x1b[0m\n"
+           "[++] Joomla 3.9.1\n"
+           "[++] Core Joomla Vulnerability : SQLi in com_fields\n")
+    rows = lst.parse_tool("joomscan", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert any("Joomla" in r["fields"]["title"] and "3.9.1" in r["fields"]["title"] for r in rows)
+    assert any(r["fields"]["severity"] == "medium" for r in rows)
+    assert lst.parse_tool("joomscan", "[+] target is not Joomla\n", "h", 1, "http://h") == []
+
+
+# ---- NEW: screenshots + credentialed AD dump + surface reuse ------------------------------------------
+def test_eyewitness_screenshot_artifact():
+    rows = lst.parse_tool("eyewitness", "/tmp/ew/screens/http.h.png\n", "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "info"
+    assert lst.parse_tool("eyewitness", "no report generated\n", "h", 1, "http://h") == []
+
+
+def test_ldapdomaindump_credentialed():
+    out = ("cn\tname\tsAMAccountName\n"
+           "Administrator\tAdministrator\tadministrator\n"
+           "John Doe\tJohn Doe\tjdoe\n")
+    rows = lst.parse_tool("ldapdomaindump", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium" and rows[0]["affected_port"] == 389
+    assert "2 user record" in rows[0]["fields"]["title"]                # header line dropped
+    assert lst.parse_tool("ldapdomaindump", "", "h", 1, "http://h") == []   # env-gated no-run -> nothing
+
+
+def test_content_discovery_and_surface_summaries():
+    ferox = lst.parse_tool("feroxbuster", "200      GET http://h/admin\n200      GET http://h/login\n",
+                           "h", 1, "http://h")
+    _assert_shape(ferox)
+    assert ferox and "2 path" in ferox[0]["fields"]["title"]
+    ffuf = lst.parse_tool("ffuf", "http://h/robots.txt [Status: 200]\n", "h", 1, "http://h")
+    assert ffuf and ffuf[0]["source_slug"] == "ffuf"
+    subs = lst.parse_tool("subfinder", "www.h.com\napi.h.com\n", "h", 1, "http://h")
+    assert subs and "subdomain" in subs[0]["fields"]["title"]
+    for n in ("gobuster", "dirsearch", "dnsx", "dnsrecon", "fierce", "gau", "katana"):
+        assert lst.parse_tool(n, "", "h", 1, "http://h") == []          # empty -> honest skip
+
+
+def test_still_unwired_and_missing_are_honest():
+    names = {s["name"] for s in lst.LINUX_SCAN_TOOLS}
+    # nothing declared still-unwired or missing may also be wired (no contradiction)
+    assert not (set(lst._STILL_UNWIRED_LINUX_SCAN_TOOLS) & names)
+    assert not (set(lst._MISSING_FROM_IMAGE) & names)
+    assert "netexec" in lst._MISSING_FROM_IMAGE and "enum4linux-ng" in lst._MISSING_FROM_IMAGE
+
+
 def test_parsers_never_raise_on_garbage():
     everyone = ("nmap", "masscan", "naabu", "ssh-audit", "showmount", "rpcinfo", "smbmap", "onesixtyone",
-                "ldapsearch", "nbtscan", "sslscan", "testssl", "sslyze", "whatweb", "httpx", "wafw00f")
+                "ldapsearch", "nbtscan", "sslscan", "testssl", "sslyze", "whatweb", "httpx", "wafw00f",
+                "snmp-check", "snmpwalk", "braa", "smbclient", "rpcclient", "redis-cli", "mysql", "psql",
+                "ike-scan", "smtp-user-enum", "wpscan", "joomscan", "eyewitness", "ldapdomaindump",
+                "feroxbuster", "ffuf", "gobuster", "dirsearch", "dnsx", "subfinder", "dnsrecon", "fierce",
+                "gau", "katana", "gowitness")
     for name in everyone:
         assert lst.parse_tool(name, "", "h", 1, "http://h") == []                     # empty -> nothing
         assert isinstance(lst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -190,7 +365,10 @@ def test_registry_specs_bounded_and_readonly():
         assert 0 < int(spec["timeout"]) <= 600                       # every tool is time-bounded
         assert callable(spec["parse"])
         joined = " ".join(argv)
-        assert not any(bad in joined for bad in (" rm -", "--delete", " -X DELETE", "mkfs", " -w ", "--write"))
+        # destructive/write flags stay out. (`-w <wordlist>` is content-discovery INPUT, read-only, so it is
+        # NOT forbidden; smtp-user-enum's `-w 5` is a wait timeout; snmp-check's write probe is `-w`/`--write`.)
+        assert not any(bad in joined for bad in (" rm -", "--delete", " -X DELETE", "mkfs", "--write"))
+        assert "-w" not in argv                                       # no bare snmp-check write-access probe
 
 
 # ---- wiring: the convention dispatcher loads THIS module for (internal, linux) + honest on unmapped ------
