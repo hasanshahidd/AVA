@@ -31,3 +31,5 @@ from ._56_scf_catalog_models import *  # noqa: F401,F403 - SCF canonical catalog
 from ._pentest_scan_jobs import PentestScanJob  # noqa: F401 - AVA pentest live scan jobs (M2)
 from ._pentest_exploit_results import PentestExploitResult  # noqa: F401 - AVA pentest persisted exploit results (M2)
 from ._pentest_event_log import PentestEventLog  # noqa: F401 - AVA/GRC pentest all-stage event log
+from ._pentest_runs import PentestRun  # noqa: F401 - AVA pentest batch/run domain object (P1)
+from ._pentest_run_assets import PentestRunAsset  # noqa: F401 - AVA pentest per-asset run state (P1)
