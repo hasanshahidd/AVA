@@ -198,7 +198,7 @@ def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
         "ghauri", "wpscan", "sstimap", "crlfuzz",
         "webcheck-lfi", "webcheck-openredirect", "webcheck-ssrf", "webcheck-xxe", "webcheck-deser"}
     assert svc._lane_toolset_hardcoded("internal") == {
-        "netexec", "impacket", "pacu", "peirates", "metasploit", "certipy", "evil-winrm"}
+        "netexec", "impacket", "pacu", "peirates", "metasploit", "certipy", "evil-winrm", "sshpass"}
     # subtype-independent: _lane_toolset with NO phase is the code-derived lock, unchanged for any sub-lane
     # (including the three new ones) — the lock has no subtype axis.
     for st in ("windows", "linux", "network", "cloud", "kubernetes", "repos"):
