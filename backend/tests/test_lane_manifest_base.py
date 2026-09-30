@@ -161,3 +161,45 @@ def test_internal_subtype_resolver_and_llm_seam():
     assert svc._internal_subtype({"os_family": "Ubuntu"}, llm_pick="network") == "network"
     assert svc._internal_subtype({"os_family": "Ubuntu"}, llm_pick="nonsense") == "linux"
     assert svc._internal_subtype({"os_family": "Ubuntu"}, llm_pick=None) == "linux"
+
+
+# ── NEW internal sub-lanes: cloud / kubernetes / repos resolve their own split images ────────────
+
+_NEW_SUBTYPE_IMAGES = {
+    "cloud":      ("ava-cloud-scan", "ava-cloud-exploit"),
+    "kubernetes": ("ava-k8s-scan",   "ava-k8s-exploit"),
+    "repos":      ("ava-repo-scan",  "ava-repo-exploit"),
+}
+
+
+def test_new_internal_subtypes_resolve_their_own_images(monkeypatch):
+    # (c) treat every split image as BUILT -> each new sub-lane runs its OWN scan/exploit image.
+    monkeypatch.setattr(svc, "_image_built", lambda _img: True)
+    for st, (scan, exploit) in _NEW_SUBTYPE_IMAGES.items():
+        assert svc._lane_image("internal", "scan", st) == scan
+        assert svc._lane_image("internal", "exploit", st) == exploit
+
+
+def test_new_internal_subtypes_fall_back_to_monolith_when_not_built(monkeypatch):
+    # (c) NOT built -> the ava-internal monolith fallback, exactly like windows/linux/network.
+    monkeypatch.setattr(svc, "_image_built", lambda _img: False)
+    for st in _NEW_SUBTYPE_IMAGES:
+        assert svc._lane_image("internal", "scan", st) == svc._LANE_IMAGE["internal"]
+        assert svc._lane_image("internal", "exploit", st) == svc._LANE_IMAGE["internal"]
+
+
+# ── (d) DRIFT-GUARD: the hard lane-lock is an exact set and is subtype-independent ────────────────
+
+def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
+    # The lane-lock floor, pinned to its exact expected membership: a change to the runner tables (a tool
+    # added/removed) trips this, and no manifest subtype may ever widen or narrow it.
+    assert svc._lane_toolset_hardcoded("web") == {
+        "sqlmap", "commix", "xsstrike", "dalfox", "nuclei-web",
+        "webcheck-lfi", "webcheck-openredirect", "webcheck-ssrf", "webcheck-xxe", "webcheck-deser"}
+    assert svc._lane_toolset_hardcoded("internal") == {
+        "netexec", "impacket", "pacu", "peirates", "metasploit"}
+    # subtype-independent: _lane_toolset with NO phase is the code-derived lock, unchanged for any sub-lane
+    # (including the three new ones) — the lock has no subtype axis.
+    for st in ("windows", "linux", "network", "cloud", "kubernetes", "repos"):
+        assert svc._lane_toolset("internal", subtype=st) == svc._lane_toolset_hardcoded("internal")
+        assert svc._lane_toolset("web", subtype=st) == svc._lane_toolset_hardcoded("web")
