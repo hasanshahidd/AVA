@@ -203,3 +203,65 @@ def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
     for st in ("windows", "linux", "network", "cloud", "kubernetes", "repos"):
         assert svc._lane_toolset("internal", subtype=st) == svc._lane_toolset_hardcoded("internal")
         assert svc._lane_toolset("web", subtype=st) == svc._lane_toolset_hardcoded("web")
+
+
+# ── (e) END-TO-END: every one of the 10 asset types routes type -> lane/subtype -> its OWN image ──
+
+# type -> (lane, subtype, scan_image, exploit_image). web is its own top lane (no subtype); db/virt ride the
+# linux images and storage the netdev images (they are NOT their own sub-lanes); cloud/k8s/repos own theirs.
+_TYPE_ROUTING = {
+    "web":            ("web",      None,         "ava-web-scan",    "ava-web-exploit"),
+    "windows":        ("internal", "windows",    "ava-win-scan",    "ava-win-exploit"),
+    "linux":          ("internal", "linux",      "ava-linux-scan",  "ava-linux-exploit"),
+    "network":        ("internal", "network",    "ava-netdev-scan", "ava-netdev-exploit"),
+    "databases":      ("internal", "linux",      "ava-linux-scan",  "ava-linux-exploit"),
+    "virtualization": ("internal", "linux",      "ava-linux-scan",  "ava-linux-exploit"),
+    "storage":        ("internal", "network",    "ava-netdev-scan", "ava-netdev-exploit"),
+    "cloud":          ("internal", "cloud",      "ava-cloud-scan",  "ava-cloud-exploit"),
+    "kubernetes":     ("internal", "kubernetes", "ava-k8s-scan",    "ava-k8s-exploit"),
+    "repos":          ("internal", "repos",      "ava-repo-scan",   "ava-repo-exploit"),
+}
+
+
+def test_all_ten_types_route_to_their_own_image_when_built(monkeypatch):
+    monkeypatch.setattr(svc, "_image_built", lambda _img: True)          # every split image is built
+    assert set(_TYPE_ROUTING) == set(svc._ASSET_TYPES)                    # all 10 covered, none missed
+    for t, (lane, subtype, scan, exploit) in _TYPE_ROUTING.items():
+        # brain #1's type maps to the SAME lane + subtype the run resolves.
+        assert svc._asset_type_to_lane(t) == lane, t
+        assert svc._asset_type_to_subtype(t) == subtype, t
+        assert svc._lane_image(lane, "scan", subtype) == scan, t
+        assert svc._lane_image(lane, "exploit", subtype) == exploit, t
+
+
+def test_all_ten_types_fall_back_to_monolith_when_not_built(monkeypatch):
+    monkeypatch.setattr(svc, "_image_built", lambda _img: False)         # no split image is built
+    for t, (lane, subtype, _s, _e) in _TYPE_ROUTING.items():
+        monolith = svc._LANE_IMAGE[lane]                                 # ava-web for web, ava-internal else
+        assert svc._lane_image(lane, "scan", subtype) == monolith, t
+        assert svc._lane_image(lane, "exploit", subtype) == monolith, t
+
+
+# ── (f) DETERMINISTIC subtype detection (brain #1 OFFLINE) for the new + aliased types ───────────
+
+def test_internal_subtype_detects_new_and_aliased_types_deterministically():
+    # first-class service sub-lanes resolve from the asset's own fields (no LLM).
+    assert svc._internal_subtype({"asset_type": "cloud", "platform_kind": "aws ec2"}) == "cloud"
+    assert svc._internal_subtype({"platform_kind": "azure", "kind": "s3 bucket"}) == "cloud"
+    assert svc._internal_subtype({"asset_type": "kubernetes", "platform_kind": "eks"}) == "kubernetes"
+    assert svc._internal_subtype({"kind": "kubelet"}) == "kubernetes"
+    assert svc._internal_subtype({"asset_type": "repos", "kind": "gitlab repository"}) == "repos"
+    assert svc._internal_subtype({"kind": "bitbucket"}) == "repos"
+    # aliased types (no own sub-lane): db/virt -> linux tooling, storage -> network-device tooling.
+    assert svc._internal_subtype({"asset_type": "databases", "kind": "mysql"}) == "linux"
+    assert svc._internal_subtype({"kind": "mongodb"}) == "linux"
+    assert svc._internal_subtype({"asset_type": "virtualization", "platform_kind": "proxmox"}) == "linux"
+    assert svc._internal_subtype({"asset_type": "storage", "device_category": "iscsi"}) == "network"
+    assert svc._internal_subtype({"kind": "netapp"}) == "network"
+    # HOST OS is authoritative: a Windows/Linux box carrying one of those tokens stays on its host sub-lane.
+    assert svc._internal_subtype({"os_family": "Windows Server", "kind": "mssql"}) == "windows"
+    assert svc._internal_subtype({"os_family": "Ubuntu", "asset_type": "kubernetes"}) == "linux"
+    # a VALID brain-#1 pick for a new sub-lane wins the accept-guard (previously discarded -> windows).
+    for t in ("cloud", "kubernetes", "repos"):
+        assert svc._internal_subtype({"os_family": "Windows"}, llm_pick=t) == t
+    assert set(svc._INTERNAL_SUBTYPES) == {"windows", "linux", "network", "cloud", "kubernetes", "repos"}
