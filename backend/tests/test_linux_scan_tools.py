@@ -343,6 +343,70 @@ def test_arjun_hidden_params():
     assert lst.parse_tool("arjun", "no params here", "h", 1, "http://h") == []
 
 
+# ---- LIVE-FIRE argv/parser fixes (verified against ava-livefire-net, 2026-09-30) ----------------------
+def test_ffuf_bare_tokens_normalized_to_paths():
+    # REAL `ffuf -s` output: BARE relative words (no scheme, no leading slash) — the shared _extract_disc
+    # matched neither full URLs nor /-paths, yielding 0 rows. _extract_ffuf normalizes each to a /path.
+    out = ".git/HEAD\n.cvs\n.config\n.env\n.git/HEAD\n"
+    rows = lst.parse_tool("ffuf", out, "juice", 1, "http://juice:3000")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "4 path" in rows[0]["fields"]["title"]     # dupe collapsed
+    ev = rows[0]["fields"]["evidence"]
+    assert "/.git/HEAD" in ev and "/.env" in ev                          # bare word -> /path
+
+
+def test_psql_error_line_not_faked_as_version():
+    # REAL psql empty-password error vs pg: the IP octets 172.18.0.8 match \d+\.\d+, and the old
+    # _DB_FAIL_RE missed "fe_sendauth: no password supplied" -> the error line was reported as a version.
+    err = ('Password for user postgres: \n'
+           'psql: error: connection to server at "pg" (172.18.0.8), port 5432 failed: '
+           'fe_sendauth: no password supplied')
+    assert lst.parse_tool("psql", err, "pg", 1, "http://pg") == []       # clean fail, no fake version
+    # a genuine no-auth success still parses the real version banner.
+    ok = ("PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, "
+          "compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit")
+    rows = lst.parse_tool("psql", ok, "pg", 1, "http://pg")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "critical" and "18.6" in rows[0]["fields"]["title"]
+
+
+def test_naabu_top_ports_100_not_200_linux():
+    spec = next(s for s in lst.LINUX_SCAN_TOOLS if s["name"] == "naabu")
+    joined = " ".join(spec["argv"]("samba", "http://samba"))
+    assert "-top-ports 100" in joined and "-top-ports 200" not in joined
+
+
+def test_masscan_resolves_hostname_to_ip():
+    # masscan does NO DNS and rejects a hostname ("unknown command-line parameter") — the argv must
+    # resolve host->IP (getent) before invoking masscan.
+    spec = next(s for s in lst.LINUX_SCAN_TOOLS if s["name"] == "masscan")
+    joined = " ".join(spec["argv"]("samba", "http://samba"))
+    assert "getent hosts" in joined and "masscan" in joined
+    # parser still consumes the real "Discovered open port" lines.
+    out = ("Discovered open port 139/tcp on 172.18.0.5\nDiscovered open port 445/tcp on 172.18.0.5\n")
+    rows = lst.parse_tool("masscan", out, "samba", 1, "http://samba")
+    _assert_shape(rows)
+    assert {r["affected_port"] for r in rows} == {139, 445}
+
+
+def test_dirsearch_uses_output_formats_not_format():
+    # dirsearch v0.5.0 in this image rejects --format ("no such option"); the supported flag is
+    # --output-formats (simple is available).
+    spec = next(s for s in lst.LINUX_SCAN_TOOLS if s["name"] == "dirsearch")
+    joined = " ".join(spec["argv"]("juice", "http://juice:3000"))
+    assert "--output-formats=simple" in joined and "--format=simple" not in joined
+    # parser reads the report's full-URL lines.
+    rows = lst.parse_tool("dirsearch", "http://juice:3000/api\nhttp://juice:3000/ftp\n", "juice", 1,
+                          "http://juice:3000")
+    assert rows and "2 path" in rows[0]["fields"]["title"]
+
+
+def test_gowitness_writes_screenshots_flag():
+    spec = next(s for s in lst.LINUX_SCAN_TOOLS if s["name"] == "gowitness")
+    joined = " ".join(spec["argv"]("juice", "http://juice:3000"))
+    assert "--write-screenshots" in joined and "--screenshot-path" in joined
+
+
 def test_still_unwired_and_missing_are_honest():
     names = {s["name"] for s in lst.LINUX_SCAN_TOOLS}
     # nothing declared still-unwired or missing may also be wired (no contradiction)
@@ -382,8 +446,10 @@ def test_registry_specs_bounded_and_readonly():
         assert callable(spec["parse"])
         joined = " ".join(argv)
         # destructive/write flags stay out. (`-w <wordlist>` is content-discovery INPUT, read-only, so it is
-        # NOT forbidden; smtp-user-enum's `-w 5` is a wait timeout; snmp-check's write probe is `-w`/`--write`.)
-        assert not any(bad in joined for bad in (" rm -", "--delete", " -X DELETE", "mkfs", "--write"))
+        # NOT forbidden; smtp-user-enum's `-w 5` is a wait timeout; snmp-check's write probe is `-w`/`--write`.
+        # gowitness's `--write-screenshots` writes a local screenshot artifact — benign, like `-o`.)
+        joined_no_gw = joined.replace("--write-screenshots", "")
+        assert not any(bad in joined_no_gw for bad in (" rm -", "--delete", " -X DELETE", "mkfs", "--write"))
         assert "-w" not in argv                                       # no bare snmp-check write-access probe
 
 

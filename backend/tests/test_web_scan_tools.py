@@ -325,6 +325,28 @@ def test_wordlists_mount_added_to_docker_argv(monkeypatch):
     assert svc._wordlists_mount() == []
 
 
+def test_wfuzz_ansi_colored_rows_parsed():
+    # LIVE-FIRE (2026-09-30, ava-web-scan vs juice): wfuzz emits ANSI even when piped — each row ends
+    # `"<payload>"\x1b[0m`, which defeated `"([^"]*)"\s*$`. Real captured rows (ESC = \x1b):
+    out = ('000000003:\x1b[0m   200     \x1b[0m   33 L  \x1b[0m   393 W   \x1b[0m   9393 Ch  \x1b[0m'
+           '   ".cache"       \x1b[0m\n'
+           '000000007:\x1b[0m   200     \x1b[0m   33 L  \x1b[0m   393 W   \x1b[0m   9393 Ch  \x1b[0m'
+           '   ".env"         \x1b[0m\n'
+           '000000003:\x1b[0m   200     \x1b[0m   33 L  \x1b[0m   393 W   \x1b[0m   9393 Ch  \x1b[0m'
+           '   ".cache"       \x1b[0m')
+    rows = wst.parse_tool("wfuzz", out, "juice", 1, "http://juice:3000")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "2 path" in rows[0]["fields"]["title"]     # dupe collapsed, ANSI stripped
+    assert ".cache" in rows[0]["fields"]["evidence"] and ".env" in rows[0]["fields"]["evidence"]
+
+
+def test_naabu_top_ports_100_not_200():
+    # LIVE-FIRE: naabu REJECTS `-top-ports 200` (only 100/1000/full); must be 100.
+    spec = next(s for s in wst.WEB_SCAN_TOOLS if s["name"] == "naabu")
+    joined = " ".join(spec["argv"]("juice", "http://juice:3000"))
+    assert "-top-ports 100" in joined and "-top-ports 200" not in joined
+
+
 def test_unwired_accounting_is_accurate():
     """graphw00f + kiterunner are ABSENT from the deployed ava-web-scan image (verified read-only
     2026-09-30 on d0eb2aca410a — only paramspider/waymore in pipx, `kr`/graphw00f/x8/ffuf/wpscan all
