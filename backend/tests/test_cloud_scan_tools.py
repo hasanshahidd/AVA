@@ -101,7 +101,7 @@ _MUTATING = (" rm ", " rm -", " del ", "put-object", "put-bucket", "delete-objec
 def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in cst.CLOUD_SCAN_TOOLS}
     assert names == {"festin", "s3scanner", "gcpbucketbrute", "subfinder", "dnsx",
-                     "scoutsuite", "cloudsplaining"}
+                     "scoutsuite", "cloudsplaining", "cloudsploit", "kubescape", "kube-bench", "amass"}
     for spec in cst.CLOUD_SCAN_TOOLS:
         assert callable(spec["parse"]) and callable(spec["argv"])
         assert isinstance(spec["timeout"], int) and 0 < spec["timeout"] <= 600
@@ -126,7 +126,7 @@ def test_bucket_candidates_bounded_and_valid():
 
 def test_deferred_list_is_honest():
     # still-unwired / missing / broken heavy hitters are named, not pretended-wired
-    for t in ("prowler", "cloudfox", "pmapper", "checkov", "kubescape", "pacu"):
+    for t in ("prowler", "cloudfox", "pmapper", "checkov", "cartography", "steampipe", "cnquery", "pacu"):
         assert t in cst._DEFERRED_CLOUD_SCAN_TOOLS
     # every wired spec name is ABSENT from the deferred set (no half-wiring)
     for spec in cst.CLOUD_SCAN_TOOLS:
@@ -252,6 +252,113 @@ def test_new_parsers_never_raise_on_garbage():
     junk = ["", "   ", "not json", "{bad", "null", "[]", "{}", "\x00\xff bin",
             "scoutsuite_results =\n{bad", '{"services": "notadict"}', "EXISTS:",
             "    UNAUTHENTICATED ACCESS ALLOWED:"]
-    for name in ("subfinder", "dnsx", "gcpbucketbrute", "scoutsuite", "cloudsplaining"):
+    for name in ("subfinder", "dnsx", "gcpbucketbrute", "scoutsuite", "cloudsplaining",
+                 "cloudsploit", "kubescape", "kube-bench", "amass"):
         for j in junk:
             assert cst.parse_tool(name, j, "t.com", 9, "http://t.com") == []
+
+
+# ---- cloudsploit: multi-cloud posture, FAIL/WARN -> findings (distinct ruleset from scoutsuite) --------
+def test_cloudsploit_status_ladder():
+    doc = json.dumps([
+        {"plugin": "bucketAllUsersPolicy", "category": "S3", "title": "S3 Bucket All Users Policy",
+         "resource": "arn:aws:s3:::acme-open", "region": "us-east-1", "status": "FAIL",
+         "message": "Bucket policy allows global access"},
+        {"plugin": "mfaEnabled", "category": "IAM", "title": "MFA Enabled", "resource": "arn:aws:iam::1:user/x",
+         "region": "global", "status": "WARN", "message": "MFA not enabled"},
+        {"plugin": "rootAccount", "category": "IAM", "title": "Root Account", "resource": "root",
+         "region": "global", "status": "OK", "message": "fine"},
+        {"plugin": "x", "category": "EC2", "title": "y", "resource": "z", "status": "UNKNOWN"},
+    ])
+    rows = cst.parse_tool("cloudsploit", doc, "acme.com", 20, "http://acme.com")
+    _assert_shape(rows)
+    sev = {r["affected_component"]: r["fields"]["severity"] for r in rows}
+    assert sev == {"arn:aws:s3:::acme-open": "high", "arn:aws:iam::1:user/x": "medium"}
+    # OK / UNKNOWN never become findings
+    fail = next(r for r in rows if r["affected_component"] == "arn:aws:s3:::acme-open")
+    assert "S3" in fail["fields"]["title"] and "global access" in fail["fields"]["evidence"]
+
+
+def test_cloudsploit_object_wrapped_results():
+    doc = json.dumps({"results": [{"plugin": "p", "category": "GCP", "title": "t", "resource": "r",
+                                   "region": "us", "status": "FAIL", "message": "m"}]})
+    rows = cst.parse_tool("cloudsploit", doc, "acme.com", 21, "http://acme.com")
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "high"
+
+
+# ---- kubescape: failed controls -> findings, scoreFactor -> severity ----------------------------------
+def test_kubescape_controls_by_score():
+    doc = json.dumps({"summaryDetails": {"controls": {
+        "C-0016": {"controlID": "C-0016", "name": "Allow privilege escalation", "scoreFactor": 7.0,
+                   "ResourceCounters": {"passedResources": 1, "failedResources": 3, "excludedResources": 0}},
+        "C-0009": {"controlID": "C-0009", "name": "Resource limits", "scoreFactor": 4.0,
+                   "ResourceCounters": {"passedResources": 5, "failedResources": 2}},
+        "C-0002": {"controlID": "C-0002", "name": "Exec into container", "scoreFactor": 1.0,
+                   "ResourceCounters": {"passedResources": 9, "failedResources": 1}},
+        "C-0777": {"controlID": "C-0777", "name": "All good", "scoreFactor": 9.0,
+                   "ResourceCounters": {"passedResources": 3, "failedResources": 0}},
+    }}})
+    rows = cst.parse_tool("kubescape", doc, "cluster", 22, "http://cluster")
+    _assert_shape(rows)
+    sev = {r["affected_component"]: r["fields"]["severity"] for r in rows}
+    assert sev == {"C-0016": "high", "C-0009": "medium", "C-0002": "low"}
+    assert "C-0777" not in sev                          # failedResources==0 -> not a finding
+
+
+# ---- kube-bench: CIS FAIL/WARN -> findings ------------------------------------------------------------
+def test_kube_bench_status_ladder():
+    doc = json.dumps({"Controls": [{"tests": [{"results": [
+        {"test_number": "1.2.1", "test_desc": "Ensure anonymous-auth is off", "status": "FAIL",
+         "remediation": "Set --anonymous-auth=false"},
+        {"test_number": "1.2.2", "test_desc": "Ensure basic-auth is off", "status": "WARN",
+         "remediation": "Remove --basic-auth-file"},
+        {"test_number": "1.2.3", "test_desc": "TLS configured", "status": "PASS", "remediation": ""},
+        {"test_number": "1.2.4", "test_desc": "manual check", "status": "INFO"},
+    ]}]}]})
+    rows = cst.parse_tool("kube-bench", doc, "node", 23, "http://node")
+    _assert_shape(rows)
+    sev = {r["affected_component"]: r["fields"]["severity"] for r in rows}
+    assert sev == {"1.2.1": "high", "1.2.2": "medium"}   # PASS/INFO excluded
+    assert "anonymous-auth=false" in next(r for r in rows if r["affected_component"] == "1.2.1")["fields"]["evidence"]
+
+
+# ---- amass fallback: bare FQDNs -> one subdomain-surface summary (same shape as subfinder) -------------
+def test_amass_fallback_summary():
+    out = "api.acme.com\ncdn.acme.com\nnot a host\nadmin.acme.com\n"
+    rows = cst.parse_tool("amass", out, "acme.com", 24, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "3 subdomain" in rows[0]["fields"]["title"]
+    assert rows[0]["source_slug"] == "amass"
+
+
+# ---- arm-and-gate + fallback + feeder wiring contract (the Mechanism the dispatcher consumes) ----------
+def test_credentialed_tools_are_armed_and_gated():
+    """Each credential/cluster-gated posture tool is ARMED (in the registry, counts as armed) yet marked
+    needs_creds AND self-gates in its argv so it stays DORMANT (emits nothing) until its input is present."""
+    gated = {s["name"]: s for s in cst.CLOUD_SCAN_TOOLS if s.get("needs_creds")}
+    # the posture/cluster tools armed in THIS pass carry the needs_creds dormancy flag (scoutsuite/
+    # cloudsplaining were pre-wired as plain primaries that self-gate by emitting [] without creds).
+    assert {"cloudsploit", "kubescape", "kube-bench"} <= set(gated)
+    # cloudsploit self-gates on provider creds; kube* self-gate on a cluster/kubeconfig -> `exit 0` when absent.
+    for name, guard in (("cloudsploit", "AWS_ACCESS_KEY_ID"), ("kubescape", "KUBECONFIG"),
+                        ("kube-bench", "KUBECONFIG")):
+        argv = gated[name]["argv"]("acme.com", "http://acme.com")
+        joined = " ".join(argv)
+        assert "exit 0" in joined and guard in joined       # dormant without the input
+    # ...but the parser FIRES when the input yields real output (proved by the parser tests above).
+    assert cst.parse_tool("cloudsploit", json.dumps(
+        [{"plugin": "p", "category": "S3", "title": "t", "resource": "r", "status": "FAIL", "message": "m"}]),
+        "acme.com", 25, "http://acme.com")
+
+
+def test_amass_is_a_fallback_for_subfinder():
+    """The duplicate (amass, subfinder's class) is wired as a FALLBACK, not dropped — the dispatcher fires it
+    ONLY when subfinder produced nothing (runtime gating is dispatcher-tested); here we assert the linkage."""
+    amass = next(s for s in cst.CLOUD_SCAN_TOOLS if s["name"] == "amass")
+    subfinder_names = {s["name"] for s in cst.CLOUD_SCAN_TOOLS}
+    assert amass.get("fallback_for") == "subfinder" and "subfinder" in subfinder_names
+    # a fallback is NOT a primary and NOT a feeder (dispatcher partitions the registry on these keys)
+    assert not amass.get("feeds") and not amass.get("needs_creds")
+    # and it is runnable, not dead: its argv is bounded + read-only
+    argv = amass["argv"]("acme.com", "http://acme.com")
+    assert argv and argv[0] in ("sh", "true")

@@ -363,3 +363,94 @@ def test_unwired_accounting_is_accurate():
     assert not ({"graphw00f", "kiterunner"} & wired)
     # a wired/unwired name can never appear in both accountings
     assert not (wired & set(unwired))
+
+
+# ---- ARM-AND-GATE wave: same-class duplicates wired as FALLBACKS (via service._lane_scan_arsenal_rows) ---
+# The generic gate/fallback/feeder PLUMBING is proven in test_pentest_arsenal_gating.py; here we assert THIS
+# lane's actual wiring on the REAL WEB_SCAN_TOOLS registry: one primary per finding class, duplicates dormant
+# on a good primary run and firing only when the primary came back empty. Offline — the container-runner is
+# faked to return canned stdout keyed by which registry tool owns the argv.
+def _dispatch(monkeypatch, outputs, url="http://h", **kw):
+    names = sorted((s["name"] for s in wst.WEB_SCAN_TOOLS), key=len, reverse=True)  # longest-first, no substr clash
+
+    def which(argv):
+        joined = " ".join(argv)
+        return next((n for n in names if n in joined), "")
+
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+        return {"stdout": outputs.get(which(argv), ""), "stderr": "", "rc": 0, "error": None}
+
+    monkeypatch.setattr(svc, "_lane_container_run", fake_run)
+    rows = svc._lane_scan_arsenal_rows("web", None, "h", 1, url, **kw)
+    return {r["source_slug"] for r in rows}
+
+
+def test_content_discovery_fallback_dormant_then_fires(monkeypatch):
+    disc = "200      GET http://h/admin\n"                       # parses to one content-path summary row
+    # feroxbuster (primary) succeeds -> gobuster/dirb/dirsearch/wfuzz stay DORMANT even though they'd emit
+    slugs = _dispatch(monkeypatch, {"feroxbuster": disc, "gobuster": disc, "dirb": disc,
+                                    "dirsearch": disc, "wfuzz": disc})
+    assert slugs == {"feroxbuster"}
+    # feroxbuster ran-and-found-nothing -> the fallback (gobuster) fires as a second opinion
+    slugs = _dispatch(monkeypatch, {"feroxbuster": "", "gobuster": "/admin (Status: 200)\n"})
+    assert "gobuster" in slugs and "feroxbuster" not in slugs
+
+
+def test_crawl_and_archive_fallbacks(monkeypatch):
+    urls = "https://h/a\nhttps://h/b\n"
+    # katana (primary crawl) works -> gospider/hakrawler/cariddi dormant
+    assert _dispatch(monkeypatch, {"katana": urls, "gospider": urls, "hakrawler": urls}) == {"katana"}
+    # katana empty -> a crawl fallback fires
+    assert "gospider" in _dispatch(monkeypatch, {"katana": "", "gospider": urls})
+    # gau (primary archive) works -> waybackurls/urlfinder/waymore dormant
+    assert _dispatch(monkeypatch, {"gau": urls, "waybackurls": urls, "waymore": urls}) == {"gau"}
+    assert "waybackurls" in _dispatch(monkeypatch, {"gau": "", "waybackurls": urls})
+
+
+def test_tls_fallback_by_vuln_class(monkeypatch):
+    # https target so the https_only TLS tools actually run; sslscan is the class primary
+    ssl = "  SSLv3     enabled\nAccepted  TLSv1.0  112 bits  DES-CBC3-SHA\n"
+    tsjson = '[{"id":"TLS1","ip":"h","port":"443","severity":"LOW","finding":"deprecated"}]'
+    # sslscan works -> testssl/sslyze (fallback_for the "tls" class) stay dormant
+    slugs = _dispatch(monkeypatch, {"sslscan": ssl, "testssl": tsjson}, url="https://h")
+    assert "sslscan" in slugs and "testssl" not in slugs and "sslyze" not in slugs
+    # sslscan came back empty -> the class fallback testssl fires
+    slugs = _dispatch(monkeypatch, {"sslscan": "", "testssl": tsjson}, url="https://h")
+    assert "testssl" in slugs and "sslscan" not in slugs
+
+
+def test_fallback_wiring_is_coherent():
+    """Lane-lock: every fallback targets a real primary class, exactly one primary owns each class, no tool is
+    both primary and fallback, and every fallback stays fully runnable (never a dead entry)."""
+    specs = wst.WEB_SCAN_TOOLS
+    classes = {s["vuln_class"] for s in specs if s.get("vuln_class")}
+    prim_names = {s["name"] for s in specs if not s.get("fallback_for")}
+    expected = {
+        "tls": {"testssl", "sslyze"},
+        "content-discovery": {"gobuster", "dirb", "dirsearch", "wfuzz"},
+        "crawl": {"gospider", "hakrawler", "cariddi"},
+        "archive-urls": {"waybackurls", "urlfinder", "waymore"},
+        "tech-fingerprint": {"webanalyze"},
+    }
+    for cls, fbs in expected.items():
+        assert cls in classes                                          # the primary declares the class
+        assert len([s for s in specs if s.get("vuln_class") == cls]) == 1  # exactly one primary per class
+        assert {s["name"] for s in specs if s.get("fallback_for") == cls} == fbs
+    for s in specs:
+        fb = s.get("fallback_for")
+        if not fb:
+            continue
+        assert fb in classes or fb in prim_names                       # no dangling fallback target
+        assert "vuln_class" not in s                                   # a tool is never both primary and fallback
+        argv = s["argv"]("h", "https://h")                             # …and is still runnable, not dead
+        assert isinstance(argv, list) and argv and callable(s["parse"]) and 0 < int(s["timeout"]) <= 600
+
+
+def test_deferred_feeder_and_credentialed_recorded_honestly():
+    """The web lane has no INSTALLED wordlist-maker (cewl) or genuinely-new credentialed scan tool, so those
+    two arm-and-gate categories are DEFERRED, not faked. They must be recorded with a reason and never appear
+    as wired specs."""
+    unwired = wst._STILL_UNWIRED_WEB_SCAN_TOOLS
+    assert "cewl" in unwired and "wordlist" in unwired["cewl"].lower() and "feeds=" in unwired["cewl"]
+    assert "wapiti-auth" in unwired and "wapiti" in unwired["wapiti-auth"]
+    assert not ({s["name"] for s in wst.WEB_SCAN_TOOLS} & set(unwired))   # never both wired and deferred

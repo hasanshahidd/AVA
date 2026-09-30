@@ -331,10 +331,109 @@ def test_sslscan_ldaps_tls_posture():
                           "h", 10, "http://h") == []
 
 
+def test_rdpseccheck_posture_issues_and_protocols():
+    out = ("[+] Scanning 10.10.10.5:3389\n\n"
+           "[+] Summary of protocol support\n"
+           "[-] 10.10.10.5:3389 supports PROTOCOL_RDP     : TRUE\n"
+           "[-] 10.10.10.5:3389 supports PROTOCOL_SSL     : TRUE\n"
+           "[-] 10.10.10.5:3389 supports PROTOCOL_HYBRID  : FALSE\n\n"
+           "[+] Summary of security issues\n"
+           "[-] 10.10.10.5:3389 has issue NLA_NOT_SUPPORTED_OR_DISABLED\n"
+           "[-] 10.10.10.5:3389 has issue SSL_WITH_WEAK_RSA_KEYS\n")
+    rows = wst.parse_tool("rdp-sec-check", out, "10.10.10.5", 11, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert all(r["affected_port"] == 3389 for r in rows)
+    host = next(r for r in rows if r["fields"]["title"].startswith("RDP service"))
+    assert host["fields"]["severity"] == "info"
+    nla = next(r for r in rows if "NLA" in r["fields"]["title"] or "Network Level" in r["fields"]["title"])
+    assert nla["fields"]["severity"] == "medium"
+    std = next(r for r in rows if "Standard RDP Security" in r["fields"]["title"])
+    assert std["fields"]["severity"] == "medium"
+    weak = next(r for r in rows if "WEAK_RSA" in r["fields"]["title"] or "Weak RDP" in r["fields"]["title"])
+    assert weak["fields"]["severity"] == "medium"
+    # a hardened host (only TLS+NLA, no issues) -> just the info host row
+    hard = ("[+] Summary of protocol support\n"
+            "[-] 10.0.0.9:3389 supports PROTOCOL_RDP     : FALSE\n"
+            "[-] 10.0.0.9:3389 supports PROTOCOL_SSL     : TRUE\n"
+            "[-] 10.0.0.9:3389 supports PROTOCOL_HYBRID  : TRUE\n")
+    hrows = wst.parse_tool("rdp-sec-check", hard, "10.0.0.9", 12, "http://10.0.0.9")
+    assert len(hrows) == 1 and hrows[0]["fields"]["severity"] == "info"
+    # closed/refused 3389 (no protocol/issue lines) -> honest skip
+    assert wst.parse_tool("rdp-sec-check", "Connection refused\n", "h", 11, "http://h") == []
+
+
+def test_polenum_null_session_password_policy():
+    out = ("[+] Attaching to 10.10.10.5 using anonymous session\n\n"
+           "[+] Password Info for Domain: CORP\n\n"
+           "\t[+] Minimum password length: 5\n"
+           "\t[+] Password history length: 24\n"
+           "\t[+] Account Lockout Threshold: None\n"
+           "\t[+] Forced Log off Time: Not Set\n")
+    rows = wst.parse_tool("polenum", out, "10.10.10.5", 13, "http://10.10.10.5")
+    _assert_shape(rows)
+    base = next(r for r in rows if r["fields"]["title"].startswith("Password policy retrieved"))
+    assert base["fields"]["severity"] == "low" and base["affected_port"] == 445
+    minlen = next(r for r in rows if "minimum password length" in r["fields"]["title"].lower())
+    assert minlen["fields"]["severity"] == "medium"
+    lockout = next(r for r in rows if "lockout" in r["fields"]["title"].lower())
+    assert lockout["fields"]["severity"] == "medium"
+    # a strong policy -> just the low base row (no weak-minlen / no-lockout findings)
+    strong = ("[+] Password Info for Domain: CORP\n"
+              "\t[+] Minimum password length: 14\n"
+              "\t[+] Account Lockout Threshold: 5\n")
+    srows = wst.parse_tool("polenum", strong, "10.10.10.5", 13, "http://10.10.10.5")
+    assert len(srows) == 1 and srows[0]["fields"]["severity"] == "low"
+    # access-denied / no policy -> honest skip
+    assert wst.parse_tool("polenum", "[-] Failed to connect: STATUS_ACCESS_DENIED\n", "h", 13, "http://h") == []
+
+
+def test_polenum_is_wired_as_enum4linux_fallback():
+    """polenum is a DUPLICATE of enum4linux's null-session policy row, so it must be wired as a fallback
+    (never a primary that runs unconditionally)."""
+    spec = next(s for s in wst.WIN_SCAN_TOOLS if s["name"] == "polenum")
+    assert spec["fallback_for"] == "enum4linux"
+
+
+def test_fallback_fires_only_when_enum4linux_empty(monkeypatch):
+    """Real-registry dispatcher check: polenum (fallback_for=enum4linux) runs ONLY when the flagship
+    enumerator ran and produced nothing — and stays dormant when enum4linux succeeds (zero added cost)."""
+    import grc.modules.pentest.service as svc
+
+    def _make_run(e4l_stdout):
+        calls = []
+
+        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+            calls.append(argv)
+            cmd = " ".join(argv)
+            if "enum4linux-ng" in cmd:
+                return {"stdout": e4l_stdout, "stderr": "", "rc": 0, "error": None}
+            if argv and argv[0] == "polenum":
+                return {"stdout": ("[+] Password Info for Domain: CORP\n"
+                                   "\t[+] Minimum password length: 7\n"
+                                   "\t[+] Account Lockout Threshold: None\n"),
+                        "stderr": "", "rc": 0, "error": None}
+            return {"stdout": "", "stderr": "", "rc": 0, "error": None}   # every other tool: honest empty
+        return calls, fake_run
+
+    e4l_ok = '{"users": {"1000": {"username": "alice"}}}'   # enum4linux-ng produces rows -> it "succeeded"
+    calls, run = _make_run(e4l_ok)
+    monkeypatch.setattr(svc, "_lane_container_run", run)
+    rows = svc._lane_scan_arsenal_rows("internal", "windows", "10.10.10.5", 1, "http://10.10.10.5")
+    assert any(r["source_slug"] == "enum4linux" for r in rows)
+    assert not any(r["source_slug"] == "polenum" for r in rows)          # fallback dormant
+    assert not any(a and a[0] == "polenum" for a in calls)               # …and never even ran
+
+    calls, run = _make_run("")                                           # enum4linux ran, produced NOTHING
+    monkeypatch.setattr(svc, "_lane_container_run", run)
+    rows = svc._lane_scan_arsenal_rows("internal", "windows", "10.10.10.5", 1, "http://10.10.10.5")
+    assert any(r["source_slug"] == "polenum" for r in rows)             # fallback picked up the miss
+    assert any(a and a[0] == "polenum" for a in calls)
+
+
 def test_parsers_never_raise_on_garbage():
     everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
                 "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
-                "lookupsid", "samrdump", "rpcdump", "sslscan")
+                "lookupsid", "samrdump", "rpcdump", "sslscan", "rdp-sec-check", "polenum")
     for name in everyone:
         assert wst.parse_tool(name, "", "h", 1, "http://h") == []            # empty -> nothing
         assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -347,7 +446,7 @@ def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in wst.WIN_SCAN_TOOLS}
     assert {"netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
             "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
-            "lookupsid", "samrdump", "rpcdump", "sslscan"} <= names
+            "lookupsid", "samrdump", "rpcdump", "sslscan", "rdp-sec-check", "polenum"} <= names
     assert len(names) == len(wst.WIN_SCAN_TOOLS)                             # no duplicate spec name
     for spec in wst.WIN_SCAN_TOOLS:
         argv = spec["argv"]("10.10.10.5", "http://10.10.10.5")

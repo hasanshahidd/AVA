@@ -412,7 +412,10 @@ def test_still_unwired_and_missing_are_honest():
     # nothing declared still-unwired or missing may also be wired (no contradiction)
     assert not (set(lst._STILL_UNWIRED_LINUX_SCAN_TOOLS) & names)
     assert not (set(lst._MISSING_FROM_IMAGE) & names)
-    assert "netexec" in lst._MISSING_FROM_IMAGE and "enum4linux-ng" in lst._MISSING_FROM_IMAGE
+    # netexec + enum4linux-ng ARE in the image (pipx) and are now wired — no longer "missing"
+    assert {"netexec", "enum4linux-ng"} <= names
+    # cewl (target-specific wordlist maker / would-be feeder) is the genuine image gap, honestly recorded
+    assert "cewl" in lst._MISSING_FROM_IMAGE
 
 
 def test_parsers_never_raise_on_garbage():
@@ -421,7 +424,7 @@ def test_parsers_never_raise_on_garbage():
                 "snmp-check", "snmpwalk", "braa", "smbclient", "rpcclient", "redis-cli", "mysql", "psql",
                 "ike-scan", "smtp-user-enum", "wpscan", "joomscan", "eyewitness", "ldapdomaindump",
                 "feroxbuster", "ffuf", "gobuster", "dirsearch", "arjun", "dnsx", "subfinder", "dnsrecon",
-                "fierce", "gau", "katana", "gowitness")
+                "fierce", "gau", "katana", "gowitness", "netexec", "enum4linux-ng")
     for name in everyone:
         assert lst.parse_tool(name, "", "h", 1, "http://h") == []                     # empty -> nothing
         assert isinstance(lst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -438,7 +441,8 @@ def test_registry_specs_bounded_and_readonly():
             "wafw00f"} <= names
     assert len(names) == len(lst.LINUX_SCAN_TOOLS)                    # no duplicate spec name
     # brute-force / already-wired tools must NOT have leaked into the read-only find registry
-    assert not ({"hydra", "medusa", "netexec", "nuclei", "nikto", "swaks"} & names)
+    # (netexec IS wired now — read-only creds-gated enum, not the brute modes — so it is intentionally absent here)
+    assert not ({"hydra", "medusa", "nuclei", "nikto", "swaks"} & names)
     for spec in lst.LINUX_SCAN_TOOLS:
         argv = spec["argv"]("1.2.3.4", "https://1.2.3.4")
         assert isinstance(argv, list) and argv and all(isinstance(a, str) for a in argv)
@@ -465,3 +469,84 @@ def test_dispatcher_loads_linux_module_by_convention(monkeypatch):
     assert any(r["source_slug"] == "showmount" for r in rows)        # module loaded + parsed by convention
     # an unmapped sub-lane -> honest [] (no run, no rows)
     assert svc._lane_scan_arsenal_rows("internal", "bogus", "h", 1, "http://h") == []
+
+
+# ---- NEW: netexec — CREDENTIALED SMB enum (parser) -----------------------------------------------------
+def test_netexec_credentialed_smb_enum():
+    out = ("SMB  10.0.0.5  445  DC01  [*] Windows Server 2019 (name:DC01) (domain:CORP)\n"
+           "SMB  10.0.0.5  445  DC01  [+] CORP\\svc:Passw0rd\n"
+           "SMB  10.0.0.5  445  DC01  Share           Permissions     Remark\n"
+           "SMB  10.0.0.5  445  DC01  -----           -----------     ------\n"
+           "SMB  10.0.0.5  445  DC01  ADMIN$                          Remote Admin\n"
+           "SMB  10.0.0.5  445  DC01  Data            READ,WRITE      File share\n"
+           "SMB  10.0.0.5  445  DC01  IPC$            READ            Remote IPC\n"
+           "SMB  10.0.0.5  445  DC01  CORP\\Administrator\n"
+           "SMB  10.0.0.5  445  DC01  CORP\\DC01$\n")           # machine account -> skipped
+    rows = lst.parse_tool("netexec", out, "10.0.0.5", 1, "http://10.0.0.5")
+    _assert_shape(rows)
+    shares = {r["affected_component"]: r for r in rows if "share" in r["fields"]["title"].lower()}
+    assert set(shares) == {"Data", "IPC$"}                       # header/sep + no-perm ADMIN$ dropped
+    assert shares["Data"]["fields"]["severity"] == "medium"      # writable
+    assert shares["IPC$"]["fields"]["severity"] == "low"         # read-only
+    users = {r["affected_component"] for r in rows if "user enumerated" in r["fields"]["title"].lower()}
+    assert users == {"Administrator"}                            # DC01$ machine account skipped
+    assert all(r["affected_port"] == 445 and r["source_slug"] == "netexec" for r in rows)
+    assert lst.parse_tool("netexec", "", "h", 1, "http://h") == []
+
+
+# ---- NEW: enum4linux-ng — null-session comprehensive enum (parser) -------------------------------------
+def test_enum4linux_null_session_parse():
+    out = ('{"users": {"1001": {"username": "administrator"}, "1002": {"username": "guest"}}, '
+           '"shares": {"public": {"access": {"mapping": "ok"}}, "netlogon": {}}}')
+    rows = lst.parse_tool("enum4linux-ng", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    users = {r["affected_component"] for r in rows if r["fields"]["severity"] == "medium"}
+    assert users == {"administrator", "guest"}
+    shares = {r["affected_component"] for r in rows if r["fields"]["severity"] == "low"}
+    assert shares == {"public", "netlogon"}
+    assert all(r["affected_port"] == 445 and r["source_slug"] == "enum4linux-ng" for r in rows)
+    assert lst.parse_tool("enum4linux-ng", "not json", "h", 1, "http://h") == []
+
+
+# ---- NEW: netexec is creds-GATED at the dispatcher (dormant w/o creds, fires with) ---------------------
+def test_netexec_creds_gated_dispatcher(monkeypatch):
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+        j = " ".join(argv)
+        if "nxc smb" in j:
+            return {"stdout": "SMB 10.0.0.5 445 DC01  Data  READ,WRITE  File share\n"
+                              "SMB 10.0.0.5 445 DC01  CORP\\jdoe\n", "stderr": "", "rc": 0, "error": None}
+        return {"stdout": "", "stderr": "", "rc": 0, "error": None}
+
+    monkeypatch.setattr(svc, "_lane_container_run", fake_run)
+    # no creds -> netexec (needs_creds) stays DORMANT: not run, no rows
+    dormant = svc._lane_scan_arsenal_rows("internal", "linux", "h", 1, "http://h", creds_available=False)
+    assert not any(r["source_slug"] == "netexec" for r in dormant)
+    # creds available -> netexec FIRES and its rows land
+    fired = svc._lane_scan_arsenal_rows("internal", "linux", "h", 1, "http://h", creds_available=True)
+    assert any(r["source_slug"] == "netexec" for r in fired)
+
+
+# ---- NEW: enum4linux-ng fires ONLY when its primary (rpcclient) produced nothing -----------------------
+def test_enum4linux_fallback_fires_only_on_rpcclient_empty(monkeypatch):
+    e4l = ('{"users": {"1001": {"username": "administrator"}}, "shares": {"public": {}}}')
+
+    def make_fake(rpcclient_out):
+        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+            j = " ".join(argv)
+            if "rpcclient" in j:
+                return {"stdout": rpcclient_out, "stderr": "", "rc": 0, "error": None}
+            if "enum4linux-ng" in j:
+                return {"stdout": e4l, "stderr": "", "rc": 0, "error": None}
+            return {"stdout": "", "stderr": "", "rc": 0, "error": None}
+        return fake_run
+
+    # rpcclient SUCCEEDS (enumerates a user) -> enum4linux-ng fallback stays DORMANT
+    monkeypatch.setattr(svc, "_lane_container_run", make_fake("user:[admin] rid:[0x3e8]\n"))
+    ok = svc._lane_scan_arsenal_rows("internal", "linux", "h", 1, "http://h")
+    assert any(r["source_slug"] == "rpcclient" for r in ok)
+    assert not any(r["source_slug"] == "enum4linux-ng" for r in ok)
+    # rpcclient PRODUCES NOTHING -> the fallback fires and contributes its rows
+    monkeypatch.setattr(svc, "_lane_container_run", make_fake(""))
+    fb = svc._lane_scan_arsenal_rows("internal", "linux", "h", 1, "http://h")
+    assert not any(r["source_slug"] == "rpcclient" for r in fb)
+    assert any(r["source_slug"] == "enum4linux-ng" for r in fb)

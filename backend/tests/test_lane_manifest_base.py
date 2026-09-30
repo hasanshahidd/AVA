@@ -196,6 +196,8 @@ def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
     assert svc._lane_toolset_hardcoded("web") == {
         "sqlmap", "commix", "xsstrike", "dalfox", "nuclei-web",
         "ghauri", "wpscan", "sstimap", "crlfuzz", "nosqli",
+        # CMS / API / protocol provers
+        "joomscan", "droopescan", "graphql-cop", "inql", "corsy", "smuggler",
         "webcheck-lfi", "webcheck-openredirect", "webcheck-ssrf", "webcheck-xxe", "webcheck-deser"}
     assert svc._lane_toolset_hardcoded("internal") == {
         "netexec", "impacket", "pacu", "peirates", "metasploit", "certipy", "evil-winrm", "sshpass",
@@ -204,7 +206,11 @@ def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
         # windows kerberos / LDAP recon / coercion-detection / netexec-CVE-module provers
         "kerberoast", "asreproast", "kerbrute", "ldapdomaindump", "coercer", "nxc-vuln",
         # cloud attack-surface / IAM / directory enum provers
-        "cloudfox", "enumerate-iam", "gcpwn", "azurehound", "roadrecon"}
+        "cloudfox", "enumerate-iam", "gcpwn", "azurehound", "roadrecon",
+        # windows post-exploitation credential-collection READ provers
+        "secretsdump", "dploot",
+        # repo-exploit provers (exposed-.git recovery, CI/CD abuse, verified-secret proof)
+        "git-dumper", "gittools", "gato-x", "trufflehog"}
     # subtype-independent: _lane_toolset with NO phase is the code-derived lock, unchanged for any sub-lane
     # (including the three new ones) — the lock has no subtype axis.
     for st in ("windows", "linux", "network", "cloud", "kubernetes", "repos"):
