@@ -248,6 +248,15 @@ def test_actionlint_injection_is_high():
     assert sev == ["high", "low"]  # injection -> high, lint -> low
 
 
+def test_actionlint_argv_does_not_append_second_json():
+    # Regression (live-fire): actionlint exits 1 WHEN it finds issues. An `|| echo '[]'` fallback then
+    # appended a 2nd array to the finding JSON ("[{...}]\n[]"), which _first_json's greedy rfind spanned,
+    # breaking json.loads and silently dropping every finding. The argv must not append a JSON literal.
+    spec = next(s for s in rst.REPO_SCAN_TOOLS if s["name"] == "actionlint")
+    cmd = spec["argv"]("/src", None)[-1]
+    assert "echo '[]'" not in cmd and "echo []" not in cmd
+
+
 # ======================================================================================================
 # ROBUSTNESS — every wired parser is garbage-safe (never raises, never fabricates on junk/empty)
 # ======================================================================================================
