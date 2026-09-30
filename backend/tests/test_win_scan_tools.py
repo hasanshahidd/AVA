@@ -297,10 +297,44 @@ def test_rpcdump_anonymous_epm():
     assert wst.parse_tool("rpcdump", "[-] Connection refused\n", "h", 9, "http://h") == []
 
 
+def test_sslscan_ldaps_tls_posture():
+    out = ("Version: 2.1.3\n\nConnected to 10.10.10.5\n\n"
+           "Testing SSL server dc01.corp.local on port 636 using SNI name dc01.corp.local\n\n"
+           "  SSL/TLS Protocols:\n"
+           "SSLv2     disabled\nSSLv3     enabled\nTLSv1.0   enabled\nTLSv1.1   disabled\n"
+           "TLSv1.2   enabled\nTLSv1.3   disabled\n\n"
+           "  Supported Server Cipher(s):\n"
+           "Accepted  TLSv1.2  256 bits  ECDHE-RSA-AES256-GCM-SHA384   Curve 25519 DHE 253\n"
+           "Accepted  TLSv1.2  128 bits  AES128-SHA\n"
+           "Accepted  TLSv1.0  112 bits  DES-CBC3-SHA\n"
+           "Accepted  SSLv3    128 bits  RC4-SHA\n\n"
+           "  SSL Certificate:\nRSA Key Strength:    2048\nSubject:  dc01.corp.local\n")
+    rows = wst.parse_tool("sslscan", out, "10.10.10.5", 10, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert all(r["affected_port"] == 636 for r in rows)
+    tls = next(r for r in rows if r["fields"]["title"].startswith("TLS service"))
+    assert tls["fields"]["severity"] == "info" and "dc01.corp.local" in tls["fields"]["title"]
+    sslv3 = next(r for r in rows if "SSLv3" in r["fields"]["title"])
+    assert sslv3["fields"]["severity"] == "high"
+    tls10 = next(r for r in rows if "TLSv1.0" in r["fields"]["title"])
+    assert tls10["fields"]["severity"] == "medium"
+    # deprecated protocols that are DISABLED are not surfaced
+    assert not any("TLSv1.1" in r["fields"]["title"] for r in rows)
+    # weak ciphers: 3DES (112-bit) and RC4 flagged; strong AES256/AES128 not
+    des = next(r for r in rows if "DES-CBC3-SHA" in r["fields"]["title"])
+    assert des["fields"]["severity"] == "medium"
+    rc4 = next(r for r in rows if "RC4-SHA" in r["fields"]["title"])
+    assert rc4["fields"]["severity"] == "medium"
+    assert not any("AES256" in r["fields"]["title"] or "AES128" in r["fields"]["title"] for r in rows)
+    # a closed/refused 636 (no protocol lines) -> honest skip
+    assert wst.parse_tool("sslscan", "Connection refused\nCould not open a connection.\n",
+                          "h", 10, "http://h") == []
+
+
 def test_parsers_never_raise_on_garbage():
     everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
                 "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
-                "lookupsid", "samrdump", "rpcdump")
+                "lookupsid", "samrdump", "rpcdump", "sslscan")
     for name in everyone:
         assert wst.parse_tool(name, "", "h", 1, "http://h") == []            # empty -> nothing
         assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -313,7 +347,7 @@ def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in wst.WIN_SCAN_TOOLS}
     assert {"netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
             "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
-            "lookupsid", "samrdump", "rpcdump"} <= names
+            "lookupsid", "samrdump", "rpcdump", "sslscan"} <= names
     assert len(names) == len(wst.WIN_SCAN_TOOLS)                             # no duplicate spec name
     for spec in wst.WIN_SCAN_TOOLS:
         argv = spec["argv"]("10.10.10.5", "http://10.10.10.5")

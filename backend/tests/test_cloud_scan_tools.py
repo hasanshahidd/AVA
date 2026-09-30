@@ -134,6 +134,10 @@ def test_deferred_list_is_honest():
     # missing/broken tools carry a concrete rebuild reason
     for t in ("prowler", "pmapper", "parliament", "cloud_enum", "CloudBrute", "trivy"):
         assert cst._MISSING_FROM_IMAGE.get(t)
+    # pass-2 present-but-unlinkable tools are catalogued with an honest reason, not fake-wired
+    for t in ("aws_public_ips", "KubiScan", "MicroBurst", "monkey365", "MFASweep", "GraphRunner", "BARK"):
+        assert t in cst._DEFERRED_CLOUD_SCAN_TOOLS
+        assert cst._STILL_UNWIRED_CLOUD_SCAN_TOOLS.get(t)
 
 
 # ---- subfinder: cloud subdomain surface -> one summary row --------------------------------------------

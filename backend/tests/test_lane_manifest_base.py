@@ -195,7 +195,7 @@ def test_lane_lock_hardcoded_exact_sets_and_subtype_independent():
     # added/removed) trips this, and no manifest subtype may ever widen or narrow it.
     assert svc._lane_toolset_hardcoded("web") == {
         "sqlmap", "commix", "xsstrike", "dalfox", "nuclei-web",
-        "ghauri", "wpscan", "sstimap", "crlfuzz",
+        "ghauri", "wpscan", "sstimap", "crlfuzz", "nosqli",
         "webcheck-lfi", "webcheck-openredirect", "webcheck-ssrf", "webcheck-xxe", "webcheck-deser"}
     assert svc._lane_toolset_hardcoded("internal") == {
         "netexec", "impacket", "pacu", "peirates", "metasploit", "certipy", "evil-winrm", "sshpass"}

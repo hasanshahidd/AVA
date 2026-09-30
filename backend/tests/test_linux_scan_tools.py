@@ -327,6 +327,22 @@ def test_content_discovery_and_surface_summaries():
         assert lst.parse_tool(n, "", "h", 1, "http://h") == []          # empty -> honest skip
 
 
+def test_arjun_hidden_params():
+    # arjun -oJ JSON: endpoint -> {method, params}. One low row per distinct param (an injection target).
+    out = '{"http://h/search": {"method": "GET", "params": ["id", "q", "debug"]}}'
+    rows = lst.parse_tool("arjun", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert {r["affected_component"] for r in rows} == {"id", "q", "debug"}
+    assert all(r["fields"]["severity"] == "low" and r["source_slug"] == "arjun" for r in rows)
+    assert all(r["affected_url"] == "http://h/search" for r in rows)
+    # flat single-URL shape ({"params":[...]}) normalizes against the target url
+    flat = lst.parse_tool("arjun", '{"params": ["token"]}', "h", 1, "http://h")
+    assert len(flat) == 1 and flat[0]["affected_component"] == "token" and flat[0]["affected_url"] == "http://h"
+    # nothing found / non-JSON -> honest skip
+    assert lst.parse_tool("arjun", "{}", "h", 1, "http://h") == []
+    assert lst.parse_tool("arjun", "no params here", "h", 1, "http://h") == []
+
+
 def test_still_unwired_and_missing_are_honest():
     names = {s["name"] for s in lst.LINUX_SCAN_TOOLS}
     # nothing declared still-unwired or missing may also be wired (no contradiction)
@@ -340,8 +356,8 @@ def test_parsers_never_raise_on_garbage():
                 "ldapsearch", "nbtscan", "sslscan", "testssl", "sslyze", "whatweb", "httpx", "wafw00f",
                 "snmp-check", "snmpwalk", "braa", "smbclient", "rpcclient", "redis-cli", "mysql", "psql",
                 "ike-scan", "smtp-user-enum", "wpscan", "joomscan", "eyewitness", "ldapdomaindump",
-                "feroxbuster", "ffuf", "gobuster", "dirsearch", "dnsx", "subfinder", "dnsrecon", "fierce",
-                "gau", "katana", "gowitness")
+                "feroxbuster", "ffuf", "gobuster", "dirsearch", "arjun", "dnsx", "subfinder", "dnsrecon",
+                "fierce", "gau", "katana", "gowitness")
     for name in everyone:
         assert lst.parse_tool(name, "", "h", 1, "http://h") == []                     # empty -> nothing
         assert isinstance(lst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
