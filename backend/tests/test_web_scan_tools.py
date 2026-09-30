@@ -87,21 +87,117 @@ def test_wapiti_injection_findings():
     assert xss["fields"]["severity"] == "high" and xss["affected_component"] == "q"
 
 
+# ---- P0b pass 2: TLS auditors (testssl, sslyze), header/param (humble, arjun), enum tools -------------
+def test_testssl_flat_json_severity_mapped():
+    out = ('[ {"id":"engine_problem","ip":"/","port":"443","severity":"WARN","finding":"no engine"},'
+           '{"id":"TLS1","ip":"h/1.2.3.4","port":"443","severity":"LOW","finding":"offered (deprecated)"},'
+           '{"id":"cipherlist_3DES_IDEA","ip":"h/1.2.3.4","port":"443","severity":"MEDIUM","cwe":"CWE-310",'
+           '"finding":"offered"},'
+           '{"id":"cert_keyUsage","ip":"h/1.2.3.4","port":"443","severity":"HIGH",'
+           '"finding":"Certificate incorrectly used"} ]')
+    rows = wst.parse_tool("testssl", out, "h", 4, "https://h")
+    _assert_shape(rows)
+    sevs = {r["fields"]["title"].split(":")[1].split("—")[0].strip(): r["fields"]["severity"] for r in rows}
+    assert len(rows) == 3                                        # WARN dropped, LOW/MEDIUM/HIGH kept
+    assert sevs["TLS1"] == "low" and sevs["cipherlist_3DES_IDEA"] == "medium"
+    assert sevs["cert_keyUsage"] == "high"
+    assert all(r["source_slug"] == "testssl" for r in rows)
+
+
+def test_sslyze_weak_proto_cipher_and_vuln():
+    out = ('{"server_scan_results":[{"scan_result":{'
+           '"ssl_2_0_cipher_suites":{"result":{"accepted_cipher_suites":[]}},'
+           '"tls_1_0_cipher_suites":{"result":{"accepted_cipher_suites":[{"cipher_suite":'
+           '{"name":"TLS_RSA_WITH_3DES_EDE_CBC_SHA","openssl_name":"DES-CBC3-SHA","key_size":112,'
+           '"is_anonymous":false}}]}},'
+           '"tls_1_2_cipher_suites":{"result":{"accepted_cipher_suites":[{"cipher_suite":'
+           '{"name":"TLS_RSA_WITH_AES_256_GCM_SHA384","openssl_name":"AES256-GCM-SHA384","key_size":256,'
+           '"is_anonymous":false}}]}},'
+           '"heartbleed":{"result":{"is_vulnerable_to_heartbleed":true}}}}]}')
+    rows = wst.parse_tool("sslyze", out, "h", 5, "https://h")
+    _assert_shape(rows)
+    titles = [r["fields"]["title"] for r in rows]
+    assert any("TLSv1.0" in t and "protocol" in t for t in titles)
+    assert any("DES-CBC3-SHA" in t for t in titles)
+    assert any("Heartbleed" in t for t in titles)
+    assert not any("AES256-GCM" in t for t in titles)           # strong cipher not flagged
+    assert not any("SSLv2" in t for t in titles)                # empty accepted list not flagged
+    hb = next(r for r in rows if "Heartbleed" in r["fields"]["title"])
+    assert hb["fields"]["severity"] == "critical"
+
+
+def test_humble_missing_and_deprecated_headers():
+    out = ('{"[0. Info]":{"URL":"https://h"},'
+           '"[1. Enabled HTTP Security Headers]":[{"Header":"Content-Type","Value":"text/html"}],'
+           '"[2. Missing HTTP Security Headers]":[{"Header":"Content-Security-Policy","Details":"XSS"},'
+           '{"Header":"Strict-Transport-Security","Details":"HSTS"}],'
+           '"[4. Deprecated HTTP Response Headers/Protocols and Insecure Values]":'
+           '[{"Header":"X-XSS-Protection","Details":"deprecated"}]}')
+    rows = wst.parse_tool("humble", out, "h", 6, "https://h")
+    _assert_shape(rows)
+    assert len(rows) == 3                                        # 2 missing + 1 deprecated; enabled ignored
+    csp = next(r for r in rows if "Content-Security-Policy" in r["fields"]["title"])
+    assert csp["fields"]["severity"] == "low" and csp["affected_component"] == "Content-Security-Policy"
+    dep = next(r for r in rows if "X-XSS-Protection" in r["fields"]["title"])
+    assert dep["fields"]["severity"] == "medium"
+
+
+def test_arjun_hidden_params():
+    out = '{"https://h/search.php": {"params": ["id", "q"], "method": "GET", "headers": {}}}'
+    rows = wst.parse_tool("arjun", out, "h", 7, "https://h")
+    _assert_shape(rows)
+    assert len(rows) == 2
+    assert {r["affected_component"] for r in rows} == {"id", "q"}
+    assert all(r["affected_url"] == "https://h/search.php" for r in rows)
+
+
+def test_enum_tools_summarize_surface():
+    # crawlers/harvesters -> one URL-count summary row
+    for slug in ("katana", "gospider", "hakrawler", "cariddi", "gau", "waybackurls", "urlfinder"):
+        rows = wst.parse_tool(slug, "https://h/a\nhttps://h/b\nhttps://h/a\nnoise line", "h", 8, "https://h")
+        _assert_shape(rows)
+        assert len(rows) == 1 and rows[0]["fields"]["severity"] == "info"
+        assert "2 " in rows[0]["fields"]["title"]                # 2 unique URLs, dupe collapsed
+        assert rows[0]["source_slug"] == slug
+    # subfinder -> subdomain count
+    rows = wst.parse_tool("subfinder", "a.example.com\nb.example.com\n", "example.com", 8, "http://example.com")
+    assert len(rows) == 1 and "2 subdomain" in rows[0]["fields"]["title"]
+    # naabu -> open-port count
+    rows = wst.parse_tool("naabu", "example.com:80\nexample.com:443\n", "example.com", 8, "http://example.com")
+    assert len(rows) == 1 and "2 open port" in rows[0]["fields"]["title"]
+    # empty output -> nothing (honest skip)
+    for slug in ("katana", "subfinder", "naabu", "dnsx"):
+        assert wst.parse_tool(slug, "", "h", 8, "http://h") == []
+
+
 def test_parsers_never_raise_on_garbage():
-    for name in ("whatweb", "httpx", "wafw00f", "sslscan", "wapiti"):
-        assert wst.parse_tool(name, "", "h", 1, "http://h") == []
+    everyone = ("whatweb", "httpx", "wafw00f", "sslscan", "wapiti", "testssl", "sslyze", "humble", "arjun",
+                "katana", "gospider", "hakrawler", "cariddi", "gau", "waybackurls", "urlfinder",
+                "subfinder", "dnsx", "naabu")
+    for name in everyone:
+        assert wst.parse_tool(name, "", "h", 1, "http://h") == []        # empty -> nothing, every tool
+        assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
+    # the JSON-driven parsers must reject non-JSON garbage outright (never a fabricated finding)
+    for name in ("testssl", "sslyze", "humble", "arjun", "wapiti", "httpx"):
         assert wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h") == []
     assert wst.parse_tool("does-not-exist", "anything", "h", 1, "http://h") == []
 
 
 def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in wst.WEB_SCAN_TOOLS}
-    assert {"whatweb", "httpx", "wafw00f", "sslscan", "wapiti"} <= names
+    # pass-1 (5) + pass-2 (14) all present and reachable
+    assert {"whatweb", "httpx", "wafw00f", "sslscan", "wapiti", "testssl", "sslyze", "humble", "arjun",
+            "katana", "gospider", "hakrawler", "cariddi", "gau", "waybackurls", "urlfinder", "subfinder",
+            "dnsx", "naabu"} <= names
+    assert len(names) == len(wst.WEB_SCAN_TOOLS)                 # no duplicate spec name
     for spec in wst.WEB_SCAN_TOOLS:
-        argv = spec["argv"]("demo.testfire.net", "http://demo.testfire.net")
+        argv = spec["argv"]("demo.testfire.net", "https://demo.testfire.net")
         assert isinstance(argv, list) and argv and all(isinstance(a, str) for a in argv)
         assert 0 < int(spec["timeout"]) <= 600                  # every tool is time-bounded
         assert callable(spec["parse"])
+        # no destructive/writey flags leaked into any argv
+        joined = " ".join(argv)
+        assert not any(bad in joined for bad in (" rm -", "--delete", " -X DELETE", "mkfs"))
 
 
 # ---- wiring into the finder: additive (existing nmap/nuclei rows kept) + honest on missing image --------
