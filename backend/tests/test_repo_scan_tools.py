@@ -232,9 +232,37 @@ def test_kics():
     assert {r["affected_component"] for r in rows} == {"s3.tf", "s3b.tf"}
 
 
+def test_noseyparker_redacts_secret():
+    # report --format json: array of findings; match carries provenance.path, location line, snippet.matching
+    out = json.dumps([
+        {"rule_name": "GitHub Personal Access Token", "num_matches": 1, "matches": [
+            {"provenance": [{"kind": "file", "path": "creds.txt"}],
+             "location": {"source_span": {"start": {"line": 2, "column": 12}}},
+             "snippet": {"matching": "ghp_1234567890abcdefghijklmnopqrstuvwx12"}}]},
+    ])
+    rows = rst.parse_tool("noseyparker", out, T, A, U)
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "high"
+    assert rows[0]["affected_component"] == "creds.txt"
+    assert "ghp_1234567890abcdefghijklmnopqrstuvwx12" not in rows[0]["fields"]["evidence"]  # redacted
+
+
 # ======================================================================================================
-# CI/CD
+# CI/CD + container
 # ======================================================================================================
+def test_hadolint_level_map():
+    out = json.dumps([
+        {"code": "DL3002", "line": 5, "column": 1, "level": "error", "message": "Last USER should not be root",
+         "file": "Dockerfile"},
+        {"code": "DL3009", "line": 2, "column": 1, "level": "info", "message": "Delete the apt-get lists",
+         "file": "Dockerfile"},
+    ])
+    rows = rst.parse_tool("hadolint", out, T, A, U)
+    _assert_shape(rows)
+    assert [r["fields"]["severity"] for r in rows] == ["high", "info"]  # error->high, info->info
+    assert all(r["affected_component"] == "Dockerfile" for r in rows)
+
+
 def test_actionlint_injection_is_high():
     out = json.dumps([
         {"message": "object filter extracts potentially untrusted input into a run: step (injection)",
