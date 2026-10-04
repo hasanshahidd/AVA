@@ -23,14 +23,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2) Scan tools Kali ships in apt (preferred — most reliable install).
 #    Rock-solid core set is fatal; the rest install one-per-package so a
 #    single missing/renamed package can never abort the whole build.
+#    nmap + sqlmap are PRIMARY web finders the engine calls directly (_lane_find_container
+#    nmap sweep, sqlmap on injectable params) — they MUST be present, so they are core/fatal.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      zaproxy nikto whatweb wfuzz dirb sslscan \
- && for p in wapiti feroxbuster gobuster dirsearch amass \
+      nmap sqlmap zaproxy nikto whatweb wfuzz dirb sslscan \
+ && for p in wapiti feroxbuster gobuster dirsearch amass wpscan \
              wafw00f sslyze arjun gitleaks testssl.sh x8 kiterunner ; do \
       apt-get install -y --no-install-recommends "$p" || echo "skip apt:$p" ; \
     done \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2b) Prebuilt Go-tool binaries the engine calls as PRIMARY finders (nuclei = CVE/misconfig sweep,
+#     dalfox = XSS, ffuf = content discovery). Prebuilt releases avoid go-compile OOM on a 2GB box.
+#     Each non-fatal so one bad release URL can't zero the image. nuclei TEMPLATES are NOT baked here —
+#     the engine mounts the host's shared /opt/nuclei-templates read-only and passes `-t` at run time.
+RUN set +e; cd /tmp; \
+  curl -sSL -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.11.1/nuclei_3.11.1_linux_amd64.zip \
+    && unzip -o nuclei.zip nuclei -d /usr/local/bin && echo "nuclei ok" || echo "skip:nuclei"; \
+  curl -sSL -o ffuf.tgz https://github.com/ffuf/ffuf/releases/download/v2.1.0/ffuf_2.1.0_linux_amd64.tar.gz \
+    && tar -xzf ffuf.tgz -C /usr/local/bin ffuf && echo "ffuf ok" || echo "skip:ffuf"; \
+  curl -sSL -o dalfox.tgz https://github.com/hahwul/dalfox/releases/download/v2.9.2/dalfox_2.9.2_linux_amd64.tar.gz \
+    && tar -xzf dalfox.tgz -C /usr/local/bin dalfox && echo "dalfox ok" || echo "skip:dalfox"; \
+  chmod +x /usr/local/bin/nuclei /usr/local/bin/ffuf /usr/local/bin/dalfox 2>/dev/null; \
+  rm -f /tmp/nuclei.zip /tmp/ffuf.tgz /tmp/dalfox.tgz; true
 
 # 3) Go-native probe / crawl / discovery tools (vetted `go install`, GOBIN=/usr/local/bin).
 #    Each non-fatal so one module-fetch hiccup can't zero the image.
