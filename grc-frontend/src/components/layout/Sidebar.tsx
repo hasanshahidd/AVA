@@ -112,7 +112,7 @@ const navigation: NavEntry[] = [
       // { name: 'Criticality Assessments',   href: '/assets/criticality-assessments', icon: ClipboardCheck, requiredPermissions: ['assets:criticality_assessments:view'] },
       { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'Vulnerability Scanning',    href: '/scan-flows',                    icon: Crosshair,     requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
-      { name: 'AI Pentest',              href: '/pentest',                       icon: Bot },
+      { name: 'AI Pentest',              href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
     ],
   },
 ];
