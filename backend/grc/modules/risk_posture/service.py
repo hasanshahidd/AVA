@@ -93,6 +93,17 @@ VULN_SEVERITY_POINTS = {
     "info":      0.2,
 }
 VULN_POINTS_CAP = 50.0
+
+# CVSS floor per severity band, for findings that carry a severity but NO numeric
+# cvss_score. The effective-risk formula (effective_risk.py) is driven by cvss/epss/
+# kev — a pentest finding ingested with severity="high" but cvss_score=NULL scored
+# 0.0, so scanner findings never raised the asset risk even though they DID show on
+# the Vulnerabilities subpage. Representative midpoints of the CVSS v3 bands (critical
+# 9.0-10, high 7.0-8.9, medium 4.0-6.9, low 0.1-3.9); info carries no numeric risk.
+# Used ONLY as a fallback — a real cvss_score always wins.
+_SEVERITY_CVSS_FLOOR = {
+    "critical": 9.5, "high": 8.0, "medium": 5.5, "low": 2.5, "info": 0.0,
+}
 CONTROL_COVERAGE_TARGET = 12
 
 # Cap for residual_score sum — most platforms use 1-25 (5x5 likelihood×impact),
@@ -556,8 +567,14 @@ def _vuln_score(
     best_reason: Optional[str] = None
     per_vuln_scores: list = []
     for v in active:
+        # Severity→CVSS fallback so a finding with a severity but no numeric CVSS
+        # (the common shape of pentest/scanner findings) still contributes to the
+        # score instead of evaluating to 0.0. A real cvss_score always takes priority.
+        _cvss = v.cvss_score
+        if _cvss is None:
+            _cvss = _SEVERITY_CVSS_FLOOR.get((v.severity or "").lower())
         inp = RiskInputs(
-            cvss_score=v.cvss_score,
+            cvss_score=_cvss,
             epss_score=v.epss_score,
             kev_flag=bool(v.kev_flag),
             asset_cia_max=asset_cia_max,
