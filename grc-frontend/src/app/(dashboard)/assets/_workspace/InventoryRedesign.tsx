@@ -10,6 +10,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { registrableDomain } from '@/lib/domains';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
@@ -63,7 +64,9 @@ const isExternalRow = (a: any) => !!(a.internet_facing || a.origin_source === 'e
 
 export default function InventoryRedesign(p: Props) {
   const assets = p.assets || [];
-  const [view, setView] = useState('all');
+  // ?view=external|internal|unowned|stale… — deep links from the Overview land pre-filtered.
+  const initialView = useSearchParams()?.get('view');
+  const [view, setView] = useState(initialView || 'all');
   const [tab, setTab] = useState<'reg' | 'ins'>('reg');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('crit');

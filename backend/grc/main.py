@@ -202,6 +202,8 @@ app.include_router(sbp_inventory_router)
 # Performance (exec) dashboard read-only aggregates — isolated module: grc/modules/exec_dashboard
 from grc.modules.exec_dashboard.router import router as exec_dashboard_router
 app.include_router(exec_dashboard_router)
+# IT Asset Inventory Overview estate composition (read-only) — isolated module: grc/modules/estate_overview
+from grc.modules.estate_overview.router import router as estate_overview_router; app.include_router(estate_overview_router)
 # AI Pentest assessments (isolated module: grc/modules/pentest)
 from grc.modules.pentest.router import router as pentest_router
 app.include_router(pentest_router)
