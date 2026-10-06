@@ -2,7 +2,8 @@
 
 /**
  * VulnCommandCenter — the Vulnerabilities "Overview" pane: a dense, premium
- * VISUAL ANALYTICS dashboard (not a worklist). It leads with a KPI band and is
+ * VISUAL ANALYTICS dashboard (not a worklist). It leads with a hero KPI band
+ * (one big lead metric + a balanced, non-stranding secondary grid) and is
  * carried by charts — severity & status distributions, threat-intel bands, a
  * 90-day discovered-vs-resolved trend, an asset criticality × severity heat
  * grid, an SLA gauge + aging, and backlog by assessment type / owner — with a
@@ -11,6 +12,11 @@
  * Distinct by design from the Performance dashboard (risk gauge + lens cards)
  * and the IT Asset Inventory Overview (External/Internal split panels): THIS is
  * the charts-and-metrics surface.
+ *
+ * Layout: every multi-card row is flexbox-wrap with flex-grow, so a wrapped
+ * card always stretches to fill its row — nothing ever strands, no dead cells
+ * (unlike an auto-fit grid). Horizontal bars take the flexible track so they
+ * fill the card width instead of leaving a gap.
  *
  * Ava product tokens only (#005B96 accent, Poppins, light theme, soft card
  * shadows, grey canvas + separated white cards). Recharts marks are themed to
@@ -122,6 +128,9 @@ interface OverviewDashboard {
 
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(16,24,40,.04)' };
 const capCss: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: FAINT };
+// Flexbox row: children with flex-grow stretch to fill — a wrapped card never
+// strands (unlike auto-fit grid, which leaves empty cells).
+const row: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 12 };
 
 export default function VulnCommandCenter({
   vulns, dashboard, onView,
@@ -224,8 +233,9 @@ export default function VulnCommandCenter({
   const slaColor = m.slaPct == null ? FAINT : m.slaPct >= 80 ? '#1F7A54' : m.slaPct >= 60 ? '#C0682F' : '#C2453F';
   const w = (n: number, max: number) => `${max ? Math.max(n > 0 ? 5 : 0, (n / max) * 100) : 0}%`;
 
+  // Secondary KPIs (the hero below carries "Open findings"). Six → a fixed
+  // 3×2 grid that is always full: an even count never strands.
   const kpis: { label: string; value: string; tone?: string; sub: string; Icon?: typeof Flame }[] = [
-    { label: 'Open findings', value: String(m.totalOpen), sub: 'active in register' },
     { label: 'Critical + High', value: String(m.critHigh), tone: m.critHigh ? '#C0682F' : INK, sub: 'by raw severity' },
     { label: 'Actively exploited', value: String(m.exploited), tone: m.exploited ? '#C2453F' : INK, sub: 'KEV / public exploit', Icon: Flame },
     { label: 'Internet-exposed', value: String(m.exposed), tone: m.exposed ? '#7A5AC9' : INK, sub: 'reachable from outside', Icon: Globe },
@@ -235,31 +245,59 @@ export default function VulnCommandCenter({
   ];
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12, color: INK, fontSize: 13.5, paddingBottom: 8 }}>
-      {/* ── KPI band ── */}
+    <div style={{ overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12, color: INK, fontSize: 13.5, paddingBottom: 16 }}>
+      {/* ── KPI band: hero lead metric + balanced 3×2 secondary grid (never strands) ── */}
       <section style={{ ...card, padding: '12px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
           <Activity size={15} color={ACS} /><b style={{ fontSize: 13.5 }}>Open security posture</b>
           <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>real-world risk across every open finding</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(132px,1fr))', gap: 10 }}>
-          {kpis.map((k) => (
-            <div key={k.label} style={{ border: `1px solid ${BORDER2}`, borderRadius: 11, padding: '10px 12px', minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                {k.Icon && <k.Icon size={11} color={k.tone && k.tone !== INK ? k.tone : FAINT} />}
-                <span style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.label}</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {/* hero lead metric */}
+          <div style={{ flex: '1 1 232px', minWidth: 0, display: 'flex', flexDirection: 'column', background: ACSOFT, border: '1px solid #D7E6F2', borderRadius: 11, padding: '13px 15px' }}>
+            <span style={{ ...capCss, color: ACS }}>Open findings</span>
+            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: INK, marginTop: 7, ...TNUM }}>{m.totalOpen}</div>
+            <div style={{ fontSize: 11, color: SEC, marginTop: 4 }}>active in the register</div>
+            <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+              <div style={{ display: 'flex', height: 7, borderRadius: 999, overflow: 'hidden', background: '#E3E8EC' }}>
+                {m.sevDist.map((d) => <span key={d.k} title={`${d.name}: ${d.value}`} style={{ flex: d.value, background: d.c }} />)}
               </div>
-              <div style={{ fontSize: 24, fontWeight: 600, color: k.tone || INK, lineHeight: 1.15, marginTop: 3, ...TNUM }}>{k.value}</div>
-              <div style={{ fontSize: 10, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.sub}</div>
+              {m.sevDist.length === 0 ? (
+                <div style={{ fontSize: 10.5, color: FAINT, marginTop: 8 }}>No open findings.</div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 11px', marginTop: 9 }}>
+                  {m.sevDist.map((d) => (
+                    <span key={d.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: SEC }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 2, background: d.c, flex: 'none' }} />{d.name}<b style={{ color: INK, ...TNUM }}>{d.value}</b>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          </div>
+          {/* secondary metrics — fixed 3-col, 6 items = two full rows, alarmed metrics get a colored edge */}
+          <div style={{ flex: '3 1 468px', minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
+            {kpis.map((k) => {
+              const alarmed = !!k.tone && k.tone !== INK;
+              return (
+                <div key={k.label} style={{ border: `1px solid ${BORDER2}`, borderLeft: `3px solid ${alarmed ? k.tone : '#E3E8EC'}`, borderRadius: 10, padding: '10px 12px', minWidth: 0, background: '#fff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {k.Icon && <k.Icon size={11} color={alarmed ? k.tone : FAINT} />}
+                    <span style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.label}</span>
+                  </div>
+                  <div style={{ fontSize: 23, fontWeight: 600, color: k.tone || INK, lineHeight: 1.15, marginTop: 4, ...TNUM }}>{k.value}</div>
+                  <div style={{ fontSize: 10, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.sub}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* ── distributions: severity donut + status + threat posture ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 12 }}>
+      {/* ── distributions: severity donut + status + threat posture (3-up, flex-fill) ── */}
+      <div style={row}>
         {/* severity donut */}
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
           <CardHead title="Severity distribution" sub="open findings" />
           {m.sevDist.length === 0 ? <Empty>No open findings.</Empty> : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8 }}>
@@ -291,7 +329,7 @@ export default function VulnCommandCenter({
         </section>
 
         {/* status breakdown */}
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
           <CardHead title="Status breakdown" sub="whole register" />
           <div style={{ marginTop: 12, display: 'flex', height: 12, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2 }}>
             {m.statusDist.map((s) => <i key={s.k} title={`${s.label}: ${s.n}`} style={{ width: `${(s.n / m.statusTotal) * 100}%`, background: s.c }} />)}
@@ -308,7 +346,7 @@ export default function VulnCommandCenter({
         </section>
 
         {/* threat posture */}
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
           <CardHead title="Threat posture" sub="exploited & reachable" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
             <Ring value={m.kev} total={Math.max(1, m.kev + m.nonKev)} color="#C2453F" label="KEV" />
@@ -323,12 +361,12 @@ export default function VulnCommandCenter({
       </div>
 
       {/* ── threat-intel bands: EPSS + composite priority ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 12 }}>
-        <section style={{ ...card, padding: '14px 16px' }}>
+      <div style={row}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
           <CardHead title="Exploit likelihood" sub="EPSS probability bands" />
           <BandBars rows={m.epss.map((e) => ({ label: e.label, n: e.n, c: e.c }))} max={m.epssMax} />
         </section>
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
           <CardHead title="Contextual priority" sub="CVSS × exploit × exposure × asset" />
           <BandBars rows={m.prio.map((p) => ({ label: p.label, n: p.n, c: p.c }))} max={m.prioMax} />
         </section>
@@ -368,8 +406,8 @@ export default function VulnCommandCenter({
       </section>
 
       {/* ── asset risk: heat grid + top exposed ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(340px,100%),1fr))', gap: 12 }}>
-        <section style={{ ...card, padding: '14px 16px' }}>
+      <div style={row}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
           <CardHead title="Asset criticality × severity" sub="open findings heat grid" />
           {m.matrix.length === 0 ? <Empty>No findings are linked to a criticality-rated asset yet — link assets to map blast radius.</Empty> : (
             <div style={{ marginTop: 10, overflowX: 'auto' }}>
@@ -385,12 +423,12 @@ export default function VulnCommandCenter({
           )}
         </section>
 
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
           <CardHead title="Top exposed assets" sub="by summed open priority" />
           {m.topAssets.length === 0 ? <Empty>No asset-linked open findings yet.</Empty> : (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {m.topAssets.map((a) => (
-                <div key={a.asset_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 92px 70px', gap: 10, alignItems: 'center' }}>
+                <div key={a.asset_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1.7fr) 72px', gap: 10, alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.asset_name}>{a.asset_name}{a.kev_count > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: '#C2453F', background: '#FBEAEA', borderRadius: 999, padding: '1px 5px', marginLeft: 6 }}>KEV</span>}</span>
                   <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(a.total_priority_sum, m.assetMax), background: AC, borderRadius: 4 }} /></span>
                   <span style={{ fontSize: 11, textAlign: 'right', color: MUTED, ...TNUM }}><b style={{ color: INK }}>{a.open_vuln_count}</b> · {Math.round(a.total_priority_sum)}</span>
@@ -403,8 +441,8 @@ export default function VulnCommandCenter({
       </div>
 
       {/* ── SLA gauge + aging ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 12 }}>
-        <section style={{ ...card, padding: '14px 16px' }}>
+      <div style={row}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
           <CardHead title="SLA compliance" sub="on-time remediation" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 6 }}>
             <div style={{ position: 'relative', width: 128, height: 112, flex: 'none' }}>
@@ -419,7 +457,13 @@ export default function VulnCommandCenter({
               </div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              {m.slaBySev.length === 0 ? <span style={{ fontSize: 11.5, color: FAINT }}>SLA policy not configured yet.</span> : m.slaBySev.map(({ k, rate }) => (
+              {m.slaBySev.length === 0 ? (
+                <div style={{ fontSize: 11.5, color: SEC, lineHeight: 1.6 }}>
+                  <div style={{ color: FAINT }}>SLA targets not configured yet.</div>
+                  <div style={{ marginTop: 6 }}>Set per-severity remediation windows to start tracking on-time closure.</div>
+                  {m.overdue > 0 && <div style={{ marginTop: 9, display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#C2453F', flex: 'none' }} /><span><b style={{ color: '#C2453F', ...TNUM }}>{m.overdue}</b> finding{m.overdue === 1 ? '' : 's'} already past a due date.</span></div>}
+                </div>
+              ) : m.slaBySev.map(({ k, rate }) => (
                 <div key={k} style={{ display: 'grid', gridTemplateColumns: '58px minmax(0,1fr) 34px', gap: 8, alignItems: 'center', padding: '3px 0' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: SEC }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SEV[k].c, flex: 'none' }} />{SEV[k].label}</span>
                   <span style={{ height: 7, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${Math.round(rate as number)}%`, background: (rate as number) >= 80 ? '#1F7A54' : (rate as number) >= 60 ? '#C0682F' : '#C2453F', borderRadius: 4 }} /></span>
@@ -430,7 +474,7 @@ export default function VulnCommandCenter({
           </div>
         </section>
 
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
           <CardHead title="Open backlog age" sub="time since discovery" />
           <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'flex-end' }}>
             {m.aging.map((a, i) => (
@@ -448,13 +492,13 @@ export default function VulnCommandCenter({
       </div>
 
       {/* ── backlog by assessment type + by owner ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 12 }}>
-        <section style={{ ...card, padding: '14px 16px' }}>
+      <div style={row}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
           <CardHead title="By assessment type" sub="how each finding was identified" />
           {m.asmt.length === 0 ? <Empty>No open findings.</Empty> : (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {m.asmt.map((a) => (
-                <div key={a.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 30px', gap: 10, alignItems: 'center' }}>
+                <div key={a.name} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 30px', gap: 10, alignItems: 'center' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: SEC, minWidth: 0 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: a.c, flex: 'none' }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span></span>
                   <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(a.n, m.asmtMax), background: a.c, borderRadius: 4 }} /></span>
                   <b style={{ fontSize: 12, textAlign: 'right', ...TNUM }}>{a.n}</b>
@@ -464,12 +508,12 @@ export default function VulnCommandCenter({
           )}
         </section>
 
-        <section style={{ ...card, padding: '14px 16px' }}>
+        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
           <CardHead title="Backlog by owner" sub="open findings per team" />
           {m.dept.length === 0 ? <Empty>No open findings.</Empty> : (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {m.dept.map((d) => (
-                <div key={d.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 30px', gap: 10, alignItems: 'center' }}>
+                <div key={d.name} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 30px', gap: 10, alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: d.name === 'Unassigned' ? FAINT : SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>{d.name}</span>
                   <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(d.n, m.deptMax), background: d.name === 'Unassigned' ? '#AEB8C2' : AC, borderRadius: 4 }} /></span>
                   <b style={{ fontSize: 12, textAlign: 'right', ...TNUM }}>{d.n}</b>
@@ -544,7 +588,8 @@ export default function VulnCommandCenter({
 // ── small primitives ──
 function CardHead({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ width: 3, height: 13, borderRadius: 2, background: AC, flex: 'none' }} />
       <b style={{ fontSize: 13.5 }}>{title}</b>
       {sub && <span style={{ fontSize: 11, color: MUTED }}>{sub}</span>}
     </div>

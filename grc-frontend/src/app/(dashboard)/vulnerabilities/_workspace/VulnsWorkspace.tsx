@@ -194,8 +194,13 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const railLabel: Record<string, string> = { all: 'All findings', kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned' };
   const title = railLabel[view] || (view.startsWith('sev-') ? SEV[view.slice(4) as SevKey].label : view.startsWith('dom-') ? view.slice(4) : 'Findings');
 
+  // Overview (cmd) flows at natural height so the whole page scrolls with the
+  // shell's <main> — like every other page, no contained inner scrollbar.
+  // Register/CTEM keep their own bounded-height inner table scroll.
+  const pageScroll = pane === 'cmd' && !isNca;
+
   return (
-    <div className="inv2" style={{ background: '#F4F6F7', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
+    <div className="inv2" style={{ background: '#F4F6F7', height: pageScroll ? 'auto' : '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: pageScroll ? 'visible' : 'auto', overflowX: pageScroll ? 'visible' : 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
       {/* header — hidden on the CTEM pane (mock: CTEM carries its own header) */}
       {pane !== 'ctem' && (
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
@@ -234,9 +239,9 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
               <div style={{ flex: 1, minHeight: 0 }}><CtemScopesRedesign /></div>
             </div>
           ) : pane === 'cmd' ? (
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
               <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>
-              <div style={{ flex: 1, minHeight: 0 }}><VulnCommandCenter vulns={all} dashboard={dashboard} onView={onView} /></div>
+              <div><VulnCommandCenter vulns={all} dashboard={dashboard} onView={onView} /></div>
             </div>
           ) : (
           <>
