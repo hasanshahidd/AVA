@@ -99,19 +99,14 @@ def _bootstrap() -> None:
     log = logging.getLogger(__name__)
 
     provider_modules = [
-        # Working exemplars
+        # Ticketing — vuln ticketing
         "grc.modules.connectors.providers.servicenow",
+        # SIEM — exploitation-signal pulls
         "grc.modules.connectors.providers.splunk",
-        "grc.modules.connectors.providers.metasploit",
-        "grc.modules.connectors.providers.msteams",
-        "grc.modules.connectors.providers.fireflies",
-        # Beta stubs
-        "grc.modules.connectors.providers.bmc_remedy",
         "grc.modules.connectors.providers.wazuh",
         "grc.modules.connectors.providers.qradar",
-        "grc.modules.connectors.providers.core_impact",
-        "grc.modules.connectors.providers.zoom",
-        "grc.modules.connectors.providers.office365",
+        # Pen-test — exploit feed
+        "grc.modules.connectors.providers.metasploit",
         # EASM passive sources — pull-only; read by the asset_discovery collector.
         "grc.modules.connectors.providers.shodan",
         "grc.modules.connectors.providers.censys",
