@@ -52,7 +52,12 @@ export interface Vulnerability {
   affected_host?: string;
   plugin_family?: string;
   linked_assets?: string[];
+  assigned_departments?: string[];
   due_date?: string;
+  discovered_at?: string;
+  resolved_at?: string;
+  internet_exposed?: boolean;
+  internet_facing?: boolean;
   assigned_to?: number;
   assignee_name?: string;
   report_id?: number;

@@ -14,9 +14,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Crosshair, Loader2, Building2, Clock, BarChart3, Target } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Crosshair, Loader2, Building2, Clock, BarChart3, Target, LayoutDashboard } from 'lucide-react';
 import { shortenVulnTitle, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
+import VulnCommandCenter from './VulnCommandCenter';
 
 // ── mock palette (kept literal so the register reads exactly like the mock) ──
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA';
@@ -39,7 +40,7 @@ const hasExploit = (v: Vulnerability) => (v.public_exploit_count ?? 0) > 0 || (v
 const ctxScore = (v: Vulnerability) => Math.round((v.composite_priority ?? 0) * 10); // 0–100
 const band = (score: number) => (score >= 55 ? 'urgent' : score >= 25 ? 'moderate' : 'low');
 const BAND_META = { urgent: { c: '#C2453F', label: 'Urgent' }, moderate: { c: '#9A6410', label: 'Mod' }, low: { c: '#1F7A54', label: 'Low' } } as const;
-const isUnassigned = (v: Vulnerability) => !v.assigned_to && !(v as any).assignee_name;
+const isUnassigned = (v: Vulnerability) => !v.assigned_to && !(v as any).assignee_name && !((v as any).assigned_departments?.length);
 const isExposed = (v: Vulnerability) => !!(v as any).internet_facing || !!(v as any).internet_exposed;
 const domainOf = (v: Vulnerability) => v.plugin_family || (v as any).affected_component || 'General';
 const OPEN_ISH = new Set(['open', 'in_progress', 'remediated', 'verified']);
@@ -89,16 +90,38 @@ const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline
 
 const SevPill = ({ s }: { s?: string }) => { const m = SEV[normSev(s)]; return <span style={pill(m.pillC, m.pillBg)}>{m.label}</span>; };
 
+type Pane = 'cmd' | 'reg' | 'ins' | 'ctem';
+const PANE_META: { key: Pane; label: string; Icon?: typeof Target }[] = [
+  { key: 'cmd', label: 'Overview', Icon: LayoutDashboard },
+  { key: 'reg', label: 'Register' },
+  { key: 'ins', label: 'Insights' },
+  { key: 'ctem', label: 'CTEM Scopes', Icon: Target },
+];
+// One toggle, shared by the Overview surface and the register area — so the
+// panes (Overview / Register / Insights / CTEM) can never drift apart.
+function PaneToggle({ pane, setPane }: { pane: Pane; setPane: (p: Pane) => void }) {
+  return (
+    <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 11, padding: 3, gap: 2 }}>
+      {PANE_META.map(({ key, label, Icon }) => (
+        <button key={key} onClick={() => setPane(key)} style={{ height: 32, padding: '0 14px', border: 0, borderRadius: 9, background: pane === key ? '#fff' : 'none', color: pane === key ? ACS : '#6B7787', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', boxShadow: pane === key ? '0 1px 2px rgba(16,24,40,.06)' : 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{Icon && <Icon size={14} />}{label}</button>
+      ))}
+    </div>
+  );
+}
+
 export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const {
-    vulns, filteredVulns, dashboard, domains = [], loading = false,
+    vulns, filteredVulns, dashboard, domains = [], loading = false, scoped = false,
     registerType, setRegisterType, renderNcaRegister,
     searchTerm, setSearchTerm, canCreate, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
     bulkUploadState = 'idle', bulkUploadMsg,
   } = props;
 
   const [view, setView] = useState<TriageView>('all');
-  const [pane, setPane] = useState<'reg' | 'ins' | 'ctem'>('reg');
+  // Overview ("Command") is the default landing pane — the act-now worklist —
+  // with the register one click away. When scoped to a CTEM scope the register
+  // itself is the point, so land there instead (the Overview reads the whole list).
+  const [pane, setPane] = useState<Pane>(scoped ? 'reg' : 'cmd');
   const [sort, setSort] = useState<'ctx' | 'cvss' | 'epss'>('ctx');
   const isNca = registerType === 'nca';
 
@@ -206,6 +229,11 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
               </div>
               <div style={{ flex: 1, minHeight: 0 }}><CtemScopesRedesign /></div>
             </div>
+          ) : pane === 'cmd' ? (
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>
+              <div style={{ flex: 1, minHeight: 0 }}><VulnCommandCenter vulns={all} dashboard={dashboard} onView={onView} /></div>
+            </div>
           ) : (
           <>
           {/* contextual-priority ribbon */}
@@ -267,11 +295,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
             {/* main */}
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
-                <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 11, padding: 3, gap: 2 }}>
-                  {(['reg', 'ins', 'ctem'] as const).map((k) => (
-                    <button key={k} onClick={() => setPane(k)} style={{ height: 32, padding: '0 14px', border: 0, borderRadius: 9, background: pane === k ? '#fff' : 'none', color: pane === k ? ACS : '#6B7787', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', boxShadow: pane === k ? '0 1px 2px rgba(16,24,40,.06)' : 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{k === 'ctem' && <Target size={14} />}{k === 'reg' ? 'Register' : k === 'ins' ? 'Insights' : 'CTEM Scopes'}</button>
-                  ))}
-                </div>
+                <PaneToggle pane={pane} setPane={setPane} />
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />
@@ -288,18 +312,20 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                     <span style={{ fontSize: 11.5, color: MUTED }}><b className="num" style={{ color: SEC }}>{rows.length}</b> shown · {agg.total} total</span>
                   </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1020 }}>
-                      <thead><tr>{['ID', 'Title', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · Ctx', 'Status', 'SLA / Due', 'Owner'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
+                      <thead><tr>{['ID', 'Title', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · Ctx', 'Status', 'SLA / Due', 'Asset', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
                       <tbody>
                         {loading ? (
-                          <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
+                          <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
                         ) : rows.length === 0 ? (
-                          <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
+                          <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
                         ) : rows.map((v) => {
                           const sev = normSev(v.severity); const sm = SEV[sev];
                           const sc = ctxScore(v); const bm = BAND_META[band(sc)];
                           const exp = hasExploit(v); const due = dueLabel(v);
                           const owner = (v as any).assignee_name as string | undefined;
+                          const depts = (v as any).assigned_departments as string[] | undefined;
+                          const assets = v.linked_assets || [];
                           return (
                             <tr key={v.id} onClick={() => onView(v)} style={{ cursor: 'pointer' }} className="vrow">
                               <td style={{ ...td, fontFamily: MONO }}>VULN-{v.id}</td>
@@ -312,7 +338,17 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                               <td style={{ ...td, fontFamily: MONO, color: bm.c, fontWeight: 600 }}>{sc} · {bm.label}</td>
                               <td style={td}><span style={{ ...pill('#B23A3A', '#fff'), border: '1px solid #F3D3DA', textTransform: 'capitalize' }}>{(v.status || 'open').replace(/_/g, ' ')}</span></td>
                               <td style={td}>{due ? <b style={{ fontWeight: 600, color: due.c }}>{due.t}</b> : <span style={{ color: FAINT }}>—</span>}</td>
-                              <td style={{ ...td, color: owner ? SEC : FAINT }}>{owner || 'Unassigned'}</td>
+                              <td style={{ ...td, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }} title={assets.length ? assets.join(', ') : 'No linked asset'}>
+                                {assets.length ? <span style={{ color: SEC }}>{assets[0]}{assets.length > 1 && <span style={{ color: FAINT }}> +{assets.length - 1}</span>}</span> : <span style={{ color: FAINT }}>—</span>}
+                              </td>
+                              <td style={td}>
+                                {depts && depts.length ? (
+                                  <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.25 }} title={[...depts, owner].filter(Boolean).join(' · ')}>
+                                    <span style={{ color: SEC }}>{depts[0]}{depts.length > 1 && <span style={{ color: FAINT }}> +{depts.length - 1}</span>}</span>
+                                    {owner && <span style={{ fontSize: 10.5, color: FAINT }}>{owner}</span>}
+                                  </span>
+                                ) : owner ? <span style={{ color: SEC }}>{owner}</span> : <span style={{ color: FAINT }}>Unassigned</span>}
+                              </td>
                             </tr>
                           );
                         })}
