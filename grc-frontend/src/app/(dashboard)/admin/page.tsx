@@ -47,7 +47,7 @@ export default function AdminPage() {
     // Cloud security sources — AWS Inspector, Azure Defender, GCP SCC.
     { id: 'cloud-connectors', label: 'Cloud Connectors', icon: Cloud },
     // SIEM / ticketing / alert routing — ServiceNow, Splunk, MS Teams.
-    { id: 'connectors', label: 'Connectors', icon: Plug },
+    { id: 'connectors', label: 'External Connectors', icon: Plug },
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
 

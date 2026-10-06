@@ -22,7 +22,6 @@ import {
   Activity,
   AlertCircle,
   Bug,
-  Crosshair,
   Clock,
   Layers,
   Workflow,
@@ -110,7 +109,6 @@ const navigation: NavEntry[] = [
       // Hidden until wired to real data (was showing demo/seed assessments). Route + feature stay intact at /assets/criticality-assessments.
       // { name: 'Criticality Assessments',   href: '/assets/criticality-assessments', icon: ClipboardCheck, requiredPermissions: ['assets:criticality_assessments:view'] },
       { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
-      { name: 'Vulnerability Scanning',    href: '/scan-flows',                    icon: Crosshair,     requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'AI Pentest',              href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
       { name: 'Reports',                 href: '/reports',                       icon: FileText,      requiredPermissions: ['assets:asset_inventory:*'] },
     ],
@@ -364,12 +362,15 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'teams',            label: 'Teams',                 icon: Users },
   { id: 'identity',         label: 'Identity Providers',    icon: Shield },
   { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
+  // Guided flows promoted into the menu — standalone routes, not /admin tabs.
+  { id: 'connect-wizard',   label: 'Connect Wizard',        icon: Workflow,  href: '/admin/integrations/connect' },
+  { id: 'agents',           label: 'Scan Agents',           icon: Bot,       href: '/admin/agents' },
+  { id: 'discover',         label: 'Host Discovery',        icon: Radar,     href: '/admin/discover' },
   { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },
   { id: 'cloud-connectors', label: 'Cloud Connectors',      icon: Globe },
-  { id: 'connectors',       label: 'Connectors',            icon: Layers },
-  // Standalone routes (not tabs on /admin) — platform ops.
-  { id: 'ai-usage',         label: 'Token usage',           icon: BarChart3, href: '/admin/ai-usage' },
-  { id: 'usage',            label: 'Usage Monitoring',      icon: Activity, href: '/admin/usage' },
+  { id: 'connectors',       label: 'External Connectors',   icon: Layers },
+  // Standalone route — token usage + usage monitoring merged into one entry.
+  { id: 'ai-usage',         label: 'AI Usage',              icon: BarChart3, href: '/admin/ai-usage' },
   { id: 'audit',            label: 'Audit Logs',            icon: ScrollText },
 ];
 

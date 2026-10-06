@@ -76,107 +76,41 @@ function fmtTs(ts: string) {
 
 // ── Module / sub-module derivation ───────────────────────────────────────────
 //
-// The audit log records URL paths like `/grc/erm/risks/5` or
-// `/grc/governance/documents/3/policy-statements`. We split the path into a
+// The audit log records URL paths like `/grc/vulnerabilities/42` or
+// `/grc/compliance-plugins/runs/7`. We split the path into a
 // module (first segment) and an optional sub-module (second segment when it
 // isn't a numeric id), then look each up in the friendly-label maps below.
 // Anything not in the maps falls back to title-cased text so the column never
-// blank-renders.
+// blank-renders — so unmapped/new modules degrade gracefully instead of crashing.
 
 const MODULE_LABELS: Record<string, string> = {
-  erm: 'Risks & ERM',
-  evidence: 'Evidence',
-  'evidence-mgmt': 'Evidence',
-  governance: 'Governance',
-  compliance: 'Compliance',
   'vuln-management': 'Vulnerability Mgmt',
   vulnerabilities: 'Vulnerability Mgmt',
-  frameworks: 'Frameworks',
-  'framework-upload': 'Frameworks',
-  certifications: 'Certifications',
+  pentest: 'AI Pentest',
+  assets: 'Assets',
+  dashboard: 'Dashboard',
+  reports: 'Reports',
+  integrations: 'Integrations',
   admin: 'Administration',
   auth: 'Authentication',
-  'vendor-risk': 'Vendor Risk',
-  vendor_risk: 'Vendor Risk',
-  tasks: 'Critical Tasks',
-  'critical-tasks': 'Critical Tasks',
-  assets: 'Assets',
-  'control-library': 'Control Library',
-  controls: 'Controls',
-  dashboard: 'Dashboard',
-  'workflow-engine': 'Workflow Engine',
-  workflow: 'Workflow Engine',
-  chatbot: 'AI Assistant',
-  complychat: 'AI Assistant',
-  integrations: 'Integrations',
-  'auditor-portal': 'Auditor Portal',
-  'auditor-portal/statutory-audit': 'Statutory Audit',
-  audits: 'Auditor Portal',
-  'is-projects': 'IS Projects',
-  reports: 'Reports',
-  documents: 'Documents',
   system: 'System',
-  risks: 'Risks & ERM',
-  // Issue Management — URL prefix `/issue-management/...` from the
-  // issue_management module routers.
-  'issue-management': 'Issue Management',
-  // Criticality Assessments — `/criticality-assessments/...` for the
-  // ISCA + IACA endpoints under Asset Management.
-  'criticality-assessments': 'Criticality Assessments',
+  chatbot: 'AI Assistant',
   // CIS Compliance Plugins — `/compliance-plugins/...` (library
   // listing, runs, benchmark-mappings, library-tree, scan-all, ingest).
   'compliance-plugins': 'CIS Compliance Plugins',
   // Connect Wizard — `/connect-wizard/...` (issue-token, status poll,
   // windows/linux script download, handshake).
   'connect-wizard': 'Connect Wizard',
-  // Compliance Agents — `/agents/...` (enrollment, installer downloads,
+  // Scan Agents — `/agents/...` (enrollment, installer downloads,
   // results push, revoke, scan-now-push).
-  agents: 'Compliance Agents',
+  agents: 'Scan Agents',
 };
 
 const SUBMODULE_LABELS: Record<string, string> = {
-  // ERM
-  risks: 'Risks',
-  kris: 'KRIs',
-  incidents: 'Incidents',
-  'mitigation-actions': 'Mitigation Actions',
-  'internal-controls': 'Internal Controls',
-  reviews: 'Reviews',
-  appetite: 'Risk Appetite',
-  rcsa: 'RCSA',
-  'risk-assessments': 'Risk Assessments',
-  'framework-risk-assessments': 'Framework Risk Assessments',
-  scales: 'Scoring Scales',
-  dependencies: 'Risk Dependencies',
-  // Governance
-  documents: 'Documents',
-  'gap-analysis': 'Gap Analysis',
-  attestations: 'Attestations',
-  'attestation-campaigns': 'Attestation Campaigns',
-  committees: 'Committees',
-  'regulatory-changes': 'Regulatory Changes',
-  'regulatory-feeds': 'Regulatory Feeds',
-  workflows: 'Workflows',
-  'workflow-templates': 'Workflow Templates',
-  mappings: 'Mappings',
-  exceptions: 'Exceptions',
-  applicability: 'Applicability',
-  versions: 'Document Versions',
-  // Compliance
-  policies: 'Policies',
-  statements: 'Policy Statements',
-  assessments: 'Assessments',
-  // Evidence
-  'cross-links': 'Cross-Module Links',
-  'audit-packages': 'Audit Packages',
   // Vulnerability
   vulnerabilities: 'Findings',
   sla: 'SLA Config',
   departments: 'Departments',
-  // Vendor risk
-  vendors: 'Vendors',
-  questionnaires: 'Questionnaires',
-  'questionnaire-templates': 'Questionnaire Templates',
   // Admin
   users: 'Users',
   roles: 'Roles',
@@ -185,29 +119,6 @@ const SUBMODULE_LABELS: Record<string, string> = {
   'audit-logs': 'Audit Logs',
   // AI / cross-cutting
   ai: 'AI Assistant',
-  // Workflow engine
-  definitions: 'Definitions',
-  instances: 'Instances',
-  notifications: 'Notifications',
-  'escalation-configs': 'Escalation Configs',
-  // Frameworks
-  parser: 'Parser',
-  controls: 'Controls',
-  alignment: 'Alignment',
-  // Issue Management (URL: /issue-management/{issues|actions|comments|links|...})
-  issues: 'Issues',
-  actions: 'CAPA Actions',
-  comments: 'Comments',
-  links: 'Linked Items',
-  matrices: 'Severity & Classification Matrices',
-  'automation-flags': 'Automation Flags',
-  'by-source': 'By Source',
-  'from-source': 'Auto-Create from Source',
-  // Criticality Assessments
-  'info-system': 'Information System Assessments',
-  'infra-asset': 'Infrastructure Asset Assessments',
-  'by-asset': 'By Asset',
-  coverage: 'Coverage Stats',
   // CIS Compliance Plugins (URL: /compliance-plugins/{runs|benchmarks|ingest|...})
   runs: 'Plugin Runs',
   benchmarks: 'Benchmarks',
@@ -230,7 +141,7 @@ const SUBMODULE_LABELS: Record<string, string> = {
   'control-mappings': 'Plugin Control Mappings',
   'asset-scope': 'Plugin Asset Scope',
   schedule: 'Plugin Schedule',
-  // Compliance Agents (URL: /agents/{enroll|heartbeat|results|installer.*|...})
+  // Scan Agents (URL: /agents/{enroll|heartbeat|results|installer.*|...})
   enroll: 'Agent Enrollment',
   heartbeat: 'Agent Heartbeat',
   results: 'Agent Results',
@@ -259,13 +170,9 @@ const SUBMODULE_LABELS: Record<string, string> = {
 };
 
 const SUB_ENTITY_MODULES = new Set([
-  'erm', 'evidence-mgmt', 'vuln-management',
-  'control-library', 'governance', 'compliance', 'vendor-risk',
-  'workflow-engine', 'framework-upload', 'auditor-portal',
-  // Phase-2 additions — both surfaces nest resources under module prefix.
-  'issue-management', 'criticality-assessments',
-  // CIS additions — all three modules nest resources under the
-  // top-level URL prefix (e.g. /compliance-plugins/runs/...).
+  'vuln-management',
+  // CIS + platform flows nest resources under the top-level URL prefix
+  // (e.g. /compliance-plugins/runs/..., /agents/enroll, /connect-wizard/status).
   'compliance-plugins', 'connect-wizard', 'agents',
 ]);
 
