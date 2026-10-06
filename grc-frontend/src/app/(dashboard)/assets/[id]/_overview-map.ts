@@ -938,7 +938,7 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
       // false alarm (it reads as a finding). Show the honest state in a neutral tone.
       signals: outside ? extSignals : [
         { label: 'Antivirus', value: posture?.has_antivirus ? (posture.antivirus_products?.join(', ') || 'Present') : 'None detected', tone: posture?.has_antivirus ? 'ok' : 'bad' },
-        { label: 'EDR', value: posture?.has_edr ? (posture.edr_products?.join(', ') || 'Present') : 'None detected', tone: posture?.has_edr ? 'ok' : 'bad' },
+        { label: 'EDR', value: posture?.has_edr ? (posture.edr_products?.join(', ') || 'Present') : (posture?.edr_stopped?.length ? `${posture.edr_stopped.join(', ')} (stopped)` : 'None detected'), tone: posture?.has_edr ? 'ok' : 'bad' },
         { label: 'Endpoint Protected', value: posture?.endpoint_protected ? 'Yes' : 'No', tone: posture?.endpoint_protected ? 'ok' : 'bad' },
         { label: 'Packages Found', value: String(posture?.software_total ?? software.length), tone: 'muted' },
       ],

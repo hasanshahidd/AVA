@@ -445,6 +445,13 @@ export interface ITAsset {
   // Provenance. "unmanaged" = evidence-only (e.g. an external EASM finding you
   // can't log into) — gates the Connect affordance in the register.
   discovery_state?: string | null;
+  // Two-flow scan posture (derived server-side, never null in practice):
+  // 'surface' = evidence-only row we never logged into; else 'credentialed'.
+  scan_depth?: 'surface' | 'credentialed';
+  // Surface facts — stamped from the credential-free discovery sweep.
+  open_ports?: number[] | null;
+  device_type?: string | null;
+  platform_properties?: Record<string, any> | null;
 }
 
 export interface AssetDetail extends ITAsset {

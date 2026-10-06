@@ -64,12 +64,18 @@ const isExternalRow = (a: any) => !!(a.internet_facing || a.origin_source === 'e
 
 export default function InventoryRedesign(p: Props) {
   const assets = p.assets || [];
-  // ?view=external|internal|unowned|stale… — deep links from the Overview land pre-filtered.
-  const initialView = useSearchParams()?.get('view');
+  // ?view=external|internal|unowned|stale… and ?scan_depth=surface|credentialed — deep links land pre-filtered.
+  const sp = useSearchParams();
+  const initialView = sp?.get('view');
+  const initialDepth = sp?.get('scan_depth');
   const [view, setView] = useState(initialView || 'all');
   const [tab, setTab] = useState<'reg' | 'ins'>('reg');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('crit');
+  // Two-flow filter — Surface (agentless) vs Credentialed assets. Client-side
+  // on the already-fetched list; scan_depth is derived server-side, never null.
+  const [scanDepth, setScanDepth] = useState<'all' | 'surface' | 'credentialed'>(
+    initialDepth === 'surface' || initialDepth === 'credentialed' ? initialDepth : 'all');
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
 
@@ -113,14 +119,17 @@ export default function InventoryRedesign(p: Props) {
     }
   };
   const rows = useMemo(() => {
-    const r = assets.filter((a) => match(a) && (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())));
+    const r = assets.filter((a) =>
+      match(a) &&
+      (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
+      (scanDepth === 'all' || (a.scan_depth ?? 'credentialed') === scanDepth));
     const s = [...r];
     if (sort === 'crit') s.sort((a, b) => (CRIT_ORDER[critOf(b)] || 0) - (CRIT_ORDER[critOf(a)] || 0));
     else if (sort === 'scan') s.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
     else if (sort === 'value') s.sort((a, b) => (b.valuation || b.purchase_cost || 0) - (a.valuation || a.purchase_cost || 0));
     else if (sort === 'name') s.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return s;
-  }, [assets, view, q, sort]);
+  }, [assets, view, q, sort, scanDepth]);
 
   // Nest external subdomains under their apex. Apex rows get a ▸ toggle + "N subs"
   // badge; children are inserted right after the apex only when it's expanded.
@@ -259,6 +268,12 @@ export default function InventoryRedesign(p: Props) {
               <input className="search" placeholder="Search this view…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <select className="sel" value={sort} onChange={(e) => setSort(e.target.value)}><option value="crit">Sort: Criticality</option><option value="scan">Sort: Recently scanned</option><option value="value">Sort: Value</option><option value="name">Sort: Name</option></select>
+            {/* Two-flow scan-depth filter — same segment pattern as Register/Insights. */}
+            <div className="segwrap" title="Filter by how the asset was collected">
+              <button className={'seg' + (scanDepth === 'surface' ? ' on' : '')} onClick={() => setScanDepth('surface')}>Surface</button>
+              <button className={'seg' + (scanDepth === 'credentialed' ? ' on' : '')} onClick={() => setScanDepth('credentialed')}>Credentialed</button>
+              <button className={'seg' + (scanDepth === 'all' ? ' on' : '')} onClick={() => setScanDepth('all')}>All</button>
+            </div>
           </div>
 
           {tab === 'reg' ? (
@@ -310,6 +325,9 @@ export default function InventoryRedesign(p: Props) {
                               <div style={{ minWidth: 0 }}>
                                 <span style={{ fontWeight: 600, color: '#0F1F2B' }}>{a.name}</span>
                                 <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
+                                  {(a.scan_depth ?? 'credentialed') === 'surface'
+                                    ? <span title="Discovered by an agentless sweep — no credentials" style={{ background: '#EEF1F3', color: '#6B7787', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Surface / Agentless</span>
+                                    : <span title="Collected with credentials (deep)" style={{ background: '#E7F0F8', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Managed / Credentialed</span>}
                                   {nSubs > 0 ? <span style={{ background: '#E4EDF6', color: '#3A5A80', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>{nSubs} sub{nSubs > 1 ? 's' : ''}</span> : null}
                                   {a.internet_facing ? <span style={{ background: '#DBE8FA', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Internet-facing</span> : null}
                                   {a.cde_environment ? <span style={{ background: '#F7D8D8', color: '#A32B2B', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>CDE</span> : null}

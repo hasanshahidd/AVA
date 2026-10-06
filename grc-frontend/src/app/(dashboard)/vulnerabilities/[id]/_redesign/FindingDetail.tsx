@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ShieldAlert, ShieldCheck, Biohazard, Shield, Lock, ChevronRight, Clock, Crosshair } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, ShieldCheck, Biohazard, Shield, Lock, ChevronRight, Clock, Crosshair, Globe } from 'lucide-react';
 import { vulnManagementApi, assetsApi, entityExtrasApi } from '@/lib/api';
 import { exploitMaturity } from '../_components/RiskAnalysisPanel';
 import RemediationPlanCard from '../_components/RemediationPlanCard';
@@ -163,6 +163,8 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
               {v.cvss_score != null && <span style={pill(SEC, '#EEF1F3')}>CVSS {v.cvss_score}</span>}
               {v.kev_flag && <span style={pill('#C2453F', '#FBEAEA')}>KEV · exploited</span>}
               {v.epss_score != null && <span style={pill(SEC, '#EEF1F3')}>EPSS {(v.epss_score * 100).toFixed(1)}%</span>}
+              {v.scan_mode === 'surface' && <span style={pill(MUTED, '#EEF1F3')}>Surface / Unauthenticated</span>}
+              {v.scan_mode === 'credentialed' && <span style={pill(AC, '#EFF5FA')}>Authenticated</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -195,16 +197,12 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
 
         {/* rail */}
         <aside style={{ position: 'sticky', top: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Affected asset FIRST — opening a finding should show the hit asset at a glance (top-right). */}
-          <RailCard title="Affected asset">
-            {primaryAssetId ? (
-              <>
-                <b style={{ fontSize: 13, fontWeight: 600 }}>{riskAsset?.name || `Asset #${primaryAssetId}`}</b>
-                <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{riskAsset?.criticality ? `Criticality ${riskAsset.criticality}` : 'Criticality not set'}{riskAsset?.internet_facing ? ' · internet-facing' : ''}</div>
-                <Link href={`/assets/${primaryAssetId}`} style={{ ...btn, textDecoration: 'none', width: '100%', justifyContent: 'center', marginTop: 10 }}>View asset details →</Link>
-              </>
-            ) : <div style={{ fontSize: 12, color: MUTED }}>No asset linked — link one to compute reachability.</div>}
-          </RailCard>
+          {/* Affected assets FIRST — opening a finding should show, at a glance
+              (top-right), exactly which assets this vulnerability hits and how
+              exposed they are. Blast radius + per-asset context, all real. */}
+          <AffectedAssets links={assetLinks} />
+          {/* ponytail: renders every linked asset inline; a finding on 20+ hosts
+              makes a tall sticky rail. Cap + "+N more" only if that ever happens. */}
           {/* Assignment near the top — the department(s) it's routed to plus the individual owner. */}
           <RailCard title="Assignment">
             {v.assigned_to && v.assignee_name && <Row k="Owner" v={v.assignee_name} />}
@@ -232,6 +230,72 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
 const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 function RailCard({ title, children }: { title: string; children: React.ReactNode }) {
   return <section style={card}><div style={{ padding: '11px 14px', borderBottom: `1px solid ${BORDER2}` }}><h4 style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{title}</h4></div><div style={{ padding: '8px 14px 12px' }}>{children}</div></section>;
+}
+
+// ── Affected assets — the blast radius: every asset this finding hits, each with
+// the context (IP, type/OS, criticality, internet exposure, that host's OTHER
+// open findings) that answers "what does this vulnerability actually touch, and
+// how exposed is it". Every value is read from the linked assets (the enriched
+// /assets link payload); nothing is fabricated. Honest empty state when unlinked.
+function critMeta(c?: string) {
+  const k = (c || '').toLowerCase();
+  return SEVMETA[k] || { c: MUTED, bg: '#EEF1F3', label: c || 'Unrated' };
+}
+const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
+function AffectedAssets({ links }: { links?: any[] }) {
+  const list = Array.isArray(links) ? links : [];
+  const n = list.length;
+  const exposed = list.filter((l) => l?.asset_internet_facing).length;
+  const critical = list.filter((l) => ['critical', 'high'].includes((l?.asset_criticality || '').toLowerCase())).length;
+  // Blast-radius line — the one sentence that makes the asset relationship unmissable.
+  const blast = n === 0 ? '' : [
+    `Affects ${n} asset${n === 1 ? '' : 's'}`,
+    exposed ? `${exposed} internet-exposed` : '',
+    critical ? `${critical} critical/high` : '',
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <section style={card}>
+      <div style={{ padding: '11px 14px', borderBottom: `1px solid ${BORDER2}` }}>
+        <h4 style={{ fontSize: 12, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
+          Affected asset{n === 1 ? '' : 's'}
+          {n > 1 && <span style={{ ...pill(ACS, '#EFF5FA'), fontSize: 10 }}>{n}</span>}
+        </h4>
+        {blast && <p style={{ fontSize: 11.5, color: SEC, margin: '6px 0 0', lineHeight: 1.45 }}>{blast}.</p>}
+      </div>
+      <div style={{ padding: '10px 14px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {n === 0 ? (
+          <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+            <b style={{ color: SEC, fontWeight: 600 }}>Not yet linked to an asset.</b><br />
+            Link an affected asset to compute reachability and show its blast radius.
+          </div>
+        ) : list.map((l) => {
+          const cm = critMeta(l?.asset_criticality);
+          const typeOs = [cap(l?.asset_type), l?.asset_os].filter(Boolean).join(' · ');
+          const opens = Number(l?.asset_open_findings) || 0;
+          const label = l?.asset_name || `Asset #${l?.asset_id ?? '—'}`;
+          return (
+            <div key={l?.asset_id ?? l?.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 10, padding: '9px 11px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <b style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</b>
+                <span style={{ ...pill(cm.c, cm.bg), flex: 'none', textTransform: 'capitalize' }}>{cm.label}</span>
+              </div>
+              {typeOs && <div style={{ fontSize: 11, color: MUTED, marginTop: 3, wordBreak: 'break-word' }}>{typeOs}</div>}
+              {(l?.asset_ip || l?.asset_internet_facing) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 5 }}>
+                  {l?.asset_ip && <code style={{ fontFamily: MONO, fontSize: 11, color: SEC }}>{l.asset_ip}</code>}
+                  {l?.asset_internet_facing && <span style={{ ...pill('#C0682F', '#FCEEE2'), fontSize: 10 }}><Globe size={10} />Internet-exposed</span>}
+                </div>
+              )}
+              {opens > 0 && <div style={{ fontSize: 11, color: MUTED, marginTop: 5 }}>{opens} other open finding{opens === 1 ? '' : 's'} on this host</div>}
+              {l?.asset_id != null && <Link href={`/assets/${l.asset_id}`} style={{ ...btn, textDecoration: 'none', width: '100%', justifyContent: 'center', marginTop: 9, padding: '6px 10px' }}>View asset details →</Link>}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 11.5, padding: '5px 0', borderBottom: `1px solid #F4F6F7` }}><span style={{ color: MUTED }}>{k}</span><b style={{ fontWeight: 600, textAlign: 'right', fontFamily: mono ? MONO : undefined, wordBreak: 'break-all' }}>{v}</b></div>;

@@ -227,7 +227,9 @@ function ProvenanceCard({ card, accent, kind, full }: { card: any; accent: strin
   );
 }
 
-export default function AssetOverview({ A }: { A: any }) {
+type SurfaceFacts = { ip: string | null; mac: string | null; ports: number[] | null; deviceType: string | null; vendor: string | null; internetFacing: boolean };
+
+export default function AssetOverview({ A, surface }: { A: any; surface?: SurfaceFacts | null }) {
   // Default to the first collected domain — 'hardware' for a host, 'instance' for
   // a database, 'account' for cloud, etc. — so the correct tab is highlighted.
   const [deepTab, setDeepTab] = useState<string>(() => A.deep?.[0]?.key || 'hardware');
@@ -298,6 +300,91 @@ export default function AssetOverview({ A }: { A: any }) {
     ];
     return doms.filter((d) => d.secs.length > 0);
   }, [A]);
+
+  // ── Surface (agentless) asset: field-gated overview ──────────────────────
+  // No credentialed collection ran, so the deep telemetry domains are empty.
+  // Show the sweep facts + an honest "requires credentials" gate instead of
+  // the blank KPI strip / telemetry cards the credentialed path renders.
+  if (surface) {
+    const ports = surface.ports || [];
+    const facts: [string, string][] = [
+      ['IP address', surface.ip || '—'],
+      ['MAC', surface.mac || '—'],
+      ['Device type', surface.deviceType || '—'],
+      ['Vendor', surface.vendor || '—'],
+      ['Internet-facing', surface.internetFacing ? 'Yes' : 'No'],
+    ];
+    return (
+      <div className="inv2" style={{ fontSize: 13.5 }}>
+        {/* Surface facts */}
+        <div className={CARD + ' mb-2.5'}>
+          <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#eef1f3', color: '#6b7787' }}>
+              <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-bold text-[#0f1f2b]">Surface asset · agentless</div>
+              <div className="text-[10px] text-[#8a95a1]">Discovered by a credential-free sweep — only externally-visible facts are known</div>
+            </div>
+            <span className="text-[10px] font-semibold text-[#6b7787] bg-[#eef1f3] border border-[#dfe4e8] rounded-full px-2 py-[2px] whitespace-nowrap">Surface / Agentless</span>
+          </div>
+          <div className="p-4 grid grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3">
+            {facts.map(([k, val]) => (
+              <div key={k}>
+                <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide">{k}</div>
+                <div className={'text-[13px] text-[#0f1f2b] mt-0.5 ' + (k === 'IP address' || k === 'MAC' ? MONO : '')}>{val}</div>
+              </div>
+            ))}
+            <div className="col-span-2 lg:col-span-3">
+              <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide mb-1">Open ports</div>
+              {ports.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {ports.map((p) => <span key={p} className={'text-[11.5px] font-semibold text-[#28578f] bg-[#e7f0f8] border border-[#cfe0f0] rounded-md px-2 py-0.5 ' + MONO}>{p}</span>)}
+                </div>
+              ) : <div className="text-[12px] text-[#aeb8c2]">No open ports recorded</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Deep telemetry gate — OS / software / patches / hardware */}
+        <div className={CARD + ' mb-2.5'}>
+          <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#f6efe0', color: '#9a6410' }}>
+              <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12.5px] font-bold text-[#0f1f2b]">Operating system · software · patches · hardware</div>
+              <div className="text-[10px] text-[#8a95a1]">Deep inventory</div>
+            </div>
+          </div>
+          <div className="px-4 py-6 text-center">
+            <div className="text-[13px] font-semibold text-[#6b7787]">Requires credentials — not collected</div>
+            <div className="text-[11.5px] text-[#aeb8c2] mt-1 max-w-md mx-auto">Connect this asset with credentials to collect operating system, installed software, patch level and hardware telemetry.</div>
+          </div>
+        </div>
+
+        {/* Ownership & Business Context — manually maintained, still relevant for surface assets */}
+        {A.manual?.length > 0 && (
+          <section className={CARD + ' mb-2.5'}>
+            <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#fbf2df', color: '#9a6410' }}>
+                <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /></svg>
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12.5px] font-bold text-[#0f1f2b]">Ownership &amp; Context</div>
+                <div className="text-[10px] text-[#8a95a1]">Ownership, business context &amp; procurement · manually maintained</div>
+              </div>
+            </div>
+            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
+              {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} accent="border-l-[#e2b33c]" kind="manual" full />)}
+            </div>
+          </section>
+        )}
+
+        <div className="text-center text-[#aeb8c2] text-[10.5px] mt-4">Surface overview · {A.header?.name} · agentless discovery · no credentialed collection</div>
+      </div>
+    );
+  }
 
   return (
     <div className="inv2" style={{ fontSize: 13.5 }}>

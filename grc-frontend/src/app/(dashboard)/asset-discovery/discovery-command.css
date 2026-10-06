@@ -216,3 +216,29 @@
 .disc-cc .tabs a.active .count{background:var(--mint-soft);color:var(--mint2)}
 .disc-cc .live-chip{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--mint2);background:var(--mint-soft);border-radius:999px;padding:7px 12px}
 .disc-cc .live-chip i{width:7px;height:7px;border-radius:50%;background:var(--mint);animation:disc-blink 1.6s infinite}
+
+/* ===== Connect-queue left filter rail =====
+   Mirrors the IT Asset Inventory register's left rail (assets/inventory-redesign.css
+   `.inv2 .rail`): a white card column of controls grouped under uppercase caps,
+   ~224px wide, #005B96 accent. Built with the discovery page's own tokens so it
+   matches that rail's look while staying consistent with this page. The rail is a
+   normal grid column (not sticky, no inner scroller) — the shell <main> scrolls. */
+.disc-cc .cq-workspace{display:grid;grid-template-columns:minmax(0,224px) minmax(0,1fr);gap:14px;align-items:start}
+.disc-cc .cq-rail{display:flex;flex-direction:column;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-sm);padding:12px 11px;align-self:start}
+.disc-cc .cq-railcap{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#828E9A;padding:2px 2px 0}
+.disc-cc .cq-railcap:not(:first-child){margin-top:5px}
+/* Rail controls fill the column (the column context is flex, so cancel the
+   toolbar's flex:1 on inputs and the selects' auto/max widths). */
+.disc-cc .cq-rail .input{width:100%;min-width:0;flex:none}
+.disc-cc .cq-rail .select{width:100%;min-width:0;max-width:none}
+.disc-cc .cq-rail .cq-field button{width:100%}
+.disc-cc .cq-rail .cq-wide{width:100%;justify-content:center}
+.disc-cc .cq-hint{font-size:11px;color:var(--faint);line-height:1.45;padding:0 2px}
+/* Clean action bar atop the table — primary Connect + contextual bulk actions. */
+.disc-cc .cq-actionbar{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.disc-cc .cq-actionbar .push{margin-left:auto}
+.disc-cc .cq-actionbar .btn{height:32px}
+.disc-cc .cq-actionbar .count{font-size:10px;font-weight:700;background:var(--mint-soft);color:var(--mint2);border-radius:999px;padding:1px 7px;margin-left:2px}
+/* Narrow screens: rail stacks above the table full-width (never hidden — it
+   holds the connect method + logins, which the flow needs). */
+@media(max-width:1050px){.disc-cc .cq-workspace{grid-template-columns:1fr}}

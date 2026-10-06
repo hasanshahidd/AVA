@@ -265,7 +265,7 @@ interface AssetDetailData {
   }> | null;
   security_posture?: {
     has_antivirus?: boolean; antivirus_products?: string[];
-    has_edr?: boolean; edr_products?: string[];
+    has_edr?: boolean; edr_products?: string[]; edr_stopped?: string[];
     endpoint_protected?: boolean; security_tools?: string[];
     categories?: Record<string, number>; software_total?: number; computed_at?: string;
   } | null;
@@ -273,6 +273,11 @@ interface AssetDetailData {
   source_system?: string | null;
   discovery_state?: string | null;
   first_seen_at?: string | null;
+  // Two-flow scan posture (derived server-side, never null): 'surface' =
+  // evidence-only, never logged into; else 'credentialed'. Surface facts below.
+  scan_depth?: 'surface' | 'credentialed';
+  open_ports?: number[] | null;
+  device_type?: string | null;
   // Classification / cloud
   asset_role?: string | null;
   /** A promoted application's own properties — shape varies by product. */
@@ -809,9 +814,21 @@ export default function AssetDetailPage() {
     },
   });
 
+  // Surface (agentless) assets carry no deep telemetry — the Overview shows the
+  // sweep facts + an honest "requires credentials" gate instead of blank cards.
+  const isSurface = (asset?.scan_depth ?? (asset?.discovery_state === 'unmanaged' ? 'surface' : 'credentialed')) === 'surface';
+  const surfaceFacts = isSurface && asset ? {
+    ip: asset.ip_address || null,
+    mac: asset.primary_mac || null,
+    ports: Array.isArray(asset.open_ports) ? asset.open_ports : null,
+    deviceType: asset.device_type || null,
+    vendor: asset.vendor || null,
+    internetFacing: !!asset.internet_facing,
+  } : null;
+
   return (
     <>
-      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => setShowEditModal(true)} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onDelete={() => setShowDeleteConfirm(true)}>
+      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => setShowEditModal(true)} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onRunSurfacePentest={isSurface ? () => router.push(`/pentest?new=run&asset=${assetId}`) : undefined} onDelete={() => setShowDeleteConfirm(true)}>
             {activeTab === 'overview' && (
               <>
                 {/* External (EASM) assets: scanning-scope authorization sits above
@@ -821,7 +838,7 @@ export default function AssetDetailPage() {
                     only implied the passive scan was incomplete. Re-enable ONLY alongside a real
                     active-scan feature (which the backend requires be authorization-gated). */}
                 {false && overviewData.external && <ScopeAuthorizationCard asset={asset} canManage={canEdit} />}
-                <AssetOverviewDesign A={overviewData} />
+                <AssetOverviewDesign A={overviewData} surface={surfaceFacts} />
               </>
             )}
             {activeTab === 'trajectory' && <TrajectoryPanel assetId={assetId} />}

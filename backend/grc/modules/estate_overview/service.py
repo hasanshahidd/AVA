@@ -45,6 +45,25 @@ CRITS = ("critical", "high", "medium", "low", "unrated")
 GAPS = {"Unidentified", "OS not visible", "Not yet probed", "Hosting unknown",
         "No identifying signal", "No outside-in evidence"}
 SUBTYPE_CAP = 6  # longer tails fold into one "Other …" bucket
+SAMPLE_CAP = 50  # named assets carried per group (class / OS family) for the drill-down modal;
+                 # beyond it the UI links "view all N in register". Bounded by the fixed taxonomy
+                 # (classes/OS families × SUBTYPE_CAP), so the payload stays flat at any estate size.
+ROOTS_CAP = 8    # top registrable domains the external surface hangs off
+
+# ---------- estate-wide governance / coverage enums (additive rollups) ----------
+# Fixed taxonomies a reader expects; counts only, so the payload stays flat at any size.
+ENVIRONMENTS = ("production", "staging", "development", "test", "dr")
+DATA_CLASSES = ("restricted", "confidential", "internal", "public")  # most → least sensitive
+REGULATED = ("pci", "phi", "pii", "financial", "multiple")           # 'none' counted apart
+ORIGIN_LABELS = (("easm", "External discovery"), ("network_sweep", "Network sweep"),
+                 ("connect", "Credentialed connect"), ("agent", "Endpoint agent"),
+                 ("import", "Imported register"), ("manual", "Manual entry"))
+# Security-relevant software families (security_posture.categories), counted as the
+# number of assets that run one — never product/engine names (de-branded).
+SEC_FAMILIES = (("edr", "Endpoint detection (EDR)"), ("antivirus", "Antivirus"),
+                ("backup", "Backup"), ("remote_access", "Remote access"), ("vpn", "VPN"),
+                ("database", "Database engine"), ("web_server", "Web server"),
+                ("container", "Container runtime"), ("monitoring", "Monitoring"))
 
 # ---------- OS ----------
 _NETOS = ((r"nx-?os", "Cisco NX-OS"), (r"ios[ -]?xe", "Cisco IOS XE"), (r"ios[ -]?xr", "Cisco IOS XR"),
@@ -251,6 +270,39 @@ def _is_fqdn(n: str) -> bool:
         return "." in n and bool(re.search(r"[a-z]", n))
 
 
+def _disp(a) -> str:
+    """A human name for an asset sample — the register's own display name."""
+    for k in ("name", "host_name", "fqdn"):
+        v = getattr(a, k, None)
+        if v:
+            return str(v).strip()
+    return f"asset {getattr(a, 'id', '?')}"
+
+
+# Multi-label public suffixes so a.b.co.uk groups under b.co.uk, not co.uk. A small
+# curated set covers the common ones; a true eTLD+1 would need a public-suffix list.
+# ponytail: heuristic registrable domain; swap in a PSL (tldextract) only if sprawl
+# grouping is ever materially wrong for a tenant.
+_PUBLIC_SUFFIX_2 = {
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "net.uk", "ltd.uk", "plc.uk",
+    "com.au", "net.au", "org.au", "edu.au", "gov.au", "co.nz", "org.nz", "net.nz",
+    "co.za", "org.za", "com.br", "com.mx", "com.ar", "com.tr", "com.sg", "com.hk",
+    "com.cn", "com.tw", "co.jp", "co.kr", "co.in", "net.in", "org.in", "gov.in",
+    "com.pk", "net.pk", "org.pk", "gov.pk", "edu.pk", "co.id", "or.id", "go.id",
+    "com.my", "com.ph", "com.sa", "com.eg", "com.ng", "co.ke", "com.ua", "com.ru",
+}
+
+
+def _registrable(name: str) -> str:
+    """Best-effort registrable domain (eTLD+1) for grouping the external surface."""
+    parts = [p for p in name.split(".") if p]
+    if len(parts) <= 2:
+        return name
+    if ".".join(parts[-2:]) in _PUBLIC_SUFFIX_2:
+        return ".".join(parts[-3:])
+    return ".".join(parts[-2:])
+
+
 def hosting(ep: Dict[str, Any]) -> str:
     org = str(ep.get("asn_org") or "").lower()
     if ep.get("cdn_waf") or _CDN.search(f"{str(ep.get('server') or '').lower()} {org}"):
@@ -315,10 +367,64 @@ def fingerprint(a) -> Dict[str, Any]:
     return {}
 
 
+# ---------- software (estate-wide top products) ----------
+TOP_SOFTWARE = 12                          # estate panel cap; the UI shows "+N more"
+_SW_PAREN = re.compile(r"\s*\([^)]*\)")    # strip "(64-bit)", "(x64)" … from a display name
+_SW_MAJOR = re.compile(r"\d+(?:\.\d+)?")   # first major[.minor] token in a version string
+
+
+def _sw_name(name: Any) -> str:
+    return _SW_PAREN.sub("", str(name or "")).strip()
+
+
+def _sw_key(entry: Dict[str, Any], name: str) -> str:
+    """Canonical product key — the stored software_key (mssql-2022, google-chrome) so
+    name-spelling variants and patch builds of ONE product collapse to a single row; a
+    pre-enrichment row with no key falls back to a slug of the display name."""
+    k = str(entry.get("software_key") or "").strip().lower()
+    return k or (re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48] or "app")
+
+
+def _sw_short_version(v: Any) -> str:
+    m = _SW_MAJOR.search(str(v or ""))
+    return m.group(0) if m else ""
+
+
+# An internet-facing asset carries no installed-software list — its tech stack shows
+# only in the HTTP Server banner ("nginx/1.24.0", "Microsoft-IIS/10.0", "cloudflare").
+_SERVER_LABELS = {"microsoft-iis": "IIS", "apache-coyote": "Apache Tomcat", "openresty": "OpenResty",
+                  "litespeed": "LiteSpeed", "cloudflare": "Cloudflare", "cloudfront": "CloudFront",
+                  "apache": "Apache", "nginx": "nginx", "caddy": "Caddy", "jetty": "Jetty",
+                  "gunicorn": "Gunicorn", "kestrel": "Kestrel", "tengine": "Tengine", "lighttpd": "lighttpd"}
+
+
+def _server_tech(server: Any) -> Optional[Tuple[str, str]]:
+    """(product, short version) parsed from an HTTP Server banner, or None. The banner
+    is claimed outside-in (not an installed-software fact), so the UI labels it as such."""
+    s = str(server or "").strip()
+    if not s:
+        return None
+    prod, _, ver = s.split()[0].partition("/")  # "nginx/1.24.0 (Ubuntu)" -> nginx , 1.24.0
+    prod = prod.strip().lower()
+    return (_SERVER_LABELS.get(prod, prod), _sw_short_version(ver)) if prod else None
+
+
+def _top_products(count: Counter, names: Dict[str, Counter], vers: Dict[str, Counter], cap: int) -> Dict[str, Any]:
+    """Shared product+version rollup: most common first, readable label (the display name
+    seen most often), a short version (dropped when the label already carries it), count."""
+    rows = []
+    for k, n in count.most_common(cap):
+        lbl = names[k].most_common(1)[0][0] if k in names else k
+        ver = vers[k].most_common(1)[0][0] if k in vers else ""
+        rows.append({"key": k, "n": n, "label": lbl, "version": "" if ver and ver in lbl else ver})
+    return {"top": rows, "more": max(0, len(count) - cap)}
+
+
 # ---------- roll-up ----------
 def _bucket() -> Dict[str, Any]:
     return {"n": 0, "sub": Counter(), "seen_30d": 0, "owner": 0, "cis": 0,
-            "crit": dict.fromkeys(CRITS, 0), "eol_past": 0, "eol_soon": 0, "eol_known": 0}
+            "crit": dict.fromkeys(CRITS, 0), "eol_past": 0, "eol_soon": 0, "eol_known": 0,
+            "samples": []}
 
 
 def _subs(c: Counter) -> List[Dict[str, Any]]:
@@ -326,7 +432,7 @@ def _subs(c: Counter) -> List[Dict[str, Any]]:
     if len(top) > SUBTYPE_CAP:
         rest = top[SUBTYPE_CAP - 1:]
         top = top[:SUBTYPE_CAP - 1] + [(f"Other ({len(rest)} kinds)", sum(n for _, n in rest))]
-    return [{"label": k, "n": n, "gap": k in GAPS or k.endswith("unknown") or k == "OS not profiled"} for k, n in top]
+    return [{"label": k, "n": n, "gap": k in GAPS or k.endswith("unknown") or "not profiled" in k} for k, n in top]
 
 
 def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int]],
@@ -337,17 +443,41 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
     run · ports / dtypes: latest discovery open ports + device type per asset id."""
     sides = {"external": {c: _bucket() for c in EXTERNAL}, "internal": {c: _bucket() for c in INTERNAL}}
     os_fam = {f: Counter() for f in OS_FAMILIES}
-    ext, ext_host, ext_ver = Counter(), Counter(), Counter()
+    os_samples: Dict[str, List[Dict[str, Any]]] = {f: [] for f in OS_FAMILIES}  # named hosts per OS family
+    ext, ext_host, ext_ver, roots = Counter(), Counter(), Counter(), Counter()
     life = Counter()
     soon, stale_before = now + timedelta(days=90), now - timedelta(days=30)
     total = 0
+    # ── additive estate-wide rollups (counts only; constant payload at 5 or 5,000) ──
+    env_c, dclass_c, origin_c, team_c = Counter(), Counter(), Counter(), Counter()
+    reg_c, scope_c, sec_fam = Counter(), Counter(), Counter()
+    disc = {"managed": 0, "discovered": 0, "baseline": 0}
+    team_n = cde_n = ephi_n = in_scope_n = lifecycle_set = env_set = int_hw = 0
+    fresh = {"d7": 0, "d30": 0, "d90": 0, "old": 0, "never": 0}
+    sec = {"scope": 0, "posture": 0, "av": 0, "edr": 0, "edr_stopped": 0, "protected": 0,
+           "packages": 0, "inventoried": 0}
+    cap = {"vcpu": 0, "ram": 0, "disk": 0, "hosts": 0, "val_sum": 0.0, "val_n": 0,
+           "cost_sum": 0.0, "cost_n": 0}
+    # ── version-level detail (the exec drill-down) ──
+    os_eol_past: Counter = Counter()        # OS version line -> internal hosts past vendor end-of-life
+    sw_count: Counter = Counter()           # software_key -> internal hosts running it
+    sw_names: Dict[str, Counter] = {}       # software_key -> Counter(display name)
+    sw_vers: Dict[str, Counter] = {}        # software_key -> Counter(short version)
+    tech_count: Counter = Counter()         # external service product -> internet-facing sites running it
+    tech_names: Dict[str, Counter] = {}
+    tech_vers: Dict[str, Counter] = {}
+    sw_hosts = tech_sites = 0
     for a in assets:
         total += 1
         fp = fingerprint(a)
         dt = (fp.get("device_type") or dtypes.get(a.id) or "").lower() or None
+        eol = sbp._eol(a)
         if is_external(a):
             side = "external"
             cls, sub = classify_external(a, ports.get(a.id, set()))
+            nm = _dns_name(a)
+            if _is_fqdn(nm):                         # surface concentration: names per registrable domain
+                roots[_registrable(nm)] += 1
             ep = sbp._ep(a)
             h = hosting(ep) if ep else "Not yet probed"
             ext_host[h] += 1
@@ -359,6 +489,15 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
                 ext["tls_expiring_30d"] += bool(not ep.get("tls_expired") and isinstance(days, (int, float)) and 0 <= days <= 30)
                 ext["cdn_waf"] += h == "CDN / WAF-fronted"
                 ext["cloud"] += h == "Cloud-hosted"
+                tech = _server_tech(ep.get("server"))   # web/app tech stack, outside-in
+                if tech:
+                    tlbl, tver = tech
+                    tk = tlbl.lower()
+                    tech_count[tk] += 1
+                    tech_names.setdefault(tk, Counter())[tlbl] += 1
+                    if tver:
+                        tech_vers.setdefault(tk, Counter())[tver] += 1
+                    tech_sites += 1
             ext["live"] += sbp._ext_web(a)
         else:
             side = "internal"
@@ -366,7 +505,14 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
             if cls == "Server":
                 cls, sub = refine_server(a, fp) or (cls, sub)
             fam, line = os_of(a, fp)
-            os_fam[os_bucket(fam, line)][line] += 1
+            fb = os_bucket(fam, line)
+            os_fam[fb][line] += 1
+            if len(os_samples[fb]) < SAMPLE_CAP:     # named hosts for the OS-family drill-down modal
+                cr = (getattr(a, "criticality", None) or "").lower()
+                os_samples[fb].append({"id": getattr(a, "id", None), "name": _disp(a), "sub": line,
+                                       "crit": cr if cr in CRITS and cr != "unrated" else ""})
+            if eol and eol <= now:          # which OS versions are the obsolescence exposure
+                os_eol_past[line] += 1
         b = sides[side][cls]
         b["n"] += 1
         b["sub"][sub] += 1
@@ -376,12 +522,112 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
         b["cis"] += a.id in cis_ids
         c = (getattr(a, "criticality", None) or "").lower()
         b["crit"][c if c in CRITS else "unrated"] += 1
-        eol = sbp._eol(a)
+        if len(b["samples"]) < SAMPLE_CAP:           # named assets for the drill-down modal (grouped by sub)
+            b["samples"].append({"id": getattr(a, "id", None), "name": _disp(a), "sub": sub,
+                                 "crit": c if c in CRITS and c != "unrated" else ""})
         if eol:
             b["eol_known"] += 1
             b["eol_past"] += eol <= now
             b["eol_soon"] += now < eol <= soon
         life[(getattr(a, "lifecycle_state", None) or getattr(a, "status", None) or "unset").lower()] += 1
+
+        # ── governance ──
+        e = (getattr(a, "environment", None) or "").strip().lower()
+        if e in ENVIRONMENTS:
+            env_c[e] += 1; env_set += 1
+        elif e:
+            env_c["other"] += 1; env_set += 1
+        else:
+            env_c["unset"] += 1
+        dc = (getattr(a, "data_classification", None) or "").strip().lower()
+        dclass_c[dc if dc in DATA_CLASSES else "unset"] += 1
+        if getattr(a, "lifecycle_state", None):
+            lifecycle_set += 1
+        # ── provenance ──
+        o = (getattr(a, "origin_source", None) or "").strip().lower()
+        origin_c[o if any(o == k for k, _ in ORIGIN_LABELS) else "unknown"] += 1
+        dstate = (getattr(a, "discovery_state", None) or "").strip().lower()
+        disc["managed" if dstate == "managed" else "discovered" if dstate == "discovered" else "baseline"] += 1
+        # ── ownership (team / department) ──
+        team = getattr(a, "owning_team", None) or getattr(a, "department", None)
+        if team:
+            team_c[str(team).strip()] += 1; team_n += 1
+        # ── compliance / regulated data ──
+        cde = bool(getattr(a, "cde_environment", None))
+        ephi = bool(getattr(a, "ephi_environment", None))
+        rd = (getattr(a, "regulated_data_type", None) or "none").strip().lower()
+        if rd in REGULATED:
+            reg_c[rd] += 1
+        sc = getattr(a, "compliance_scope", None) or []
+        if isinstance(sc, (list, tuple)):
+            for s in sc:
+                if s:
+                    scope_c[str(s).strip()] += 1
+        cde_n += cde
+        ephi_n += ephi
+        if cde or ephi or rd != "none" or (isinstance(sc, (list, tuple)) and len(sc) > 0):
+            in_scope_n += 1
+        # ── freshness (last seen) ──
+        if not seen:
+            fresh["never"] += 1
+        else:
+            dd = (now - seen).days
+            fresh["d7" if dd <= 7 else "d30" if dd <= 30 else "d90" if dd <= 90 else "old"] += 1
+        # ── capacity (hardware telemetry, where it was collected) ──
+        cc, mg, sg = getattr(a, "cpu_cores", None), getattr(a, "memory_gb", None), getattr(a, "storage_gb", None)
+        if cc or mg or sg:
+            cap["hosts"] += 1
+            cap["vcpu"] += int(cc or 0); cap["ram"] += int(mg or 0); cap["disk"] += int(sg or 0)
+        val = getattr(a, "valuation", None)
+        if isinstance(val, (int, float)) and val:
+            cap["val_sum"] += float(val); cap["val_n"] += 1
+        pcost = getattr(a, "purchase_cost", None)
+        if isinstance(pcost, (int, float)) and pcost:
+            cap["cost_sum"] += float(pcost); cap["cost_n"] += 1
+        # ── endpoint security posture — internal hosts only (never seen outside-in).
+        # security_posture is NULL = never read (unknown), which we keep distinct from
+        # a read host that scored endpoint_protected=False. ──
+        if side == "internal":
+            sec["scope"] += 1
+            if cc or mg:
+                int_hw += 1
+            # installed software → estate-wide product+version rollup (deduped per host
+            # by canonical software_key so patch builds / name variants collapse to one row)
+            sw_list = getattr(a, "detected_software_json", None)
+            if isinstance(sw_list, list) and sw_list:
+                here: Set[str] = set()
+                for ent in sw_list:
+                    if not isinstance(ent, dict):
+                        continue
+                    nm = _sw_name(ent.get("name"))
+                    if not nm:
+                        continue
+                    k = _sw_key(ent, nm)
+                    if k in here:
+                        continue
+                    here.add(k)
+                    sw_count[k] += 1
+                    sw_names.setdefault(k, Counter())[nm] += 1
+                    sv = _sw_short_version(ent.get("version"))
+                    if sv:
+                        sw_vers.setdefault(k, Counter())[sv] += 1
+                if here:
+                    sw_hosts += 1
+            sp = getattr(a, "security_posture", None)
+            if isinstance(sp, dict) and sp:
+                sec["posture"] += 1
+                sec["av"] += bool(sp.get("has_antivirus"))
+                sec["edr"] += bool(sp.get("has_edr"))
+                sec["edr_stopped"] += bool(sp.get("edr_stopped"))
+                sec["protected"] += bool(sp.get("endpoint_protected"))
+                st = sp.get("software_total")
+                if isinstance(st, (int, float)) and st > 0:
+                    sec["packages"] += int(st); sec["inventoried"] += 1
+                cats = sp.get("categories")
+                if isinstance(cats, dict):
+                    for fam, _lbl in SEC_FAMILIES:
+                        if cats.get(fam):
+                            sec_fam[fam] += 1
 
     def side_out(name: str, order) -> Dict[str, Any]:
         classes = []
@@ -389,6 +635,7 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
             b = sides[name][cls]
             classes.append({
                 "label": cls, "n": b["n"], "gap": cls in GAPS, "subtypes": _subs(b["sub"]),
+                "samples": b["samples"],
                 "seen_30d": b["seen_30d"], "owner": b["owner"], "crit": b["crit"],
                 # Host benchmarks and OS end-of-life can't be observed outside-in: n/a, not 0.
                 "cis": b["cis"] if name == "internal" else None,
@@ -400,20 +647,131 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
     out_ext["facets"] = {k: ext[k] for k in ("probed", "live", "cdn_waf", "cloud", "tls_expired", "tls_expiring_30d")}
     out_ext["hosting"] = [{"label": h, "n": ext_host[h], "gap": h in GAPS} for h in HOSTING]
     out_ext["verification"] = [{"label": v, "n": ext_ver[v], "gap": v in GAPS} for v in VERIFICATION]
-    out_int["os"] = [{"label": f, "n": sum(os_fam[f].values()), "gap": f in GAPS, "subtypes": _subs(os_fam[f])}
-                     for f in OS_FAMILIES]
+    # Where the internet-facing surface concentrates: names grouped by registrable domain.
+    out_ext["roots"] = {"distinct": len(roots), "named": sum(roots.values()),
+                        "top": [{"label": k, "n": n} for k, n in roots.most_common(ROOTS_CAP)],
+                        "more": max(0, len(roots) - ROOTS_CAP)}
+    def _os_rows() -> List[Dict[str, Any]]:
+        """OS family → version drill-down, each version tagged with how many of its hosts
+        are past vendor end-of-life (the obsolescence exposure that version detail is for)."""
+        rows = []
+        for f in OS_FAMILIES:
+            c = os_fam[f]
+            top = c.most_common()
+            folded: Set[str] = set()
+            if len(top) > SUBTYPE_CAP:
+                rest = top[SUBTYPE_CAP - 1:]
+                folded = {k for k, _ in rest}
+                top = top[:SUBTYPE_CAP - 1] + [(f"Other ({len(rest)} kinds)", sum(n for _, n in rest))]
+            subs = []
+            for k, n in top:
+                past = sum(os_eol_past[x] for x in folded) if k.startswith("Other (") else os_eol_past.get(k, 0)
+                subs.append({"label": k, "n": n, "eol_past": past,
+                             "gap": k in GAPS or k.endswith("unknown") or "not profiled" in k})
+            rows.append({"label": f, "n": sum(c.values()), "gap": f in GAPS,
+                         "eol_past": sum(os_eol_past[x] for x in c), "subtypes": subs,
+                         "samples": os_samples.get(f, [])})
+        return rows
+    out_int["os"] = _os_rows()
     out_int["facets"] = {"os_profiled": sum(o["n"] for o in out_int["os"] if o["label"] != "OS not visible")}
     allc = out_ext["classes"] + out_int["classes"]
+    cov_seen = sum(c["seen_30d"] for c in allc)
+    cov_owner = sum(c["owner"] for c in allc)
+    cov_cis = sum(c["cis"] or 0 for c in out_int["classes"])
+    crit_all = {k: sum(c["crit"][k] for c in allc) for k in CRITS}
+    os_profiled = out_int["facets"]["os_profiled"]
+    int_total = out_int["total"]
+    unidentified = sides["external"]["Unidentified"]["n"] + sides["internal"]["Unidentified"]["n"]
+
+    governance = {
+        "criticality": crit_all,
+        "environment": [{"label": e.title(), "n": env_c.get(e, 0)} for e in ENVIRONMENTS]
+        + ([{"label": "Other", "n": env_c["other"]}] if env_c.get("other") else [])
+        + [{"label": "Not set", "n": env_c.get("unset", 0), "gap": True}],
+        "data_classification": [{"label": d.title(), "n": dclass_c.get(d, 0)} for d in DATA_CLASSES]
+        + [{"label": "Not set", "n": dclass_c.get("unset", 0), "gap": True}],
+    }
+    provenance = {
+        "origin": [{"label": lbl, "n": origin_c.get(k, 0)} for k, lbl in ORIGIN_LABELS]
+        + ([{"label": "Unknown", "n": origin_c["unknown"], "gap": True}] if origin_c.get("unknown") else []),
+        "managed": disc["managed"], "discovered": disc["discovered"], "baseline": disc["baseline"],
+    }
+    ownership = {
+        "owned": cov_owner, "unowned": total - cov_owner, "with_team": team_n,
+        "teams": [{"label": k, "n": n} for k, n in team_c.most_common(6)],
+    }
+    security = {
+        "scope": sec["scope"], "posture": sec["posture"], "antivirus": sec["av"], "edr": sec["edr"],
+        "edr_stopped": sec["edr_stopped"], "protected": sec["protected"], "packages": sec["packages"],
+        "inventoried": sec["inventoried"],
+        "families": [{"label": lbl, "n": sec_fam.get(k, 0)} for k, lbl in SEC_FAMILIES if sec_fam.get(k)],
+    }
+    compliance = {
+        "cde": cde_n, "ephi": ephi_n, "in_scope": in_scope_n,
+        "regulated": [{"label": r.upper() if r in ("pci", "phi", "pii") else r.title(), "n": reg_c.get(r, 0)}
+                      for r in REGULATED],
+        "regulated_none": total - sum(reg_c.values()),
+        "scopes": [{"label": k, "n": n} for k, n in scope_c.most_common(8)],
+    }
+    freshness = {
+        "buckets": [
+            {"label": "Seen ≤7 days", "n": fresh["d7"]},
+            {"label": "8–30 days", "n": fresh["d30"]},
+            {"label": "31–90 days", "n": fresh["d90"]},
+            {"label": "Over 90 days", "n": fresh["old"], "gap": True},
+            {"label": "Never seen", "n": fresh["never"], "gap": True},
+        ],
+        "stale": fresh["d90"] + fresh["old"] + fresh["never"],
+    }
+    completeness = {
+        "total": total,
+        # n = assets we hold this signal for; of = assets it can apply to (host-only
+        # signals scope to the internal estate — an outside-in asset can't carry them).
+        "dims": [
+            {"key": "classified", "label": "Classified", "n": total - unidentified, "of": total, "scope": "all"},
+            {"key": "owner", "label": "Owner assigned", "n": cov_owner, "of": total, "scope": "all"},
+            {"key": "criticality", "label": "Criticality rated", "n": total - crit_all["unrated"], "of": total, "scope": "all"},
+            {"key": "lifecycle", "label": "Lifecycle set", "n": lifecycle_set, "of": total, "scope": "all"},
+            {"key": "environment", "label": "Environment tagged", "n": env_set, "of": total, "scope": "all"},
+            {"key": "seen30", "label": "Seen ≤30 days", "n": cov_seen, "of": total, "scope": "all"},
+            {"key": "os", "label": "OS profiled", "n": os_profiled, "of": int_total, "scope": "internal"},
+            {"key": "hardware", "label": "Hardware profiled", "n": int_hw, "of": int_total, "scope": "internal"},
+            {"key": "security", "label": "Endpoint posture read", "n": sec["posture"], "of": int_total, "scope": "internal"},
+            {"key": "cis", "label": "CIS benchmarked", "n": cov_cis, "of": int_total, "scope": "internal"},
+        ],
+    }
+    capacity = {
+        "hosts": cap["hosts"], "vcpu": cap["vcpu"], "ram_gb": cap["ram"], "disk_gb": cap["disk"],
+        "valuation_sum": round(cap["val_sum"], 2), "valuation_n": cap["val_n"],
+        "purchase_sum": round(cap["cost_sum"], 2), "purchase_n": cap["cost_n"],
+    }
+    # Estate-wide software & platform versions: internal installed products (DB engines,
+    # web/app servers, apps — carries its own version) + internet-facing service banners.
+    software = {
+        "hosts_reporting": sw_hosts, "products": len(sw_count), "installs": sum(sw_count.values()),
+        **_top_products(sw_count, sw_names, sw_vers, TOP_SOFTWARE),
+        "external": {"sites": tech_sites, "products": len(tech_count),
+                     **_top_products(tech_count, tech_names, tech_vers, TOP_SOFTWARE)},
+    }
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "total": total,
         "external": out_ext,
         "internal": out_int,
-        "coverage": {"seen_30d": sum(c["seen_30d"] for c in allc), "owner": sum(c["owner"] for c in allc),
-                     "cis": sum(c["cis"] or 0 for c in out_int["classes"])},
+        "coverage": {"seen_30d": cov_seen, "owner": cov_owner, "cis": cov_cis},
         "eol": {k: sum(c["eol"][k] for c in out_int["classes"]) for k in ("past", "soon", "known")},
         "lifecycle": [{"label": k, "n": n} for k, n in life.most_common()],
-        "unidentified": sides["external"]["Unidentified"]["n"] + sides["internal"]["Unidentified"]["n"],
+        "unidentified": unidentified,
+        # ── additive estate dimensions (back-compatible; existing keys unchanged) ──
+        "governance": governance,
+        "provenance": provenance,
+        "ownership": ownership,
+        "security": security,
+        "compliance": compliance,
+        "freshness": freshness,
+        "completeness": completeness,
+        "capacity": capacity,
+        "software": software,
     }
 
 
@@ -428,14 +786,25 @@ if __name__ == "__main__":  # self-check on synthetic assets — no DB needed
                     status="active", lifecycle_state=None, os_family=None, os_version=None, os_normalized=None,
                     os_build=None, manufacturer=None, model=None, owner_id=None, primary_owner_id=None,
                     criticality=None, last_seen_at=now - timedelta(days=2), eol_date=None,
-                    platform_properties={}, detected_software_json=None)
+                    platform_properties={}, detected_software_json=None,
+                    environment=None, data_classification=None, department=None, owning_team=None,
+                    discovery_state=None, cde_environment=False, ephi_environment=False,
+                    regulated_data_type="none", compliance_scope=None, valuation=None, purchase_cost=None,
+                    cpu_cores=None, memory_gb=None, storage_gb=None, security_posture=None)
         base.update(kw)
         return NS(**base)
 
     laptop = A(1, platform_kind="server", os_family="windows", os_version="Microsoft Windows 11 Pro 25H2",
                manufacturer="HP", model="HP EliteBook 840 G8 Notebook PC",
                detected_software_json=[{"name": "PostgreSQL 18", "version": "18.0"}])
-    winsrv = A(2, platform_kind="server", os_family="windows", os_version="Microsoft Windows Server 2012 R2 Standard")
+    winsrv = A(2, platform_kind="server", os_family="windows", os_version="Microsoft Windows Server 2012 R2 Standard",
+               environment="production", data_classification="confidential", lifecycle_state="active",
+               owning_team="Platform Ops", discovery_state="managed", origin_source="connect",
+               cpu_cores=8, memory_gb=32, storage_gb=512, regulated_data_type="pci", cde_environment=True,
+               compliance_scope=["PCI-DSS"],
+               security_posture={"has_antivirus": True, "antivirus_products": ["Defender"], "has_edr": True,
+                                 "edr_products": ["Falcon"], "edr_stopped": [], "endpoint_protected": True,
+                                 "software_total": 42, "categories": {"antivirus": 1, "edr": 1, "database": 1}})
     dbsrv = A(3, os_family="linux", os_version="Ubuntu 22.04.4 LTS",
               detected_software_json=[{"name": "postgresql-16", "version": "16.2"}])
     fw = A(4, manufacturer="Fortinet", model="FortiGate 60F")
@@ -448,7 +817,7 @@ if __name__ == "__main__":  # self-check on synthetic assets — no DB needed
         "cdn_waf": "Cloudflare", "ip": "1.2.3.4", "content_type": "text/html", "tls_days_to_expiry": 12}})
     api = A(10, name="api.example.com", origin_source="easm", internet_facing=True, platform_properties={"external_probe": {
         "live": True, "status_code": 200, "scheme": "https", "content_type": "application/json", "asn_org": "AMAZON-02",
-        "ip": "5.6.7.8"}})
+        "server": "nginx/1.25.3", "ip": "5.6.7.8"}})
     rdp = A(11, name="vpn.example.com", origin_source="easm", internet_facing=True)
     unprobed = A(12, name="mail.example.com", origin_source="easm", internet_facing=True)
     dangling = A(13, name="old.example.com", origin_source="easm", internet_facing=True,
@@ -487,5 +856,59 @@ if __name__ == "__main__":  # self-check on synthetic assets — no DB needed
     assert {v["label"]: v["n"] for v in out["external"]["verification"]} == {
         "Live web service": 2, "Open non-web ports": 1, "No web response": 0, "Doesn't resolve": 1, "Not yet probed": 2}
     assert os_bucket("Windows", "Windows (version not profiled)") == "Windows (edition unknown)"
-    assert summarize([], set(), {}, {}, now)["total"] == 0
+
+    # additive estate rollups
+    gov = out["governance"]
+    assert sum(gov["criticality"][k] for k in CRITS) == out["total"]
+    assert {r["label"]: r["n"] for r in gov["environment"]}["Production"] == 1
+    assert {r["label"]: r["n"] for r in gov["data_classification"]}["Confidential"] == 1
+    prov = out["provenance"]
+    assert prov["managed"] == 1 and {r["label"]: r["n"] for r in prov["origin"]}["Credentialed connect"] == 1
+    assert out["ownership"]["with_team"] == 1 and out["ownership"]["teams"][0]["label"] == "Platform Ops"
+    s = out["security"]
+    assert s["scope"] == out["internal"]["total"] and s["posture"] == 1
+    assert s["antivirus"] == 1 and s["edr"] == 1 and s["protected"] == 1 and s["packages"] == 42
+    assert {r["label"]: r["n"] for r in s["families"]}.get("Database engine") == 1
+    comp = out["compliance"]
+    assert comp["cde"] == 1 and comp["in_scope"] == 1 and {r["label"]: r["n"] for r in comp["regulated"]}["PCI"] == 1
+    fr = out["freshness"]
+    assert sum(b["n"] for b in fr["buckets"]) == out["total"] and fr["buckets"][-1]["n"] == 0  # none never-seen
+    cm = out["completeness"]
+    assert len(cm["dims"]) == 10 and cm["dims"][0]["n"] == out["total"] - out["unidentified"]
+    assert out["capacity"]["vcpu"] == 8 and out["capacity"]["hosts"] == 1
+
+    # ── version-level detail (the exec drill-down) ──
+    # OS family → version, each version carrying its obsolescence exposure.
+    assert os_rows["Windows Server"]["subtypes"][0]["label"] == "Windows Server 2012 R2"
+    assert os_rows["Windows Server"]["subtypes"][0]["eol_past"] == 1 and os_rows["Windows Server"]["eol_past"] == 1
+    assert os_rows["Windows client"]["subtypes"][0]["eol_past"] == 0  # Windows 11 is still supported
+    # Internal installed software → product + version + host count, deduped by software_key.
+    sw = out["software"]
+    assert sw["hosts_reporting"] == 2 and sw["products"] == 2 and sw["more"] == 0
+    swk = {r["key"]: r for r in sw["top"]}
+    assert set(swk) == {"postgresql-18", "postgresql-16"}
+    assert swk["postgresql-18"]["n"] == 1 and swk["postgresql-18"]["version"] == "18.0" and swk["postgresql-18"]["label"] == "PostgreSQL 18"
+    assert swk["postgresql-16"]["version"] == "16.2"
+    # Internet-facing service banners → web/app-server tech + version.
+    et = sw["external"]
+    assert et["sites"] == 2 and et["products"] == 2
+    etk = {r["key"]: r for r in et["top"]}
+    assert etk["nginx"]["version"] == "1.25" and etk["cloudflare"]["version"] == ""
+
+    # ── surface concentration + named drill-down samples ──
+    rt = out["external"]["roots"]
+    assert rt["distinct"] == 1 and rt["named"] == 5 and rt["top"][0] == {"label": "example.com", "n": 5}
+    assert _registrable("a.b.co.uk") == "b.co.uk" and _registrable("x.example.com") == "example.com"
+    # Named assets per class (modal key content): id for the detail link, sub = the sub-kind it groups under.
+    assert by["Server"]["samples"][0] == {"id": 2, "name": "a2", "sub": "Windows Server 2012 R2", "crit": ""}
+    assert by["Database"]["samples"][0]["sub"] == "PostgreSQL"  # refined server + port-only DB both land named here
+    assert len(out["external"]["classes"][3]["samples"]) <= SAMPLE_CAP  # Domain/subdomain peek stays bounded
+    # Named assets per OS FAMILY too (finer than class → the OS drill-down modal groups them by version).
+    assert os_rows["Windows client"]["samples"][0] == {"id": 1, "name": "a1", "sub": "Windows 11", "crit": ""}
+    assert os_rows["Windows Server"]["samples"][0]["name"] == "a2" and os_rows["Windows Server"]["samples"][0]["sub"] == "Windows Server 2012 R2"
+
+    empty = summarize([], set(), {}, {}, now)
+    assert empty["total"] == 0 and len(empty["completeness"]["dims"]) == 10 and empty["ownership"]["teams"] == []
+    assert empty["external"]["roots"] == {"distinct": 0, "named": 0, "top": [], "more": 0}
+    assert empty["software"]["top"] == [] and empty["software"]["hosts_reporting"] == 0 and empty["software"]["external"]["top"] == []
     print("estate_overview self-check OK")

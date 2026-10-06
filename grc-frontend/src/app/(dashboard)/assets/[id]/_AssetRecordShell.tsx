@@ -33,7 +33,7 @@ const GLOBE = (
 export default function AssetRecordShell({
   asset, overviewData, displayName, sections, activeTab, onTab, tabCounts,
   canEdit, canDelete, getIcon, onAssessRisk, assessing, onEdit, onLifecycle,
-  onCisScans, onRiskPosture, onDelete, children,
+  onCisScans, onRiskPosture, onRunSurfacePentest, onDelete, children,
 }: any) {
   const signals: Sig[] = Array.isArray(overviewData?.security?.signals) ? overviewData.security.signals : [];
   // External (EASM / domain) asset: warm brown/amber identity + globe, an
@@ -114,6 +114,7 @@ export default function AssetRecordShell({
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
               <button type="button" onClick={onCisScans} style={RAILLINK}>CIS scans →</button>
               <button type="button" onClick={onRiskPosture} style={RAILLINK}>Risk posture →</button>
+              {onRunSurfacePentest && <button type="button" onClick={onRunSurfacePentest} style={RAILLINK} title="Launch an unauthenticated pentest against this surface asset — no credentials">Run surface pentest →</button>}
               {canEdit && <button type="button" onClick={onLifecycle} style={RAILLINK}>Change lifecycle →</button>}
               {canDelete && <button type="button" onClick={onDelete} style={{ ...RAILLINK, color: '#B23A3A' }}>Delete asset</button>}
             </div>

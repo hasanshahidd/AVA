@@ -363,9 +363,7 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'identity',         label: 'Identity Providers',    icon: Shield },
   { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
   // Guided flows promoted into the menu — standalone routes, not /admin tabs.
-  { id: 'connect-wizard',   label: 'Connect Wizard',        icon: Workflow,  href: '/admin/integrations/connect' },
   { id: 'agents',           label: 'Scan Agents',           icon: Bot,       href: '/admin/agents' },
-  { id: 'discover',         label: 'Host Discovery',        icon: Radar,     href: '/admin/discover' },
   { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },
   { id: 'cloud-connectors', label: 'Cloud Connectors',      icon: Globe },
   { id: 'connectors',       label: 'External Connectors',   icon: Layers },

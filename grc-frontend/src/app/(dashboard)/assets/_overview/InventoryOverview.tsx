@@ -1,48 +1,78 @@
 'use client';
 
 /**
- * IT Asset Inventory — Overview: the inventory-native C-level view of the estate.
+ * IT Asset Inventory — Overview: the inventory-native estate dashboard.
  *
- *   1. Estate header — size, health, onboarding and hygiene of the whole estate.
- *   2. External | Internal — two panels, each on its OWN scale, so a 2-asset internal
- *      estate reads as clearly as 243 external names. External: by type + what the
- *      outside-in probe verified. Internal: by infrastructure type + by OS (Windows
- *      Server vs client). Fixed taxonomies, counts + share — same shape at 5 or 5,000.
- *   3. Asset-class matrix — rows = classes, columns = count, share, seen ≤30d, owner,
- *      CIS, criticality mix, end-of-life — beside the needs-attention list.
+ * Its own identity, distinct from the Performance dashboard (risk gauge + module
+ * lenses) and the Vulnerabilities dashboard (findings donut + threat charts):
+ * THIS surface answers "what is the estate MADE OF, and how complete & well-governed
+ * is our knowledge of it" — composition, telemetry coverage and hygiene across every
+ * dimension the Inventory module holds, including the depth that lives in the asset
+ * detail tabs, rolled up estate-wide.
  *
- * Every number is live: /estate-overview (read-only aggregate that buckets each asset
- * from its own signals; counts only), /assets/inventory-overview (health + assessment
- * facts) and /discovery/discovered-devices (onboarding). Nothing is sampled or invented:
- * a failing source says so, an empty class says "none found", unknowns stay grey.
+ * Structure = the SME-approved droplet layout, enriched. A full-width estate-summary strip,
+ * then the External/Internal → class hierarchy as TWO distinct cards (each owning its own
+ * aggregations), the per-class assurance matrix and the largest-gaps list — with the richer
+ * estate lenses laid out around them. 12-col so the matrix can run wider than the gaps list.
+ *   • Estate header — size, external/internal, freshness, ownership, service.
+ *   • External attack surface | Internal estate — by-type / by-infra + a second breakdown
+ *       (outside-in verification · OS family) + coverage stats; EVERY class/OS row is a
+ *       drill-down disclosure (within-kind versions/engines, hygiene, criticality, named
+ *       assets); external also carries a registrable-domain concentration readout.
+ *   • Asset-class matrix | Needs attention — coverage & assurance per class; largest gaps first.
+ *   • Software & versions | Criticality & data · Lifecycle | Ownership · Provenance |
+ *       Telemetry coverage · Endpoint security | Obsolescence · Regulatory scope | Estate scale.
+ *
+ * Every number is live from /estate-overview (read-only aggregate, counts only),
+ * /assets/inventory-overview (performance + attention queue) and
+ * /discovery/discovered-devices (onboarding). Nothing is sampled or invented: a failing
+ * source says so, an empty dimension says "none"/"not collected yet", unknowns stay grey.
  */
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRight, ChevronRight, Globe, Layers, RefreshCw, Server, ShieldCheck } from 'lucide-react';
+import {
+  Activity, AlertTriangle, ArrowRight, Boxes, CalendarClock, ChevronRight, ClipboardCheck, Cpu, Globe,
+  Layers, Monitor, Package, Radar, RefreshCw, Server, ShieldCheck, Users, X,
+} from 'lucide-react';
 import apiClient, { discoveryApi } from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import {
-  BAND, CARD_SHADOW, Empty, FONT, Key, Loading, Pill, SEV, Skel, T, Unavailable,
+  CARD_SHADOW, Empty, FONT, Key, Loading, Pill, SEV, Skel, T, Unavailable,
   alpha, nfmt, pctOf, plural, share, type Tone,
 } from '../../dashboard/_components/kit';
+import { BarList, PartLegend, StackBar, type BarRow, type Part } from '../../dashboard/_components/charts';
 
-/* ---------- API shapes (only the fields this page reads) ---------- */
-type Sub = { label: string; n: number; gap: boolean; subtypes?: Sub[] };
+/* ---------- API shapes (only the fields this page reads; all additive keys optional) ---------- */
+type Named = { label: string; n: number; gap?: boolean };
+type Sample = { id?: number | null; name: string; sub: string; crit?: string };
+type Sub = { label: string; n: number; gap: boolean; eol_past?: number; subtypes?: Sub[]; samples?: Sample[] };
+type SwRow = { key: string; label: string; version: string; n: number };
 type Crit = Record<'critical' | 'high' | 'medium' | 'low' | 'unrated', number>;
 type Eol = { past: number; soon: number; known: number };
-type Cls = { label: string; n: number; gap: boolean; subtypes: Sub[]; seen_30d: number; owner: number; cis: number | null; crit: Crit; eol: Eol | null };
-type Side = { total: number; classes: Cls[]; facets: Record<string, number>; verification?: Sub[]; os?: Sub[] };
+type Roots = { distinct: number; named: number; top: Named[]; more: number };
+type Cls = { label: string; n: number; gap: boolean; subtypes: Sub[]; samples?: Sample[]; seen_30d: number; owner: number; cis: number | null; crit: Crit; eol: Eol | null };
+type Side = { total: number; classes: Cls[]; facets: Record<string, number>; verification?: Sub[]; hosting?: Sub[]; roots?: Roots; os?: Sub[] };
 type Estate = {
   total: number; external: Side; internal: Side; unidentified: number;
-  coverage: { seen_30d: number; owner: number; cis: number }; eol: Eol; lifecycle: { label: string; n: number }[];
+  coverage: { seen_30d: number; owner: number; cis: number }; eol: Eol; lifecycle: Named[];
+  governance?: { criticality: Crit; environment: Named[]; data_classification: Named[] };
+  provenance?: { origin: Named[]; managed: number; discovered: number; baseline: number };
+  ownership?: { owned: number; unowned: number; with_team: number; teams: Named[] };
+  security?: { scope: number; posture: number; antivirus: number; edr: number; edr_stopped: number; protected: number; packages: number; inventoried: number; families: Named[] };
+  compliance?: { cde: number; ephi: number; in_scope: number; regulated: Named[]; regulated_none: number; scopes: Named[] };
+  freshness?: { buckets: Named[]; stale: number };
+  completeness?: { total: number; dims: { key: string; label: string; n: number; of: number; scope: string }[] };
+  capacity?: { hosts: number; vcpu: number; ram_gb: number; disk_gb: number; valuation_sum: number; valuation_n: number; purchase_sum: number; purchase_n: number };
+  software?: { hosts_reporting: number; products: number; installs: number; top: SwRow[]; more: number; external: { sites: number; products: number; top: SwRow[]; more: number } };
 };
 type InvOverview = {
   no_data?: boolean;
   performance?: { score: number | null; grade: string | null };
   attention_queue?: { assets_unassessed: number; open_critical_high_vulns: number };
 };
-type Devices = { devices?: { in_inventory?: boolean; connectable?: boolean }[] };
+type Devices = { devices?: { in_inventory?: boolean }[] };
 type Q<X> = { data?: X | null; isLoading: boolean; isError: boolean; isFetching?: boolean };
 const busy = (q: Q<unknown>) => !!q.isFetching && !q.isLoading;
 
@@ -58,14 +88,16 @@ const REG = '/assets?tab=inventory';
 function Go({ href, ...rest }: { href: string; className?: string; title?: string; children: ReactNode }) {
   return href.startsWith('/assets?') ? <a href={href} {...rest} /> : <Link href={href} {...rest} />;
 }
-/* External / Internal identity: the product's base blue and success green — a validated
-   categorical pair (CVD ΔE 14.9, normal 15.5), always shown with its label + icon.
-   Unknown buckets (unprobed, unidentified, OS not visible) are neutral grey. */
+
+/* Colour language — the product's own tokens only. External = base blue, Internal = success
+   green (the validated categorical pair the register already uses); gaps / unknowns = grey.
+   External / Internal carry a label + icon everywhere, never colour alone. */
+const GREY = '#CBD5E1';
+const EXT_C = T.base, INT_C = T.success;
 const SIDE = {
   external: { c: T.base, name: 'External attack surface', blurb: 'Internet-facing names & services, verified outside-in', icon: Globe, view: 'external' },
   internal: { c: T.success, name: 'Internal estate', blurb: 'Hosts & devices on your networks, read with credentials', icon: Server, view: 'internal' },
 } as const;
-const GREY = '#CBD5E1';
 const CRIT: { k: keyof Crit; label: string; c: string }[] = [
   { k: 'critical', label: 'Critical', c: SEV.critical.c }, { k: 'high', label: 'High', c: SEV.high.c },
   { k: 'medium', label: 'Medium', c: SEV.medium.c }, { k: 'low', label: 'Low', c: SEV.low.c },
@@ -75,6 +107,7 @@ const CRIT: { k: keyof Crit; label: string; c: string }[] = [
 const INT_CORE = ['Server', 'Workstation / endpoint', 'Database', 'Network device', 'Unidentified'];
 const OS_CORE = ['Windows Server', 'Windows client', 'Linux', 'macOS', 'Network OS'];
 const absentNote = (labels: string[]) => (labels.length ? `Also tracked, none found: ${labels.join(' · ')}` : undefined);
+
 /* Page-scope fixes, injected once by the overview:
    1. flip the (cream) asset-suite canvas to the dashboard grey so the white cards lift off it;
    2. the asset page wraps every tab in `.assets-light`, whose global rules paint h2/p/li/span/
@@ -83,12 +116,20 @@ const absentNote = (labels: string[]) => (labels.length ? `Also tracked, none fo
 const INK = ['#0F172A', '#334155', '#475569', '#64748B', '#94A3B8', '#CBD5E1', '#005B96'];
 const SCOPE_CSS = [
   '.asset-suite:has([data-inv-overview]),main:has([data-inv-overview]){background:#EDF0F5}',
-  '[data-inv-overview] :is(h1,h2,h3,h4,h5,p,li,label,span){color:inherit}',
+  '[data-inv-overview] :is(h1,h2,h3,h4,h5,p,li,label,span,dt,dd){color:inherit}',
   '[data-inv-overview] :is(table,tr,td){color:inherit!important}',
   '[data-inv-overview] td{font-size:inherit}',
   ...INK.map((c) => `[data-inv-overview] [class~="text-[${c}]"]{color:${c}!important}`),
   '[data-inv-overview] [class~="hover:text-[#014A81]"]:hover{color:#014A81!important}',
   '[data-inv-overview] a:hover>span[class~="text-[#334155]"]{color:#005B96!important}',
+].join('');
+/* The drill-down modal renders in a portal on <body> (outside .assets-light + the zoom:0.8
+   container), so it needs its own scoped colour re-assertion — the same INK utilities, the
+   anti-flatten rule, and a de-dimmed muted/subtle set — keyed off [data-inv-modal]. */
+const MODAL_CSS = [
+  '[data-inv-modal] :is(h1,h2,h3,h4,h5,p,li,label,span,dt,dd,b,a){color:inherit}',
+  ...INK.map((c) => `[data-inv-modal] [class~="text-[${c}]"]{color:${c}!important}`),
+  '[data-inv-modal] a[class~="hover:text-[#005B96]"]:hover,[data-inv-modal] a:hover [class~="hover:text-[#005B96]"]{color:#005B96!important}',
 ].join('');
 
 export default function InventoryOverview() {
@@ -107,11 +148,16 @@ export default function InventoryOverview() {
   const [updated, setUpdated] = useState(0);
   useEffect(() => { if (!fetching && latest) setUpdated(latest); }, [fetching, latest]);
   const refresh = () => Object.values(KEYS).forEach((queryKey) => qc.invalidateQueries({ queryKey, refetchType: 'all' }));
-
   const d = estateQ.data;
+
   return (
+    // The SME-approved droplet layout: a full-width summary strip, then the External/Internal →
+    // class hierarchy as two DISTINCT cards (each owning its own aggregations), the per-class
+    // assurance matrix and the largest-gaps list — with the richer estate lenses laid out around
+    // them. 12-col so the matrix (8) can run wider than the attention list (4); everything else pairs 6/6.
     <div data-inv-overview className="mx-auto grid w-full max-w-[1950px] grid-cols-1 gap-3 text-[#0F172A] xl:grid-cols-12" style={{ fontFamily: FONT, zoom: 0.8 }}>
       <style>{SCOPE_CSS}</style>
+
       <EstateHeader estate={estateQ} inv={invQ} devices={devicesQ} className="xl:col-span-12"
         stamp={
           <div className="flex shrink-0 items-center gap-3 px-5 text-[12px] text-[#64748B]">
@@ -125,11 +171,14 @@ export default function InventoryOverview() {
             </button>
           </div>
         } />
+
+      {/* ── SME-approved core: External | Internal (two distinct cards), then the matrix & the gaps list ── */}
       <SidePanel kind="external" q={estateQ} className="xl:col-span-6"
         lists={d ? [
-          { title: 'By type', rows: d.external.classes.map(asRow) },
-          { title: 'Outside-in verification', rows: d.external.verification ?? [] },
+          { title: 'By type', mode: 'class', rows: d.external.classes },
+          { title: 'Outside-in verification', mode: 'plain', rows: d.external.verification ?? [] },
         ] : []}
+        roots={d?.external.roots}
         stats={d ? [
           { label: 'Probed outside-in', value: share(d.external.facets.probed, d.external.total) || '0%', sub: `${nfmt(d.external.facets.probed)} of ${nfmt(d.external.total)} names` },
           { label: 'Behind CDN / WAF', value: nfmt(d.external.facets.cdn_waf), sub: `of ${nfmt(d.external.facets.probed)} probed` },
@@ -138,8 +187,8 @@ export default function InventoryOverview() {
         ] : []} />
       <SidePanel kind="internal" q={estateQ} className="xl:col-span-6"
         lists={d ? [
-          { title: 'By infrastructure type', rows: d.internal.classes.filter((c) => c.n > 0 || INT_CORE.includes(c.label)).map(asRow) },
-          { title: 'By operating system', rows: (d.internal.os ?? []).filter((o) => o.n > 0 || OS_CORE.includes(o.label)).map((o) => ({ ...o, suffix: versions(o) })) },
+          { title: 'By infrastructure type', mode: 'class', rows: d.internal.classes.filter((c) => c.n > 0 || INT_CORE.includes(c.label)) },
+          { title: 'By operating system', mode: 'os', rows: (d.internal.os ?? []).filter((o) => o.n > 0 || OS_CORE.includes(o.label)) },
         ] : []}
         note={d ? absentNote(d.internal.classes.filter((c) => !c.n && !INT_CORE.includes(c.label)).map((c) => c.label)) : undefined}
         stats={d ? [
@@ -150,28 +199,37 @@ export default function InventoryOverview() {
         ] : []} />
       <ClassMatrix q={estateQ} className="xl:col-span-8" />
       <AttentionCard estate={estateQ} inv={invQ} className="xl:col-span-4" />
+
+      {/* ── Richer estate lenses around the core ── */}
+      {/* Paired by natural height so neither card in a row stretches to leave a blank gap:
+          tall with tall (software·security, coverage·compliance), the figure-light pair last. */}
+      <SoftwareCard q={estateQ} className="xl:col-span-6" />
+      <SecurityCard q={estateQ} className="xl:col-span-6" />
+      <CoverageCard q={estateQ} className="xl:col-span-6" />
+      <ComplianceCard q={estateQ} className="xl:col-span-6" />
+      <ClassificationCard q={estateQ} className="xl:col-span-6" />
+      <OwnershipCard q={estateQ} className="xl:col-span-6" />
+      <LifecycleCard q={estateQ} className="xl:col-span-6" />
+      <ProvenanceCard q={estateQ} className="xl:col-span-6" />
+      <ObsolescenceCard q={estateQ} className="xl:col-span-6" />
+      <ScaleCard q={estateQ} className="xl:col-span-6" />
     </div>
   );
 }
 
-type Row = { label: string; n: number; gap: boolean; suffix?: string };
-const asRow = (c: Cls): Row => ({ label: c.label, n: c.n, gap: c.gap });
-/** "11 ×2 · 10 ×1" — the versions behind an OS row, without repeating the family. */
-const versions = (o: Sub) => (o.subtypes ?? []).filter((s) => s.label !== o.label)
-  .map((s) => `${s.label.replace(/^Windows (Server )?/, '')} ×${nfmt(s.n)}`).slice(0, 3).join(' · ');
-
 /* ---------- shared card chrome (one header style for every surface) ---------- */
-function Box({ title, sub, aside, accent, busy: dim, className = '', children }: {
-  title: ReactNode; sub?: ReactNode; aside?: ReactNode; accent?: string; busy?: boolean; className?: string; children: ReactNode;
+function Box({ title, sub, icon, aside, accent, busy: dim, className = '', children }: {
+  title: ReactNode; sub?: ReactNode; icon?: ReactNode; aside?: ReactNode; accent?: string; busy?: boolean; className?: string; children: ReactNode;
 }) {
   return (
     <section aria-busy={dim || undefined}
-      className={`flex min-w-0 flex-col rounded-[14px] border border-[#E2E5EC] bg-white px-5 pb-4 pt-4 ${CARD_SHADOW} ${className}`}
+      className={`flex min-w-0 flex-col rounded-[14px] border border-[#E2E5EC] bg-white p-[18px] ${CARD_SHADOW} ${className}`}
       style={accent ? { borderTop: `3px solid ${accent}` } : undefined}>
-      <header className="mb-3 flex items-start gap-3">
+      <header className="mb-3 flex items-start gap-2.5">
+        {icon && <span aria-hidden className="mt-[1px] grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px]" style={{ background: alpha(accent ?? T.base, 0.1), color: accent ?? T.base }}>{icon}</span>}
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 truncate font-semibold text-[#0F172A] !text-[14.5px] !leading-[1.3]">{title}</h2>
-          {sub && <p className="m-0 mt-0.5 truncate text-[12px] text-[#64748B]">{sub}</p>}
+          <h2 className="m-0 truncate font-semibold text-[#0F172A] !text-[13.5px] !leading-[1.3]">{title}</h2>
+          {sub && <p className="m-0 mt-0.5 truncate text-[11.5px] text-[#64748B]">{sub}</p>}
         </div>
         {aside}
       </header>
@@ -180,32 +238,53 @@ function Box({ title, sub, aside, accent, busy: dim, className = '', children }:
   );
 }
 const MoreLink = ({ href, children }: { href: string; children: ReactNode }) => (
-  <Go href={href} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md text-[12px] font-semibold text-[#005B96] hover:text-[#014A81] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005B96]">
+  <Go href={href} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md text-[12px] font-semibold text-[#005B96] hover:text-[#014A81]">
     {children}<ArrowRight size={13} aria-hidden />
   </Go>
 );
+const Eyebrow = ({ children }: { children: ReactNode }) => (
+  <p className="m-0 mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.07em] text-[#94A3B8]">{children}</p>
+);
+/** Small labelled figure (local — tolerant of ReactNode values + alarm tone). */
+function Fig({ label, value, sub, alarm }: { label: ReactNode; value: ReactNode; sub?: ReactNode; alarm?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="m-0 truncate text-[11px] font-medium text-[#64748B]">{label}</p>
+      <p className="m-0 mt-0.5 flex items-baseline gap-1.5 text-[19px] font-semibold leading-[1.15]" style={{ color: alarm ? SEV.critical.ink : '#0F172A' }}>{value}</p>
+      {sub && <p className="m-0 mt-0.5 truncate text-[11px] leading-[1.4] text-[#64748B]">{sub}</p>}
+    </div>
+  );
+}
+const bars = (rows: Named[] | undefined, color = T.base): BarRow[] =>
+  (rows ?? []).map((r) => ({ key: r.label, label: r.label, n: r.n, c: r.gap ? GREY : color, title: r.label }));
+/** Standard body gate: loading skeleton, failed-source notice, or the real content. */
+function body<X>(q: Q<X>, what: string, render: (d: X) => ReactNode, rows = 6): ReactNode {
+  if (q.isLoading) return <Loading rows={rows} />;
+  if (!q.data) return <Unavailable what={what} />;
+  return render(q.data);
+}
 
 /* ---------- 1) Estate header ---------- */
 const GRADE_TONE: Record<string, Tone> = {
-  excellent: { ...BAND.contained, label: 'Excellent' }, good: { ...BAND.contained, label: 'Good' },
+  excellent: { ...SEV.info, label: 'Excellent', c: T.success, ink: T.success, bg: '#E7F5EE' },
+  good: { ...SEV.info, label: 'Good', c: T.success, ink: T.success, bg: '#E7F5EE' },
   fair: { ...SEV.medium, label: 'Fair' }, poor: { ...SEV.critical, label: 'Poor' },
 };
-
 function EstateHeader({ estate, inv, devices, stamp, className }: { estate: Q<Estate>; inv: Q<InvOverview>; devices: Q<Devices>; stamp: ReactNode; className: string }) {
   const d = estate.data;
   const p = inv.data?.performance;
   const devs = devices.data?.devices ?? [];
   const onboarded = devs.filter((x) => x.in_inventory).length;
   const active = d?.lifecycle.find((l) => l.label === 'active')?.n ?? 0;
-  const tone = GRADE_TONE[p?.grade ?? ''] ?? BAND.unknown;
+  const tone = GRADE_TONE[p?.grade ?? ''] ?? SEV.info;
   const cells: { key: string; label: string; href: string; loading: boolean; value: ReactNode; sub: ReactNode }[] = [
     { key: 'estate', label: 'Asset estate', href: REG, loading: estate.isLoading,
-      value: d ? nfmt(d.total) : '—', sub: d ? <><Dot c={SIDE.external.c} />{nfmt(d.external.total)} external<Dot c={SIDE.internal.c} />{nfmt(d.internal.total)} internal</> : 'unavailable' },
+      value: d ? nfmt(d.total) : '—', sub: d ? <><Dot c={EXT_C} />{nfmt(d.external.total)} external<Dot c={INT_C} />{nfmt(d.internal.total)} internal</> : 'unavailable' },
     { key: 'health', label: 'Inventory health', href: '/risk-posture', loading: inv.isLoading,
       value: p?.score != null ? <span className="inline-flex items-baseline gap-2">{p.score.toFixed(1)}<span className="text-[12px] font-medium text-[#64748B]">/ 100</span><Pill tone={tone}>{tone.label}</Pill></span> : '—',
       sub: p?.score != null ? 'target 85 · see Risk posture' : inv.data ? 'not scored yet' : 'unavailable' },
     { key: 'onboarded', label: 'Onboarded from discovery', href: '/asset-discovery', loading: devices.isLoading,
-      value: devs.length ? `${pctOf(onboarded, devs.length)}%` : '—', sub: devices.data ? (devs.length ? `${nfmt(onboarded)} of ${nfmt(devs.length)} discovered devices` : 'nothing discovered yet') : 'unavailable' },
+      value: devs.length ? `${pctOf(onboarded, devs.length)}%` : '—', sub: devices.data ? (devs.length ? `${nfmt(onboarded)} of ${nfmt(devs.length)} discovered` : 'nothing discovered yet') : 'unavailable' },
     { key: 'seen', label: 'Seen in last 30 days', href: `${REG}&view=stale`, loading: estate.isLoading,
       value: d?.total ? share(d.coverage.seen_30d, d.total) || '0%' : '—', sub: d ? `${nfmt(d.coverage.seen_30d)} of ${nfmt(d.total)} assets` : 'unavailable' },
     { key: 'owner', label: 'Owner assigned', href: `${REG}&view=unowned`, loading: estate.isLoading,
@@ -218,7 +297,7 @@ function EstateHeader({ estate, inv, devices, stamp, className }: { estate: Q<Es
       <div className="grid min-w-0 flex-1 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {cells.map((c, i) => (
           <Go key={c.key} href={c.href}
-            className={`group flex min-w-0 flex-col justify-center px-5 py-2.5 transition hover:bg-[#F6F7FB] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#005B96] ${i ? 'border-l border-[#EEF1F5]' : ''}`}>
+            className={`group flex min-w-0 flex-col justify-center px-5 py-2.5 transition hover:bg-[#F6F7FB] ${i ? 'border-l border-[#EEF1F5]' : ''}`}>
             <span className="flex items-center gap-1 truncate text-[11.5px] font-medium text-[#64748B]">{c.label}<ChevronRight size={12} aria-hidden className="text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" /></span>
             {c.loading ? <Skel h={24} w="55%" className="my-1" /> : <span className="mt-0.5 truncate text-[22px] font-semibold leading-[1.2] text-[#0F172A]">{c.value}</span>}
             <span className="truncate text-[11.5px] text-[#64748B]">{c.sub}</span>
@@ -231,10 +310,24 @@ function EstateHeader({ estate, inv, devices, stamp, className }: { estate: Q<Es
 }
 const Dot = ({ c }: { c: string }) => <i aria-hidden className="ml-2.5 mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle first:ml-0" style={{ background: c }} />;
 
-/* ---------- 2) External | Internal panels ---------- */
+/* ---------- 2) External | Internal panels (the SME droplet structure + drill-down depth) ----------
+   Two distinct cards, each owning its own aggregations: a by-type / by-infrastructure list and a
+   second list (outside-in verification for external, OS family for internal), a coverage-stat
+   footer, and — external only — a registrable-domain concentration readout. Each class/OS row opens
+   a blur-background pop-up modal: the within-kind breakdown (versions / engines / exposed services),
+   governance & hygiene, criticality, and the actual named assets grouped by sub-kind / version. */
+/** "11 ×2 · 10 ×1" — the versions behind an OS row, without repeating the family. */
+const versions = (o: Sub) => (o.subtypes ?? []).filter((s) => s.label !== o.label)
+  .map((s) => `${s.label.replace(/^Windows (Server )?/, '')} ×${nfmt(s.n)}`).slice(0, 3).join(' · ');
+
 type Stat = { label: string; value: string; sub?: string; alarm?: boolean };
-function SidePanel({ kind, q, lists, note, stats, className }: {
-  kind: keyof typeof SIDE; q: Q<Estate>; lists: { title: string; rows: Row[] }[]; note?: string; stats: Stat[]; className: string;
+type ListSpec =
+  | { title: string; mode: 'class'; rows: Cls[] }
+  | { title: string; mode: 'os'; rows: Sub[] }
+  | { title: string; mode: 'plain'; rows: { label: string; n: number; gap: boolean }[] };
+
+function SidePanel({ kind, q, lists, note, stats, roots, className }: {
+  kind: keyof typeof SIDE; q: Q<Estate>; lists: ListSpec[]; note?: string; stats: Stat[]; roots?: Roots; className: string;
 }) {
   const s = SIDE[kind];
   const d = q.data;
@@ -267,9 +360,25 @@ function SidePanel({ kind, q, lists, note, stats, className }: {
   else body = (
     <>
       <div className="grid flex-1 grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-        {lists.map((l) => <BarList key={l.title} title={l.title} rows={l.rows} total={side.total} color={s.c} where={kind} />)}
+        {lists.map((l) => <PanelList key={l.title} spec={l} total={side.total} color={s.c} where={kind} />)}
       </div>
       {note && <p className="m-0 mt-1.5 truncate text-[11.5px] text-[#94A3B8]" title={note}>{note}</p>}
+      {roots && roots.distinct > 0 && (
+        <div className="mt-3 border-t border-[#EEF1F5] pt-2.5">
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <Eyebrow>Surface concentration</Eyebrow>
+            <span className="text-[11px] text-[#64748B]">{nfmt(roots.named)} names · {nfmt(roots.distinct)} registrable {roots.distinct === 1 ? 'domain' : 'domains'}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {roots.top.map((r) => (
+              <span key={r.label} title={`${r.label}: ${plural(r.n, 'name')}`} className="inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[#E6EAF0] bg-white px-2 py-[3px] text-[11px]">
+                <span className="max-w-[160px] truncate font-medium text-[#334155]">{r.label}</span><b className="tabular-nums text-[#0F172A]">{nfmt(r.n)}</b>
+              </span>
+            ))}
+            {roots.more > 0 && <span className="inline-flex items-center rounded-[7px] bg-[#F1F5F9] px-2 py-[3px] text-[11px] font-medium text-[#64748B]">+{nfmt(roots.more)} more</span>}
+          </div>
+        </div>
+      )}
       <dl className="m-0 mt-3 grid grid-cols-2 border-t border-[#EEF1F5] pt-3 md:grid-cols-4">
         {stats.map((st, i) => (
           <div key={st.label} className={`min-w-0 px-3 first:pl-0 ${i ? 'md:border-l md:border-[#EEF1F5]' : ''}`}>
@@ -285,39 +394,246 @@ function SidePanel({ kind, q, lists, note, stats, className }: {
   );
   return <Box title={title} aside={aside} accent={s.c} busy={busy(q)} className={className}>{body}</Box>;
 }
-
-/** Fixed-taxonomy bar list on its own scale (the longest bar = this list's largest bucket),
-    so a 2-asset side reads as clearly as a 243-asset one. Two-line rows give the label the
-    full width (never clipped) and the bar the full track; rows share the panel height. */
-function BarList({ title, rows, total, color, where }: { title: string; rows: Row[]; total: number; color: string; where: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.n));
+/** A fixed-taxonomy list on its own scale (longest bar = this list's largest bucket, so a
+    2-asset side reads as clearly as a 243-asset one). Class and OS rows are drill-down
+    disclosures; outside-in verification rows are plain. */
+function PanelList({ spec, total, color, where }: { spec: ListSpec; total: number; color: string; where: 'external' | 'internal' }) {
+  const max = Math.max(1, ...spec.rows.map((r) => (r as { n: number }).n));
   return (
     <div className="flex min-w-0 flex-col">
       <div className="mb-0.5 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-[.06em] text-[#94A3B8]">
-        <span className="min-w-0 flex-1 truncate">{title}</span><span className="w-[40px] text-right">No.</span><span className="w-[40px] text-right">Share</span>
+        <span className="min-w-0 flex-1 truncate">{spec.title}</span><span className="w-[40px] text-right">No.</span><span className="w-[40px] text-right">Share</span><span className="w-[16px] shrink-0" />
       </div>
       <ul className="m-0 flex flex-1 list-none flex-col p-0">
-        {rows.map((r) => (
-          <li key={r.label} title={`${r.label}: ${nfmt(r.n)} · ${share(r.n, total) || '0%'} of ${where}${r.suffix ? ` (${r.suffix})` : ''}`}
-            className="flex min-h-[31px] flex-1 flex-col justify-center gap-[4px]">
-            <div className="flex items-baseline gap-2">
-              <span className={`min-w-0 flex-1 truncate text-[12.5px] ${r.n ? 'text-[#0F172A]' : 'text-[#94A3B8]'}`}>
-                {r.label}{r.suffix ? <span className="text-[11.5px] text-[#94A3B8]"> · {r.suffix}</span> : null}
-              </span>
-              <span className={`w-[40px] text-right text-[13px] font-semibold tabular-nums ${r.n ? 'text-[#0F172A]' : 'text-[#CBD5E1]'}`}>{nfmt(r.n)}</span>
-              <span className="w-[40px] text-right text-[12px] tabular-nums text-[#64748B]">{r.n ? share(r.n, total) : '—'}</span>
-            </div>
-            <div className="h-[6px] rounded-full bg-[#F1F4F8]">
-              {r.n > 0 && <div className="h-full min-w-[6px] rounded-full" style={{ width: `${(r.n / max) * 100}%`, background: r.gap ? GREY : color }} />}
-            </div>
-          </li>
-        ))}
+        {spec.mode === 'class' && spec.rows.map((c) => <ClassBar key={c.label} cls={c} total={total} max={max} color={color} where={where} />)}
+        {spec.mode === 'os' && spec.rows.map((o) => <OsBar key={o.label} os={o} total={total} max={max} color={color} />)}
+        {spec.mode === 'plain' && spec.rows.map((r) => <PlainBar key={r.label} row={r} total={total} max={max} color={color} />)}
       </ul>
     </div>
   );
 }
+/** Clean two-line bar row — the row content (and, where expandable, the modal trigger's face).
+    A chevron marks the rows that open a drill-down pop-up. */
+function BarRowBody({ label, n, total, max, gap, color, expandable }: {
+  label: ReactNode; n: number; total: number; max: number; gap: boolean; color: string; expandable: boolean;
+}) {
+  return (
+    <>
+      <div className="flex items-baseline gap-2">
+        <span className={`min-w-0 flex-1 truncate text-[12.5px] ${n ? 'text-[#0F172A]' : 'text-[#94A3B8]'}`}>{label}</span>
+        <span className={`w-[40px] text-right text-[13px] font-semibold tabular-nums ${n ? 'text-[#0F172A]' : 'text-[#CBD5E1]'}`}>{nfmt(n)}</span>
+        <span className="w-[40px] text-right text-[12px] tabular-nums text-[#64748B]">{n ? share(n, total) : '—'}</span>
+        {expandable ? <ChevronRight size={13} aria-hidden className="w-[16px] shrink-0 text-[#94A3B8]" /> : <span className="w-[16px] shrink-0" />}
+      </div>
+      <div className="h-[6px] rounded-full bg-[#F1F4F8]">
+        {n > 0 && <div className="h-full min-w-[6px] rounded-full" style={{ width: `${(n / max) * 100}%`, background: gap ? GREY : color }} />}
+      </div>
+    </>
+  );
+}
+const triggerCls = 'flex w-full min-h-[31px] cursor-pointer flex-col justify-center gap-[4px] rounded-[6px] px-1.5 text-left transition hover:bg-[#F3F7FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005B96]';
 
-/* ---------- 3) Asset-class matrix ---------- */
+/** Blur-background pop-up: a fixed scrim (dim + backdrop blur) over the whole dashboard, a
+    centered white panel whose body scrolls internally. Click-scrim / Esc / X closes. Rendered in a
+    <body> portal so the dashboard's zoom:0.8 and .assets-light colour scope don't touch it. */
+function DrillModal({ color, title, meta, onClose, children }: {
+  color: string; title: ReactNode; meta?: ReactNode; onClose: () => void; children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div data-inv-modal role="presentation" onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+               padding: 16, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', fontFamily: FONT }}>
+      <style>{MODAL_CSS}</style>
+      <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
+        style={{ width: 'min(580px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                 background: '#fff', borderRadius: 16, border: '1px solid #E2E5EC', borderTop: `3px solid ${color}`, boxShadow: '0 24px 64px rgba(15,23,42,0.3)' }}>
+        <header style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px 12px', borderBottom: '1px solid #EEF1F5' }}>
+          <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: color, marginTop: 5, flex: 'none' }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: '#0F172A', lineHeight: 1.3 }}>{title}</div>
+            {meta && <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>{meta}</div>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, flex: 'none', borderRadius: 8, border: '1px solid #E2E5EC', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+            <X size={15} aria-hidden />
+          </button>
+        </header>
+        <div style={{ overflowY: 'auto', padding: 16 }}>{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** The real asset NAMES, grouped by the sub-kind / version they fall under (class → sub → the
+    actual machines/hosts/domains). Each name links to its detail where an id exists; larger sets
+    link out to the register. Honest empty state when no names are recorded. */
+function SampleNames({ samples, total, where }: { samples?: Sample[]; total: number; where: 'external' | 'internal' }) {
+  const list = samples ?? [];
+  const groups: { sub: string; items: Sample[] }[] = [];
+  const idx = new Map<string, number>();
+  for (const s of list) {
+    const k = s.sub || 'Other';
+    let i = idx.get(k);
+    if (i === undefined) { i = groups.length; idx.set(k, i); groups.push({ sub: k, items: [] }); }
+    groups[i].items.push(s);
+  }
+  const critC = (c?: string) => (c ? (SEV as Record<string, Tone>)[c]?.c ?? GREY : '');
+  return (
+    <div className="min-w-0">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <Eyebrow>Named assets</Eyebrow>
+        {list.length > 0 && <span className="text-[11px] text-[#64748B]">{nfmt(list.length)}{total > list.length ? ` of ${nfmt(total)}` : ''} shown</span>}
+      </div>
+      {list.length === 0 ? (
+        <p className="m-0 text-[11.5px] text-[#94A3B8]">No named assets recorded for this group.</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {groups.map((g) => (
+            <div key={g.sub} className="min-w-0">
+              <p className="m-0 mb-1 text-[11.5px] font-semibold text-[#334155]">{g.sub} <span className="font-normal text-[#94A3B8]">· {nfmt(g.items.length)}</span></p>
+              <div className="flex flex-wrap gap-1.5">
+                {g.items.map((s, i) => {
+                  const inner = (
+                    <>
+                      {s.crit && <i aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: critC(s.crit) }} title={s.crit} />}
+                      <span className="max-w-[210px] truncate">{s.name}</span>
+                    </>
+                  );
+                  return s.id != null ? (
+                    <Link key={`${s.id}-${i}`} href={`/assets/${s.id}`} title={`${s.name}${s.crit ? ` · ${s.crit}` : ''}`}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[#E6EAF0] bg-white px-2 py-[3px] text-[11px] font-medium text-[#334155] transition hover:border-[#C7D2E4] hover:text-[#005B96]">
+                      {inner}
+                    </Link>
+                  ) : (
+                    <span key={`n-${i}`} title={s.name} className="inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[#E6EAF0] bg-white px-2 py-[3px] text-[11px] font-medium text-[#334155]">
+                      {inner}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {total > list.length && <div className="pt-0.5"><MoreLink href={`${REG}&view=${where}`}>View all {nfmt(total)} in the register</MoreLink></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassBar({ cls, total, max, color, where }: { cls: Cls; total: number; max: number; color: string; where: 'external' | 'internal' }) {
+  const [open, setOpen] = useState(false);
+  const subs = (cls.subtypes ?? []).filter((s) => s.n > 0);
+  const row = <BarRowBody label={cls.label} n={cls.n} total={total} max={max} gap={cls.gap} color={color} expandable={cls.n > 0} />;
+  if (cls.n === 0) return <li className="flex min-h-[31px] flex-col justify-center gap-[4px] px-1.5" title={`${cls.label}: 0`}>{row}</li>;
+  return (
+    <li>
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={triggerCls}>{row}</button>
+      {open && (
+        <DrillModal color={color} onClose={() => setOpen(false)} title={cls.label}
+          meta={<>{nfmt(cls.n)} {cls.n === 1 ? 'asset' : 'assets'} · {share(cls.n, total) || '0%'} of {where === 'external' ? 'external surface' : 'internal estate'}</>}>
+          <Eyebrow>{where === 'internal' ? 'OS / engine within this kind' : 'Exposure within this kind'}</Eyebrow>
+          <SubBreakdown subs={subs} color={color} />
+          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><CoverageStrip cls={cls} side={where} /></div>
+          <div className="mt-3"><CritMini crit={cls.crit} n={cls.n} /></div>
+          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><SampleNames samples={cls.samples} total={cls.n} where={where} /></div>
+        </DrillModal>
+      )}
+    </li>
+  );
+}
+function OsBar({ os, total, max, color }: { os: Sub; total: number; max: number; color: string }) {
+  const [open, setOpen] = useState(false);
+  const vers = (os.subtypes ?? []).filter((v) => v.n > 0 && v.label !== os.label);
+  const suffix = versions(os);
+  const label = <>{os.label}{suffix ? <span className="text-[11.5px] text-[#94A3B8]"> · {suffix}</span> : null}</>;
+  const openable = os.n > 0 && (vers.length > 0 || (os.samples?.length ?? 0) > 0);
+  const row = <BarRowBody label={label} n={os.n} total={total} max={max} gap={os.gap} color={color} expandable={openable} />;
+  if (!openable) return <li className="flex min-h-[31px] flex-col justify-center gap-[4px] px-1.5" title={`${os.label}: ${nfmt(os.n)}${suffix ? ` (${suffix})` : ''}`}>{row}</li>;
+  return (
+    <li>
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={triggerCls}>{row}</button>
+      {open && (
+        <DrillModal color={color} onClose={() => setOpen(false)} title={os.label}
+          meta={<>{nfmt(os.n)} {os.n === 1 ? 'host' : 'hosts'}{(os.eol_past ?? 0) > 0 ? ` · ${nfmt(os.eol_past)} past end-of-life` : ''}</>}>
+          <Eyebrow>Versions in use</Eyebrow>
+          <SubBreakdown subs={vers} color={color} />
+          {(os.eol_past ?? 0) > 0 && <p className="m-0 mt-2 text-[11px] font-medium" style={{ color: SEV.critical.ink }}>{nfmt(os.eol_past)} past vendor end-of-life</p>}
+          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><SampleNames samples={os.samples} total={os.n} where="internal" /></div>
+        </DrillModal>
+      )}
+    </li>
+  );
+}
+function PlainBar({ row, total, max, color }: { row: { label: string; n: number; gap: boolean }; total: number; max: number; color: string }) {
+  return (
+    <li className="flex min-h-[31px] flex-col justify-center gap-[4px] px-1.5" title={`${row.label}: ${nfmt(row.n)} · ${share(row.n, total) || '0%'}`}>
+      <BarRowBody label={row.label} n={row.n} total={total} max={max} gap={row.gap} color={color} expandable={false} />
+    </li>
+  );
+}
+function SubBreakdown({ subs, color }: { subs: Sub[]; color: string }) {
+  if (!subs.length) return <p className="m-0 mt-1 text-[11px] text-[#94A3B8]">Not profiled yet.</p>;
+  const max = Math.max(1, ...subs.map((s) => s.n));
+  return (
+    <ul className="m-0 mt-1 flex list-none flex-col gap-[6px] p-0">
+      {subs.map((s) => (
+        <li key={s.label} className="flex items-center gap-2 text-[11.5px]" title={(s.eol_past ?? 0) > 0 ? `${s.label}: ${s.eol_past} past vendor end-of-life` : s.label}>
+          <span className="min-w-0 flex-1 truncate" style={{ color: s.gap ? '#94A3B8' : '#334155' }}>{s.label}</span>
+          {(s.eol_past ?? 0) > 0 && <span aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: SEV.critical.c }} title={`${s.eol_past} past end-of-life`} />}
+          <span className="h-[6px] w-[48px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
+            <span className="block h-full rounded-full" style={{ width: `${(s.n / max) * 100}%`, minWidth: s.n > 0 ? 3 : 0, background: s.gap ? GREY : color }} />
+          </span>
+          <span className="w-[30px] shrink-0 text-right tabular-nums text-[#64748B]">{nfmt(s.n)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+function Mini({ label, value, alarm }: { label: ReactNode; value: ReactNode; alarm?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="m-0 truncate text-[10px] font-medium uppercase tracking-[.04em] text-[#94A3B8]">{label}</p>
+      <p className="m-0 text-[13px] font-semibold leading-[1.2] tabular-nums" style={{ color: alarm ? SEV.critical.ink : '#0F172A' }}>{value}</p>
+    </div>
+  );
+}
+function CoverageStrip({ cls, side }: { cls: Cls; side: 'external' | 'internal' }) {
+  const metrics: { label: string; value: ReactNode; alarm?: boolean }[] = [
+    { label: 'Seen ≤30d', value: share(cls.seen_30d, cls.n) || '0%' },
+    { label: 'Owner', value: share(cls.owner, cls.n) || '0%', alarm: cls.owner < cls.n },
+  ];
+  if (side === 'internal') {
+    if (cls.cis != null) metrics.push({ label: 'CIS', value: share(cls.cis, cls.n) || '0%' });
+    if (cls.eol) metrics.push({ label: 'Past EOL', value: nfmt(cls.eol.past), alarm: cls.eol.past > 0 });
+  }
+  return <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-2 min-[380px]:grid-cols-4 sm:grid-cols-2">{metrics.map((m) => <Mini key={m.label} {...m} />)}</div>;
+}
+function CritMini({ crit, n }: { crit: Crit; n: number }) {
+  const parts: Part[] = CRIT.map((x) => ({ key: x.k, label: x.label, n: crit[x.k] ?? 0, c: x.c }));
+  const rated = parts.filter((p) => p.key !== 'unrated').reduce((s, p) => s + p.n, 0);
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 flex items-baseline justify-between gap-2"><Eyebrow>Criticality</Eyebrow><span className="text-[10.5px] text-[#94A3B8]">{nfmt(rated)} of {nfmt(n)} rated</span></div>
+      <StackBar parts={parts} label="Criticality mix" height={8} />
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-[#64748B]">
+        {parts.filter((p) => p.n > 0).map((p) => (
+          <span key={p.key} className="inline-flex items-center gap-1"><i aria-hidden className="inline-block h-[7px] w-[7px] rounded-[2px]" style={{ background: p.c }} />{p.label} <b className="tabular-nums text-[#334155]">{nfmt(p.n)}</b></span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 3) Asset-class matrix (SME droplet card, restored verbatim) ---------- */
 function ClassMatrix({ q, className }: { q: Q<Estate>; className: string }) {
   const d = q.data;
   let body: ReactNode;
@@ -388,8 +704,7 @@ function SideRows({ kind, side, estate }: { kind: keyof typeof SIDE; side: Side;
         <tr key={c.label} className="border-b border-[#F1F3F7]">
           <td className="py-1.5 pl-3 pr-3">
             <span className={`block truncate font-medium ${c.gap ? 'text-[#64748B]' : 'text-[#0F172A]'}`}>{c.label}</span>
-            {/* One line of whole subtype chips: any that don't fit wrap onto a hidden second
-                line (never cut mid-word); the full breakdown is in the tooltip. */}
+            {/* One line of whole subtype chips; the full breakdown is in the tooltip. */}
             <span className="mt-0.5 flex h-[17px] flex-wrap gap-x-1.5 overflow-hidden text-[11.5px] leading-[17px] text-[#94A3B8]" title={c.subtypes.map((x) => `${x.label}: ${nfmt(x.n)}`).join(' · ')}>
               {c.subtypes.map((x, i) => <span key={x.label} className="whitespace-nowrap">{i > 0 && '· '}{x.label} <b className="font-semibold text-[#64748B]">{nfmt(x.n)}</b></span>)}
             </span>
@@ -446,7 +761,332 @@ function EolCell({ e, n }: { e: Eol | null; n: number }) {
   );
 }
 
-/* ---------- needs attention ---------- */
+/* ---------- 3a-bis) Software & versions across the estate ---------- */
+function SoftwareCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Software & versions" icon={<Package size={15} />} sub="Products running across the estate — databases, web & app servers and applications — with their versions and host counts" busy={busy(q)} className={className}
+      aside={<MoreLink href={`${REG}&view=internal`}>Internal</MoreLink>}>
+      {body(q, 'Software', (d) => {
+        const sw = d.software;
+        const inst = sw?.top ?? [];
+        const ext = sw?.external?.top ?? [];
+        if (!inst.length && !ext.length) {
+          return <Empty icon={<Package size={16} />} title="No software inventory yet" body="Installed software and versions appear once internal hosts are read with credentials or report through an agent; internet-facing tech is read from service banners." href="/asset-discovery" cta="Open Discovery" />;
+        }
+        return (
+          <div className="flex flex-1 flex-col gap-3.5">
+            {inst.length > 0 && (
+              <div className="flex flex-col">
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <Eyebrow>Installed on internal hosts</Eyebrow>
+                  <span className="text-[11px] text-[#64748B]">{plural(sw!.products, 'product')} · {plural(sw!.hosts_reporting, 'host')}</span>
+                </div>
+                <SwList rows={inst} more={sw!.more} unit="host" />
+              </div>
+            )}
+            {ext.length > 0 && (
+              <div className={`flex flex-col ${inst.length ? 'border-t border-[#EEF1F5] pt-3.5' : ''}`}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <Eyebrow>Internet-facing service software</Eyebrow>
+                  <span className="text-[11px] text-[#94A3B8]">read from service banners</span>
+                </div>
+                <SwList rows={ext} more={sw!.external.more} unit="site" />
+              </div>
+            )}
+          </div>
+        );
+      }, 7)}
+    </Box>
+  );
+}
+function SwList({ rows, more, unit }: { rows: SwRow[]; more: number; unit: string }) {
+  const max = Math.max(1, ...rows.map((r) => r.n));
+  return (
+    <>
+      <ul className="m-0 flex list-none flex-col gap-[9px] p-0">
+        {rows.map((s) => (
+          <li key={s.key} className="flex items-center gap-2.5 text-[12px]" title={`${s.label}${s.version ? ` ${s.version}` : ''} · ${plural(s.n, unit)}`}>
+            <span className="flex min-w-0 items-baseline gap-1.5" style={{ flex: '0 1 160px' }}>
+              <span className="min-w-0 truncate text-[#334155]">{s.label}</span>
+              {s.version && <span className="shrink-0 rounded bg-[#EEF1F5] px-1 text-[10.5px] font-medium tabular-nums text-[#475569]">{s.version}</span>}
+            </span>
+            <span className="relative block h-[8px] min-w-[40px] flex-1 overflow-hidden rounded-[4px] bg-[#EEF1F5]">
+              <i className="absolute inset-y-0 left-0 block rounded-[4px]" style={{ width: `${(s.n / max) * 100}%`, minWidth: s.n > 0 ? 3 : 0, background: T.base }} />
+            </span>
+            <b className="w-[42px] shrink-0 text-right font-semibold tabular-nums text-[#0F172A]">{nfmt(s.n)}</b>
+          </li>
+        ))}
+      </ul>
+      {more > 0 && <p className="m-0 mt-2 text-[11px] text-[#94A3B8]">+{nfmt(more)} more {more === 1 ? 'product' : 'products'}</p>}
+    </>
+  );
+}
+
+/* ---------- 3b) Business criticality & data sensitivity ---------- */
+function ClassificationCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Criticality & data sensitivity" icon={<Activity size={15} />} sub="Business criticality rating and data classification across the estate" busy={busy(q)} className={className}>
+      {body(q, 'Classification', (d) => {
+        const crit = d.governance?.criticality;
+        const parts: Part[] = CRIT.map((x) => ({ key: x.k, label: x.label, n: crit?.[x.k] ?? 0, c: x.c }));
+        const rated = parts.filter((p) => p.key !== 'unrated').reduce((s, p) => s + p.n, 0);
+        const dc = d.governance?.data_classification;
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <Eyebrow>Business criticality</Eyebrow>
+              <span className="text-[11px] text-[#64748B]">{nfmt(rated)} of {nfmt(d.total)} rated</span>
+            </div>
+            <StackBar parts={parts} label="Assets by criticality" height={12} />
+            <div className="mt-2.5"><PartLegend parts={parts} total={d.total} cols={2} /></div>
+            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Data classification</Eyebrow>
+              {dc && dc.some((r) => r.n > 0)
+                ? <BarList rows={bars(dc)} />
+                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No data classification recorded yet.</p>}
+            </div>
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 3c) Lifecycle & environment ---------- */
+const LIFE_LABELS: Record<string, string> = {
+  planned: 'Planned', active: 'Active', maintenance: 'Maintenance', decommissioned: 'Decommissioned',
+  retired: 'Retired', inactive: 'Inactive', unset: 'Not set',
+};
+function LifecycleCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Lifecycle & environment" icon={<Radar size={15} />} sub="Where each asset sits in its service life, and which environment it runs in" busy={busy(q)} className={className}>
+      {body(q, 'Lifecycle', (d) => {
+        const life = (d.lifecycle ?? []).map((l) => ({ label: LIFE_LABELS[l.label] ?? l.label, n: l.n, gap: l.label === 'unset' }));
+        const env = d.governance?.environment;
+        return (
+          <div className="flex flex-1 flex-col">
+            <Eyebrow>Lifecycle state</Eyebrow>
+            {life.length ? <BarList rows={bars(life)} /> : <p className="m-0 text-[11.5px] text-[#94A3B8]">No lifecycle data.</p>}
+            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Deployment environment</Eyebrow>
+              {env && env.some((r) => r.n > 0)
+                ? <BarList rows={bars(env)} />
+                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No environment tagged yet.</p>}
+            </div>
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 4a) Ownership & accountability ---------- */
+function OwnershipCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Ownership & accountability" icon={<Users size={15} />} sub="Who owns the estate — and how much of it has no owner" busy={busy(q)} className={className}
+      aside={<MoreLink href={`${REG}&view=unowned`}>Unowned</MoreLink>}>
+      {body(q, 'Ownership', (d) => {
+        const o = d.ownership;
+        const owned = o?.owned ?? d.coverage.owner;
+        const unowned = o?.unowned ?? (d.total - d.coverage.owner);
+        const parts: Part[] = [
+          { key: 'owned', label: 'Has an owner', n: owned, c: T.base },
+          { key: 'un', label: 'No owner', n: unowned, c: GREY },
+        ];
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+              <Fig label="Owner assigned" value={share(owned, d.total) || '0%'} sub={`${nfmt(owned)} of ${nfmt(d.total)} assets`} />
+              <Fig label="Without an owner" value={nfmt(unowned)} sub="need an accountable owner" alarm={unowned > 0} />
+            </div>
+            <div className="mt-3"><StackBar parts={parts} label="Ownership coverage" /></div>
+            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Largest owning teams</Eyebrow>
+              {o?.teams && o.teams.length
+                ? <BarList rows={bars(o.teams)} />
+                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No owning team or department recorded yet.</p>}
+            </div>
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 4b) Provenance — how assets entered the inventory ---------- */
+function ProvenanceCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="How assets entered" icon={<Boxes size={15} />} sub="Provenance of the estate — how each asset was first discovered or added" busy={busy(q)} className={className}>
+      {body(q, 'Provenance', (d) => {
+        const p = d.provenance;
+        const managed = p?.managed ?? 0, discovered = p?.discovered ?? 0, baseline = p?.baseline ?? 0;
+        const parts: Part[] = [
+          { key: 'managed', label: 'Operator-confirmed', n: managed, c: T.base },
+          { key: 'disc', label: 'Auto-discovered', n: discovered, c: '#7FA7C9' },
+          { key: 'base', label: 'Pre-existing / manual', n: baseline, c: GREY },
+        ];
+        return (
+          <div className="flex flex-1 flex-col">
+            <Eyebrow>Origin</Eyebrow>
+            {p?.origin && p.origin.some((r) => r.n > 0)
+              ? <BarList rows={bars(p.origin)} />
+              : <p className="m-0 text-[11.5px] text-[#94A3B8]">Origin not recorded for any asset yet.</p>}
+            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <Eyebrow>Management state</Eyebrow>
+                <span className="text-[11px] text-[#64748B]">{nfmt(managed)} confirmed</span>
+              </div>
+              <StackBar parts={parts} label="Management state" />
+              <div className="mt-2.5"><PartLegend parts={parts} total={d.total} /></div>
+            </div>
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 4c) Compliance & regulated data ---------- */
+function ComplianceCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Regulatory scope & data" icon={<ClipboardCheck size={15} />} sub="Assets in a regulatory scope, and the regulated data they carry" busy={busy(q)} className={className}>
+      {body(q, 'Compliance', (d) => {
+        const c = d.compliance;
+        const inScope = c?.in_scope ?? 0;
+        const reg = (c?.regulated ?? []).filter((r) => r.n > 0);
+        const scopes = c?.scopes ?? [];
+        if (!c || (!inScope && !reg.length && !scopes.length)) {
+          return <Empty icon={<ClipboardCheck size={16} />} title="No regulatory scope recorded" body="Tag assets as CDE / ePHI, set regulated-data types or a compliance scope to track obligations here." href={REG} cta="Open register" />;
+        }
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+              <Fig label="In regulatory scope" value={nfmt(inScope)} sub={share(inScope, d.total) || '0%'} />
+              <Fig label="CDE (PCI)" value={nfmt(c.cde ?? 0)} sub="cardholder data" />
+              <Fig label="ePHI (HIPAA)" value={nfmt(c.ephi ?? 0)} sub="health data" />
+            </div>
+            <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Regulated data type</Eyebrow>
+              {reg.length ? <BarList rows={bars(reg)} /> : <p className="m-0 text-[11.5px] text-[#94A3B8]">No regulated-data type set.</p>}
+            </div>
+            {scopes.length > 0 && (
+              <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+                <Eyebrow>Compliance frameworks in scope</Eyebrow>
+                <BarList rows={bars(scopes)} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 5a) Telemetry coverage — the knowledge-completeness matrix (signature) ---------- */
+function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Telemetry coverage" icon={<ShieldCheck size={15} />} sub="How complete our knowledge of the estate is — the signal held for each dimension, and where the blind spots are" busy={busy(q)} className={className}>
+      {body(q, 'Coverage', (d) => {
+        const dims = d.completeness?.dims ?? [];
+        if (!dims.length || !d.total) return <Empty icon={<ShieldCheck size={16} />} title="Coverage appears with assets" body="Once the inventory holds assets, this maps how much telemetry each dimension carries." href="/asset-discovery" cta="Bring assets in" />;
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="grid flex-1 grid-cols-1 gap-x-10 gap-y-0 sm:grid-cols-2">
+              <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(0, 5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
+              <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
+            </div>
+            <p className="m-0 mt-2.5 border-t border-[#EEF1F5] pt-2.5 text-[11px] leading-[1.5] text-[#94A3B8]">
+              Share of assets we hold each signal for. Host-only signals (<span className="text-[#64748B]">internal</span>) are measured against the internal estate — an outside-in asset can&rsquo;t carry them, so it isn&rsquo;t counted as a gap.
+            </p>
+          </div>
+        );
+      }, 8)}
+    </Box>
+  );
+}
+function CovRow({ label, n, of, scope }: { label: string; n: number; of: number; scope?: string }) {
+  const pct = of > 0 ? pctOf(n, of) : 0;
+  return (
+    <li className="flex items-center gap-2.5 border-b border-[#F4F6F8] py-[7px] text-[12px] last:border-0">
+      <span className="min-w-0 flex-1 truncate text-[#334155]" title={`${label}: ${nfmt(n)} of ${nfmt(of)}`}>
+        {label}{scope === 'internal' && <span className="ml-1.5 text-[10px] font-medium uppercase tracking-[.04em] text-[#94A3B8]">internal</span>}
+      </span>
+      <span className="h-[7px] w-[72px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
+        <span className="block h-full rounded-full" style={{ width: `${pct}%`, minWidth: n > 0 ? 3 : 0, background: T.base }} />
+      </span>
+      <span className="w-[62px] shrink-0 text-right text-[11px] tabular-nums text-[#94A3B8]">{nfmt(n)}/{nfmt(of)}</span>
+      <b className="w-[34px] shrink-0 text-right tabular-nums" style={{ color: of && pct < 50 ? SEV.medium.ink : '#0F172A' }}>{of ? `${pct}%` : '—'}</b>
+    </li>
+  );
+}
+
+/* ---------- 5b) Endpoint security & hardening ---------- */
+function SecurityCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Endpoint security & hardening" icon={<ShieldCheck size={15} />} sub="Protection & benchmark coverage across internal hosts (outside-in assets can't be read inside)" busy={busy(q)} className={className}>
+      {body(q, 'Security posture', (d) => {
+        const s = d.security;
+        const scope = s?.scope ?? 0;
+        if (!scope) return <Empty icon={<ShieldCheck size={16} />} title="No internal hosts yet" body="Connect a host with credentials to read its endpoint protection and hardening." href="/asset-discovery" cta="Open Discovery" />;
+        if (!s || !s.posture) return <Empty icon={<ShieldCheck size={16} />} title="Endpoint posture not collected yet" body={`None of the ${nfmt(scope)} internal ${scope === 1 ? 'host has' : 'hosts have'} been read for antivirus / EDR. Connect with credentials to populate this.`} href="/asset-discovery" cta="Open Discovery" />;
+        const covRows = [
+          { label: 'Antivirus present', n: s.antivirus, of: scope },
+          { label: 'EDR running', n: s.edr, of: scope },
+          { label: 'Endpoint protected', n: s.protected, of: scope },
+          { label: 'CIS benchmarked', n: d.coverage.cis, of: scope },
+        ];
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+              <Fig label="Hosts read" value={share(s.posture, scope) || '0%'} sub={`${nfmt(s.posture)} of ${nfmt(scope)} internal`} />
+              <Fig label="Packages catalogued" value={nfmt(s.packages)} sub={`on ${plural(s.inventoried, 'host')}`} />
+              {s.edr_stopped > 0 && <Fig label="EDR stopped" value={nfmt(s.edr_stopped)} sub="installed but not running" alarm />}
+            </div>
+            <ul className="m-0 mt-3 flex list-none flex-col p-0">{covRows.map((r) => <CovRow key={r.label} label={r.label} n={r.n} of={r.of} />)}</ul>
+            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Security-relevant software · hosts running one</Eyebrow>
+              {s.families && s.families.length
+                ? <BarList rows={bars(s.families)} max={scope} />
+                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No security tooling catalogued on hosts yet.</p>}
+            </div>
+          </div>
+        );
+      }, 7)}
+    </Box>
+  );
+}
+
+/* ---------- 6a) Obsolescence & freshness ---------- */
+function ObsolescenceCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Obsolescence & freshness" icon={<CalendarClock size={15} />} sub="End-of-life exposure and how recently each asset was last seen" busy={busy(q)} className={className}>
+      {body(q, 'Obsolescence', (d) => {
+        const eol = d.eol ?? { past: 0, soon: 0, known: 0 };
+        const fresh = d.freshness;
+        return (
+          <div className="flex flex-1 flex-col">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+              <Fig label="Past end-of-life" value={nfmt(eol.past)} sub="no vendor support" alarm={eol.past > 0} />
+              <Fig label="Due ≤90 days" value={nfmt(eol.soon)} sub="plan replacement" alarm={eol.soon > 0} />
+              <Fig label="EOL dated" value={nfmt(eol.known)} sub={`of ${nfmt(d.internal.total)} internal`} />
+            </div>
+            <div className="mt-3 flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
+              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <Eyebrow>Last seen</Eyebrow>
+                {fresh && <span className="text-[11px] text-[#64748B]">{nfmt(fresh.stale)} stale (30d+)</span>}
+              </div>
+              {fresh?.buckets && fresh.buckets.some((b) => b.n > 0)
+                ? <BarList fill rows={fresh.buckets.map((b) => ({ key: b.label, label: b.label, n: b.n, c: b.gap ? '#E0A45E' : T.base, title: b.label }))} />
+                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No last-seen timestamps yet.</p>}
+            </div>
+          </div>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ---------- 4) Needs attention (SME droplet card, restored verbatim) ---------- */
 function AttentionCard({ estate, inv, className }: { estate: Q<Estate>; inv: Q<InvOverview>; className: string }) {
   const d = estate.data;
   const aq = inv.data?.attention_queue;
@@ -460,11 +1100,11 @@ function AttentionCard({ estate, inv, className }: { estate: Q<Estate>; inv: Q<I
     { label: 'Not seen in 30+ days', n: d.total - d.coverage.seen_30d, href: `${REG}&view=stale` },
     { label: 'Unidentified assets', n: d.unidentified, href: REG },
   ].sort((a, b) => (b.n ?? -1) - (a.n ?? -1)) : [];
-  let body: ReactNode;
-  if (estate.isLoading) body = <Loading rows={8} />;
-  else if (!d) body = <Unavailable what="Attention list" />;
-  else if (!d.total) body = <Empty icon={<ShieldCheck size={16} />} title="Nothing to action yet" body="Gaps appear once the inventory has assets." />;
-  else body = (
+  let attnBody: ReactNode;
+  if (estate.isLoading) attnBody = <Loading rows={8} />;
+  else if (!d) attnBody = <Unavailable what="Attention list" />;
+  else if (!d.total) attnBody = <Empty icon={<ShieldCheck size={16} />} title="Nothing to action yet" body="Gaps appear once the inventory has assets." />;
+  else attnBody = (
     <ul className="m-0 flex flex-1 list-none flex-col p-0">
       {rows.map((r) => (
         <li key={r.label} className="flex flex-1 border-b border-[#F1F3F7] last:border-0">
@@ -478,5 +1118,33 @@ function AttentionCard({ estate, inv, className }: { estate: Q<Estate>; inv: Q<I
       ))}
     </ul>
   );
-  return <Box title="Needs attention" sub="Largest gaps first — each opens the matching list" busy={busy(estate)} className={className}>{body}</Box>;
+  return <Box title="Needs attention" sub="Largest gaps first — each opens the matching list" busy={busy(estate)} className={className}>{attnBody}</Box>;
+}
+
+/* ---------- 7) Estate scale — fleet hardware capacity recorded ---------- */
+const gb = (n: number) => (n >= 1024 ? `${(n / 1024).toFixed(1)} TB` : `${nfmt(n)} GB`);
+function ScaleCard({ q, className }: { q: Q<Estate>; className: string }) {
+  return (
+    <Box title="Estate scale" icon={<Cpu size={15} />} sub="Fleet hardware and value recorded on the register — honest sums over the assets that carry each figure" busy={busy(q)} className={className}>
+      {body(q, 'Estate scale', (d) => {
+        const c = d.capacity;
+        if (!c || !c.hosts) return <Empty compact icon={<Cpu size={16} />} title="No hardware telemetry collected yet" body="CPU, memory and disk appear once hosts are profiled by a credentialed scan or agent." href="/asset-discovery" cta="Open Discovery" />;
+        const cells = [
+          { label: 'Assets in inventory', value: nfmt(d.total), sub: `${nfmt(d.external.total)} external · ${nfmt(d.internal.total)} internal` },
+          { label: 'Hosts hardware-profiled', value: nfmt(c.hosts), sub: share(c.hosts, d.total) || '0%' },
+          { label: 'Total compute', value: nfmt(c.vcpu), sub: 'vCPU across the fleet' },
+          { label: 'Total memory', value: gb(c.ram_gb), sub: 'RAM across the fleet' },
+          { label: 'Total storage', value: gb(c.disk_gb), sub: 'disk across the fleet' },
+          { label: 'Value recorded', value: c.valuation_n ? nfmt(Math.round(c.valuation_sum)) : '—', sub: c.valuation_n ? `on ${plural(c.valuation_n, 'asset')}` : 'not recorded' },
+        ];
+        return (
+          <div className="flex flex-1 flex-col justify-center">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
+              {cells.map((x) => <Fig key={x.label} label={x.label} value={x.value} sub={x.sub} />)}
+            </div>
+          </div>
+        );
+      }, 3)}
+    </Box>
+  );
 }

@@ -962,6 +962,13 @@ export const discoveryApi = {
   resolve: (obsId: number, action: 'adopt' | 'merge' | 'ignore', targetAssetId?: number) =>
     apiClient.post(`/discovery/observations/${obsId}/resolve`,
       { action, target_asset_id: targetAssetId }),
+  // Bulk self-service adopt — resolve many observations in ONE call (surface
+  // adoption, no credentials). Returns how many were adopted vs skipped and the
+  // resulting asset ids.
+  bulkResolve: (observationIds: number[], action: 'adopt' = 'adopt') =>
+    apiClient.post<{ adopted: number; skipped: number; asset_ids: number[] }>(
+      '/discovery/observations/bulk-resolve',
+      { observation_ids: observationIds, action }),
   listCredentials: () => apiClient.get('/discovery/credentials'),
   createCredential: (data: {
     name: string; kind: string; username: string; secret: string;

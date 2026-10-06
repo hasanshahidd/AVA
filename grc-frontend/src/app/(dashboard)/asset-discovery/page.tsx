@@ -9,12 +9,14 @@
  * deep-collection (OS / software / antivirus on discovered hosts).
  */
 import { useState, useEffect, useRef, Fragment } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Radar, Inbox, Network, History, Play, Plus, Trash2, X,
   ShieldCheck, RefreshCw, Check, Plug,
 } from 'lucide-react';
 import { discoveryApi } from '@/lib/api';
+import { useToast } from '@/components/ui/ToastProvider';
 import { useTabParam } from '@/lib/useTabParam';
 import ConnectWizardPage, { PLATFORMS, PLATFORM_GROUPS, type Platform } from '../admin/integrations/connect/page';
 import AgentsAdminPage from '../admin/agents/page';
@@ -2009,6 +2011,8 @@ function CsDeviceRow({ d, checked, onToggle, onConnect, onAdopt, adopting }: any
 
 function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all' }) {
   const qc = useQueryClient();
+  const { toast } = useToast();
+  const [adoptedN, setAdoptedN] = useState(0);   // last successful surface-adopt count → inline deep-link to inventory
   const [connecting, setConnecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectedCreds, setSelectedCreds] = useState<Set<number>>(new Set());  // logins to try; empty = auto
@@ -2029,7 +2033,7 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
   // The active view ('login' | 'adopt' | 'inventory' | 'all') is chosen by the
   // parent ConnectionsTab's single tab bar and passed in — one tab row, not
   // tabs-under-tabs. Clear the selection when the view changes.
-  useEffect(() => { setSelected(new Set()); }, [seg, bulkMethod]);
+  useEffect(() => { setSelected(new Set()); setAdoptedN(0); }, [seg, bulkMethod]);
   const creds = useQuery({ queryKey: ['disc-creds'], queryFn: async () => (await discoveryApi.listCredentials()).data.credentials as any[] });
   const hostCreds = (creds.data ?? []).filter((c: any) => c.kind === 'winrm' || c.kind === 'ssh');
   const q = useQuery({
@@ -2089,11 +2093,16 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
   // UNMANAGED, evidence-only asset (IP/MAC/vendor/type). This is the managed
   // home for the leftover devices — reachable right here, not only in the Inbox.
   const runAdopt = useMutation({
-    mutationFn: async (ids: number[]) => {
-      // No bulk endpoint yet — resolve each observation as 'adopt' in parallel.
-      await Promise.all(ids.map((id) => discoveryApi.resolve(id, 'adopt')));
+    mutationFn: (ids: number[]) => discoveryApi.bulkResolve(ids, 'adopt').then((r) => r.data),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] });
+      qc.invalidateQueries({ queryKey: ['disc-inbox'] });
+      setSelected(new Set());
+      const n = res?.adopted ?? 0;
+      setAdoptedN(n);
+      toast({ type: n ? 'success' : 'info', title: `${n} adopted`,
+        message: n ? 'Added to inventory as surface assets — no credentials used.' : 'Nothing new to adopt.' });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); qc.invalidateQueries({ queryKey: ['disc-inbox'] }); },
   });
   // Dismiss a row (resolve 'ignore') — removes stale/ghost devices (e.g. a
   // machine that moved IP and lingers via a stale ARP entry) from the queue.
@@ -2154,82 +2163,125 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
   //  host → attemptable hosts (WinRM/SSH/typed service); wmi → Windows only;
   //  snmp → any device with an IP (SNMP needs no host login — that's the point,
   //  it's for the no-login network gear). So the checkboxes light up accordingly.
-  const bulkSelectable = (d: any) => !d.connected && !d.in_inventory && d.resolution !== 'review' && !!d.observation_id && (
+  const connSelectable = (d: any) => !d.connected && !d.in_inventory && d.resolution !== 'review' && !!d.observation_id && (
     bulkMethod === 'auto' ? ((d.login_methods || []).length > 0)
       : bulkMethod === 'snmp' ? !!d.ip_address
       : bulkMethod === 'wmi' ? d.transport === 'windows'
       : attemptOf(d));
-  const selectableIds: number[] = shown.filter(bulkSelectable).map((d) => d.observation_id);
-  // Non-host devices (phones/printers/silent) that can only be brought in via Adopt.
-  const adoptableIds: number[] = shown.filter((d) => nonTerminal(d) && !attemptOf(d) && d.observation_id).map((d) => d.observation_id);
+  // Surface-adopt candidate: a non-host device (phone/printer/silent) brought in
+  // WITHOUT credentials as a surface (unmanaged, evidence-only) asset. Firewall
+  // echoes are SIP/IPS proxy reflections, not real devices — never adoptable.
+  const adoptSelectable = (d: any) => nonTerminal(d) && !attemptOf(d) && !!d.observation_id && d.device_type !== 'firewall_echo';
+  // A row's checkbox is live if EITHER action can target it; the two sets are
+  // disjoint (attemptable→connect vs not→adopt), so one selection is unambiguous.
+  const rowSelectable = (d: any) => connSelectable(d) || adoptSelectable(d);
+  const connSelectableIds: number[] = shown.filter(connSelectable).map((d) => d.observation_id);
+  const adoptableIds: number[] = shown.filter(adoptSelectable).map((d) => d.observation_id);
+  const selectableIds: number[] = Array.from(new Set([...connSelectableIds, ...adoptableIds]));
+  // Connect targets = the attemptable subset of the selection (or all attemptable
+  // when nothing is ticked). Adopt targets = the adoptable subset likewise — so
+  // ticking a mix lights up both buttons, each acting only on its own rows.
+  const connectTargets: number[] = selected.size > 0 ? connSelectableIds.filter((id) => selected.has(id)) : connSelectableIds;
+  const adoptTargets: number[] = selected.size > 0 ? adoptableIds.filter((id) => selected.has(id)) : adoptableIds;
   const allChecked = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
-  const targetIds = selected.size > 0 ? Array.from(selected) : selectableIds;
-  const connectLabel = selected.size > 0 ? `Connect ${selected.size} selected` : `Connect all (${selectableIds.length})`;
+  const targetIds = connectTargets;
+  const connectLabel = selected.size > 0 ? `Connect ${connectTargets.length} selected` : `Connect all (${connSelectableIds.length})`;
   // The device the popup explainer is open for (from the full list, so it
   // survives filter/segment changes while the modal is up).
   const explainDev = explainFor != null ? devices.find((d: any) => d.observation_id === explainFor && !d.in_inventory) : null;
   const connectDev = openFor != null ? devices.find((d: any) => d.observation_id === openFor && !d.in_inventory) : null;
 
   return (
-    <section className="panel">
-      {/* One compact bar: filters (search / run / type) on the left, actions
-          (fill names / logins / connect) pushed to the right. The counts already
-          live in the tab ("Can log in N") and the table footer, so no separate
-          info line. */}
-      <div className="toolbar">
+    <div className="cq-workspace">
+      {/* LEFT FILTER RAIL — same pattern as the IT Asset Inventory register's
+          left rail (white card column, controls grouped under uppercase caps).
+          Every control that used to crowd the top bar lives here now: the
+          search / run / type filters, plus the bulk connect method and
+          logins-to-try. Same state + filtering logic, only relocated. */}
+      <aside className="cq-rail">
+        <div className="cq-railcap">Search</div>
         <input className="input" placeholder="Search device, IP or hostname" value={search} onChange={(e) => setSearch(e.target.value)} />
+
         {runs.length > 1 && (
-          <select className="select" value={runFilter != null ? String(runFilter) : ''} onChange={(e) => setRunFilter(e.target.value ? Number(e.target.value) : undefined)}>
-            <option value="">All runs · {devices.length}</option>
-            {runs.map((r) => <option key={r.run_id} value={String(r.run_id)}>{(r.is_latest ? 'Latest · ' : '') + 'Run #' + r.run_id}</option>)}
-          </select>
+          <>
+            <div className="cq-railcap">Scan run</div>
+            <select className="select" value={runFilter != null ? String(runFilter) : ''} onChange={(e) => setRunFilter(e.target.value ? Number(e.target.value) : undefined)}>
+              <option value="">All runs · {devices.length}</option>
+              {runs.map((r) => <option key={r.run_id} value={String(r.run_id)}>{(r.is_latest ? 'Latest · ' : '') + 'Run #' + r.run_id}</option>)}
+            </select>
+            {runFilter != null && (
+              <button className="btn btn-secondary cq-wide" title="Delete this run" disabled={delRunQ.isPending}
+                onClick={() => { if (window.confirm(`Delete Run #${runFilter}? This removes the scan and its discovered devices — adopted assets stay in inventory.`)) delRunQ.mutate(runFilter); }}
+                style={{ color: '#b91c1c' }}>🗑 Delete run</button>
+            )}
+          </>
         )}
-        {runFilter != null && (
-          <button className="btn btn-secondary" title="Delete this run" disabled={delRunQ.isPending}
-            onClick={() => { if (window.confirm(`Delete Run #${runFilter}? This removes the scan and its discovered devices — adopted assets stay in inventory.`)) delRunQ.mutate(runFilter); }}
-            style={{ color: '#b91c1c' }}>🗑 Delete run</button>
-        )}
+
+        <div className="cq-railcap">Device type</div>
         <select className="select" value={ftype} onChange={(e) => setFtype(e.target.value)}>
           <option value="">All types</option>
           {types.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        {(ftype || search) && <button className="btn btn-secondary" onClick={() => { setFtype(''); setSearch(''); }}>Clear</button>}
-        <span className="push" />
-        {namelessCount > 0 && <button className="btn btn-secondary" onClick={() => setDhcpOpen(true)} title="Pull real device names from your DHCP server lease table">Fill names <span className="count">{namelessCount}</span></button>}
-        {adoptableIds.length > 0 && (
-          <button className="btn btn-secondary" disabled={runAdopt.isPending}
-            onClick={() => { if (window.confirm(`Adopt ${adoptableIds.length} device${adoptableIds.length === 1 ? '' : 's'} as unmanaged, evidence-only assets?`)) runAdopt.mutate(adoptableIds); }}>
-            {runAdopt.isPending ? 'Adopting…' : `Adopt ${adoptableIds.length}`}
-          </button>
-        )}
+
         {/* Bulk method: WinRM/SSH host login (default), WMI (Windows·DCOM, reuses
             the WinRM login), or SNMP (community string). SNMP swaps the login
-            picker for a community field. */}
-        <CsDropdown minWidth={148} value={bulkMethod} onChange={(v) => setBulkMethod(v as any)}
-          options={[
-            { value: 'auto', label: 'Auto · use what each device answers on' },
-            { value: 'host', label: 'Host · WinRM/SSH' },
-            { value: 'wmi', label: 'WMI · Windows' },
-            { value: 'snmp', label: 'SNMP · 161' },
-          ]} />
+            picker below for a community field. */}
+        <div className="cq-railcap">Connect with</div>
+        <div className="cq-field">
+          <CsDropdown value={bulkMethod} onChange={(v) => setBulkMethod(v as any)}
+            options={[
+              { value: 'auto', label: 'Auto · use what each device answers on' },
+              { value: 'host', label: 'Host · WinRM/SSH' },
+              { value: 'wmi', label: 'WMI · Windows' },
+              { value: 'snmp', label: 'SNMP · 161' },
+            ]} />
+        </div>
+
+        <div className="cq-railcap">{bulkMethod === 'snmp' ? 'SNMP community' : 'Logins to try'}</div>
         {bulkMethod === 'snmp'
-          ? <input className="input" style={{ flex: 'none', minWidth: 140, maxWidth: 190 }} placeholder="Community (e.g. public)" value={bulkCommunity} onChange={(e) => setBulkCommunity(e.target.value)} />
-          : hostCreds.length > 0 && (
-            <CsLoginPicker
-              options={hostCreds.map((c: any) => ({ id: c.id, name: c.name, kind: c.kind }))}
-              selected={selectedCreds}
-              onToggle={toggleCred}
-              onToggleAll={(checked) => setSelectedCreds(checked ? new Set<number>(hostCreds.map((c: any) => c.id as number)) : new Set())}
-              minWidth={150}
-            />
+          ? <input className="input" placeholder="Community (e.g. public)" value={bulkCommunity} onChange={(e) => setBulkCommunity(e.target.value)} />
+          : hostCreds.length > 0
+            ? (
+              <div className="cq-field">
+                <CsLoginPicker
+                  options={hostCreds.map((c: any) => ({ id: c.id, name: c.name, kind: c.kind }))}
+                  selected={selectedCreds}
+                  onToggle={toggleCred}
+                  onToggleAll={(checked) => setSelectedCreds(checked ? new Set<number>(hostCreds.map((c: any) => c.id as number)) : new Set())}
+                />
+              </div>
+            )
+            : <div className="cq-hint">No host login saved yet — use ＋ Add connection.</div>}
+
+        {(ftype || search) && <button className="btn btn-secondary cq-wide" onClick={() => { setFtype(''); setSearch(''); }}>Clear filters</button>}
+      </aside>
+
+      {/* RIGHT — the device table, now with the freed horizontal width. The old
+          crammed top bar is reduced to the primary Connect action (plus the two
+          contextual bulk actions, which still only appear when they apply). */}
+      <section className="panel">
+        <div className="cq-actionbar">
+          <span className="push" />
+          {namelessCount > 0 && <button className="btn btn-secondary" onClick={() => setDhcpOpen(true)} title="Pull real device names from your DHCP server lease table">Fill names <span className="count">{namelessCount}</span></button>}
+          {adoptedN > 0 && (
+            <Link href="/assets?tab=inventory&scan_depth=surface" style={{ color: 'var(--mint2, #1e9e8a)', fontWeight: 700, fontSize: 12.5, textDecoration: 'none', alignSelf: 'center' }}>
+              View {adoptedN} surface asset{adoptedN === 1 ? '' : 's'} →
+            </Link>
           )}
-        <button className="btn btn-primary"
-          disabled={connecting || runConnect.isPending || targetIds.length === 0 || (bulkMethod === 'snmp' && !bulkCommunity.trim())}
-          title={bulkMethod === 'wmi' ? 'WMI needs impacket on the server + TCP 135 reachable' : bulkMethod === 'snmp' ? 'Reads devices over SNMP UDP/161 with the community string' : undefined}
-          onClick={() => runConnect.mutate({ ids: targetIds, credIds: Array.from(selectedCreds), method: bulkMethod, community: bulkCommunity })}>
-          {connecting || runConnect.isPending ? 'Connecting…' : connectLabel}
-        </button>
-      </div>
+          {adoptTargets.length > 0 && (
+            <button className="btn btn-primary" disabled={runAdopt.isPending}
+              title="Bring these in as surface (unmanaged, evidence-only) assets — no login or credentials needed"
+              onClick={() => runAdopt.mutate(adoptTargets)}>
+              {runAdopt.isPending ? 'Adopting…' : `Adopt as surface asset (no credentials) · ${adoptTargets.length}`}
+            </button>
+          )}
+          <button className="btn btn-primary"
+            disabled={connecting || runConnect.isPending || targetIds.length === 0 || (bulkMethod === 'snmp' && !bulkCommunity.trim())}
+            title={bulkMethod === 'wmi' ? 'WMI needs impacket on the server + TCP 135 reachable' : bulkMethod === 'snmp' ? 'Reads devices over SNMP UDP/161 with the community string' : undefined}
+            onClick={() => runConnect.mutate({ ids: targetIds, credIds: Array.from(selectedCreds), method: bulkMethod, community: bulkCommunity })}>
+            {connecting || runConnect.isPending ? 'Connecting…' : connectLabel}
+          </button>
+        </div>
 
       <SweepProgress active={connecting} onIdle={() => { setConnecting(false); qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); }} />
       {runConnect.isError && <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--red)' }}>{(runConnect.error as any)?.response?.data?.detail || 'Could not start connect.'}</div>}
@@ -2253,8 +2305,9 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
                   : st2 === 'ready' ? 'A login door (WinRM, SSH, WMI or SNMP) was confirmed open at the last scan.'
                   : st2 === 'attempt' ? 'This looks like a Windows/Linux host, but its login port (WinRM/SSH) was NOT seen open at the last scan. You can still try a saved login — it fast-fails as "unreachable" if the port is closed (never a bad-password lockout). If it keeps failing, enable remote management on that host, then re-scan.'
                   : undefined;
-                const canSel = bulkSelectable(d);
+                const canSel = rowSelectable(d);
                 const canConnect = attemptOf(d);
+                const canAdopt = adoptSelectable(d);
                 const ty = (discType(d) || '').toLowerCase();
                 const icon = ty.includes('camera') ? '◉' : ty.includes('dns') ? '⌘' : ty.includes('printer') ? '⎙' : (ty.includes('phone') || ty.includes('voip')) ? '☎' : (ty.includes('host') || ty.includes('linux') || ty.includes('server') || ty.includes('windows')) ? '▣' : '▢';
                 return (
@@ -2309,7 +2362,8 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
                           : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                             {canConnect ? <button className="btn btn-sm btn-primary" onClick={() => setOpenFor(openFor === d.observation_id ? null : d.observation_id)}>Connect</button>
-                              : <button className="btn btn-sm btn-secondary" disabled={runAdopt.isPending} onClick={() => runAdopt.mutate([d.observation_id])}>Adopt</button>}
+                              : canAdopt ? <button className="btn btn-sm btn-secondary" disabled={runAdopt.isPending} title="Adopt as a surface asset — no credentials" onClick={() => runAdopt.mutate([d.observation_id])}>Adopt</button>
+                              : null}
                             <button onClick={() => { if (window.confirm(`Dismiss ${d.host_name || d.ip_address}? It leaves the queue (marked ignored). A future scan that truly sees it can bring it back.`)) runDismiss.mutate(d.observation_id); }}
                               disabled={runDismiss.isPending}
                               title="Remove this row from the queue — use for ghosts (e.g. a device that moved IP and lingers via a stale ARP entry)"
@@ -2338,7 +2392,8 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
       )}
       {explainDev && <DeviceExplainerModal device={explainDev} onClose={() => setExplainFor(null)} />}
       {connectDev && <ConnectDeviceModal device={connectDev} onClose={() => setOpenFor(null)} onDone={() => { setOpenFor(null); qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); }} />}
-    </section>
+      </section>
+    </div>
   );
 }
 

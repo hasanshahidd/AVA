@@ -21,7 +21,13 @@ router = APIRouter(prefix="/estate-overview", tags=["IT Assets"])
 _COLS = ("id", "name", "fqdn", "host_name", "asset_type", "asset_role", "platform_kind", "origin_source",
          "internet_facing", "last_seen_source", "status", "lifecycle_state", "os_family", "os_version",
          "os_normalized", "os_build", "manufacturer", "model", "owner_id", "primary_owner_id", "criticality",
-         "last_seen_at", "eol_date")
+         "last_seen_at", "eol_date",
+         # Additive estate-rollup columns — all cheap scalars (several indexed) + one
+         # small JSON list (compliance_scope). The heavy JSON (security_posture) is
+         # loaded separately below, internal hosts only, so it never lands on every row.
+         "environment", "data_classification", "department", "owning_team", "discovery_state",
+         "cde_environment", "ephi_environment", "regulated_data_type", "compliance_scope",
+         "valuation", "purchase_cost", "cpu_cores", "memory_gb", "storage_gb")
 # Only the small platform_properties sections the classifier reads — a full deep-scan
 # blob (services, tasks, users…) per asset would make this endpoint heavy at 5k assets.
 _PP_KEYS = ("fingerprint", "discovery_classification", "external_probe", "engine")
@@ -71,6 +77,24 @@ def estate_overview(db: Session = Depends(get_db), current_user: GRCUser = Depen
             servers[aid].detected_software_json = sw
             if svc is not None:
                 servers[aid].platform_properties["services"] = svc
+
+    # Endpoint security posture (a JSON blob) — internal hosts only; an outside-in asset
+    # can never be read for AV/EDR, so there is no point loading it for the external side.
+    # Chunked like the software load above so the blob never lands on every row at 5k.
+    for a in assets:
+        a.security_posture = None
+    by_id = {a.id: a for a in assets}
+    internal_ids = [a.id for a in assets if not is_external(a)]
+    # The per-host software blob rides along for every internal host (not just servers) so
+    # the estate-wide top-software + version rollup can aggregate it — same chunked query,
+    # one extra column, no new round-trips.
+    # ponytail: holds every internal host's software list in memory for one request; if
+    # endpoint inventories ever make that too heavy, stream-aggregate it here instead.
+    for i in range(0, len(internal_ids), 500):
+        chunk = internal_ids[i:i + 500]
+        for aid, sp, sw in db.query(A.id, A.security_posture, A.detected_software_json).filter(A.id.in_(chunk)):
+            by_id[aid].security_posture = sp
+            by_id[aid].detected_software_json = sw
 
     cis_ids: set = set()
     if ids:

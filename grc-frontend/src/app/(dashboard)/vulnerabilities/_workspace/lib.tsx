@@ -78,6 +78,9 @@ export interface Vulnerability {
   nvd_last_synced_at?: string;
   exploit_references?: string[];
   composite_priority?: number;
+  // Two-flow provenance: 'surface' = unauthenticated scan, 'credentialed' =
+  // authenticated scan, null/absent = unknown (manual/imported findings).
+  scan_mode?: 'surface' | 'credentialed' | null;
   // NCA template payload — present only on bridged NCA vulns.
   template_fields?: Record<string, unknown>;
 }

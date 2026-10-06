@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Crosshair, Loader2, Building2, Clock, Target, LayoutDashboard } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
@@ -85,10 +85,24 @@ const td: React.CSSProperties = { padding: '11px 12px', borderBottom: `1px solid
 const cap: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, padding: '2px 6px 6px' };
 const railBtn = (active: boolean): React.CSSProperties => ({ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 10px', border: 0, borderRadius: 10, background: active ? ACSOFT : 'none', color: active ? '#0A5A4B' : SEC, fontSize: 12.5, fontWeight: active ? 600 : 500, textAlign: 'left', width: '100%', cursor: 'pointer' });
 const btn: React.CSSProperties = { border: `1px solid #E4E8EC`, background: '#fff', color: SEC, borderRadius: 9, padding: '7px 12px', fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' };
-const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#06342B', fontWeight: 600 };
+const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 };
 const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999, whiteSpace: 'nowrap', color: c, background: bg });
 
 const SevPill = ({ s }: { s?: string }) => { const m = SEV[normSev(s)]; return <span style={pill(m.pillC, m.pillBg)}>{m.label}</span>; };
+
+// One row of the "Import ▾" overflow menu — the three data-import actions live
+// here instead of as three scattered toolbar buttons.
+function ImportItem({ Icon, label, hint, onClick }: { Icon: typeof Plus; label: string; hint: string; onClick: () => void }) {
+  return (
+    <button role="menuitem" onClick={onClick} className="imp-item" style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: 0, background: 'none', borderRadius: 9, padding: '8px 9px', cursor: 'pointer', textAlign: 'left' }}>
+      <span style={{ width: 28, height: 28, borderRadius: 8, background: ACSOFT, color: AC, display: 'grid', placeItems: 'center', flex: 'none' }}><Icon size={15} /></span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: INK }}>{label}</span>
+        <span style={{ display: 'block', fontSize: 10.5, color: MUTED }}>{hint}</span>
+      </span>
+    </button>
+  );
+}
 
 type Pane = 'cmd' | 'reg' | 'ctem';
 const PANE_META: { key: Pane; label: string; Icon?: typeof Target }[] = [
@@ -118,6 +132,10 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   } = props;
 
   const [view, setView] = useState<TriageView>('all');
+  // Two-flow filter — surface (unauthenticated) vs authenticated findings.
+  // Client-side only, layered on top of the page's already-filtered list.
+  const [scanMode, setScanMode] = useState<'all' | 'surface' | 'credentialed'>('all');
+  const [importOpen, setImportOpen] = useState(false); // "Import ▾" overflow menu
   // Overview ("Command") is the default landing pane — the act-now worklist —
   // with the register one click away. When scoped to a CTEM scope the register
   // itself is the point, so land there instead (the Overview reads the whole list).
@@ -183,13 +201,13 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     return true;
   };
   const rows = useMemo(() => {
-    const r = (filteredVulns ?? []).filter(matches);
+    const r = (filteredVulns ?? []).filter(matches).filter((v) => scanMode === 'all' || (v.scan_mode ?? null) === scanMode);
     const s = [...r];
     if (sort === 'ctx') s.sort((a, b) => ctxScore(b) - ctxScore(a));
     else if (sort === 'cvss') s.sort((a, b) => (b.cvss_score ?? 0) - (a.cvss_score ?? 0));
     else if (sort === 'epss') s.sort((a, b) => (b.epss_score ?? 0) - (a.epss_score ?? 0));
     return s;
-  }, [filteredVulns, view, sort]);
+  }, [filteredVulns, view, sort, scanMode]);
 
   const railLabel: Record<string, string> = { all: 'All findings', kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned' };
   const title = railLabel[view] || (view.startsWith('sev-') ? SEV[view.slice(4) as SevKey].label : view.startsWith('dom-') ? view.slice(4) : 'Findings');
@@ -200,7 +218,11 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const pageScroll = pane === 'cmd' && !isNca;
 
   return (
-    <div className="inv2" style={{ background: '#F4F6F7', height: pageScroll ? 'auto' : '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: pageScroll ? 'visible' : 'auto', overflowX: pageScroll ? 'visible' : 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
+    // zoom:0.8 is the SAME density knob the Performance page uses (page at 80%) — it scales
+    // the header AND the VulnCommandCenter dashboard (which renders inside this root) uniformly.
+    // Bounded panes (register/CTEM/NCA) are height:100%, which would only fill 80% once zoomed,
+    // so they compensate to 100%/0.8 = 125% layout height → exactly one viewport after zoom.
+    <div className="inv2" style={{ background: '#F4F6F7', zoom: 0.8, height: pageScroll ? 'auto' : 'calc(100% / 0.8)', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: pageScroll ? 'visible' : 'auto', overflowX: pageScroll ? 'visible' : 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
       {/* header — hidden on the CTEM pane (mock: CTEM carries its own header) */}
       {pane !== 'ctem' && (
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
@@ -210,14 +232,33 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: AC }} />{agg.total} findings · triage by real-world priority, not raw CVSS
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+        {/* Two clean zones: [ which register ] │ [ import ▾ ] [ + Add (primary) ].
+            Choke points removed; the three import actions collapse into one menu. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <select value={registerType} onChange={(e) => setRegisterType(e.target.value as 'standard' | 'nca')} style={{ ...btn, cursor: 'pointer' }} title="Switch register">
-            <option value="standard">Standard</option><option value="nca">NCA Template</option>
+            <option value="standard">Standard register</option><option value="nca">NCA Template</option>
           </select>
-          <Link href="/vulnerabilities/choke-points" style={{ ...btn, textDecoration: 'none' }}><Crosshair size={15} />Choke points</Link>
-          {canCreate && <button style={btn} onClick={onTemplate}><Download size={15} />Template</button>}
-          {canCreate && <button style={btn} onClick={onBulkUpload} disabled={bulkUploadState === 'uploading'}>{bulkUploadState === 'uploading' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}Bulk Upload</button>}
-          {canCreate && <button style={btn} onClick={onImport}><FileSpreadsheet size={15} />Import</button>}
+          {canCreate && (
+            <>
+              <span aria-hidden style={{ width: 1, height: 22, background: BORDER, flex: 'none' }} />
+              <div style={{ position: 'relative' }}>
+                <button style={btn} onClick={() => setImportOpen((o) => !o)} aria-haspopup="menu" aria-expanded={importOpen} title="Import findings">
+                  {bulkUploadState === 'uploading' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}Import<ChevronDown size={14} style={{ marginLeft: 1, opacity: 0.55 }} />
+                </button>
+                {importOpen && (
+                  <>
+                    {/* transparent backdrop = lazy, reliable click-outside-to-close */}
+                    <div onClick={() => setImportOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                    <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41, minWidth: 214, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, boxShadow: '0 14px 34px -10px rgba(16,24,40,.32)', padding: 5 }}>
+                      <ImportItem Icon={Download} label="Download template" hint="CSV starter file" onClick={() => { setImportOpen(false); onTemplate(); }} />
+                      <ImportItem Icon={Upload} label="Bulk upload" hint="Fill the template, upload it" onClick={() => { setImportOpen(false); onBulkUpload(); }} />
+                      <ImportItem Icon={FileSpreadsheet} label="Smart import" hint="Map any spreadsheet" onClick={() => { setImportOpen(false); onImport(); }} />
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
           {canCreate && <button style={btnGreen} onClick={onAdd}><Plus size={15} />{isNca ? 'Add NCA Entry' : 'Add Vulnerability'}</button>}
         </div>
       </div>
@@ -309,6 +350,9 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />
                 </div>
+                <select value={scanMode} onChange={(e) => setScanMode(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }} title="Filter by scan provenance">
+                  <option value="all">Scan: All</option><option value="credentialed">Authenticated</option><option value="surface">Surface / Unauth</option>
+                </select>
                 <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }}>
                   <option value="ctx">Sort: Contextual priority</option><option value="cvss">Sort: CVSS</option><option value="epss">Sort: EPSS</option>
                 </select>
@@ -322,7 +366,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
-                      <thead><tr>{['ID', 'Title', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · Ctx', 'Status', 'SLA / Due', 'Asset', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                      <thead><tr>{['ID', 'Title', 'Linked asset', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · Ctx', 'Status', 'SLA / Due', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
                       <tbody>
                         {loading ? (
                           <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
@@ -338,7 +382,16 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                           return (
                             <tr key={v.id} onClick={() => onView(v)} style={{ cursor: 'pointer' }} className="vrow">
                               <td style={{ ...td, fontFamily: MONO }}>VULN-{v.id}</td>
-                              <td style={{ ...td, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis' }} title={v.title}>{shortenVulnTitle(v.title)}{v.kev_flag && <span style={{ ...pill('#C2453F', '#FBEAEA'), fontSize: 9, marginLeft: 6 }}>KEV</span>}</td>
+                              <td style={{ ...td, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }} title={v.title}>{shortenVulnTitle(v.title)}{v.kev_flag && <span style={{ ...pill('#C2453F', '#FBEAEA'), fontSize: 9, marginLeft: 6 }}>KEV</span>}{v.scan_mode === 'surface' && <span style={{ ...pill(MUTED, '#EEF1F3'), fontSize: 9, marginLeft: 6 }} title="Surface / Unauthenticated scan">Surface</span>}{v.scan_mode === 'credentialed' && <span style={{ ...pill(ACS, '#EFF5FA'), fontSize: 9, marginLeft: 6 }} title="Authenticated scan">Auth</span>}</td>
+                              {/* LINKED ASSET — promoted to a prominent lead field so "this finding → this asset" reads at a glance */}
+                              <td style={{ ...td, maxWidth: 230 }}>
+                                {assets.length ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, maxWidth: 230 }} title={assets.join(', ')}>
+                                    <span style={{ width: 22, height: 22, borderRadius: 6, background: ACSOFT, color: AC, display: 'grid', placeItems: 'center', flex: 'none' }}><Server size={12} /></span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><b style={{ fontWeight: 600, color: INK }}>{assets[0]}</b>{assets.length > 1 && <span style={{ color: FAINT, fontWeight: 500 }}> +{assets.length - 1}</span>}</span>
+                                  </span>
+                                ) : <span style={{ color: FAINT, fontStyle: 'italic' }}>— no linked asset</span>}
+                              </td>
                               <td style={{ ...td, fontFamily: MONO, color: v.cve_id ? SEC : FAINT }}>{v.cve_id || '—'}</td>
                               <td style={td}><SevPill s={v.severity} /></td>
                               <td style={{ ...td, fontFamily: MONO, color: sm.pillC }}>{v.cvss_score ?? '—'}</td>
@@ -347,9 +400,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                               <td style={{ ...td, fontFamily: MONO, color: bm.c, fontWeight: 600 }}>{sc} · {bm.label}</td>
                               <td style={td}><span style={{ ...pill('#B23A3A', '#fff'), border: '1px solid #F3D3DA', textTransform: 'capitalize' }}>{(v.status || 'open').replace(/_/g, ' ')}</span></td>
                               <td style={td}>{due ? <b style={{ fontWeight: 600, color: due.c }}>{due.t}</b> : <span style={{ color: FAINT }}>—</span>}</td>
-                              <td style={{ ...td, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }} title={assets.length ? assets.join(', ') : 'No linked asset'}>
-                                {assets.length ? <span style={{ color: SEC }}>{assets[0]}{assets.length > 1 && <span style={{ color: FAINT }}> +{assets.length - 1}</span>}</span> : <span style={{ color: FAINT }}>—</span>}
-                              </td>
                               <td style={td}>
                                 {depts && depts.length ? (
                                   <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.25 }} title={[...depts, owner].filter(Boolean).join(' · ')}>
@@ -373,7 +423,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
           )}
         </>
       )}
-      <style>{`.inv2 .vrow:hover{background:#F7FBFA}`}</style>
+      <style>{`.inv2 .vrow:hover{background:#F7FBFA}.inv2 .imp-item:hover{background:#F2F7FB}`}</style>
     </div>
   );
 }

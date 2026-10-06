@@ -1,48 +1,57 @@
 'use client';
 
 /**
- * VulnCommandCenter — the Vulnerabilities "Overview" pane: a dense, premium
- * VISUAL ANALYTICS dashboard (not a worklist). It leads with a hero KPI band
- * (one big lead metric + a balanced, non-stranding secondary grid) and is
- * carried by charts — severity & status distributions, threat-intel bands, a
- * 90-day discovered-vs-resolved trend, an asset criticality × severity heat
- * grid, an SLA gauge + aging, and backlog by assessment type / owner — with a
- * single compact "fix first" card at the end.
+ * VulnCommandCenter — the Vulnerabilities "Overview" surface.
  *
- * Distinct by design from the Performance dashboard (risk gauge + lens cards)
- * and the IT Asset Inventory Overview (External/Internal split panels): THIS is
- * the charts-and-metrics surface.
+ * Executive-grade, insight-led. This tenant's findings carry strong, POPULATED
+ * signal in a few dimensions (severity, linked assets, finding type/domain,
+ * contextual priority, internet exposure, discovery age, status/lifecycle) and
+ * almost NO signal in others (KEV, EPSS, public-exploit, SLA on-time, MTTR —
+ * threat-intel enrichment hasn't run). Every panel leads with a populated number
+ * turned into a business "so what" (exposure, blast radius, what to fix first and
+ * why), then renders it with a premium Ava-themed chart — a recharts donut for
+ * severity, gradient tracked bars for priority & finding-type, a heat grid for
+ * severity×criticality, a treemap for host blast-radius, a segmented pipeline for
+ * the remediation lifecycle. The empty-now-but-real-later signals fold into ONE
+ * honest, minimized "not scored yet" strip — never a big blank card.
  *
- * Layout: every multi-card row is flexbox-wrap with flex-grow, so a wrapped
- * card always stretches to fill its row — nothing ever strands, no dead cells
- * (unlike an auto-fit grid). Horizontal bars take the flexible track so they
- * fill the card width instead of leaving a gap.
+ * Data (all real, all frontend-only — no new backend):
+ *   • `dashboard`  — server rollup over the WHOLE register.
+ *   • `vulns`      — the register; the open subset drives the composition panels.
+ *   • getThreatIntel / getAssetRiskHeatmap / getDomains — cached server aggregates
+ *     the client can't cheaply derive (criticality×severity matrix, per-asset
+ *     summed priority, de-branded finding-type families).
  *
- * Ava product tokens only (#005B96 accent, Poppins, light theme, soft card
- * shadows, grey canvas + separated white cards). Recharts marks are themed to
- * an Ava-mapped palette + a validated categorical ramp — never the GRC
- * blue/multicolor default. Every number is real; sparse signals read as honest
- * "not scored yet" empty states, never "zero risk". No engine/tool names — a
- * finding's source is mapped to an assessment type.
+ * Ava tokens only: #005B96 accent, light theme, grey canvas + white cards,
+ * Poppins (inherited), soft shadows. Recharts marks are themed to the Ava
+ * palette (severity semantics / accent), never a default multicolour ramp.
+ * Distinct from the Performance dashboard (risk gauge + lenses) and the Asset
+ * Inventory Overview. The shell <main> is the scroller — the root stays
+ * natural-height + overflowX:hidden (no inner scroll container).
  */
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Area, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, RadialBarChart, RadialBar, PolarAngleAxis,
+  Activity, Flame, Globe, Server, Clock3, GitBranch,
+  ShieldAlert, ShieldCheck, ArrowRight, FileWarning, Crosshair, Layers,
+} from 'lucide-react';
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, LabelList,
+  Treemap, ResponsiveContainer,
 } from 'recharts';
-import { Flame, Globe, Clock3, ShieldAlert, ArrowRight, Activity, TrendingUp } from 'lucide-react';
 import { vulnManagementApi } from '@/lib/api';
-import { shortenVulnTitle, assessmentType, type Vulnerability } from './lib';
+import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 
 // ── Ava palette (literal, matching the workspace) ──
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA';
-const INK = '#0F1F2B', SEC = '#3A4653', MUTED = '#8A95A1', FAINT = '#AEB8C2', BORDER = '#E8ECEE', BORDER2 = '#F0F3F5';
+const INK = '#0F1F2B', SEC = '#3A4653', MUTED = '#8A95A1', FAINT = '#AEB8C2';
+const BORDER = '#E8ECEE', BORDER2 = '#F0F3F5';
 const MONO = 'ui-monospace,Consolas,monospace';
 const TNUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
-// Severity — the product's status-reserved severity tones.
+// Severity tones — Info stays a calm grey so the real heat (crit/high) reads
+// against a quiet majority instead of a wall of colour.
 const SEV = {
   critical: { c: '#C2453F', label: 'Critical' },
   high: { c: '#C0682F', label: 'High' },
@@ -52,8 +61,10 @@ const SEV = {
 } as const;
 type SevKey = keyof typeof SEV;
 const SEV_ORDER: SevKey[] = ['critical', 'high', 'medium', 'low', 'info'];
+const SEV_RANK: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+const EXPOSED_TONE = '#7A5AC9';
 
-// Status — Ava-mapped (NOT the GRC recharts palette).
+// Status — Ava-mapped (not a stock multicolour ramp).
 const STATUS: Record<string, { c: string; label: string }> = {
   open: { c: '#C2453F', label: 'Open' },
   in_progress: { c: '#E0AF33', label: 'In progress' },
@@ -65,71 +76,85 @@ const STATUS: Record<string, { c: string; label: string }> = {
   auto_closed_fixed: { c: '#2E8B6B', label: 'Closed · verified' },
   auto_closed_decommissioned: { c: '#AEB8C2', label: 'Closed · retired' },
 };
-
-// Sequential single-hue accent ramp (magnitude → heat grid).
-const BLUE_RAMP = ['#EAF2F8', '#C7DDEC', '#9CC3DE', '#5E9AC4', '#2E77AB', '#005B96'];
-const rampAt = (t: number) => BLUE_RAMP[Math.max(0, Math.min(BLUE_RAMP.length - 1, Math.round(t * (BLUE_RAMP.length - 1))))];
-
-// Categorical identity (validated CVD/contrast-safe) — assessment types.
-const ASMT_COLOR: Record<string, string> = {
-  'Vulnerability scan': '#005B96',
-  'Web application scan': '#2E8B6B',
-  'Penetration test': '#A8640E',
-};
-
-// EPSS exploit-likelihood bands (alarm→calm) + the server's key names.
-const EPSS_BANDS: { k: string; label: string; c: string }[] = [
-  { k: 'very_high', label: '≥ 50%', c: '#C2453F' },
-  { k: 'high', label: '10–50%', c: '#C0682F' },
-  { k: 'moderate', label: '1–10%', c: '#E0AF33' },
-  { k: 'low', label: '0.1–1%', c: '#5E9AC4' },
-  { k: 'negligible', label: '< 0.1%', c: '#AEB8C2' },
-  { k: 'unscored', label: 'Not scored', c: '#E3E8EC' },
-];
-const PRIO_BANDS: { k: string; label: string; c: string }[] = [
-  { k: 'critical', label: 'Critical', c: '#C2453F' },
-  { k: 'high', label: 'High', c: '#C0682F' },
-  { k: 'medium', label: 'Medium', c: '#E0AF33' },
-  { k: 'low', label: 'Low', c: '#1F7A54' },
-  { k: 'unscored', label: 'Unscored', c: '#CBD3DA' },
-];
-
 const RESOLVED = new Set(['resolved', 'remediated', 'verified', 'closed', 'accepted', 'false_positive', 'auto_closed_decommissioned', 'auto_closed_fixed']);
+const CLOSED_LIKE = new Set(['remediated', 'verified', 'closed', 'accepted', 'false_positive', 'auto_closed_decommissioned', 'auto_closed_fixed']);
+
+// Contextual-priority tiers (composite_priority is 0–10; shown ×10 → 0–100).
+const PRIO: { k: 'critical' | 'high' | 'medium' | 'low' | 'unscored'; label: string; c: string; hint: string }[] = [
+  { k: 'critical', label: 'Critical', c: '#C2453F', hint: '≥90' },
+  { k: 'high', label: 'High', c: '#C0682F', hint: '70–89' },
+  { k: 'medium', label: 'Medium', c: '#E0AF33', hint: '40–69' },
+  { k: 'low', label: 'Low', c: '#1F7A54', hint: '<40' },
+  { k: 'unscored', label: 'Unscored', c: '#CBD3DA', hint: 'not yet' },
+];
+
+const AGING_ORDER = ['0-7 days', '8-30 days', '31-90 days', '90+ days'];
+const AGING_LABEL: Record<string, string> = { '0-7 days': '0–7d', '8-30 days': '8–30d', '31-90 days': '31–90d', '90+ days': '90d+' };
+const AGING_COLOR = ['#1F7A54', '#E0AF33', '#C0682F', '#C2453F'];
+const AGE_GRAD = ['sgv-low', 'sgv-medium', 'sgv-high', 'sgv-critical'];
+
 const normSev = (s?: string): SevKey => { const k = (s || '').toLowerCase(); return (k in SEV ? k : k === 'informational' ? 'info' : 'info') as SevKey; };
+const worseSev = (a: string | undefined, b: string | undefined): SevKey => (SEV_RANK[normSev(a)] >= SEV_RANK[normSev(b)] ? normSev(a) : normSev(b));
 const hasExploit = (v: Vulnerability) => (v.public_exploit_count ?? 0) > 0 || (v.exploitdb_count ?? 0) > 0 || !!v.kev_flag;
 const isExposed = (v: Vulnerability) => !!v.internet_facing || !!v.internet_exposed;
-const ctx = (v: Vulnerability) => Math.round((v.composite_priority ?? 0) * 10);
-const band = (n: number) => (n >= 55 ? { c: '#C2453F', label: 'Urgent' } : n >= 25 ? { c: '#9A6410', label: 'Moderate' } : { c: '#1F7A54', label: 'Low' });
-const dueDays = (v: Vulnerability) => (v.due_date ? Math.ceil((new Date(v.due_date).getTime() - Date.now()) / 864e5) : null);
-const isOverdue = (v: Vulnerability) => { const d = dueDays(v); return d != null && d < 0; };
+const ctx = (v: Vulnerability) => (v.composite_priority == null ? null : Math.round(v.composite_priority * 10));
+const prioTier = (v: Vulnerability): typeof PRIO[number]['k'] => {
+  const s = ctx(v);
+  if (s == null) return 'unscored';
+  return s >= 90 ? 'critical' : s >= 70 ? 'high' : s >= 40 ? 'medium' : 'low';
+};
 const ageDays = (v: Vulnerability) => { const b = v.discovered_at || v.created_at; return b ? Math.floor((Date.now() - new Date(b).getTime()) / 864e5) : null; };
+const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+// Why-fix-this drivers — turns the action queue from a list into "fix BECAUSE".
+const drivers = (v: Vulnerability): { t: string; c: string }[] => {
+  const out: { t: string; c: string }[] = [];
+  if (v.kev_flag) out.push({ t: 'Exploited', c: '#C2453F' });
+  if ((v.public_exploit_count ?? 0) > 0 || (v.exploitdb_count ?? 0) > 0) out.push({ t: 'Public exploit', c: '#C0682F' });
+  if (isExposed(v)) out.push({ t: 'Internet-facing', c: EXPOSED_TONE });
+  if ((v.cvss_score ?? 0) >= 9) out.push({ t: `CVSS ${(v.cvss_score as number).toFixed(1)}`, c: '#9A6410' });
+  return out;
+};
 
-// ── server response shapes (reused from the standalone dashboard) ──
+// ── server aggregate shapes (reused from the standalone dashboard) ──
 interface ThreatIntel {
-  kev_exposure: { kev: number; non_kev: number };
-  priority_buckets: { critical: number; high: number; medium: number; low: number; unscored: number };
-  epss_bands: { very_high: number; high: number; moderate: number; low: number; negligible: number; unscored: number };
-  asset_criticality_matrix: Array<{ asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }>;
-  enrichment_coverage: { total_open: number; enriched: number; kev_count: number; epss_count: number };
+  kev_exposure?: { kev: number; non_kev: number };
+  priority_buckets?: { critical: number; high: number; medium: number; low: number; unscored: number };
+  epss_bands?: { very_high: number; high: number; moderate: number; low: number; negligible: number; unscored: number };
+  asset_criticality_matrix?: Array<{ asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }>;
+  enrichment_coverage?: { total_open: number; enriched: number; kev_count: number; epss_count: number };
 }
 interface HeatmapRow { asset_id: number; asset_name: string; criticality?: string | null; open_vuln_count: number; kev_count: number; total_priority_sum: number; }
-interface Heatmap { assets: HeatmapRow[]; summary: { total_assets: number; total_open_vulns: number } }
-interface Trends { buckets: string[]; discovered: { count: number }[]; resolved: { count: number }[]; summary: { total_discovered: number; total_resolved: number; total_status_changes: number } }
+interface Heatmap { assets?: HeatmapRow[]; summary?: { total_assets: number; total_open_vulns: number }; }
+interface DomainRow { family: string; total: number; worst_severity: string; }
 
+// Richer than the component strictly needs; every field optional so the
+// narrower `dashboard` passed by the workspace stays structurally assignable.
 interface OverviewDashboard {
   total_vulnerabilities?: number;
   by_severity?: Record<string, number>;
   by_status?: Record<string, number>;
-  sla_compliance?: Record<string, { compliance_rate: number }>;
+  contextual_priority?: { urgent?: number; moderate?: number; low?: number };
+  aging_buckets?: Record<string, number>;
+  internet_exposed_count?: number;
+  with_cve_count?: number;
+  no_exploit_count?: number;
+  patch_count?: number;
+  mitigation_coverage?: { with_mitigations?: number; without_mitigations?: number };
+  top_affected_assets?: Array<{ asset_id: number; asset_name: string; vulnerability_count: number }>;
+  kev_count?: number;
+  exploit_count?: number;
+  high_epss_count?: number;
   overdue_count?: number;
   mttr_days?: number | null;
-  by_department?: Record<string, number>;
+  sla_compliance?: Record<string, { compliance_rate?: number }>;
 }
 
-const card: React.CSSProperties = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(16,24,40,.04)' };
-const capCss: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: FAINT };
-// Flexbox row: children with flex-grow stretch to fill — a wrapped card never
-// strands (unlike auto-fit grid, which leaves empty cells).
+// ── shared style atoms ──
+// Cards are flex columns so, inside the stretch-equal rows, their main content block can grow
+// with flex:1 to fill the shared height — no big blank bottoms, both cards in a row aligned.
+const card: React.CSSProperties = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(16,24,40,.05), 0 8px 22px -14px rgba(16,24,40,.16)', display: 'flex', flexDirection: 'column' };
+const cap: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: FAINT };
+// Flex rows with flex-grow children → a wrapped card always fills its row.
 const row: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 12 };
 
 export default function VulnCommandCenter({
@@ -139,534 +164,574 @@ export default function VulnCommandCenter({
   dashboard?: OverviewDashboard;
   onView: (v: Vulnerability) => void;
 }) {
-  // Extra aggregates not already loaded by the page (shared query keys, cached).
+  // Server aggregates the client can't cheaply derive (cached shared keys).
   const { data: threat } = useQuery({ queryKey: ['vuln-threat-intel'], queryFn: async () => (await vulnManagementApi.dashboard.getThreatIntel()).data as ThreatIntel, staleTime: 60_000 });
   const { data: heatmap } = useQuery({ queryKey: ['vuln-asset-heatmap'], queryFn: async () => (await vulnManagementApi.dashboard.getAssetRiskHeatmap()).data as Heatmap, staleTime: 60_000 });
-  const { data: trends } = useQuery({ queryKey: ['vuln-trends-overview', '90d'], queryFn: async () => (await vulnManagementApi.dashboard.getTrends({ period: '90d' })).data as Trends, staleTime: 60_000 });
+  // Reuses the page's existing ['vuln-domains'] query key → shared cache, no extra request.
+  const { data: domainsResp } = useQuery({ queryKey: ['vuln-domains'], queryFn: async () => (await vulnManagementApi.vulnerabilities.getDomains()).data as { domains?: DomainRow[] }, staleTime: 60_000 });
 
   const m = useMemo(() => {
     const all = vulns || [];
     const open = all.filter((v) => !RESOLVED.has((v.status || '').toLowerCase()));
     const totalOpen = open.length;
-    const critHigh = open.filter((v) => { const s = normSev(v.severity); return s === 'critical' || s === 'high'; }).length;
-    const exploited = open.filter((v) => v.kev_flag || hasExploit(v)).length;
-    const exposed = open.filter(isExposed).length;
-    const overdue = open.filter(isOverdue).length;
 
-    // Severity distribution of OPEN findings (coherent with the KPI band).
-    const sevDist = SEV_ORDER.map((k) => ({ name: SEV[k].label, k, value: open.filter((v) => normSev(v.severity) === k).length, c: SEV[k].c })).filter((d) => d.value > 0);
+    // ── Severity composition of open findings (the lead story) ──
+    const sevDist = SEV_ORDER.map((k) => ({ k, label: SEV[k].label, c: SEV[k].c, n: open.filter((v) => normSev(v.severity) === k).length }));
+    const critHigh = sevDist[0].n + sevDist[1].n;
+    const sevMax = Math.max(1, ...sevDist.map((x) => x.n));
 
-    // Status breakdown — whole register (server aggregate, else derive).
-    const byStatusRaw = dashboard?.by_status ?? all.reduce<Record<string, number>>((a, v) => { const s = (v.status || 'open').toLowerCase(); a[s] = (a[s] || 0) + 1; return a; }, {});
-    const statusDist = Object.entries(byStatusRaw).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, c: STATUS[k]?.c || '#CBD3DA', label: STATUS[k]?.label || k.replace(/_/g, ' ') })).sort((a, b) => b.n - a.n);
-    const statusTotal = statusDist.reduce((s, x) => s + x.n, 0) || 1;
+    // ── Populated headline stats (all server/real, never dashes) ──
+    const exposed = dashboard?.internet_exposed_count ?? open.filter(isExposed).length;
+    const withCve = dashboard?.with_cve_count ?? open.filter((v) => !!v.cve_id).length;
+    const distinctAssets = heatmap?.summary?.total_assets ?? new Set(open.flatMap((v) => v.linked_assets ?? [])).size;
+    // The "wow" exposure stat — what an adversary reaches first.
+    const exposedCritHigh = open.filter((v) => isExposed(v) && (normSev(v.severity) === 'critical' || normSev(v.severity) === 'high')).length;
 
-    // EPSS bands + composite-priority buckets (threat-intel, else derive from open).
-    const epss = EPSS_BANDS.map((b) => ({ ...b, n: (threat?.epss_bands as Record<string, number> | undefined)?.[b.k] ?? (b.k === 'unscored' ? open.filter((v) => v.epss_score == null).length : b.k === 'very_high' ? open.filter((v) => (v.epss_score ?? -1) >= 0.5).length : b.k === 'high' ? open.filter((v) => (v.epss_score ?? -1) >= 0.1 && (v.epss_score as number) < 0.5).length : b.k === 'moderate' ? open.filter((v) => (v.epss_score ?? -1) >= 0.01 && (v.epss_score as number) < 0.1).length : b.k === 'low' ? open.filter((v) => (v.epss_score ?? -1) >= 0.001 && (v.epss_score as number) < 0.01).length : open.filter((v) => v.epss_score != null && (v.epss_score as number) < 0.001).length) }));
-    const prio = PRIO_BANDS.map((b) => ({ ...b, n: (threat?.priority_buckets as Record<string, number> | undefined)?.[b.k] ?? (b.k === 'unscored' ? open.filter((v) => v.composite_priority == null).length : b.k === 'critical' ? open.filter((v) => ctx(v) >= 70).length : b.k === 'high' ? open.filter((v) => ctx(v) >= 40 && ctx(v) < 70).length : b.k === 'medium' ? open.filter((v) => ctx(v) >= 20 && ctx(v) < 40).length : open.filter((v) => v.composite_priority != null && ctx(v) < 20).length) }));
-    const epssMax = Math.max(1, ...epss.map((e) => e.n));
+    // ── Contextual priority tiers ──
+    const pbServer = threat?.priority_buckets;
+    const prio = PRIO.map((p) => ({
+      ...p,
+      n: pbServer?.[p.k] ?? open.filter((v) => prioTier(v) === p.k).length,
+    }));
     const prioMax = Math.max(1, ...prio.map((p) => p.n));
+    const prioActionable = prio[0].n + prio[1].n; // critical + high (contextual)
 
-    // KEV exposure + public-exploit.
-    const kev = threat?.kev_exposure?.kev ?? open.filter((v) => !!v.kev_flag).length;
-    const nonKev = threat?.kev_exposure?.non_kev ?? (totalOpen - kev);
-    const publicExploit = open.filter(hasExploit).length;
+    // ── Finding type / domain (server-accurate, de-branded) ──
+    const rawDomains = domainsResp?.domains ?? [];
+    const domMap = new Map<string, { n: number; sev: SevKey }>();
+    if (rawDomains.length) {
+      for (const d of rawDomains) {
+        const label = deBrandDomain(d.family);
+        const cur = domMap.get(label);
+        domMap.set(label, { n: (cur?.n ?? 0) + (d.total ?? 0), sev: cur ? worseSev(cur.sev, d.worst_severity) : normSev(d.worst_severity) });
+      }
+    } else {
+      // Fallback: group the open set by de-branded plugin family.
+      for (const v of open) {
+        const label = deBrandDomain(v.plugin_family);
+        const cur = domMap.get(label);
+        domMap.set(label, { n: (cur?.n ?? 0) + 1, sev: cur ? worseSev(cur.sev, v.severity) : normSev(v.severity) });
+      }
+    }
+    const domains = [...domMap.entries()].map(([label, x]) => ({ label, n: x.n, sev: x.sev, c: SEV[x.sev].c })).sort((a, b) => b.n - a.n).slice(0, 7);
+    const domainMax = Math.max(1, ...domains.map((d) => d.n));
+    const domainTotal = domains.reduce((s, d) => s + d.n, 0);
 
-    // Trends (90d).
-    const tb = trends?.buckets ?? [];
-    let cum = 0;
-    const trendData = tb.map((b, i) => {
-      const d = trends!.discovered[i]?.count ?? 0; const r = trends!.resolved[i]?.count ?? 0; cum += d - r;
-      const dt = new Date(b); const name = Number.isNaN(dt.getTime()) ? b : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      return { name, Discovered: d, Resolved: r, 'Net change': cum };
-    });
-    const trendActive = trendData.some((d) => d.Discovered || d.Resolved);
+    // ── Asset blast radius / choke-points (server heatmap, else dashboard) ──
+    let assetRows: HeatmapRow[] = heatmap?.assets ?? [];
+    if (!assetRows.length && dashboard?.top_affected_assets?.length) {
+      assetRows = dashboard.top_affected_assets.map((a) => ({ asset_id: a.asset_id, asset_name: a.asset_name, criticality: null, open_vuln_count: a.vulnerability_count, kev_count: 0, total_priority_sum: 0 }));
+    }
+    const topAssets = [...assetRows].sort((a, b) => (b.open_vuln_count - a.open_vuln_count) || (b.total_priority_sum - a.total_priority_sum)).slice(0, 10);
+    const assetOpenTotal = heatmap?.summary?.total_open_vulns ?? assetRows.reduce((s, a) => s + a.open_vuln_count, 0);
+    const topShare = pct(topAssets.reduce((s, a) => s + a.open_vuln_count, 0), assetOpenTotal);
+    const assetMax = Math.max(1, ...topAssets.map((a) => a.open_vuln_count));
+    const top1 = topAssets[0];
 
-    // Asset criticality × severity heat grid.
+    // ── Severity × asset-criticality heat grid (server) ──
     const matrix = (threat?.asset_criticality_matrix ?? []).filter((r) => (r.critical + r.high + r.medium + r.low + r.info) > 0);
     const matrixMax = Math.max(1, ...matrix.flatMap((r) => [r.critical, r.high, r.medium, r.low, r.info]));
+    // The danger corner: Critical/High findings landing on business-critical assets.
+    const dangerCorner = matrix.filter((r) => { const c = (r.asset_criticality || '').toLowerCase(); return c === 'critical' || c === 'high'; }).reduce((s, r) => s + r.critical + r.high, 0);
 
-    // Top exposed assets by summed open priority.
-    const topAssets = [...(heatmap?.assets ?? [])].sort((a, b) => b.total_priority_sum - a.total_priority_sum).slice(0, 6);
-    const assetMax = Math.max(1, ...topAssets.map((a) => a.total_priority_sum));
+    // ── Discovery-age backlog (server aging_buckets, else client) ──
+    const agingSrc = dashboard?.aging_buckets && Object.keys(dashboard.aging_buckets).length ? dashboard.aging_buckets : null;
+    const aging = AGING_ORDER.map((key, i) => {
+      let n: number;
+      if (agingSrc) n = agingSrc[key] ?? 0;
+      else n = open.filter((v) => { const d = ageDays(v); if (d == null) return false; return key === '0-7 days' ? d <= 7 : key === '8-30 days' ? d > 7 && d <= 30 : key === '31-90 days' ? d > 30 && d <= 90 : d > 90; }).length;
+      return { label: AGING_LABEL[key], n, c: AGING_COLOR[i] };
+    });
+    const stubborn = aging[3].n; // 90d+
+    const fresh = aging[0].n; // 0–7d
 
-    // SLA + aging.
-    const slaVals = dashboard?.sla_compliance ? Object.entries(dashboard.sla_compliance) : [];
-    const slaPct = slaVals.length ? Math.round(slaVals.reduce((s, [, x]) => s + (x.compliance_rate || 0), 0) / slaVals.length) : null;
-    const slaBySev = SEV_ORDER.map((k) => ({ k, rate: dashboard?.sla_compliance?.[k]?.compliance_rate })).filter((x) => x.rate != null);
-    const agingDefs: [string, (d: number) => boolean][] = [['0–30d', (d) => d <= 30], ['31–90d', (d) => d > 30 && d <= 90], ['91–180d', (d) => d > 90 && d <= 180], ['> 180d', (d) => d > 180]];
-    const aging = agingDefs.map(([label, f]) => ({ label, n: open.filter((v) => { const d = ageDays(v); return d != null && f(d); }).length }));
-    const agingMax = Math.max(1, ...aging.map((a) => a.n));
+    // ── Remediation posture — full lifecycle (server by_status over ALL) ──
+    const byStatusRaw = dashboard?.by_status ?? all.reduce<Record<string, number>>((a, v) => { const s = (v.status || 'open').toLowerCase(); a[s] = (a[s] || 0) + 1; return a; }, {});
+    const statusDist = Object.entries(byStatusRaw).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, c: STATUS[k]?.c || '#CBD3DA', label: STATUS[k]?.label || k.replace(/_/g, ' ') })).sort((a, b) => b.n - a.n);
+    const statusTotal = statusDist.reduce((s, x) => s + x.n, 0);
+    const registerTotal = dashboard?.total_vulnerabilities ?? (statusTotal || all.length);
+    const closedCount = Object.entries(byStatusRaw).reduce((s, [k, n]) => s + (CLOSED_LIKE.has(k) ? n : 0), 0);
+    const fixAvailable = dashboard?.patch_count ?? open.filter((v) => Array.isArray(v.patch_references) && v.patch_references.length > 0).length;
+    const mitigated = dashboard?.mitigation_coverage?.with_mitigations ?? 0;
 
-    // Backlog by assessment type (de-branded) + by owner/department.
-    const asmtMap = new Map<string, number>();
-    for (const v of open) { const t = assessmentType(v.source || v.plugin_family); asmtMap.set(t, (asmtMap.get(t) || 0) + 1); }
-    const asmt = Array.from(asmtMap.entries()).map(([name, n]) => ({ name, n, c: ASMT_COLOR[name] || AC })).sort((a, b) => b.n - a.n);
-    const asmtMax = Math.max(1, ...asmt.map((a) => a.n));
-    // Prefer the server aggregate, but fall back to client grouping when it's
-    // absent OR empty (an empty {} is truthy, so `??` alone would leave the card blank).
-    const deptRaw = (dashboard?.by_department && Object.keys(dashboard.by_department).length)
-      ? dashboard.by_department
-      : open.reduce<Record<string, number>>((a, v) => { const k = v.assigned_departments?.[0] || v.assignee_name || 'Unassigned'; a[k] = (a[k] || 0) + 1; return a; }, {});
-    const dept = Object.entries(deptRaw).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n).slice(0, 6);
-    const deptMax = Math.max(1, ...dept.map((d) => d.n));
+    // ── Fix-first — top open by contextual priority ──
+    const fixFirst = [...open].sort((a, b) => (ctx(b) ?? -1) - (ctx(a) ?? -1)).slice(0, 8);
 
-    // Fix-first (compact) — top open by contextual priority.
-    const fixFirst = [...open].sort((a, b) => ctx(b) - ctx(a)).slice(0, 7);
-
-    // Enrichment honesty.
-    const cveRows = open.filter((v) => !!v.cve_id).length;
+    // ── Honest "not scored yet" threat-intel signals ──
     const ec = threat?.enrichment_coverage;
-    const enriched = ec?.enriched ?? open.filter((v) => v.epss_score != null || v.kev_flag != null || v.public_exploit_count != null).length;
+    const kev = dashboard?.kev_count ?? threat?.kev_exposure?.kev ?? open.filter((v) => !!v.kev_flag).length;
+    const publicExploit = dashboard?.exploit_count ?? open.filter(hasExploit).length;
+    const epssScored = ec?.epss_count ?? dashboard?.high_epss_count ?? 0;
+    const overdue = dashboard?.overdue_count ?? 0;
+    const mttr = dashboard?.mttr_days ?? null;
+    const slaRates = dashboard?.sla_compliance ? Object.values(dashboard.sla_compliance).map((x) => x.compliance_rate ?? 0).filter((r) => r > 0) : [];
+    const slaPct = slaRates.length ? Math.round(slaRates.reduce((s, r) => s + r, 0) / slaRates.length) : null;
+    const enriched = ec?.enriched ?? 0;
     const enrichBase = ec?.total_open ?? totalOpen;
-    const enrichPct = enrichBase ? Math.round((enriched / enrichBase) * 100) : 0;
+
+    // ── chart-ready arrays (memoised → stable identity, no re-animation) ──
+    const sevSlices = sevDist.map((d) => ({ k: d.k, label: d.label, c: d.c, n: d.n }));
+    const prioRows = prio.map((p) => ({ label: p.label, n: p.n, c: p.c, grad: `url(#sgv-${p.k})`, hint: p.hint }));
+    const typeRows = domains.map((d) => ({ label: d.label, n: d.n, c: d.c, grad: `url(#sgv-${d.sev})` }));
+    const ageRows = aging.map((a, i) => ({ label: a.label, n: a.n, c: a.c, grad: `url(#${AGE_GRAD[i]})` }));
+    const treeData = topAssets.map((a) => ({ name: a.asset_name, size: Math.max(0, a.open_vuln_count), kev: a.kev_count, crit: a.criticality ?? null }));
 
     return {
-      totalOpen, critHigh, exploited, exposed, overdue, mttr: dashboard?.mttr_days ?? null,
-      sevDist, statusDist, statusTotal, epss, epssMax, prio, prioMax, kev, nonKev, publicExploit,
-      trendData, trendActive, trendSummary: trends?.summary, matrix, matrixMax, topAssets, assetMax,
-      slaPct, slaBySev, aging, agingMax, asmt, asmtMax, dept, deptMax, fixFirst,
-      cveRows, enriched, enrichBase, enrichPct,
+      totalOpen, registerTotal, sevDist, sevMax, sevSlices, critHigh, exposed, withCve, distinctAssets, exposedCritHigh,
+      prio, prioMax, prioActionable, prioRows, domains, domainMax, domainTotal, typeRows,
+      topAssets, topShare, assetMax, assetOpenTotal, top1, treeData, matrix, matrixMax, dangerCorner,
+      aging, ageRows, stubborn, fresh, statusDist, statusTotal, closedCount, fixAvailable, mitigated,
+      fixFirst, kev, publicExploit, epssScored, overdue, mttr, slaPct, enriched, enrichBase,
     };
-  }, [vulns, dashboard, threat, heatmap, trends]);
+  }, [vulns, dashboard, threat, heatmap, domainsResp]);
 
-  const slaColor = m.slaPct == null ? FAINT : m.slaPct >= 80 ? '#1F7A54' : m.slaPct >= 60 ? '#C0682F' : '#C2453F';
-  const w = (n: number, max: number) => `${max ? Math.max(n > 0 ? 5 : 0, (n / max) * 100) : 0}%`;
+  const barW = (n: number, max: number) => `${max ? Math.max(n > 0 ? 5 : 0, (n / max) * 100) : 0}%`;
+  const closedPct = pct(m.closedCount, m.registerTotal);
 
-  // Secondary KPIs (the hero below carries "Open findings"). Six → a fixed
-  // 3×2 grid that is always full: an even count never strands.
-  const kpis: { label: string; value: string; tone?: string; sub: string; Icon?: typeof Flame }[] = [
-    { label: 'Critical + High', value: String(m.critHigh), tone: m.critHigh ? '#C0682F' : INK, sub: 'by raw severity' },
-    { label: 'Actively exploited', value: String(m.exploited), tone: m.exploited ? '#C2453F' : INK, sub: 'KEV / public exploit', Icon: Flame },
-    { label: 'Internet-exposed', value: String(m.exposed), tone: m.exposed ? '#7A5AC9' : INK, sub: 'reachable from outside', Icon: Globe },
-    { label: 'Overdue', value: String(m.overdue), tone: m.overdue ? '#C2453F' : INK, sub: 'past SLA due date', Icon: Clock3 },
-    { label: 'MTTR', value: m.mttr != null ? `${m.mttr}d` : '—', sub: 'mean time to remediate' },
-    { label: 'SLA on-time', value: m.slaPct != null ? `${m.slaPct}%` : '—', tone: m.slaPct != null && m.slaPct < 80 ? '#C2453F' : INK, sub: 'avg across severities' },
+  // Headline chips — every one is a populated, high-signal number.
+  const chips: { label: string; value: number; sub: string; Icon: typeof Flame; tone: string }[] = [
+    { label: 'Critical + High', value: m.critHigh, sub: `${pct(m.critHigh, m.totalOpen)}% of what's open`, Icon: Flame, tone: m.critHigh ? '#C0682F' : INK },
+    { label: 'Internet-reachable', value: m.exposed, sub: `${m.exposedCritHigh} of them Critical/High`, Icon: Globe, tone: m.exposed ? EXPOSED_TONE : INK },
+    { label: 'Hosts affected', value: m.distinctAssets, sub: 'carrying ≥1 open finding', Icon: Server, tone: INK },
+    { label: 'Carry a CVE', value: m.withCve, sub: 'externally catalogued', Icon: FileWarning, tone: INK },
+  ];
+
+  // Threat-intel / SLA coverage figures — populated or honest, for the signal-coverage card.
+  const covStats: { label: string; value: number | string; tone: string }[] = [
+    { label: 'Exploited (KEV)', value: m.kev, tone: m.kev ? '#C2453F' : FAINT },
+    { label: 'Public exploit', value: m.publicExploit, tone: m.publicExploit ? '#C0682F' : FAINT },
+    { label: 'Probability-scored', value: m.epssScored, tone: m.epssScored ? AC : FAINT },
+    { label: 'Overdue', value: m.overdue, tone: m.overdue ? '#C2453F' : FAINT },
+    { label: 'SLA on-time', value: m.slaPct == null ? '—' : `${m.slaPct}%`, tone: FAINT },
+    { label: 'MTTR', value: m.mttr == null ? '—' : `${m.mttr}d`, tone: FAINT },
   ];
 
   return (
-    <div style={{ overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12, color: INK, fontSize: 13.5, paddingBottom: 16 }}>
-      {/* ── KPI band: hero lead metric + balanced 3×2 secondary grid (never strands) ── */}
-      <section style={{ ...card, padding: '12px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
-          <Activity size={15} color={ACS} /><b style={{ fontSize: 13.5 }}>Open security posture</b>
-          <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>real-world risk across every open finding</span>
+    <div style={{ overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12, color: INK, fontSize: 13.5, paddingBottom: 18 }}>
+
+      {/* document-global SVG gradient defs — referenced by id from every recharts mark */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <defs>
+          {SEV_ORDER.map((k) => (
+            <linearGradient key={k} id={`sgv-${k}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={SEV[k].c} stopOpacity={0.72} />
+              <stop offset="100%" stopColor={SEV[k].c} stopOpacity={1} />
+            </linearGradient>
+          ))}
+          <linearGradient id="sgv-unscored" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#CBD3DA" stopOpacity={0.7} />
+            <stop offset="100%" stopColor="#B4BEC8" stopOpacity={1} />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      {/* ══ TOP STRIP — thin executive summary (the ONE allowed full-width element) ══ */}
+      <section style={{ ...card, padding: '11px 16px', background: 'linear-gradient(180deg,#FFFFFF 0%, #FBFDFE 100%)', borderLeft: `3px solid ${AC}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ width: 30, height: 30, borderRadius: 9, background: `${AC}14`, color: ACS, display: 'grid', placeItems: 'center', flex: 'none' }}><Activity size={16} /></span>
+          <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+            <span style={cap}>Open security posture</span>
+            <p style={{ fontSize: 12.5, color: SEC, lineHeight: 1.5, margin: '2px 0 0' }}>
+              {m.totalOpen === 0 ? 'No open findings in the register — the backlog is clear.' : <>
+                <b style={{ color: INK }}>{m.critHigh}</b> of {m.totalOpen} open findings are <b style={{ color: '#C0682F' }}>Critical or High</b>, concentrated on <b style={{ color: INK }}>{m.distinctAssets}</b> host{m.distinctAssets === 1 ? '' : 's'}.{m.exposedCritHigh > 0 ? <> <b style={{ color: EXPOSED_TONE }}>{m.exposedCritHigh}</b> of them are reachable from the internet — the surface an adversary reaches first.</> : m.exposed > 0 ? <> <b style={{ color: EXPOSED_TONE }}>{m.exposed}</b> sit on internet-facing hosts.</> : ''}
+              </>}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+            <MiniStat label="In register" value={m.registerTotal} tone={INK} />
+            <MiniStat label="Open" value={m.totalOpen} tone={m.totalOpen ? '#C0682F' : INK} />
+            <MiniStat label="Resolved" value={`${closedPct}%`} tone="#1F7A54" />
+          </div>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {/* hero lead metric */}
-          <div style={{ flex: '1 1 232px', minWidth: 0, display: 'flex', flexDirection: 'column', background: ACSOFT, border: '1px solid #D7E6F2', borderRadius: 11, padding: '13px 15px' }}>
-            <span style={{ ...capCss, color: ACS }}>Open findings</span>
-            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: INK, marginTop: 7, ...TNUM }}>{m.totalOpen}</div>
-            <div style={{ fontSize: 11, color: SEC, marginTop: 4 }}>active in the register</div>
-            <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-              <div style={{ display: 'flex', height: 7, borderRadius: 999, overflow: 'hidden', background: '#E3E8EC' }}>
-                {m.sevDist.map((d) => <span key={d.k} title={`${d.name}: ${d.value}`} style={{ flex: d.value, background: d.c }} />)}
+      </section>
+
+      {/* ══ ROW 1 — open by severity · exposure & reach ══ */}
+      <div style={row}>
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 340px', minWidth: 0 }}>
+          <CardHead title="Open by severity" sub="the register's severity mix" Icon={Activity} />
+          <Insight>{m.critHigh > 0
+            ? <><b style={{ color: '#C0682F' }}>{m.critHigh}</b> of {m.totalOpen} open ({pct(m.critHigh, m.totalOpen)}%) are Critical/High; the remainder is lower-severity noise that can wait.</>
+            : <>No Critical or High findings are open — the mix is entirely lower-severity.</>}</Insight>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'center', justifyContent: 'center', marginTop: 12, flex: 1 }}>
+            {/* premium recharts donut + centred total */}
+            <SeverityDonut data={m.sevSlices} total={m.totalOpen} />
+            {/* severity composition — the distribution, spelled out */}
+            <div style={{ flex: '1 1 190px', minWidth: 0 }}>
+              <span style={cap}>Severity composition</span>
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {m.sevDist.map((d) => (
+                  <div key={d.k} style={{ display: 'grid', gridTemplateColumns: '62px minmax(0,1fr) 56px', gap: 9, alignItems: 'center' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: SEC }}><span style={{ width: 9, height: 9, borderRadius: 3, background: d.c, flex: 'none' }} />{d.label}</span>
+                    <span style={{ height: 8, background: '#EFF2F4', borderRadius: 5, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: barW(d.n, m.sevMax), background: `linear-gradient(90deg, ${d.c}C0, ${d.c})`, borderRadius: 5 }} /></span>
+                    <span style={{ textAlign: 'right', fontSize: 11, color: MUTED, ...TNUM }}><b style={{ color: INK }}>{d.n}</b> · {pct(d.n, m.totalOpen)}%</span>
+                  </div>
+                ))}
               </div>
-              {m.sevDist.length === 0 ? (
-                <div style={{ fontSize: 10.5, color: FAINT, marginTop: 8 }}>No open findings.</div>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 11px', marginTop: 9 }}>
-                  {m.sevDist.map((d) => (
-                    <span key={d.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: SEC }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 2, background: d.c, flex: 'none' }} />{d.name}<b style={{ color: INK, ...TNUM }}>{d.value}</b>
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
-          {/* secondary metrics — fixed 3-col, 6 items = two full rows, alarmed metrics get a colored edge */}
-          <div style={{ flex: '3 1 468px', minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
-            {kpis.map((k) => {
-              const alarmed = !!k.tone && k.tone !== INK;
+        </section>
+
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 340px', minWidth: 0 }}>
+          <CardHead title="Exposure & reach" sub="what an adversary can touch first" Icon={Globe} />
+          <Insight>{m.exposed > 0
+            ? <><b style={{ color: EXPOSED_TONE }}>{m.exposed}</b> open finding{m.exposed === 1 ? '' : 's'} sit on internet-facing hosts{m.exposedCritHigh > 0 ? <>, <b style={{ color: '#C0682F' }}>{m.exposedCritHigh}</b> of them Critical/High — the first surface an attacker reaches</> : ''}.</>
+            : <>Nothing open is internet-facing — exposure is contained to internal hosts.</>}</Insight>
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, flex: 1, gridAutoRows: 'minmax(0, 1fr)' }}>
+            {chips.map((c) => {
+              const tone = c.tone === INK ? AC : c.tone;
               return (
-                <div key={k.label} style={{ border: `1px solid ${BORDER2}`, borderLeft: `3px solid ${alarmed ? k.tone : '#E3E8EC'}`, borderRadius: 10, padding: '10px 12px', minWidth: 0, background: '#fff' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {k.Icon && <k.Icon size={11} color={alarmed ? k.tone : FAINT} />}
-                    <span style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.label}</span>
+                <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${BORDER2}`, borderRadius: 12, padding: '9px 11px', background: '#fff', minWidth: 0, boxShadow: '0 1px 2px rgba(16,24,40,.03)' }}>
+                  <span style={{ width: 34, height: 34, borderRadius: 9, background: `${tone}14`, color: tone, display: 'grid', placeItems: 'center', flex: 'none' }}><c.Icon size={16} /></span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: c.tone, lineHeight: 1.12, ...TNUM }}>{c.value}</div>
+                    <div style={{ fontSize: 10, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.sub}</div>
                   </div>
-                  <div style={{ fontSize: 23, fontWeight: 600, color: k.tone || INK, lineHeight: 1.15, marginTop: 4, ...TNUM }}>{k.value}</div>
-                  <div style={{ fontSize: 10, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.sub}</div>
                 </div>
               );
             })}
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      {/* ── distributions: severity donut + status + threat posture (3-up, flex-fill) ── */}
+      {/* ══ contextual priority triage + finding types ══ */}
       <div style={row}>
-        {/* severity donut */}
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
-          <CardHead title="Severity distribution" sub="open findings" />
-          {m.sevDist.length === 0 ? <Empty>No open findings.</Empty> : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8 }}>
-              <div style={{ position: 'relative', width: 132, height: 132, flex: 'none' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={m.sevDist} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={44} outerRadius={62} paddingAngle={2} stroke="#fff" strokeWidth={2}>
-                      {m.sevDist.map((d) => <Cell key={d.k} fill={d.c} />)}
-                    </Pie>
-                    <Tooltip content={<DonutTip total={m.totalOpen} />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: 22, fontWeight: 700, ...TNUM }}>{m.totalOpen}</div><div style={{ fontSize: 9, letterSpacing: '.08em', color: FAINT }}>OPEN</div></div>
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {m.sevDist.map((d) => (
-                  <div key={d.k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: `1px solid #F4F6F7`, fontSize: 12 }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 2, background: d.c, flex: 'none' }} />
-                    <span style={{ color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
-                    <b style={{ marginLeft: 'auto', ...TNUM }}>{d.value}</b>
-                    <span style={{ width: 34, textAlign: 'right', fontSize: 11, color: FAINT, ...TNUM }}>{Math.round((d.value / Math.max(1, m.totalOpen)) * 100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 340px', minWidth: 0 }}>
+          <CardHead title="Contextual priority" sub="CVSS re-weighted by exploit, exposure & asset value" Icon={Crosshair} />
+          <Insight>{m.prioActionable > 0
+            ? <>Raw severity flags <b>{m.critHigh}</b> findings urgent; once exploitability, exposure and asset value are folded in, the real work queue is <b style={{ color: '#C0682F' }}>{m.prioActionable}</b> Critical/High — chase these, not the raw count.</>
+            : <>Context pulls almost everything to the lower tiers once exposure and asset value are weighed — little is genuinely urgent.</>}</Insight>
+          {m.prioMax <= 0 ? <Empty>No findings to prioritise.</Empty> : <HBars rows={m.prioRows} labelWidth={78} height={m.prioRows.length * 30 + 14} />}
+          <p style={{ fontSize: 10, color: FAINT, marginTop: 9 }}>Tiers (score /100): Critical ≥90 · High 70–89 · Medium 40–69 · Low &lt;40 · Unscored — enrichment pending.</p>
+        </section>
+
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 340px', minWidth: 0 }}>
+          <CardHead title="Finding types" sub="what kind of weakness, by domain" Icon={Layers} />
+          {m.domains.length === 0 ? <Empty>No open findings to categorise.</Empty> : (
+            <>
+              <Insight>{m.domains[0] && <><b>{m.domains[0].label}</b> is the dominant class ({m.domains[0].n}{m.domainTotal ? `, ${pct(m.domains[0].n, m.domainTotal)}%` : ''}){m.domains[1] ? <>, then {m.domains[1].label} ({m.domains[1].n})</> : ''} — a concentrated class means one patch wave or control clears many findings at once.</>}</Insight>
+              <HBars rows={m.typeRows} labelWidth={128} height={m.typeRows.length * 30 + 14} />
+              <p style={{ fontSize: 10, color: FAINT, marginTop: 9 }}>Bar colour = the worst severity seen in that class.</p>
+            </>
+          )}
+        </section>
+      </div>
+
+      {/* ══ ROW 3 — where the risk concentrates · severity × criticality ══ */}
+      <div style={row}>
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 360px', minWidth: 0 }}>
+          <CardHead title="Where the risk concentrates" sub="open findings by host — the blast radius" Icon={Server} />
+          {m.topAssets.length === 0 ? <Empty>No findings are linked to an asset yet — link assets to map blast radius.</Empty> : (
+            <>
+              <Insight>{m.topShare > 0
+                ? <>The top {m.topAssets.length} host{m.topAssets.length === 1 ? '' : 's'} carry <b>{m.topShare}%</b> of every open finding{m.top1 ? <>, and <b>{m.top1.asset_name}</b> alone holds <b>{m.top1.open_vuln_count}</b></> : ''} — remediating this short list clears most of the backlog in a handful of actions.</>
+                : <>These hosts carry the most open findings — the fastest place to cut exposure.</>}</Insight>
+              <AssetTreemap data={m.treeData} max={m.assetMax} />
+              <p style={{ fontSize: 10, color: FAINT, marginTop: 9 }}>Each tile is a host, sized by open findings; darker = heavier load. Hover for the full name.</p>
+            </>
           )}
         </section>
 
-        {/* status breakdown */}
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
-          <CardHead title="Status breakdown" sub="whole register" />
-          <div style={{ marginTop: 12, display: 'flex', height: 12, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2 }}>
-            {m.statusDist.map((s) => <i key={s.k} title={`${s.label}: ${s.n}`} style={{ width: `${(s.n / m.statusTotal) * 100}%`, background: s.c }} />)}
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 360px', minWidth: 0 }}>
+          <CardHead title="Severity × asset criticality" sub="where the blast actually lands" Icon={Crosshair} />
+          {m.matrix.length === 0 ? <Empty>No findings linked to a criticality-rated asset yet.</Empty> : (
+            <>
+              <Insight>{m.dangerCorner > 0
+                ? <><b style={{ color: '#C2453F' }}>{m.dangerCorner}</b> Critical/High findings sit on business-critical assets — the danger corner, and where the next remediation cycle should go first.</>
+                : <>No Critical/High findings currently land on business-critical assets — the heaviest load sits on lower-value hosts.</>}</Insight>
+              <div style={{ marginTop: 12, overflowX: 'auto', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '92px repeat(5, minmax(42px,1fr))', gridAutoRows: '36px', gap: 4, minWidth: 330 }}>
+                  <span />
+                  {SEV_ORDER.map((k) => <div key={k} style={{ ...cap, fontSize: 9, textAlign: 'center', paddingBottom: 2, color: SEV[k].c }}>{SEV[k].label}</div>)}
+                  {m.matrix.map((r) => <HeatRow key={r.asset_criticality} r={r} max={m.matrixMax} />)}
+                </div>
+                <p style={{ fontSize: 10, color: FAINT, marginTop: 10 }}>Darker = more open findings of that severity on assets of that criticality. Top-left is the danger corner.</p>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+
+      {/* ══ ROW 4 — remediation posture · fix these first ══ */}
+      <div style={row}>
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 360px', minWidth: 0 }}>
+          <CardHead title="Remediation posture" sub="where findings sit in the lifecycle" Icon={GitBranch} />
+          <Insight>{m.registerTotal > 0
+            ? <><b style={{ color: '#1F7A54' }}>{m.closedCount}</b> of {m.registerTotal} findings ({closedPct}%) are closed, verified or accepted; <b>{m.totalOpen}</b> remain open.{m.fixAvailable > 0 ? <> A vendor fix is <b style={{ color: '#1F7A54' }}>already published</b> for {m.fixAvailable} of the open set — patch-ready wins sitting on the table.</> : ''}</>
+            : <>No findings recorded yet.</>}</Insight>
+          {m.statusTotal > 0 && (
+            <>
+              <div style={{ marginTop: 13, display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2, boxShadow: 'inset 0 1px 2px rgba(16,24,40,.07)' }}>
+                {m.statusDist.map((s) => <i key={s.k} title={`${s.label}: ${s.n} (${pct(s.n, m.statusTotal)}%)`} style={{ width: `${(s.n / m.statusTotal) * 100}%`, background: `linear-gradient(180deg, ${s.c}D8, ${s.c})`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3)', minWidth: s.n > 0 ? 3 : 0 }} />)}
+              </div>
+              <div style={{ marginTop: 11, display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+                {m.statusDist.map((s) => (
+                  <span key={s.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 3, background: s.c, flex: 'none' }} />
+                    <span style={{ color: SEC }}>{s.label}</span>
+                    <b style={{ color: INK, ...TNUM }}>{s.n}</b>
+                    <span style={{ color: FAINT, fontSize: 10.5, ...TNUM }}>{pct(s.n, m.statusTotal)}%</span>
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          <div style={{ marginTop: 'auto', paddingTop: 14, display: 'flex', flexWrap: 'wrap', gap: 11 }}>
+            <PostureStat Icon={ShieldCheck} label="Closed / verified / accepted" n={m.closedCount} tone="#1F7A54" />
+            <PostureStat Icon={ShieldCheck} label="Vendor patch available" n={m.fixAvailable} tone={m.fixAvailable ? '#1F7A54' : MUTED} />
+            <PostureStat Icon={ShieldCheck} label="Has a mitigation on file" n={m.mitigated} tone={m.mitigated ? AC : MUTED} />
+            <PostureStat Icon={FileWarning} label="Carries a CVE" n={m.withCve} tone={INK} />
           </div>
-          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '4px 14px' }}>
-            {m.statusDist.map((s) => (
-              <div key={s.k} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, minWidth: 0 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.c, flex: 'none' }} />
-                <span style={{ color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                <b style={{ marginLeft: 'auto', ...TNUM }}>{s.n}</b>
+        </section>
+
+        <section style={{ ...card, flex: '1 1 360px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 17px', borderBottom: `1px solid ${BORDER2}` }}>
+            <span style={{ width: 28, height: 28, borderRadius: 8, background: '#FBEAEA', color: '#C2453F', display: 'grid', placeItems: 'center', flex: 'none' }}><Flame size={15} /></span>
+            <b style={{ fontSize: 14 }}>Fix these first</b>
+            <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>top {m.fixFirst.length} of {m.totalOpen} open · ranked · click to open</span>
+          </div>
+          {m.fixFirst.length === 0 ? <Empty pad>Nothing open right now — the queue is clear.</Empty> : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {m.fixFirst.map((v) => {
+                  const score = ctx(v); const sc = normSev(v.severity); const assets = v.linked_assets || [];
+                  const tone = score == null ? FAINT : score >= 70 ? '#C2453F' : score >= 40 ? '#9A6410' : '#1F7A54';
+                  const dr = drivers(v);
+                  return (
+                    <tr key={v.id} onClick={() => onView(v)} style={{ cursor: 'pointer' }} className="ccrow">
+                      <td style={{ padding: '10px 14px', borderBottom: `1px solid ${BORDER2}`, width: 56 }}>
+                        <span style={{ display: 'inline-block', minWidth: 40, textAlign: 'center', background: `${tone}16`, color: tone, borderRadius: 8, padding: '4px 6px', fontFamily: MONO, fontWeight: 700, fontSize: 12.5, ...TNUM }}>{score ?? '—'}</span>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: `1px solid ${BORDER2}`, maxWidth: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV[sc].c, flex: 'none' }} />
+                          <span style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.title}>{shortenVulnTitle(v.title)}</span>
+                          {dr.slice(0, 2).map((d) => <span key={d.t} style={{ fontSize: 9, fontWeight: 700, color: d.c, background: `${d.c}16`, borderRadius: 999, padding: '1px 7px', flex: 'none', whiteSpace: 'nowrap' }}>{d.t}</span>)}
+                          {dr.length > 2 && <span style={{ fontSize: 9.5, color: FAINT, flex: 'none' }}>+{dr.length - 2}</span>}
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 14px', borderBottom: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 10.5, color: FAINT, whiteSpace: 'nowrap' }}>{v.cve_id || `VULN-${v.id}`}</td>
+                      <td style={{ padding: '10px 14px', borderBottom: `1px solid ${BORDER2}`, fontSize: 12, color: assets.length ? SEC : FAINT, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assets.join(', ')}>{assets.length ? `${assets[0]}${assets.length > 1 ? ` +${assets.length - 1}` : ''}` : '—'}</td>
+                      <td style={{ padding: '10px 14px', borderBottom: `1px solid ${BORDER2}`, textAlign: 'right', width: 20 }}><ArrowRight size={13} color={FAINT} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+
+      {/* ══ ROW 5 — open backlog age · threat-intel & signal coverage ══ */}
+      <div style={row}>
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 300px', minWidth: 0 }}>
+          <CardHead title="Open backlog age" sub="time since discovery" Icon={Clock3} />
+          <Insight>{m.stubborn > 0
+            ? <><b style={{ color: '#C2453F' }}>{m.stubborn}</b> finding{m.stubborn === 1 ? '' : 's'} {m.stubborn === 1 ? 'has' : 'have'} aged past 90 days — stale risk that signals a remediation bottleneck, not fresh discovery.</>
+            : m.fresh > 0 ? <>Nothing has aged past 90 days — the backlog is fresh and moving.</> : <>No datable findings in the open backlog yet.</>}</Insight>
+          <AgeBars rows={m.ageRows} height={132} />
+        </section>
+
+        <section style={{ ...card, padding: '15px 17px', flex: '1 1 300px', minWidth: 0, background: ACSOFT, borderColor: '#D7E6F2' }}>
+          <CardHead title="Threat intel & signal coverage" sub="live exploit / probability enrichment" Icon={ShieldAlert} />
+          <Insight>
+            {m.enrichBase === 0
+              ? <>No open findings to enrich.</>
+              : m.enriched === 0
+                ? <>Live exploit &amp; probability feeds haven&apos;t run for these <b>{m.enrichBase}</b> findings. Blank means <b>unscored</b>, not <b>zero risk</b> — the panels above rank on CVSS, exposure and asset context.</>
+                : <>Enriched <b>{m.enriched} of {m.enrichBase}</b> open findings. The rest are unscored, not risk-free.</>}
+          </Insight>
+          <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '13px 10px', flex: 1, alignContent: 'space-between' }}>
+            {covStats.map((s) => (
+              <div key={s.label} style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</div>
+                <b style={{ fontSize: 18, fontWeight: 700, color: s.tone, ...TNUM }}>{s.value}</b>
               </div>
             ))}
           </div>
         </section>
-
-        {/* threat posture */}
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 250px', minWidth: 0 }}>
-          <CardHead title="Threat posture" sub="exploited & reachable" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
-            <Ring value={m.kev} total={Math.max(1, m.kev + m.nonKev)} color="#C2453F" label="KEV" />
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <PostureStat label="Actively exploited (KEV)" n={m.kev} c="#C2453F" />
-              <PostureStat label="Public exploit available" n={m.publicExploit} c="#C0682F" />
-              <PostureStat label="Internet-exposed" n={m.exposed} c="#7A5AC9" />
-            </div>
-          </div>
-          <p style={{ fontSize: 10.5, color: FAINT, marginTop: 10, lineHeight: 1.5 }}>Known-exploited &amp; internet-facing findings are what attackers reach first — these jump the queue regardless of raw CVSS.</p>
-        </section>
       </div>
 
-      {/* ── threat-intel bands: EPSS + composite priority ── */}
-      <div style={row}>
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
-          <CardHead title="Exploit likelihood" sub="EPSS probability bands" />
-          <BandBars rows={m.epss.map((e) => ({ label: e.label, n: e.n, c: e.c }))} max={m.epssMax} />
-        </section>
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
-          <CardHead title="Contextual priority" sub="CVSS × exploit × exposure × asset" />
-          <BandBars rows={m.prio.map((p) => ({ label: p.label, n: p.n, c: p.c }))} max={m.prioMax} />
-        </section>
-      </div>
-
-      {/* ── trends (90d) ── */}
-      <section style={{ ...card, padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-          <TrendingUp size={15} color={ACS} /><b style={{ fontSize: 13.5 }}>Discovered vs resolved</b>
-          <span style={{ fontSize: 11, color: MUTED }}>last 90 days</span>
-          <div style={{ display: 'flex', gap: 16, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <LegendDot c="#C0682F" label="Discovered" n={m.trendSummary?.total_discovered} />
-            <LegendDot c="#1F7A54" label="Resolved" n={m.trendSummary?.total_resolved} />
-            <LegendDot c={AC} label="Net change (cum.)" />
-            <span style={{ fontSize: 11, color: MUTED }}>Status changes <b style={{ color: INK, ...TNUM }}>{m.trendSummary?.total_status_changes ?? 0}</b></span>
-          </div>
-        </div>
-        {!m.trendActive ? <Empty>No discovery or remediation activity recorded in the last 90 days.</Empty> : (
-          <div style={{ height: 196, marginTop: 6 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={m.trendData} margin={{ top: 6, right: 8, bottom: 0, left: -14 }}>
-                <defs>
-                  <linearGradient id="gDisc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#C0682F" stopOpacity={0.22} /><stop offset="100%" stopColor="#C0682F" stopOpacity={0} /></linearGradient>
-                  <linearGradient id="gRes" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1F7A54" stopOpacity={0.2} /><stop offset="100%" stopColor="#1F7A54" stopOpacity={0} /></linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="#F0F3F5" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: MUTED }} axisLine={{ stroke: BORDER }} tickLine={false} interval="preserveStartEnd" minTickGap={22} />
-                <YAxis tick={{ fontSize: 10, fill: MUTED }} axisLine={false} tickLine={false} width={34} allowDecimals={false} />
-                <Tooltip content={<TrendTip />} />
-                <Area type="monotone" dataKey="Discovered" stroke="#C0682F" strokeWidth={2} fill="url(#gDisc)" dot={false} activeDot={{ r: 3 }} />
-                <Area type="monotone" dataKey="Resolved" stroke="#1F7A54" strokeWidth={2} fill="url(#gRes)" dot={false} activeDot={{ r: 3 }} />
-                <Line type="monotone" dataKey="Net change" stroke={AC} strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </section>
-
-      {/* ── asset risk: heat grid + top exposed ── */}
-      <div style={row}>
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
-          <CardHead title="Asset criticality × severity" sub="open findings heat grid" />
-          {m.matrix.length === 0 ? <Empty>No findings are linked to a criticality-rated asset yet — link assets to map blast radius.</Empty> : (
-            <div style={{ marginTop: 10, overflowX: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: `96px repeat(5, minmax(42px,1fr))`, gap: 3, minWidth: 320 }}>
-                <span />
-                {SEV_ORDER.map((k) => <div key={k} style={{ ...capCss, fontSize: 9, textAlign: 'center', paddingBottom: 2 }}>{SEV[k].label}</div>)}
-                {m.matrix.map((r) => (
-                  <HeatRow key={r.asset_criticality} r={r} max={m.matrixMax} />
-                ))}
-              </div>
-              <p style={{ fontSize: 10, color: FAINT, marginTop: 8 }}>Cell shade = how many open findings of that severity sit on assets of that criticality. Top-left is the danger corner.</p>
-            </div>
-          )}
-        </section>
-
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 340px', minWidth: 0 }}>
-          <CardHead title="Top exposed assets" sub="by summed open priority" />
-          {m.topAssets.length === 0 ? <Empty>No asset-linked open findings yet.</Empty> : (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {m.topAssets.map((a) => (
-                <div key={a.asset_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1.7fr) 72px', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.asset_name}>{a.asset_name}{a.kev_count > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: '#C2453F', background: '#FBEAEA', borderRadius: 999, padding: '1px 5px', marginLeft: 6 }}>KEV</span>}</span>
-                  <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(a.total_priority_sum, m.assetMax), background: AC, borderRadius: 4 }} /></span>
-                  <span style={{ fontSize: 11, textAlign: 'right', color: MUTED, ...TNUM }}><b style={{ color: INK }}>{a.open_vuln_count}</b> · {Math.round(a.total_priority_sum)}</span>
-                </div>
-              ))}
-              <p style={{ fontSize: 10, color: FAINT, marginTop: 2 }}>open findings · summed contextual priority</p>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* ── SLA gauge + aging ── */}
-      <div style={row}>
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
-          <CardHead title="SLA compliance" sub="on-time remediation" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 6 }}>
-            <div style={{ position: 'relative', width: 128, height: 112, flex: 'none' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart innerRadius="70%" outerRadius="100%" data={[{ value: m.slaPct ?? 0 }]} startAngle={216} endAngle={-36}>
-                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                  <RadialBar background={{ fill: '#EEF1F3' }} dataKey="value" cornerRadius={8} fill={slaColor} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-                <div style={{ textAlign: 'center' }}><div style={{ fontSize: 24, fontWeight: 700, color: slaColor, ...TNUM }}>{m.slaPct != null ? `${m.slaPct}%` : '—'}</div><div style={{ fontSize: 9, letterSpacing: '.06em', color: FAINT }}>ON-TIME</div></div>
-              </div>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {m.slaBySev.length === 0 ? (
-                <div style={{ fontSize: 11.5, color: SEC, lineHeight: 1.6 }}>
-                  <div style={{ color: FAINT }}>SLA targets not configured yet.</div>
-                  <div style={{ marginTop: 6 }}>Set per-severity remediation windows to start tracking on-time closure.</div>
-                  {m.overdue > 0 && <div style={{ marginTop: 9, display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: '#C2453F', flex: 'none' }} /><span><b style={{ color: '#C2453F', ...TNUM }}>{m.overdue}</b> finding{m.overdue === 1 ? '' : 's'} already past a due date.</span></div>}
-                </div>
-              ) : m.slaBySev.map(({ k, rate }) => (
-                <div key={k} style={{ display: 'grid', gridTemplateColumns: '58px minmax(0,1fr) 34px', gap: 8, alignItems: 'center', padding: '3px 0' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: SEC }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SEV[k].c, flex: 'none' }} />{SEV[k].label}</span>
-                  <span style={{ height: 7, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${Math.round(rate as number)}%`, background: (rate as number) >= 80 ? '#1F7A54' : (rate as number) >= 60 ? '#C0682F' : '#C2453F', borderRadius: 4 }} /></span>
-                  <b style={{ fontSize: 11, textAlign: 'right', ...TNUM }}>{Math.round(rate as number)}%</b>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
-          <CardHead title="Open backlog age" sub="time since discovery" />
-          <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'flex-end' }}>
-            {m.aging.map((a, i) => (
-              <div key={a.label} style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-                <div style={{ height: 76, display: 'flex', alignItems: 'flex-end' }}>
-                  <span style={{ width: '100%', background: ['#1F7A54', '#E0AF33', '#C0682F', '#C2453F'][i], height: `${Math.max(a.n > 0 ? 10 : 2, (a.n / m.agingMax) * 100)}%`, borderRadius: '4px 4px 0 0' }} />
-                </div>
-                <b style={{ fontSize: 14, display: 'block', marginTop: 5, ...TNUM }}>{a.n}</b>
-                <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{a.label}</span>
-              </div>
-            ))}
-          </div>
-          <p style={{ fontSize: 10.5, color: FAINT, marginTop: 10 }}>Findings older than 180 days are the stubborn backlog — unresolved long past any reasonable window.</p>
-        </section>
-      </div>
-
-      {/* ── backlog by assessment type + by owner ── */}
-      <div style={row}>
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
-          <CardHead title="By assessment type" sub="how each finding was identified" />
-          {m.asmt.length === 0 ? <Empty>No open findings.</Empty> : (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {m.asmt.map((a) => (
-                <div key={a.name} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 30px', gap: 10, alignItems: 'center' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: SEC, minWidth: 0 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: a.c, flex: 'none' }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span></span>
-                  <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(a.n, m.asmtMax), background: a.c, borderRadius: 4 }} /></span>
-                  <b style={{ fontSize: 12, textAlign: 'right', ...TNUM }}>{a.n}</b>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section style={{ ...card, padding: '14px 16px', flex: '1 1 320px', minWidth: 0 }}>
-          <CardHead title="Backlog by owner" sub="open findings per team" />
-          {m.dept.length === 0 ? <Empty>No open findings.</Empty> : (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {m.dept.map((d) => (
-                <div key={d.name} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 30px', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: d.name === 'Unassigned' ? FAINT : SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>{d.name}</span>
-                  <span style={{ height: 9, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: w(d.n, m.deptMax), background: d.name === 'Unassigned' ? '#AEB8C2' : AC, borderRadius: 4 }} /></span>
-                  <b style={{ fontSize: 12, textAlign: 'right', ...TNUM }}>{d.n}</b>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* ── compact fix-first ── */}
-      <section style={{ ...card }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${BORDER2}` }}>
-          <Flame size={15} color="#C2453F" /><b style={{ fontSize: 13.5 }}>Fix these first</b>
-          <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>top open findings by contextual priority · click to open</span>
-        </div>
-        {m.fixFirst.length === 0 ? <Empty pad>Nothing open right now.</Empty> : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {m.fixFirst.map((v) => {
-                const sc = ctx(v); const bm = band(sc); const assets = v.linked_assets || [];
-                return (
-                  <tr key={v.id} onClick={() => onView(v)} style={{ cursor: 'pointer' }} className="ccrow">
-                    <td style={{ padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`, textAlign: 'right', fontFamily: MONO, fontWeight: 700, color: bm.c, width: 54, ...TNUM }}>{sc}</td>
-                    <td style={{ padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`, maxWidth: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV[normSev(v.severity)].c, flex: 'none' }} />
-                        <span style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.title}>{shortenVulnTitle(v.title)}</span>
-                        {v.kev_flag && <span style={{ fontSize: 9, fontWeight: 700, color: '#C2453F', background: '#FBEAEA', borderRadius: 999, padding: '1px 5px', flex: 'none' }}>KEV</span>}
-                      </div>
-                    </td>
-                    <td style={{ padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 10.5, color: FAINT, whiteSpace: 'nowrap' }}>{v.cve_id || `VULN-${v.id}`}</td>
-                    <td style={{ padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`, fontSize: 12, color: assets.length ? SEC : FAINT, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assets.join(', ')}>{assets.length ? `${assets[0]}${assets.length > 1 ? ` +${assets.length - 1}` : ''}` : '—'}</td>
-                    <td style={{ padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`, textAlign: 'right', width: 20 }}><ArrowRight size={13} color={FAINT} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {/* ── enrichment honesty strip ── */}
-      <section style={{ ...card, padding: '12px 16px', background: ACSOFT, borderColor: '#D7E6F2' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 260 }}>
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: '#fff', color: ACS, display: 'grid', placeItems: 'center', flex: 'none' }}><ShieldAlert size={16} /></span>
-            <div style={{ minWidth: 0 }}>
-              <b style={{ fontSize: 12.5, color: ACS }}>Data confidence</b>
-              <div style={{ fontSize: 11.5, color: SEC, lineHeight: 1.5, marginTop: 1 }}>
-                {m.enrichBase === 0
-                  ? <>No open findings to enrich.</>
-                  : m.enrichPct === 0
-                    ? <>Threat intel is <b>not scored yet</b> for the {m.enrichBase} open finding{m.enrichBase === 1 ? '' : 's'} — the bands above reflect CVSS and context only. Empty KEV/EPSS means &ldquo;unscored&rdquo;, not &ldquo;zero risk&rdquo;.</>
-                    : <>Threat intel scored for <b>{m.enriched} of {m.enrichBase}</b> open findings ({m.enrichPct}%). Unscored findings still carry risk — they simply aren&apos;t enriched yet.</>}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-            <MiniStat label="Open" n={m.enrichBase} />
-            <MiniStat label="Enriched" n={m.enriched} tone={ACS} />
-            <MiniStat label="With CVE" n={m.cveRows} />
-          </div>
-        </div>
-      </section>
-
-      <style>{`.ccrow:hover{background:#F7FBFA}`}</style>
+      <style>{`.ccrow:hover{background:#F6FAFD}.ccrow:hover td:first-child{box-shadow:inset 3px 0 0 ${AC}}`}</style>
     </div>
   );
 }
 
-// ── small primitives ──
-function CardHead({ title, sub }: { title: string; sub?: string }) {
+// ── premium recharts marks ──────────────────────────────────────────────────
+function SeverityDonut({ data, total }: { data: { k: string; label: string; c: string; n: number }[]; total: number }) {
+  const slices = data.filter((d) => d.n > 0);
+  const empty = slices.length === 0;
+  const pieData = empty ? [{ k: 'none', label: 'None', c: '#EAEEF1', n: 1 }] : slices;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      <span style={{ width: 3, height: 13, borderRadius: 2, background: AC, flex: 'none' }} />
-      <b style={{ fontSize: 13.5 }}>{title}</b>
+    <div style={{ position: 'relative', width: 176, height: 176, flex: 'none', filter: 'drop-shadow(0 6px 12px rgba(16,24,40,.12))' }}>
+      <PieChart width={176} height={176}>
+        <Pie data={pieData} dataKey="n" nameKey="label" cx="50%" cy="50%" innerRadius={60} outerRadius={82}
+          paddingAngle={empty || slices.length < 2 ? 0 : 2} cornerRadius={4} stroke="#fff" strokeWidth={1.5}
+          startAngle={90} endAngle={-270} isAnimationActive animationDuration={750}>
+          {pieData.map((d, i) => <Cell key={i} fill={empty ? '#EAEEF1' : `url(#sgv-${d.k})`} />)}
+        </Pie>
+        {!empty && <Tooltip content={<ChartTip />} />}
+      </PieChart>
+      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 42, fontWeight: 700, lineHeight: 1, color: INK, ...TNUM }}>{total}</div>
+          <div style={{ fontSize: 9.5, letterSpacing: '.13em', color: FAINT, marginTop: 4, fontWeight: 600 }}>OPEN FINDINGS</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HBars({ rows, labelWidth, height }: { rows: { label: string; n: number; grad: string; c: string }[]; labelWidth: number; height: number }) {
+  return (
+    <div style={{ width: '100%', flex: 1, minHeight: height, marginTop: 10 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart layout="vertical" data={rows} margin={{ top: 2, right: 30, bottom: 2, left: 0 }} barCategoryGap={9}>
+          <XAxis type="number" hide domain={[0, 'dataMax']} />
+          <YAxis type="category" dataKey="label" width={labelWidth} tickLine={false} axisLine={false} tick={<HTick />} />
+          <Tooltip cursor={{ fill: 'rgba(0,91,150,.05)' }} content={<ChartTip />} />
+          <Bar dataKey="n" radius={[0, 6, 6, 0]} background={{ fill: '#F1F4F6', radius: 6 } as any} isAnimationActive animationDuration={650}>
+            {rows.map((r, i) => <Cell key={i} fill={r.grad} />)}
+            <LabelList dataKey="n" position="right" style={{ fill: INK, fontSize: 12, fontWeight: 600 }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function AgeBars({ rows, height }: { rows: { label: string; n: number; grad: string; c: string }[]; height: number }) {
+  return (
+    <div style={{ width: '100%', flex: 1, minHeight: height, marginTop: 14 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={{ top: 20, right: 8, bottom: 2, left: 8 }} barCategoryGap="24%">
+          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: BORDER }} tick={{ fontSize: 11, fill: MUTED }} />
+          <YAxis hide domain={[0, 'dataMax']} />
+          <Tooltip cursor={{ fill: 'rgba(0,91,150,.05)' }} content={<ChartTip />} />
+          <Bar dataKey="n" radius={[6, 6, 0, 0]} background={{ fill: '#F4F6F8', radius: [6, 6, 0, 0] } as any} isAnimationActive animationDuration={650}>
+            {rows.map((r, i) => <Cell key={i} fill={r.grad} />)}
+            <LabelList dataKey="n" position="top" style={{ fill: INK, fontSize: 13, fontWeight: 700 }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Relative luminance (WCAG) → pick dark-vs-white text that actually contrasts with the fill.
+const lum = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); })
+    .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+};
+// Deeper ramp: the light end isn't washed out and the mid stops skip the murky zone where
+// neither dark nor white text reads — so every tile is legible (dark text ≤ idx2, white ≥ idx3).
+const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#2E77AB', '#0A5E97', '#064A78'];
+function AssetTreemap({ data, max }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number }) {
+  return (
+    <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700} content={<AssetCell max={max} />} />
+      </ResponsiveContainer>
+    </div>
+  );
+}
+function AssetCell(props: any) {
+  const { x, y, width, height, depth, name } = props;
+  if (depth !== 1 || !(width > 0) || !(height > 0)) return null;
+  const n = props.value ?? props.size ?? 0;
+  const max = props.max ?? 1;
+  const t = Math.min(1, n / Math.max(1, max));
+  const bg = TREE_RAMP[Math.max(0, Math.min(TREE_RAMP.length - 1, Math.round(t * (TREE_RAMP.length - 1))))];
+  const dark = lum(bg) < 0.32;
+  const fg = dark ? '#fff' : INK;
+  const sub = dark ? 'rgba(255,255,255,.92)' : '#2E3A45';
+  const nm = String(name ?? '');
+  const chars = Math.max(1, Math.floor(width / 7.2));
+  const showNum = width > 34 && height > 22;
+  const showName = width > 54 && height > 32;
+  return (
+    <g>
+      <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}</title>
+      <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} />
+      {showNum && <text x={x + 10} y={y + 23} fontSize={height > 56 ? 19 : 15} fontWeight={700} fill={fg} style={TNUM}>{n}</text>}
+      {showName && <text x={x + 10} y={y + (height > 56 ? 41 : 38)} fontSize={11} fill={sub}>{nm.length > chars ? nm.slice(0, Math.max(1, chars - 1)) + '…' : nm}</text>}
+      {props.kev > 0 && width > 72 && height > 54 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={dark ? '#FFD9D6' : '#9A2A24'}>{props.kev} exploited</text>}
+    </g>
+  );
+}
+
+function ChartTip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  const name = p?.payload?.label ?? p?.payload?.name ?? p?.name ?? '';
+  const val = p?.value ?? p?.payload?.n ?? p?.payload?.size ?? '';
+  const color = p?.payload?.c || p?.color || AC;
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '7px 11px', boxShadow: '0 6px 18px rgba(16,24,40,.14)', fontSize: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 9, height: 9, borderRadius: 2, background: color, flex: 'none' }} />
+        <span style={{ color: SEC, maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <b style={{ marginLeft: 12, color: INK, ...TNUM }}>{val}</b>
+      </div>
+    </div>
+  );
+}
+function HTick({ x, y, payload }: any) {
+  const label = String(payload?.value ?? '');
+  const text = label.length > 17 ? label.slice(0, 16) + '…' : label;
+  return <text x={x} y={y} dy={4} textAnchor="end" fontSize={11.5} fill={SEC}><title>{label}</title>{text}</text>;
+}
+
+// ── small primitives ──
+function CardHead({ title, sub, Icon, tone = ACS }: { title: string; sub?: string; Icon?: typeof Flame; tone?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ width: 28, height: 28, borderRadius: 8, background: `${tone}14`, color: tone, display: 'grid', placeItems: 'center', flex: 'none' }}>
+        {Icon ? <Icon size={15} /> : <span style={{ width: 4, height: 13, borderRadius: 2, background: tone }} />}
+      </span>
+      <b style={{ fontSize: 14 }}>{title}</b>
       {sub && <span style={{ fontSize: 11, color: MUTED }}>{sub}</span>}
     </div>
   );
 }
+function Insight({ children }: { children: React.ReactNode }) {
+  return <p style={{ fontSize: 12.5, color: SEC, lineHeight: 1.55, margin: '9px 0 0' }}>{children}</p>;
+}
 function Empty({ children, pad }: { children: React.ReactNode; pad?: boolean }) {
-  return <div style={{ fontSize: 11.5, color: FAINT, marginTop: pad ? 0 : 12, padding: pad ? '18px 16px' : 0, lineHeight: 1.5 }}>{children}</div>;
+  return <div style={{ fontSize: 11.5, color: FAINT, marginTop: pad ? 0 : 12, padding: pad ? '22px 16px' : 0, lineHeight: 1.5 }}>{children}</div>;
 }
-function MiniStat({ label, n, tone = INK }: { label: string; n: number; tone?: string }) {
-  return <div style={{ textAlign: 'right' }}><div style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap' }}>{label}</div><b style={{ fontSize: 17, fontWeight: 600, color: tone, ...TNUM }}>{n}</b></div>;
-}
-function PostureStat({ label, n, c }: { label: string; n: number; c: string }) {
+function PostureStat({ Icon, label, n, tone }: { Icon: typeof Flame; label: string; n: number; tone: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-      <span style={{ width: 9, height: 9, borderRadius: '50%', background: n > 0 ? c : FAINT, flex: 'none' }} />
-      <span style={{ color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      <b style={{ marginLeft: 'auto', color: n > 0 ? c : INK, ...TNUM }}>{n}</b>
-    </div>
-  );
-}
-function LegendDot({ c, label, n }: { c: string; label: string; n?: number }) {
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: SEC }}><span style={{ width: 10, height: 3, borderRadius: 2, background: c, flex: 'none' }} />{label}{n != null && <b style={{ color: INK, ...TNUM }}>{n}</b>}</span>;
-}
-function BandBars({ rows, max }: { rows: { label: string; n: number; c: string }[]; max: number }) {
-  return (
-    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rows.map((r) => (
-        <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '78px minmax(0,1fr) 34px', gap: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 11.5, color: SEC, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</span>
-          <span style={{ height: 11, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${max ? Math.max(r.n > 0 ? 5 : 0, (r.n / max) * 100) : 0}%`, background: r.c, borderRadius: 4, transition: 'width .3s' }} /></span>
-          <b style={{ fontSize: 12, textAlign: 'right', color: INK, ...TNUM }}>{r.n}</b>
-        </div>
-      ))}
-    </div>
-  );
-}
-function Ring({ value, total, color, label }: { value: number; total: number; color: string; label: string }) {
-  const pct = Math.round((value / total) * 100);
-  const len = (value / total) * 100;
-  return (
-    <div style={{ position: 'relative', width: 96, height: 96, flex: 'none' }}>
-      <svg width="96" height="96" viewBox="0 0 42 42">
-        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EEF1F3" strokeWidth="5" />
-        {value > 0 && <circle cx="21" cy="21" r="15.9" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${len} ${100 - len}`} strokeDashoffset="25" />}
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 700, color: value > 0 ? color : INK, ...TNUM }}>{value}</div><div style={{ fontSize: 8.5, letterSpacing: '.06em', color: FAINT }}>{label} · {pct}%</div></div>
+    <div style={{ flex: '1 1 160px', minWidth: 0, border: `1px solid ${BORDER2}`, borderRadius: 12, padding: '11px 13px', display: 'flex', alignItems: 'center', gap: 11, background: 'linear-gradient(180deg,#fff,#FCFDFE)' }}>
+      <span style={{ width: 34, height: 34, borderRadius: 9, background: `${tone}14`, color: tone, display: 'grid', placeItems: 'center', flex: 'none' }}><Icon size={16} /></span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: tone, ...TNUM }}>{n}</div>
+        <div style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
       </div>
+    </div>
+  );
+}
+function MiniStat({ label, value, tone }: { label: string; value: number | string; tone: string }) {
+  return (
+    <div style={{ textAlign: 'right' }}>
+      <div style={{ fontSize: 10.5, color: MUTED, whiteSpace: 'nowrap' }}>{label}</div>
+      <b style={{ fontSize: 17, fontWeight: 700, color: tone, ...TNUM }}>{value}</b>
     </div>
   );
 }
 function HeatRow({ r, max }: { r: { asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }; max: number }) {
   const cells = [r.critical, r.high, r.medium, r.low, r.info];
+  const ramp = ['#E7F0F8', '#C2DAEC', '#7FB0D6', '#2E77AB', '#0A5E97', '#064A78'];
+  const shade = (t: number) => ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))];
   return (
     <>
       <div style={{ fontSize: 11, color: SEC, display: 'flex', alignItems: 'center', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.asset_criticality}>{r.asset_criticality || 'Unknown'}</div>
       {cells.map((n, i) => {
-        const t = n / max; const bg = n === 0 ? '#F7F9FB' : rampAt(t); const fg = t > 0.55 ? '#fff' : n === 0 ? FAINT : INK;
-        return <div key={i} style={{ background: bg, color: fg, borderRadius: 5, height: 30, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: n > 0 ? 600 : 400, ...TNUM }}>{n}</div>;
+        const t = n / max; const bg = n === 0 ? '#F4F7FA' : shade(t); const fg = n === 0 ? '#6B7787' : lum(bg) < 0.32 ? '#fff' : INK;
+        return <div key={i} style={{ background: bg, color: fg, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
       })}
     </>
-  );
-}
-
-// ── recharts tooltips (Ava-styled) ──
-const tipBox: React.CSSProperties = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 9, boxShadow: '0 4px 14px rgba(16,24,40,.1)', padding: '8px 10px', fontSize: 11.5 };
-function DonutTip({ active, payload, total }: any) {
-  if (!active || !payload?.length) return null;
-  const p = payload[0]; const n = p.value as number;
-  return <div style={tipBox}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: p.payload.c }} /><b>{p.name}</b></div><div style={{ color: SEC, marginTop: 2, ...TNUM }}>{n} · {Math.round((n / Math.max(1, total)) * 100)}% of open</div></div>;
-}
-function TrendTip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={tipBox}>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      {payload.map((p: any) => <div key={p.dataKey} style={{ display: 'flex', alignItems: 'center', gap: 6, color: SEC, ...TNUM }}><span style={{ width: 8, height: 8, borderRadius: 2, background: p.stroke }} />{p.dataKey} <b style={{ color: INK, marginLeft: 'auto' }}>{p.value}</b></div>)}
-    </div>
   );
 }
