@@ -3,7 +3,7 @@
 /**
  * VulnsWorkspace — Vulnerability Register, redesigned to the handoff mock
  * ("Vulnerabilities.mock.html") 1:1: a contextual-priority ribbon, a triage-view
- * rail, a Register / Insights toggle, and a clean findings table.
+ * rail, an Overview / Register toggle, and a clean findings table.
  *
  * Still purely presentational — ALL data, filter state + setters, permissions
  * and handlers arrive as props from VulnerabilitiesPage. The triage rail applies
@@ -14,8 +14,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Crosshair, Loader2, Building2, Clock, BarChart3, Target, LayoutDashboard } from 'lucide-react';
-import { shortenVulnTitle, type Vulnerability } from './lib';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Crosshair, Loader2, Building2, Clock, Target, LayoutDashboard } from 'lucide-react';
+import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
 
@@ -90,15 +90,15 @@ const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline
 
 const SevPill = ({ s }: { s?: string }) => { const m = SEV[normSev(s)]; return <span style={pill(m.pillC, m.pillBg)}>{m.label}</span>; };
 
-type Pane = 'cmd' | 'reg' | 'ins' | 'ctem';
+type Pane = 'cmd' | 'reg' | 'ctem';
 const PANE_META: { key: Pane; label: string; Icon?: typeof Target }[] = [
   { key: 'cmd', label: 'Overview', Icon: LayoutDashboard },
   { key: 'reg', label: 'Register' },
-  { key: 'ins', label: 'Insights' },
   { key: 'ctem', label: 'CTEM Scopes', Icon: Target },
 ];
 // One toggle, shared by the Overview surface and the register area — so the
-// panes (Overview / Register / Insights / CTEM) can never drift apart.
+// panes (Overview / Register / CTEM) can never drift apart. The old "Insights"
+// pane was retired: it duplicated the analytics the Overview now owns.
 function PaneToggle({ pane, setPane }: { pane: Pane; setPane: (p: Pane) => void }) {
   return (
     <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 11, padding: 3, gap: 2 }}>
@@ -158,7 +158,18 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     { key: 'unassigned', label: 'Unassigned', n: count(isUnassigned), dot: '#8A95A1' },
   ];
   const SEV_RAIL: { key: TriageView; label: string; n: number; sw: string }[] = (['critical', 'high', 'medium', 'info'] as SevKey[]).map((k) => ({ key: `sev-${k}` as TriageView, label: SEV[k].label, n: count((v) => normSev(v.severity) === k), sw: SEV[k].dot }));
-  const DOM_RAIL = (domains ?? []).slice(0, 6).map((d) => ({ key: `dom-${d.family}` as TriageView, label: d.family || 'General', n: d.total, sw: SEV[normSev(d.worst_severity)].dot }));
+  // De-brand engine/tool names → assessment type, then MERGE families that
+  // collapse to the same label (so the rail shows one "Penetration test", not five).
+  const SEV_RANK: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+  const domGroups = new Map<string, { n: number; worst: SevKey }>();
+  for (const d of domains ?? []) {
+    const label = deBrandDomain(d.family); const ws = normSev(d.worst_severity);
+    const e = domGroups.get(label) || { n: 0, worst: 'info' as SevKey };
+    e.n += d.total; if (SEV_RANK[ws] > SEV_RANK[e.worst]) e.worst = ws;
+    domGroups.set(label, e);
+  }
+  const DOM_RAIL = Array.from(domGroups.entries()).sort((a, b) => b[1].n - a[1].n).slice(0, 6)
+    .map(([label, e]) => ({ key: `dom-${label}` as TriageView, label, n: e.n, sw: SEV[e.worst].dot }));
 
   const matches = (v: Vulnerability): boolean => {
     if (view === 'all' || view === 'unassigned') return view === 'all' ? true : isUnassigned(v);
@@ -168,7 +179,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     if (view === 'epss') return (v.epss_score ?? 0) >= 0.1;
     if (view === 'exposed') return isExposed(v);
     if (view.startsWith('sev-')) return normSev(v.severity) === view.slice(4);
-    if (view.startsWith('dom-')) return domainOf(v) === view.slice(4);
+    if (view.startsWith('dom-')) return deBrandDomain(domainOf(v)) === view.slice(4);
     return true;
   };
   const rows = useMemo(() => {
@@ -182,13 +193,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
 
   const railLabel: Record<string, string> = { all: 'All findings', kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned' };
   const title = railLabel[view] || (view.startsWith('sev-') ? SEV[view.slice(4) as SevKey].label : view.startsWith('dom-') ? view.slice(4) : 'Findings');
-
-  // ── severity donut (raw CVSS bands) for Insights ──
-  const sevCounts = (['critical', 'high', 'medium', 'low', 'info'] as SevKey[]).map((k) => ({ k, n: count((v) => normSev(v.severity) === k) }));
-  const sevTotal = sevCounts.reduce((s, x) => s + x.n, 0) || 1;
-  let acc = 0;
-  const arcs = sevCounts.filter((x) => x.n).map((x) => { const len = (x.n / sevTotal) * 100; const a = { k: x.k, len, off: -acc }; acc += len; return a; });
-  const top10 = [...all].sort((a, b) => ctxScore(b) - ctxScore(a)).slice(0, 10);
 
   return (
     <div className="inv2" style={{ background: '#F4F6F7', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
@@ -284,10 +288,10 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: r.sw, flex: 'none' }} />{r.label}<span className="num" style={{ marginLeft: 'auto', fontSize: 11.5, color: '#9BA6B2' }}>{r.n}</span>
                 </button>
               ))}
-              {/* Overview / Departments / SLA — the mock keeps these in the rail; they
-                  open the existing standalone management views. */}
+              {/* Departments / SLA — the mock keeps these in the rail; they open the
+                  existing standalone management views. (The old "Overview" link was
+                  removed: the Overview pane above is now the analytics surface.) */}
               <div style={{ height: 1, background: '#F0F3F5', margin: '10px 4px 6px' }} />
-              <Link href="/vulnerabilities/dashboard" style={{ ...railBtn(false), textDecoration: 'none' }}><BarChart3 size={15} color="#5B6673" />Overview</Link>
               <Link href="/vulnerabilities/departments" style={{ ...railBtn(false), textDecoration: 'none' }}><Building2 size={15} color="#5B6673" />Departments</Link>
               <Link href="/vulnerabilities/sla" style={{ ...railBtn(false), textDecoration: 'none' }}><Clock size={15} color="#5B6673" />SLA config</Link>
             </aside>
@@ -305,7 +309,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                 </select>
               </div>
 
-              {pane === 'reg' ? (
+              {(
                 <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(16,24,40,.04)', overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 16px', borderBottom: `1px solid ${BORDER2}`, flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: 13.5, margin: 0 }}>{title}</h3>
@@ -357,8 +361,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   </div>
                   <div style={{ padding: '7px 16px', fontSize: 11, color: MUTED }}>Row → full finding detail · <b>Priority·Contextual</b> = composite of exposure, exploit, EPSS &amp; asset criticality on top of CVSS.</div>
                 </div>
-              ) : (
-                <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}><Insights sevCounts={sevCounts} sevTotal={sevTotal} arcs={arcs} domains={domains} all={all} agg={agg} top10={top10} onView={onView} /></div>
               )}
             </div>
           </div>
@@ -371,85 +373,5 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   );
 }
 
-// ── Insights pane ──
-function Insights({ sevCounts, sevTotal, arcs, domains, all, agg, top10, onView }: any) {
-  const epssBuckets = [
-    { label: '≥ 50%', n: all.filter((v: Vulnerability) => (v.epss_score ?? 0) >= 0.5).length, c: '#C2453F' },
-    { label: '10–50%', n: all.filter((v: Vulnerability) => (v.epss_score ?? 0) >= 0.1 && (v.epss_score ?? 0) < 0.5).length, c: '#E0AF33' },
-    { label: '1–10%', n: all.filter((v: Vulnerability) => (v.epss_score ?? 0) >= 0.01 && (v.epss_score ?? 0) < 0.1).length, c: '#005B96' },
-    { label: '< 1%', n: all.filter((v: Vulnerability) => (v.epss_score ?? 0) < 0.01).length, c: '#AEB8C2' },
-  ];
-  const epssMax = Math.max(...epssBuckets.map((b) => b.n), 1);
-  const domMax = Math.max(...(domains ?? []).map((d: any) => d.total), 1);
-  const signals = [
-    { label: 'In CISA KEV', n: agg.kev }, { label: 'Public exploit', n: all.filter(hasExploit).length },
-    { label: 'With CVE', n: all.filter((v: Vulnerability) => !!v.cve_id).length }, { label: 'High EPSS (≥10%)', n: all.filter((v: Vulnerability) => (v.epss_score ?? 0) >= 0.1).length },
-  ];
-  const card: React.CSSProperties = { background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(16,24,40,.04)', padding: '16px 18px' };
-  return (
-    <div>
-      <div style={{ ...card, marginBottom: 12, background: 'linear-gradient(120deg,#EAFAF4,#fff 60%)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}><b style={{ fontSize: 14 }}>Raw severity ≠ real priority</b><span style={{ fontSize: 11.5, color: MUTED }}>of {agg.total} findings, only {agg.urgent} {agg.urgent === 1 ? 'is' : 'are'} truly urgent once exposure, exploit and EPSS are weighed</span></div>
-        <div style={{ display: 'flex', height: 12, borderRadius: 99, overflow: 'hidden', background: '#EAEEF1', margin: '12px 0 9px' }}>
-          {[['urgent', agg.urgent, '#C2453F'], ['moderate', agg.moderate, '#E0AF33'], ['low', agg.low, '#005B96']].map(([k, n, c]) => <i key={k as string} style={{ width: `${(Number(n) / Math.max(1, agg.total)) * 100}%`, background: c as string }} />)}
-        </div>
-      </div>
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 12 }}>
-        <div style={card}>
-          <h3 style={{ fontSize: 13.5, margin: 0 }}>By severity <span style={{ fontSize: 10.5, color: MUTED, fontWeight: 400 }}>raw CVSS</span></h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-            <svg width="104" height="104" viewBox="0 0 42 42">
-              <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EEF1F3" strokeWidth="6" />
-              {arcs.map((a: any) => <circle key={a.k} cx="21" cy="21" r="15.9" fill="none" stroke={SEV[a.k as SevKey].dot} strokeWidth="6" strokeDasharray={`${a.len} ${100 - a.len}`} strokeDashoffset={a.off} />)}
-              <text x="21" y="20.5" textAnchor="middle" fontSize="8" fontWeight="800" fill={INK}>{sevTotal}</text>
-              <text x="21" y="26" textAnchor="middle" fontSize="2.8" letterSpacing=".08em" fill={FAINT}>TOTAL</text>
-            </svg>
-            <div style={{ flex: 1, fontSize: 12 }}>
-              {sevCounts.map((s: any) => <div key={s.k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #F4F6F7' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: SEV[s.k as SevKey].dot, flex: 'none' }} />{SEV[s.k as SevKey].label}<b className="num" style={{ marginLeft: 'auto' }}>{s.n}</b></div>)}
-            </div>
-          </div>
-        </div>
-        <div style={card}>
-          <h3 style={{ fontSize: 13.5, margin: 0 }}>By domain</h3>
-          <div style={{ marginTop: 12, fontSize: 12 }}>
-            {(domains ?? []).length === 0 ? <p style={{ color: FAINT, fontSize: 11 }}>No domain data yet.</p> : (domains ?? []).slice(0, 8).map((d: any) => (
-              <div key={d.family} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}><span style={{ width: 120, color: SEC, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.family}>{d.family || 'General'}</span><span style={{ flex: 1, height: 8, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${(d.total / domMax) * 100}%`, background: SEV[normSev(d.worst_severity)].dot }} /></span><b className="num" style={{ width: 30, textAlign: 'right' }}>{d.total}</b></div>
-            ))}
-          </div>
-        </div>
-        <div style={card}>
-          <h3 style={{ fontSize: 13.5, margin: 0 }}>Exploit likelihood <span style={{ fontSize: 10.5, color: MUTED, fontWeight: 400 }}>EPSS</span></h3>
-          <div style={{ marginTop: 14, fontSize: 11 }}>
-            {epssBuckets.map((b) => <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}><span style={{ width: 60, color: SEC }}>{b.label}</span><span style={{ flex: 1, height: 8, background: '#F0F3F5', borderRadius: 4, overflow: 'hidden' }}><i style={{ display: 'block', height: '100%', width: `${(b.n / epssMax) * 100}%`, background: b.c }} /></span><b className="num" style={{ width: 30, textAlign: 'right' }}>{b.n}</b></div>)}
-          </div>
-        </div>
-      </section>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: FAINT, margin: '18px 2px 8px' }}>Threat signals</div>
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))', gap: 10 }}>
-        {signals.map((s) => <div key={s.label} style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, padding: '12px', textAlign: 'center' }}><div className="num" style={{ fontSize: 20, fontWeight: 700, color: s.n > 0 ? INK : '#1F7A54' }}>{s.n}</div><div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{s.label}</div></div>)}
-      </section>
-      <div style={{ ...card, marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}><h3 style={{ fontSize: 13.5, margin: 0 }}>Top 10 — fix these first</h3><span style={{ fontSize: 11, color: MUTED }}>ranked by composite priority · KEV = actively exploited</span></div>
-        <div style={{ overflowX: 'auto', marginTop: 10 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
-            <thead><tr>{['#', 'Vuln', 'CVE', 'Priority', 'CVSS', 'EPSS'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {top10.map((v: Vulnerability, i: number) => { const sc = ctxScore(v); const bm = BAND_META[band(sc)]; return (
-                <tr key={v.id} onClick={() => onView(v)} style={{ cursor: 'pointer' }} className="vrow">
-                  <td style={{ ...td, fontFamily: MONO, color: FAINT }}>{i + 1}</td>
-                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 240 }}>{v.title}{v.kev_flag && <span style={{ ...pill('#C2453F', '#FBEAEA'), fontSize: 9, marginLeft: 6 }}>KEV</span>}</td>
-                  <td style={{ ...td, fontFamily: MONO, color: v.cve_id ? SEC : FAINT }}>{v.cve_id || '—'}</td>
-                  <td style={{ ...td, fontFamily: MONO, color: bm.c, fontWeight: 600 }}>{sc} · {bm.label}</td>
-                  <td style={{ ...td, fontFamily: MONO }}>{v.cvss_score ?? '—'}</td>
-                  <td style={{ ...td, fontFamily: MONO, color: FAINT }}>{v.epss_score != null ? `${(v.epss_score * 100).toFixed(1)}%` : '—'}</td>
-                </tr>
-              ); })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default VulnsWorkspace;
