@@ -9,7 +9,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, Save, Download, CheckCircle2, Sparkles, Landmark, Fingerprint, Cpu,
+  Loader2, Save, CheckCircle2, Sparkles, Landmark, Fingerprint, Cpu,
   Database, ShieldCheck, Clock, Plug, Bug, Crosshair, FileText, ChevronDown, RefreshCw,
   ArrowUpRight, Globe,
 } from 'lucide-react';
@@ -58,7 +58,6 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
   const qc = useQueryClient();
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [sync, setSync] = useState<Record<string, 'busy' | 'failed'>>({});
   const [syncedAt, setSyncedAt] = useState<Record<string, string>>({});
@@ -95,17 +94,6 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
     } catch {
       setSync((s) => ({ ...s, [group]: 'failed' }));
     }
-  };
-
-  const exportXlsx = async () => {
-    setExporting(true);
-    try {
-      const res = await apiClient.get('/sbp-inventory/export.xlsx', { responseType: 'blob' });
-      const url = URL.createObjectURL(res.data as Blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'SBP_Asset_Inventory.xlsx'; a.click();
-      URL.revokeObjectURL(url);
-    } finally { setExporting(false); }
   };
 
   const fields = data?.fields || [];
@@ -166,7 +154,7 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
             </div>
             <div>
               <h3 className="text-[15px] font-semibold text-gray-900">SBP Offsite IT Asset Inventory</h3>
-              <p className="mt-0.5 text-xs text-gray-500">State Bank of Pakistan · 52-field regulatory return · <Sparkles size={11} className="mb-0.5 inline" style={{ color: IND }} /> auto-filled from this asset's scans and vendor patch feeds — correct anything, then Save. Export gives the bank's exact file.</p>
+              <p className="mt-0.5 text-xs text-gray-500">State Bank of Pakistan · 52-field regulatory return · <Sparkles size={11} className="mb-0.5 inline" style={{ color: IND }} /> auto-filled from this asset's scans and vendor patch feeds — correct anything, then Save. Download the bank workbook from Reports.</p>
               {data?.external && (
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
                   <Globe size={12} className="flex-none" />
@@ -176,10 +164,6 @@ export default function SbpInventoryPanel({ assetId }: { assetId: number }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={exportXlsx} disabled={exporting}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download size={15} />} Export
-            </button>
             <button onClick={() => save.mutate()} disabled={!dirty || save.isPending}
               title={dirty ? 'Save your corrections' : 'Nothing to save — change any field first'}
               className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: IND }}>

@@ -113,6 +113,7 @@ const navigation: NavEntry[] = [
       { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'Vulnerability Scanning',    href: '/scan-flows',                    icon: Crosshair,     requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'AI Pentest',              href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
+      { name: 'Reports',                 href: '/reports',                       icon: FileText,      requiredPermissions: ['assets:asset_inventory:*'] },
     ],
   },
 ];

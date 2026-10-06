@@ -3,7 +3,7 @@
 fields          : the 52-column template spec (labels/groups/which are editable)
 asset/{id}      : the full derived+stored row for one asset (?section=va|pt: that section only)
 PATCH asset/{id}: save the stored/reason/override fields
-export.xlsx     : the whole tenant as the SBP submission workbook
+export.xlsx     : the whole tenant as the SBP submission workbook (?asset_id= → one asset's row)
 """
 from __future__ import annotations
 
@@ -66,9 +66,11 @@ def save_row(asset_id: int, values: dict = Body(...),
 
 
 @router.get("/export.xlsx")
-def export(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def export(asset_id: Optional[int] = Query(None),
+           db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+    """?asset_id=<id> → a one-row workbook for just that asset; absent → the whole tenant."""
     tid = _tenant(current_user, db)
-    content = service.export_xlsx(db, tid)
+    content = service.export_xlsx(db, tid, asset_id)
     return StreamingResponse(
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

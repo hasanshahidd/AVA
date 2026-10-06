@@ -1115,20 +1115,25 @@ def _in_inventory(a: ITAsset) -> bool:
             and (getattr(a, "last_seen_source", None) or "") != "pentest-adhoc")
 
 
-def export_rows(db: Session, tenant_id: int) -> List[List[Any]]:
-    assets = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id).order_by(ITAsset.id).all()
+def export_rows(db: Session, tenant_id: int, asset_id: Optional[int] = None) -> List[List[Any]]:
+    """All in-inventory assets as bank rows; with asset_id, just that one asset
+    (still gated by _in_inventory, so it matches the row it contributes to the
+    full export)."""
+    q = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id)
+    if asset_id is not None:
+        q = q.filter(ITAsset.id == asset_id)
     rows = []
-    for a in filter(_in_inventory, assets):
+    for a in filter(_in_inventory, q.order_by(ITAsset.id).all()):
         by_key = {f["key"]: f["value"] for f in build_row(db, tenant_id, a)}
         rows.append([by_key.get(k, "") for (k, *_r) in R.FIELDS])
     return rows
 
 
-def export_xlsx(db: Session, tenant_id: int) -> bytes:
+def export_xlsx(db: Session, tenant_id: int, asset_id: Optional[int] = None) -> bytes:
     from openpyxl import Workbook
     wb = Workbook(); ws = wb.active; ws.title = "Asset Inventory"
     ws.append(R.EXPORT_HEADERS)  # bank's EXACT headers, verbatim (not the clean UI labels)
-    for r in export_rows(db, tenant_id):
+    for r in export_rows(db, tenant_id, asset_id):
         ws.append(r)
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
