@@ -9,7 +9,8 @@ from sqlalchemy import func
 
 from ....models import (
     Vulnerability, VulnerabilityReport, VulnerabilitySLAConfig,
-    VulnerabilityAssetLink, VulnerabilityControlLink, VulnerabilityDependency, GRCUser, get_db
+    VulnerabilityAssetLink, VulnerabilityControlLink, VulnerabilityDependency, GRCUser,
+    GRCVulnerabilityDepartmentAssignment, get_db
 )
 from ....schemas import (
     VulnerabilityCreate, VulnerabilityUpdate, VulnerabilityResponse,
@@ -61,12 +62,20 @@ def generate_vuln_id(tenant_id: int, db: Session) -> str:
 
 def _build_vulnerability_response(v: Vulnerability, solution_count=None) -> VulnerabilityResponse:
     linked_assets = []
+    # True iff any linked asset is internet-facing — mirrors the dashboard's
+    # internet_exposed_count (same two exposure columns), so the register's
+    # Overview console agrees with the KPI instead of reading a false 0. Uses
+    # the already eager-loaded asset, no extra query.
+    internet_exposed = False
     if getattr(v, "asset_links", None):
-        linked_assets = [
-            link.asset.name
-            for link in v.asset_links
-            if getattr(link, "asset", None) and getattr(link.asset, "name", None)
-        ]
+        for link in v.asset_links:
+            _a = getattr(link, "asset", None)
+            if not _a:
+                continue
+            if getattr(_a, "name", None):
+                linked_assets.append(_a.name)
+            if getattr(_a, "internet_facing", None) or getattr(_a, "is_internet_facing", None):
+                internet_exposed = True
 
     # The control(s) that CLOSE this finding — so the Mobilise/register rows can
     # show "closed by X" without an extra round-trip. Codes only; the full link
@@ -79,6 +88,16 @@ def _build_vulnerability_response(v: Vulnerability, solution_count=None) -> Vuln
                  or getattr(getattr(_cl, "internal_control", None), "name", None))
         if _code and _code not in linked_control_codes:
             linked_control_codes.append(_code)
+
+    # Department(s) this finding is routed to. Scanner findings almost never have
+    # an individual `assigned_to`; real routing is a department assignment, so the
+    # register/Owner column stays "Unassigned" without this. Eager-loaded on the
+    # list path (see the joinedload below); a cheap lazy read elsewhere.
+    assigned_departments = []
+    for _da in (getattr(v, "department_assignments", None) or []):
+        _dname = getattr(getattr(_da, "department", None), "name", None)
+        if _dname and _dname not in assigned_departments:
+            assigned_departments.append(_dname)
 
     return VulnerabilityResponse(
         id=v.id,
@@ -125,6 +144,8 @@ def _build_vulnerability_response(v: Vulnerability, solution_count=None) -> Vuln
         verifier_name=v.verifier.display_name if v.verifier else None,
         linked_assets=linked_assets,
         linked_control_codes=linked_control_codes,
+        assigned_departments=assigned_departments,
+        internet_exposed=internet_exposed,
         template_type=getattr(v, "template_type", None),
         template_fields=getattr(v, "template_fields", None) or None,
         # Threat-intelligence enrichment — all None on un-enriched rows. The
@@ -293,6 +314,7 @@ def list_vulnerabilities(
         joinedload(Vulnerability.assignee),
         joinedload(Vulnerability.verifier),
         joinedload(Vulnerability.asset_links).joinedload(VulnerabilityAssetLink.asset),
+        joinedload(Vulnerability.department_assignments).joinedload(GRCVulnerabilityDepartmentAssignment.department),
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.framework_control),
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.normalized_control),
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.internal_control),

@@ -195,16 +195,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
 
         {/* rail */}
         <aside style={{ position: 'sticky', top: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <RailCard title="Identity">
-            <Row k="CWE" v={v.cwe_id || '—'} mono />
-            <Row k="Severity" v={sm.label} />
-            <Row k="CVSS vector" v={v.cvss_vector || v.nvd_cvss_vector || '—'} mono />
-          </RailCard>
-          <RailCard title="Timeline">
-            <Row k="First seen" v={fmt(v.first_detected || v.created_at)} />
-            <Row k="Last seen" v={fmt(v.last_seen)} />
-            <Row k="Source" v={v.source || v.report_name || 'Scan'} />
-          </RailCard>
+          {/* Affected asset FIRST — opening a finding should show the hit asset at a glance (top-right). */}
           <RailCard title="Affected asset">
             {primaryAssetId ? (
               <>
@@ -214,10 +205,22 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
               </>
             ) : <div style={{ fontSize: 12, color: MUTED }}>No asset linked — link one to compute reachability.</div>}
           </RailCard>
-          <RailCard title="Department assignments">
+          {/* Assignment near the top — the department(s) it's routed to plus the individual owner. */}
+          <RailCard title="Assignment">
+            {v.assigned_to && v.assignee_name && <Row k="Owner" v={v.assignee_name} />}
             {(deptAssignments?.length ?? 0) > 0
               ? deptAssignments!.map((d: any, i: number) => <Row key={d.id ?? d.department_id ?? i} k={d.department_name || d.name || 'Department'} v={d.priority || d.sla_override_days ? `${d.priority || ''}${d.sla_override_days ? ` · ${d.sla_override_days}d` : ''}`.trim() || 'assigned' : 'assigned'} />)
-              : <div style={{ fontSize: 11.5, color: MUTED }}>No departments assigned — assign this finding to route remediation.</div>}
+              : !(v.assigned_to && v.assignee_name) && <div style={{ fontSize: 11.5, color: MUTED }}>No one assigned — assign this finding to route remediation.</div>}
+          </RailCard>
+          <RailCard title="Identity">
+            <Row k="CWE" v={v.cwe_id || '—'} mono />
+            <Row k="Severity" v={sm.label} />
+            <Row k="CVSS vector" v={v.cvss_vector || v.nvd_cvss_vector || '—'} mono />
+          </RailCard>
+          <RailCard title="Timeline">
+            <Row k="First seen" v={fmt(v.first_detected || v.created_at)} />
+            <Row k="Last seen" v={fmt(v.last_seen)} />
+            <Row k="Source" v={v.source || v.report_name || 'Scan'} />
           </RailCard>
         </aside>
       </div>
