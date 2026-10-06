@@ -430,10 +430,174 @@ def test_fallback_fires_only_when_enum4linux_empty(monkeypatch):
     assert any(a and a[0] == "polenum" for a in calls)
 
 
+# ---- CREDENTIALED nxc tier (needs_creds) — authenticated SMB read-only enum --------------------------
+_CREDS_PREFIX = "SMB         10.10.10.5      445    DC01             "
+
+
+def _nxc(*body_lines):
+    """Wrap body lines in the real `SMB  <host>  445  <NAME>  <body>` nxc prefix."""
+    return "\n".join(_CREDS_PREFIX + b for b in body_lines) + "\n"
+
+
+def test_nxc_creds_shares_write_read_default():
+    out = _nxc("[*] Enumerated shares",
+               "Share           Permissions     Remark",
+               "-----           -----------     ------",
+               "ADMIN$                          Remote Admin",
+               "C$                              Default share",
+               "IPC$            READ            Remote IPC",
+               "backups         READ,WRITE",
+               "public          READ")
+    rows = wst.parse_tool("nxc-creds-shares", out, "10.10.10.5", 20, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert all(r["source_slug"] == "netexec-creds" and r["affected_port"] == 445 for r in rows)
+    backups = next(r for r in rows if r["affected_component"] == "backups")
+    assert backups["fields"]["severity"] == "high"                       # writable non-default = high
+    public = next(r for r in rows if r["affected_component"] == "public")
+    assert public["fields"]["severity"] == "low"                         # readable non-default = low
+    ipc = next(r for r in rows if r["affected_component"] == "IPC$")
+    assert ipc["fields"]["severity"] == "info"                           # default share = info
+    admin = next(r for r in rows if r["affected_component"] == "ADMIN$")
+    assert admin["fields"]["severity"] == "info"
+    assert wst.parse_tool("nxc-creds-shares", "", "h", 20, "http://h") == []
+
+
+def test_nxc_creds_users_skips_machine_accounts():
+    out = _nxc("[*] Enumerated domain user(s)",
+               "corp.local\\Administrator        Built-in account for administering the computer",
+               "corp.local\\alice",
+               "corp.local\\DC01$")
+    rows = wst.parse_tool("nxc-creds-users", out, "10.10.10.5", 21, "http://10.10.10.5")
+    _assert_shape(rows)
+    names = {r["affected_component"] for r in rows}
+    assert names == {"Administrator", "alice"}                           # machine account DC01$ skipped
+    assert all(r["fields"]["severity"] == "info" for r in rows)
+    assert wst.parse_tool("nxc-creds-users", "", "h", 21, "http://h") == []
+
+
+def test_nxc_creds_admins_members_and_summary():
+    out = _nxc("[+] corp.local\\svc_admin (Pwn3d!)",
+               "Alias name     administrators",
+               "Comment        Administrators have complete and unrestricted access",
+               "Members",
+               "-------------------------------------------------------------------------------",
+               "Administrator",
+               "CORP\\Domain Admins",
+               "CORP\\svc_admin",
+               "The command completed successfully.")
+    rows = wst.parse_tool("nxc-creds-admins", out, "10.10.10.5", 22, "http://10.10.10.5")
+    _assert_shape(rows)
+    summary = next(r for r in rows if "Local Administrators group membership" in r["fields"]["title"])
+    assert summary["fields"]["severity"] == "info" and "3" in summary["fields"]["title"]
+    admins = [r for r in rows if r["fields"]["title"].startswith("Local administrator principal")]
+    assert {r["affected_component"] for r in admins} == {"Administrator", "CORP\\Domain Admins", "CORP\\svc_admin"}
+    assert all(r["fields"]["severity"] == "medium" for r in admins)      # privileged accounts
+    # lines before Members (Alias name/Comment) and the Pwn3d! status are NOT members
+    assert not any(r["affected_component"] in ("administrators", "Alias name") for r in admins)
+    assert wst.parse_tool("nxc-creds-admins", _nxc("[-] Access denied"), "h", 22, "http://h") == []
+
+
+def test_nxc_creds_passpol_weak_and_strong():
+    weak = _nxc("[+] Dumping password info for domain: CORP",
+                "Minimum password length: 5",
+                "Password history length: 24",
+                "Maximum password age: 42 days",
+                "Account Lockout Threshold: None")
+    rows = wst.parse_tool("nxc-creds-passpol", weak, "10.10.10.5", 23, "http://10.10.10.5")
+    _assert_shape(rows)
+    base = next(r for r in rows if r["fields"]["title"].startswith("Password policy retrieved"))
+    assert base["fields"]["severity"] == "low" and base["affected_port"] == 445
+    minlen = next(r for r in rows if "minimum password length" in r["fields"]["title"].lower())
+    assert minlen["fields"]["severity"] == "medium"
+    lockout = next(r for r in rows if "lockout" in r["fields"]["title"].lower())
+    assert lockout["fields"]["severity"] == "medium"
+    strong = _nxc("[+] Dumping password info for domain: CORP",
+                  "Minimum password length: 14",
+                  "Account Lockout Threshold: 5")
+    srows = wst.parse_tool("nxc-creds-passpol", strong, "10.10.10.5", 23, "http://10.10.10.5")
+    assert len(srows) == 1 and srows[0]["fields"]["severity"] == "low"   # only the base policy row
+    assert wst.parse_tool("nxc-creds-passpol", _nxc("[-] STATUS_ACCESS_DENIED"), "h", 23, "http://h") == []
+
+
+def test_nxc_creds_loggedon_users_and_sessions():
+    out = _nxc("[+] Enumerated loggedon users",
+               "CORP\\alice           logon_server: DC01",
+               "CORP\\bob",
+               "[*] Enumerated sessions",
+               "\\\\10.0.0.9     user: carol")
+    rows = wst.parse_tool("nxc-creds-loggedon", out, "10.10.10.5", 24, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert {r["affected_component"] for r in rows} == {"alice", "bob", "carol"}
+    assert all(r["fields"]["severity"] == "info" and r["affected_port"] == 445 for r in rows)
+    assert wst.parse_tool("nxc-creds-loggedon", "", "h", 24, "http://h") == []
+
+
+def test_nxc_creds_specs_armed_and_gated():
+    """Every credentialed spec is needs_creds (dormant without creds) and self-gates on $AVA_SMB_USER,
+    and NEVER interpolates the password — the argv references only the quoted shell var "${AVA_SMB_PASS:-}"."""
+    creds = [s for s in wst.WIN_SCAN_TOOLS if s["name"].startswith("nxc-creds-")]
+    assert len(creds) == 5
+    for spec in creds:
+        assert spec.get("needs_creds") is True
+        joined = " ".join(spec["argv"]("10.10.10.5", "http://10.10.10.5"))
+        assert '[ -n "${AVA_SMB_USER:-}" ] || exit 0' in joined          # self-gate
+        assert '"${AVA_SMB_PASS:-}"' in joined                           # pass only as a quoted shell var
+        assert "--local-auth" in joined and "AVA_SMB_DOMAIN" in joined    # domain-aware auth fragment
+
+
+# ---- CREDENTIALED wesng tier (needs_creds) — missing MS patch -> CVE (the Nessus alternative) ----------
+def test_wesng_creds_missing_patch_cves():
+    # REAL wesng -o CSV header (DatePosted,CVE,BulletinKB,Title,AffectedProduct,AffectedComponent,Severity,
+    # Impact,Exploits); a leading banner line is tolerated. argv filters to Critical+Important at the tool,
+    # but the parser itself never filters by severity — it maps Critical->critical / Important->high / else
+    # medium. KB lives in BulletinKB (not "KB"); the Exploits column drives the "public exploit" note.
+    out = (
+        "Windows Exploit Suggester NG banner line (goes to stdout, ignored)\n"
+        "DatePosted,CVE,BulletinKB,Title,AffectedProduct,AffectedComponent,Severity,Impact,Exploits\n"
+        "20210413,CVE-2021-28310,5001330,Win32k Elevation of Privilege,Windows 10,win32k,Critical,"
+        "Elevation of Privilege,Exploited in the wild\n"
+        "20210413,CVE-2021-28437,5001330,Windows Installer Information Disclosure,Windows 10,Installer,"
+        "Important,Information Disclosure,\n"
+        "20210309,CVE-2021-26877,5000822,Windows DNS Server RCE,Windows Server,DNS,Moderate,"
+        "Remote Code Execution,\n"
+    )
+    rows = wst.parse_tool("wesng-creds", out, "10.10.10.5", 30, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert len(rows) == 3
+    assert all(r["source_slug"] == "wesng" for r in rows)
+    crit = next(r for r in rows if r["cve_id"] == "CVE-2021-28310")
+    assert crit["fields"]["severity"] == "critical"
+    assert crit["affected_component"] == "5001330"                 # KB from BulletinKB column
+    assert "CVE-2021-28310" in crit["fields"]["title"] and "missing 5001330" in crit["fields"]["title"]
+    assert "public exploit available" in crit["fields"]["evidence"]   # Exploits column non-empty
+    assert crit["affected_port"] is None                           # host-level missing-patch finding
+    imp = next(r for r in rows if r["cve_id"] == "CVE-2021-28437")
+    assert imp["fields"]["severity"] == "high"                     # Important -> high
+    assert "public exploit available" not in imp["fields"]["evidence"]
+    mod = next(r for r in rows if r["cve_id"] == "CVE-2021-26877")
+    assert mod["fields"]["severity"] == "medium"                   # Moderate (anything else) -> medium
+    # no CSV / no header / garbage -> honest skip
+    assert wst.parse_tool("wesng-creds", "", "h", 30, "http://h") == []
+    assert wst.parse_tool("wesng-creds", "no header here\njust noise\n", "h", 30, "http://h") == []
+
+
+def test_wesng_creds_spec_armed_gated_and_secret_safe():
+    spec = next(s for s in wst.WIN_SCAN_TOOLS if s["name"] == "wesng-creds")
+    assert spec["needs_creds"] is True
+    assert not spec["name"].startswith("nxc-creds-")               # keeps the nxc-creds count at 5
+    joined = " ".join(spec["argv"]("10.10.10.5", "http://10.10.10.5"))
+    assert '[ -n "${AVA_SMB_USER:-}" ] || exit 0' in joined        # self-gate
+    assert '"${AVA_SMB_PASS:-}"' in joined                         # pass only as a quoted shell var
+    assert "-x systeminfo" in joined and "--severity Critical Important" in joined
+    assert "AVA_SMB_DOMAIN" in joined and "--local-auth" in joined
+
+
 def test_parsers_never_raise_on_garbage():
     everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
                 "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
-                "lookupsid", "samrdump", "rpcdump", "sslscan", "rdp-sec-check", "polenum")
+                "lookupsid", "samrdump", "rpcdump", "sslscan", "rdp-sec-check", "polenum",
+                "nxc-creds-shares", "nxc-creds-users", "nxc-creds-admins", "nxc-creds-passpol",
+                "nxc-creds-loggedon", "wesng-creds")
     for name in everyone:
         assert wst.parse_tool(name, "", "h", 1, "http://h") == []            # empty -> nothing
         assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
