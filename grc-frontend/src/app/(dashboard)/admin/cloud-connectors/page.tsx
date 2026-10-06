@@ -341,7 +341,7 @@ export default function CloudConnectorsAdminPage() {
             <p className="text-xs text-slate-500 -mt-2 mb-2">
               These connectors live in the legacy scanner-integrations table.
               They keep syncing on their own schedule; manage them in the
-              Integrations tab.
+              Vulnerability Scanners tab.
             </p>
             {legacyScannerRows.map((c) => {
               const lastSync = c.last_sync_at ? new Date(c.last_sync_at).toLocaleString() : 'Never';
@@ -379,7 +379,7 @@ export default function CloudConnectorsAdminPage() {
                     <a
                       href="/admin?tab=integrations"
                       className="px-2 py-1 border border-slate-300 bg-white text-slate-700 rounded text-xs hover:bg-slate-50"
-                      title="Manage in Integrations tab"
+                      title="Manage in Vulnerability Scanners tab"
                     >
                       Manage →
                     </a>
@@ -760,7 +760,7 @@ function SetupGuide({ setup }: { setup?: {
           href={setup.redirect}
           className="inline-flex items-center gap-1.5 text-xs rounded-md border border-primary-300 bg-primary-50 px-3 py-1.5 text-primary-700 hover:bg-primary-100"
         >
-          Manage in Integrations →
+          Manage in Vulnerability Scanners →
         </a>
       </div>
     );

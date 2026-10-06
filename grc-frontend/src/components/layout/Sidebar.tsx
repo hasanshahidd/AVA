@@ -8,7 +8,6 @@ import {
   ScrollText,
   FileText,
   ClipboardCheck,
-  GitPullRequest,
   Rss,
   AlertTriangle,
   Users,
@@ -359,20 +358,19 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
 // Most items deep-link into the admin tab bar via `/admin?tab=<id>`. Items
 // that live at their own standalone route set `href` to override that.
 const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; href?: string }> = [
-  { id: 'company',          label: 'Company',            icon: Settings },
-  { id: 'users',            label: 'User Management',    icon: Users },
-  { id: 'ai-usage',         label: 'Token usage',        icon: BarChart3, href: '/admin/ai-usage' },
-  { id: 'roles',            label: 'Role Management',    icon: ShieldCheck },
-  { id: 'teams',            label: 'Teams',              icon: Users },
-  { id: 'password-policy',  label: 'Password Policy',    icon: Shield },
-  { id: 'integrations',     label: 'Integrations',       icon: Bot },
-  { id: 'cloud-connectors', label: 'Cloud Connectors',   icon: Globe },
-  { id: 'connectors',       label: 'Connectors',         icon: Layers },
-  { id: 'evidence-collectors', label: 'Connections', icon: Radar },
-  { id: 'identity',         label: 'Identity Providers', icon: Shield },
-  { id: 'workflow',         label: 'Workflow Engine',    icon: GitPullRequest },
-  { id: 'usage',            label: 'Usage Monitoring',   icon: Activity, href: '/admin/usage' },
-  { id: 'audit',            label: 'Audit Logs',         icon: ScrollText },
+  { id: 'company',          label: 'Company',               icon: Settings },
+  { id: 'users',            label: 'User Management',       icon: Users },
+  { id: 'roles',            label: 'Role Management',       icon: ShieldCheck },
+  { id: 'teams',            label: 'Teams',                 icon: Users },
+  { id: 'identity',         label: 'Identity Providers',    icon: Shield },
+  { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
+  { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },
+  { id: 'cloud-connectors', label: 'Cloud Connectors',      icon: Globe },
+  { id: 'connectors',       label: 'Connectors',            icon: Layers },
+  // Standalone routes (not tabs on /admin) — platform ops.
+  { id: 'ai-usage',         label: 'Token usage',           icon: BarChart3, href: '/admin/ai-usage' },
+  { id: 'usage',            label: 'Usage Monitoring',      icon: Activity, href: '/admin/usage' },
+  { id: 'audit',            label: 'Audit Logs',            icon: ScrollText },
 ];
 
 function AdministrationPopover({

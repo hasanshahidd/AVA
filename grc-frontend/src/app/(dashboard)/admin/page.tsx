@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, Bot, GitPullRequest, KeyRound, Lock, Cloud, UsersRound, Plug, PlugZap } from 'lucide-react';
+import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, KeyRound, Lock, Cloud, UsersRound, Plug, Server } from 'lucide-react';
 import OrganizationProfilePage from './organization/page';
 import UsersManagementPage from './users/page';
 import RolesManagementPage from './roles/page';
@@ -11,15 +11,14 @@ import AuditLogsPage from './audit-logs/page';
 import PasswordPolicyPage from './password-policy/page';
 import CloudConnectorsAdminPage from './cloud-connectors/page';
 import ConnectorsAdminPage from './connectors/page';
-import EvidenceCollectorsPage from './evidence-collectors/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
 import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'password-policy' | 'integrations' | 'cloud-connectors' | 'connectors' | 'evidence-collectors' | 'identity' | 'audit';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'identity' | 'password-policy' | 'integrations' | 'cloud-connectors' | 'connectors' | 'audit';
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
-  'company','users','roles','teams','password-policy','integrations',
-  'cloud-connectors','connectors','evidence-collectors','identity','audit',
+  'company','users','roles','teams','identity','password-policy',
+  'integrations','cloud-connectors','connectors','audit',
 ]);
 
 export default function AdminPage() {
@@ -40,16 +39,15 @@ export default function AdminPage() {
     { id: 'roles', label: 'Role Management', icon: ShieldCheck },
     // Org teams — used as owning_team dropdown on assets + future ownership chains.
     { id: 'teams', label: 'Teams', icon: UsersRound },
+    { id: 'identity', label: 'Identity Providers', icon: KeyRound },
     // Password & session policy — controls complexity, lockout, and idle timeout.
     { id: 'password-policy', label: 'Password Policy', icon: Lock },
-    { id: 'integrations', label: 'Integrations', icon: Bot },
-    // Phase 7 — Cloud Connectors (AWS Inspector, Azure Defender, GCP SCC).
+    // Vulnerability scanner consoles — Rapid7 Nexpose / Tenable Nessus ingest.
+    { id: 'integrations', label: 'Vulnerability Scanners', icon: Server },
+    // Cloud security sources — AWS Inspector, Azure Defender, GCP SCC.
     { id: 'cloud-connectors', label: 'Cloud Connectors', icon: Cloud },
-    // External connector framework — ServiceNow, Splunk, MS Teams, Fireflies, …
+    // SIEM / ticketing / alert routing — ServiceNow, Splunk, MS Teams.
     { id: 'connectors', label: 'Connectors', icon: Plug },
-    // SOC 2 SaaS evidence collectors — github/okta/slack/… → live evidence.
-    { id: 'evidence-collectors', label: 'Connections', icon: PlugZap },
-    { id: 'identity', label: 'Identity Providers', icon: KeyRound },
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
 
@@ -83,12 +81,11 @@ export default function AdminPage() {
         {activeTab === 'users' && <UsersManagementPage />}
         {activeTab === 'roles' && <RolesManagementPage />}
         {activeTab === 'teams' && <TeamsAdminPage />}
+        {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'password-policy' && <PasswordPolicyPage />}
         {activeTab === 'integrations' && <IntegrationsConnectionsPage />}
         {activeTab === 'cloud-connectors' && <CloudConnectorsAdminPage />}
         {activeTab === 'connectors' && <ConnectorsAdminPage />}
-        {activeTab === 'evidence-collectors' && <EvidenceCollectorsPage />}
-        {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'audit' && <AuditLogsPage />}
       </div>
     </div>

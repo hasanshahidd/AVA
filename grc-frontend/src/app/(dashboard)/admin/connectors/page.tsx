@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plug, Plus, RefreshCw, CheckCircle, AlertCircle, Loader2, X, ExternalLink,
-  Ticket, Activity, ShieldAlert, MessageSquare, Mic, BookOpenCheck, Trash2,
+  Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2,
 } from 'lucide-react';
 import { connectorsApi, type ConnectorProviderMeta, type ConnectorRow } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -14,11 +14,10 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; descri
   ticketing:  { label: 'Ticketing',     icon: Ticket,         description: 'Push vulnerabilities and exceptions to your ITSM. Two-way status sync.' },
   siem:       { label: 'SIEM',          icon: Activity,       description: 'Pull active-exploitation signals to enrich vulnerability priority.' },
   pentest:    { label: 'Pen-test',      icon: ShieldAlert,    description: 'Pull confirmed exploit sessions to boost vulnerability priority.' },
-  collab:     { label: 'Collaboration', icon: MessageSquare,  description: 'Post alerts to channels, schedule committee meetings.' },
-  transcribe: { label: 'Transcription', icon: Mic,            description: 'Pull meeting transcripts to auto-create committee meeting minutes.' },
+  collab:     { label: 'Collaboration', icon: MessageSquare,  description: 'Post alerts and findings to your team channels.' },
 };
 
-const CATEGORY_ORDER = ['ticketing', 'siem', 'pentest', 'collab', 'transcribe'] as const;
+const CATEGORY_ORDER = ['ticketing', 'siem', 'pentest', 'collab'] as const;
 
 export default function ConnectorsAdminPage() {
   const [openSetupFor, setOpenSetupFor] = useState<ConnectorProviderMeta | null>(null);
@@ -55,7 +54,7 @@ export default function ConnectorsAdminPage() {
             External Connectors
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Wire ServiceNow, Splunk, MS Teams, Fireflies.ai and more. Credentials are encrypted at rest;
+            Wire ServiceNow, Splunk, MS Teams and more. Credentials are encrypted at rest;
             OAuth2 connectors authorise per-tenant through their vendor's consent screen.
           </p>
         </div>
