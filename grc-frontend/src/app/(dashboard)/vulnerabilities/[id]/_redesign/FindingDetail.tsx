@@ -21,7 +21,7 @@ import { ArrowLeft, ShieldAlert, ShieldCheck, Biohazard, Shield, Lock, ChevronRi
 import { vulnManagementApi, assetsApi, entityExtrasApi } from '@/lib/api';
 import { exploitMaturity } from '../_components/RiskAnalysisPanel';
 import RemediationPlanCard from '../_components/RemediationPlanCard';
-import { shortenVulnTitle } from '../../_workspace/lib';
+import { shortenVulnTitle, assessmentType } from '../../_workspace/lib';
 import { NotesPanel } from '@/components/shared/EntityExtras';
 
 // ── mock palette ──
@@ -220,7 +220,8 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
           <RailCard title="Timeline">
             <Row k="First seen" v={fmt(v.first_detected || v.created_at)} />
             <Row k="Last seen" v={fmt(v.last_seen)} />
-            <Row k="Source" v={v.source || v.report_name || 'Scan'} />
+            {/* Assessment TYPE, not the raw engine/tool name (e.g. "ai-pentest:hexstrike"). */}
+            <Row k="Source" v={assessmentType(v.source || v.report_name)} />
           </RailCard>
         </aside>
       </div>
