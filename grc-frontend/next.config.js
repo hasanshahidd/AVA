@@ -22,7 +22,10 @@ const nextConfig = {
     // The /api rewrite proxy defaults to a 30s timeout and answers 500 past it. Live
     // aggregates (risk-posture scores every asset: ~8s here, far longer on a busy box)
     // must not be turned into "didn't respond" by the proxy while the backend is still working.
-    proxyTimeout: 120000,
+    // 300s: the "Find exploitable vulnerabilities" classify pass is a real batched LLM call (~78s for ~80
+    // findings); a larger run must not be turned into a proxy 500 mid-classify. (Very large multi-asset runs
+    // move to a background job + poll on the backend as the proper fix.)
+    proxyTimeout: 300000,
     // Next's client Router Cache kept serving the OLD page on in-app navigation after a
     // deploy (looked "not updated" until a hard refresh). 0 = always refetch on navigation,
     // so freshly deployed pages show up without a manual reload.
