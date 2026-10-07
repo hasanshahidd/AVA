@@ -1000,6 +1000,9 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
         // Host-signal denominator = the internal estate size (what every internal-scoped dim is measured against).
         const intOf = dims.find((r) => r.scope === 'internal')?.of ?? 0;
         const sw = d.software;
+        // Internal host names behind every domain — the same per-class samples the Internal-estate drill renders.
+        const intSamples = (d.internal?.classes ?? []).flatMap((c) => c.samples ?? []);
+        const intTotal = d.internal?.total ?? 0;
         const domains: { key: string; label: string; blurb: string; rows: (CovDim | undefined)[] }[] = [
           { key: 'hw', label: 'Hardware', blurb: 'CPU · RAM · disk telemetry', rows: [pick('hardware')] },
           { key: 'sw', label: 'Software', blurb: 'OS & installed products', rows: [
@@ -1014,7 +1017,7 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
           <div className="flex flex-1 flex-col">
             {/* The three domains spread to fill the card height; bars simply get more breathing room when tall. */}
             <div className="flex flex-1 flex-col justify-between gap-3.5">
-              {domains.map((dm) => <CovDomain key={dm.key} label={dm.label} blurb={dm.blurb} rows={dm.rows} />)}
+              {domains.map((dm) => <CovDomain key={dm.key} label={dm.label} blurb={dm.blurb} rows={dm.rows} samples={intSamples} total={intTotal} />)}
             </div>
             {gov.length > 0 && (
               <div className="mt-3 border-t border-[#EEF1F5] pt-2.5">
@@ -1033,21 +1036,46 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
     </Box>
   );
 }
-/** One telemetry domain: a bold domain header + its coverage rows (full-width when one, 2-up when two). */
-function CovDomain({ label, blurb, rows }: { label: string; blurb: string; rows: (CovDim | undefined)[] }) {
+/** One telemetry domain: a bold domain header + its coverage rows (full-width when one, 2-up when two).
+    The whole band is a drill trigger → a blur pop-up (reused DrillModal) with the domain's coverage
+    figures and the internal host NAMES those signals are measured across (the same per-class samples
+    the Internal-estate drill renders via SampleNames). Per-host signal status isn't fabricated. */
+function CovDomain({ label, blurb, rows, samples, total }: {
+  label: string; blurb: string; rows: (CovDim | undefined)[]; samples: Sample[]; total: number;
+}) {
+  const [open, setOpen] = useState(false);
   const real = rows.filter(Boolean) as CovDim[];
   return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-5">
-      <div className="shrink-0 pt-[9px] sm:w-[118px]">
-        <p className="m-0 text-[11px] font-bold uppercase tracking-[.08em] text-[#0F172A]">{label}</p>
-        <p className="m-0 mt-0.5 text-[10.5px] leading-[1.3] text-[#94A3B8]">{blurb}</p>
-      </div>
-      {real.length === 0
-        ? <p className="m-0 flex-1 pt-[9px] text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
-        : <ul className={`m-0 min-w-0 flex-1 list-none p-0 ${real.length > 1 ? 'grid grid-cols-1 gap-x-8 sm:grid-cols-2' : ''}`}>
-            {real.map((r) => <CovRow key={r.label} {...r} bare />)}
-          </ul>}
-    </div>
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
+        className="group flex w-full cursor-pointer flex-col gap-0.5 rounded-[8px] text-left transition hover:bg-[#F3F7FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005B96] sm:flex-row sm:items-start sm:gap-5">
+        <div className="shrink-0 pt-[9px] sm:w-[118px]">
+          <p className="m-0 flex items-center gap-1 text-[11px] font-bold uppercase tracking-[.08em] text-[#0F172A]">
+            {label}<ChevronRight size={12} aria-hidden className="text-[#94A3B8] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
+          </p>
+          <p className="m-0 mt-0.5 text-[10.5px] leading-[1.3] text-[#94A3B8]">{blurb}</p>
+        </div>
+        {real.length === 0
+          ? <p className="m-0 flex-1 pt-[9px] text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
+          : <ul className={`m-0 min-w-0 flex-1 list-none p-0 ${real.length > 1 ? 'grid grid-cols-1 gap-x-8 sm:grid-cols-2' : ''}`}>
+              {real.map((r) => <CovRow key={r.label} {...r} bare />)}
+            </ul>}
+      </button>
+      {open && (
+        <DrillModal color={T.base} onClose={() => setOpen(false)} title={label} meta={blurb}>
+          <Eyebrow>Coverage</Eyebrow>
+          {real.length === 0
+            ? <p className="m-0 text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
+            : <ul className="m-0 list-none p-0">{real.map((r) => <CovRow key={r.label} {...r} bare />)}</ul>}
+          <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+            <p className="m-0 mb-2 text-[11.5px] leading-[1.5] text-[#64748B]">
+              Internal hosts the {label.toLowerCase()} signals are measured across — per-host signal status isn&rsquo;t broken out here.
+            </p>
+            <SampleNames samples={samples} total={total} where="internal" />
+          </div>
+        </DrillModal>
+      )}
+    </>
   );
 }
 function CovRow({ label, n, of, scope, bare, note }: { label: string; n: number; of: number; scope?: string; bare?: boolean; note?: ReactNode }) {
