@@ -687,11 +687,18 @@ const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#4F93CB', '#0A5E97', '#064A
 function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number; onSelect?: (name: string) => void }) {
   return (
     <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700}
-          onClick={(node: any) => { const nm = node?.name ?? node?.payload?.name; if (nm && onSelect) onSelect(String(nm)); }}
-          content={<AssetCell max={max} onSelect={onSelect} />} />
-      </ResponsiveContainer>
+      {/* The workspace wraps everything in zoom:0.8 for density. recharts sizes the SVG to the
+          PRE-zoom width, so the browser downscales the painted SVG → blurry treemap text (worse on
+          wide tiles). Counter it: an inner zoom:1.25 layer (×0.8 = net 1.0) sized 80% so it still
+          fills this slot exactly, so recharts measures + paints the treemap at 1:1 device px = crisp.
+          Animation off — the scale-in transition is the other source of transient fuzz. */}
+      <div style={{ width: '80%', height: '80%', zoom: 1.25 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive={false}
+            onClick={(node: any) => { const nm = node?.name ?? node?.payload?.name; if (nm && onSelect) onSelect(String(nm)); }}
+            content={<AssetCell max={max} onSelect={onSelect} />} />
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -732,12 +739,12 @@ function AssetCell(props: any) {
       <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}{clickable ? ' · click for findings' : ''}</title>
       <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} style={clickable ? { cursor: 'pointer' } : undefined} />
       {twoLines && <>
-        <text x={x + 10} y={y + 22} fontSize={height > 60 ? 18 : 15} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>
+        <text x={x + 10} y={y + 22} fontSize={height > 60 ? 18 : 15} fontWeight={800} fill={fg} style={TNUM}>{n}</text>
         <text x={x + 10} y={y + (height > 60 ? 40 : 37)} fontSize={11} fontWeight={600} fill={fg} style={crisp}>{label}</text>
         {props.kev > 0 && height > 58 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={useWhite ? '#FFD9D6' : '#9A2A24'} style={crisp}>{props.kev} exploited</text>}
       </>}
       {nameOnly && <text x={x + 8} y={y + height / 2 + 4} fontSize={11} fontWeight={700} fill={fg} style={crisp}>{label}</text>}
-      {numOnly && <text x={x + 8} y={y + height / 2 + 5} fontSize={13} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>}
+      {numOnly && <text x={x + 8} y={y + height / 2 + 5} fontSize={13} fontWeight={800} fill={fg} style={TNUM}>{n}</text>}
     </g>
   );
 }

@@ -21,7 +21,7 @@
  *       assets); external also carries a registrable-domain concentration readout.
  *   • Asset-class matrix | Needs attention — coverage & assurance per class; largest gaps first.
  *   • Software & versions | Criticality & data · Lifecycle | Ownership · Provenance |
- *       Telemetry coverage · Endpoint security | Obsolescence · Regulatory scope | Estate scale.
+ *       Telemetry coverage | Obsolescence · Regulatory scope | Estate scale.
  *
  * Every number is live from /estate-overview (read-only aggregate, counts only),
  * /assets/inventory-overview (performance + attention queue) and
@@ -205,7 +205,6 @@ export default function InventoryOverview() {
           that height with no dead gap: data-rich cards spread/fill their sections, sparse ones
           (Ownership, and any empty/loading state) centre so the stretch reads as intentional. */}
       <SoftwareCard q={estateQ} className="xl:col-span-6" />
-      <SecurityCard q={estateQ} className="xl:col-span-6" />
       <CoverageCard q={estateQ} className="xl:col-span-6" />
       <ComplianceCard q={estateQ} className="xl:col-span-6" />
       <ClassificationCard q={estateQ} className="xl:col-span-6" />
@@ -213,7 +212,9 @@ export default function InventoryOverview() {
       <LifecycleCard q={estateQ} className="xl:col-span-6" />
       <ProvenanceCard q={estateQ} className="xl:col-span-6" />
       <ObsolescenceCard q={estateQ} className="xl:col-span-6" />
-      <ScaleCard q={estateQ} className="xl:col-span-6" />
+      {/* ScaleCard spans full width: with SecurityCard removed, 9 half-cards would leave a
+          half-empty final row — a full-width fleet-summary strip fills it cleanly instead. */}
+      <ScaleCard q={estateQ} className="xl:col-span-12" />
     </div>
   );
 }
@@ -1175,48 +1176,6 @@ function CovRow({ label, n, of, scope, bare, note }: { label: string; n: number;
   );
 }
 
-/* ---------- 5b) Endpoint security & hardening ---------- */
-function SecurityCard({ q, className }: { q: Q<Estate>; className: string }) {
-  return (
-    <Box title="Endpoint security & hardening" icon={<ShieldCheck size={15} />} sub="Protection & benchmark coverage across internal hosts (outside-in assets can't be read inside)" busy={busy(q)} className={className}>
-      {body(q, 'Security posture', (d) => {
-        const s = d.security;
-        const scope = s?.scope ?? 0;
-        if (!scope) return <Empty icon={<ShieldCheck size={16} />} title="No internal hosts yet" body="Connect a host with credentials to read its endpoint protection and hardening." href="/asset-discovery" cta="Open Discovery" />;
-        if (!s || !s.posture) return <Empty icon={<ShieldCheck size={16} />} title="Endpoint posture not collected yet" body={`None of the ${nfmt(scope)} internal ${scope === 1 ? 'host has' : 'hosts have'} been read for antivirus / EDR. Connect with credentials to populate this.`} href="/asset-discovery" cta="Open Discovery" />;
-        const covRows = [
-          { label: 'Antivirus present', n: s.antivirus, of: scope },
-          { label: 'EDR running', n: s.edr, of: scope },
-          { label: 'Endpoint protected', n: s.protected, of: scope },
-          { label: 'CIS benchmarked', n: d.coverage.cis, of: scope },
-        ];
-        return (
-          <div className="flex flex-1 flex-col gap-3.5">
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-              <Fig label="Hosts read" value={share(s.posture, scope) || '0%'} sub={`${nfmt(s.posture)} of ${nfmt(scope)} internal`} />
-              <Fig label="Packages catalogued" value={nfmt(s.packages)} sub={`on ${plural(s.inventoried, 'host')}`} />
-              {s.edr_stopped > 0 && <Fig label="EDR stopped" value={nfmt(s.edr_stopped)} sub="installed but not running" alarm />}
-            </div>
-            {/* 2×2 posture grid — fills the width the old 4 thin rows left empty, and reads clearly. */}
-            <div>
-              <Eyebrow>Protection &amp; hardening coverage</Eyebrow>
-              <ul className="m-0 mt-0.5 grid list-none grid-cols-1 gap-x-7 gap-y-1 p-0 sm:grid-cols-2">
-                {covRows.map((r) => <CovRow key={r.label} label={r.label} n={r.n} of={r.of} bare />)}
-              </ul>
-            </div>
-            <div className="flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
-              <Eyebrow>Security-relevant software · hosts running one</Eyebrow>
-              {s.families && s.families.length
-                ? <BarList rows={bars(s.families)} max={scope} fill />
-                : <p className="m-0 text-[11.5px] text-[#64748B]">No security tooling catalogued on hosts yet.</p>}
-            </div>
-          </div>
-        );
-      }, 7)}
-    </Box>
-  );
-}
-
 /* ---------- 6a) Obsolescence & freshness ---------- */
 function ObsolescenceCard({ q, className }: { q: Q<Estate>; className: string }) {
   return (
@@ -1300,7 +1259,7 @@ function ScaleCard({ q, className }: { q: Q<Estate>; className: string }) {
         ];
         return (
           // Stat tiles that fill the grid evenly — no more figures floated in the middle of a void.
-          <div className="grid flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3" style={{ gridAutoRows: '1fr' }}>
+          <div className="grid flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6" style={{ gridAutoRows: '1fr' }}>
             {cells.map((x) => (
               <div key={x.label} className="flex min-w-0 flex-col justify-center rounded-[10px] border border-[#E9EDF3] bg-[#FBFCFE] px-3 py-2.5">
                 <p className="m-0 truncate text-[11px] font-medium text-[#475569]" title={x.label}>{x.label}</p>

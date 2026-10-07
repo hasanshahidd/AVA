@@ -23,6 +23,10 @@ const nextConfig = {
     // aggregates (risk-posture scores every asset: ~8s here, far longer on a busy box)
     // must not be turned into "didn't respond" by the proxy while the backend is still working.
     proxyTimeout: 120000,
+    // Next's client Router Cache kept serving the OLD page on in-app navigation after a
+    // deploy (looked "not updated" until a hard refresh). 0 = always refetch on navigation,
+    // so freshly deployed pages show up without a manual reload.
+    staleTimes: { dynamic: 0, static: 0 },
   },
   // Increase timeout for long-running API operations
   serverRuntimeConfig: {
