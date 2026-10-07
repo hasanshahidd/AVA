@@ -2,23 +2,21 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, KeyRound, Lock, Cloud, UsersRound, Plug, Server } from 'lucide-react';
+import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, KeyRound, Lock, UsersRound, Server } from 'lucide-react';
 import OrganizationProfilePage from './organization/page';
 import UsersManagementPage from './users/page';
 import RolesManagementPage from './roles/page';
 import TeamsAdminPage from './teams/page';
 import AuditLogsPage from './audit-logs/page';
 import PasswordPolicyPage from './password-policy/page';
-import CloudConnectorsAdminPage from './cloud-connectors/page';
-import ConnectorsAdminPage from './connectors/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
 import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'identity' | 'password-policy' | 'integrations' | 'cloud-connectors' | 'connectors' | 'audit';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'identity' | 'password-policy' | 'integrations' | 'audit';
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
   'company','users','roles','teams','identity','password-policy',
-  'integrations','cloud-connectors','connectors','audit',
+  'integrations','audit',
 ]);
 
 export default function AdminPage() {
@@ -44,10 +42,6 @@ export default function AdminPage() {
     { id: 'password-policy', label: 'Password Policy', icon: Lock },
     // Vulnerability scanner consoles — Rapid7 Nexpose / Tenable Nessus ingest.
     { id: 'integrations', label: 'Vulnerability Scanners', icon: Server },
-    // Cloud security sources — AWS Inspector, Azure Defender, GCP SCC.
-    { id: 'cloud-connectors', label: 'Cloud Connectors', icon: Cloud },
-    // SIEM / ticketing / alert routing — ServiceNow, Splunk, MS Teams.
-    { id: 'connectors', label: 'External Connectors', icon: Plug },
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
 
@@ -88,8 +82,6 @@ export default function AdminPage() {
         {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'password-policy' && <PasswordPolicyPage />}
         {activeTab === 'integrations' && <IntegrationsConnectionsPage />}
-        {activeTab === 'cloud-connectors' && <CloudConnectorsAdminPage />}
-        {activeTab === 'connectors' && <ConnectorsAdminPage />}
         {activeTab === 'audit' && <AuditLogsPage />}
       </div>
       </div>

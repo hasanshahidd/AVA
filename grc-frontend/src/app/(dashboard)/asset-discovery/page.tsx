@@ -2616,8 +2616,8 @@ export default function AssetDiscoveryPage() {
   const inboxQ = useQuery({ queryKey: ['disc-inbox'], queryFn: async () => (await discoveryApi.inbox('open')).data.observations as any[] });
   const inboxN = (inboxQ.data ?? []).length;
   return (
-    <div className="asset-suite discovery-suite as-fadeup" style={{ padding: '4px 2px' }}>
-      <div className="disc-cc"><nav className="tabs" style={{ marginBottom: 18 }}>
+    <div className="asset-suite discovery-suite as-fadeup" style={{ padding: '4px 2px', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="disc-cc" style={{ flexShrink: 0 }}><nav className="tabs" style={{ marginBottom: 18 }}>
         {TABS.map((t) => (
           <a key={t.id} className={t.id === tab ? 'active' : ''} onClick={() => setTab(t.id)}>
             {t.label}{t.id === 'inbox' && inboxN > 0 && <span className="count">{inboxN}</span>}
@@ -2625,11 +2625,16 @@ export default function AssetDiscoveryPage() {
         ))}
       </nav></div>
 
-      {tab === 'overview' && <Overview go={(t) => setTab((t as any) || 'runs')} />}
-      {tab === 'discover' && <DiscoveryTab go={(t) => setTab(t as any)} />}
-      {tab === 'connections' && <ConnectionsTab />}
-      {tab === 'inbox' && <InboxView />}
-      {tab === 'runs' && <Runs />}
+      {/* One-window lock: the tab bar stays fixed and the tab BODY is the only scroller, so the
+          page fills exactly one viewport with internal scroll — no page-level empty bar when you
+          scroll down (matches how the Vulnerability Register bounds its panes). */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+        {tab === 'overview' && <Overview go={(t) => setTab((t as any) || 'runs')} />}
+        {tab === 'discover' && <DiscoveryTab go={(t) => setTab(t as any)} />}
+        {tab === 'connections' && <ConnectionsTab />}
+        {tab === 'inbox' && <InboxView />}
+        {tab === 'runs' && <Runs />}
+      </div>
     </div>
   );
 }
