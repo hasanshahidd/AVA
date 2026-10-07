@@ -30,11 +30,12 @@
  * natural-height + overflowX:hidden (no inner scroll container).
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity, Flame, Globe, Server, Clock3, GitBranch,
-  ShieldAlert, ShieldCheck, ArrowRight, FileWarning, Crosshair, Layers,
+  ShieldAlert, ShieldCheck, ArrowRight, FileWarning, Crosshair, Layers, X,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, LabelList,
@@ -45,7 +46,9 @@ import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 
 // ── Ava palette (literal, matching the workspace) ──
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA';
-const INK = '#0F1F2B', SEC = '#3A4653', MUTED = '#8A95A1', FAINT = '#AEB8C2';
+// MUTED/FAINT darkened from #8A95A1/#AEB8C2 → legible on white (≈5.3:1 / ≈3.7:1,
+// was ≈3.1:1 / ≈2.0:1) while keeping the hierarchy INK > SEC > MUTED > FAINT.
+const INK = '#0F1F2B', SEC = '#3A4653', MUTED = '#616C7A', FAINT = '#7B8795';
 const BORDER = '#E8ECEE', BORDER2 = '#F0F3F5';
 const MONO = 'ui-monospace,Consolas,monospace';
 const TNUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
@@ -228,6 +231,22 @@ export default function VulnCommandCenter({
     const assetMax = Math.max(1, ...topAssets.map((a) => a.open_vuln_count));
     const top1 = topAssets[0];
 
+    // ── Per-asset OPEN findings (drives the treemap drill-down popup) ──
+    // Groups the register's open set by linked asset (else affected_host), keyed
+    // on a normalised name so a server asset_name and a finding's linked_assets
+    // entry still match across case / whitespace drift.
+    const assetVulnMap = new Map<string, Vulnerability[]>();
+    for (const v of open) {
+      const names = v.linked_assets?.length ? v.linked_assets : (v.affected_host ? [v.affected_host] : []);
+      for (const raw of names) {
+        const name = (raw || '').trim();
+        if (!name) continue;
+        const k = name.toLowerCase();
+        const arr = assetVulnMap.get(k);
+        if (arr) arr.push(v); else assetVulnMap.set(k, [v]);
+      }
+    }
+
     // ── Severity × asset-criticality heat grid (server) ──
     const matrix = (threat?.asset_criticality_matrix ?? []).filter((r) => (r.critical + r.high + r.medium + r.low + r.info) > 0);
     const matrixMax = Math.max(1, ...matrix.flatMap((r) => [r.critical, r.high, r.medium, r.low, r.info]));
@@ -282,11 +301,15 @@ export default function VulnCommandCenter({
       topAssets, topShare, assetMax, assetOpenTotal, top1, treeData, matrix, matrixMax, dangerCorner,
       aging, ageRows, stubborn, fresh, statusDist, statusTotal, closedCount, fixAvailable, mitigated,
       fixFirst, kev, publicExploit, epssScored, overdue, mttr, slaPct, enriched, enrichBase,
+      assetVulnMap,
     };
   }, [vulns, dashboard, threat, heatmap, domainsResp]);
 
   const barW = (n: number, max: number) => `${max ? Math.max(n > 0 ? 5 : 0, (n / max) * 100) : 0}%`;
   const closedPct = pct(m.closedCount, m.registerTotal);
+
+  // Blast-radius drill-down: which host's findings to show in the popup (null = closed).
+  const [assetModal, setAssetModal] = useState<string | null>(null);
 
   // Headline chips — every one is a populated, high-signal number.
   const chips: { label: string; value: number; sub: string; Icon: typeof Flame; tone: string }[] = [
@@ -426,8 +449,8 @@ export default function VulnCommandCenter({
               <Insight>{m.topShare > 0
                 ? <>The top {m.topAssets.length} host{m.topAssets.length === 1 ? '' : 's'} carry <b>{m.topShare}%</b> of every open finding{m.top1 ? <>, and <b>{m.top1.asset_name}</b> alone holds <b>{m.top1.open_vuln_count}</b></> : ''} — remediating this short list clears most of the backlog in a handful of actions.</>
                 : <>These hosts carry the most open findings — the fastest place to cut exposure.</>}</Insight>
-              <AssetTreemap data={m.treeData} max={m.assetMax} />
-              <p style={{ fontSize: 10, color: FAINT, marginTop: 9 }}>Each tile is a host, sized by open findings; darker = heavier load. Hover for the full name.</p>
+              <AssetTreemap data={m.treeData} max={m.assetMax} onSelect={setAssetModal} />
+              <p style={{ fontSize: 10, color: FAINT, marginTop: 9 }}>Each tile is a host, sized by open findings; darker = heavier load. Click a host to see its findings.</p>
             </>
           )}
         </section>
@@ -460,11 +483,14 @@ export default function VulnCommandCenter({
             ? <><b style={{ color: '#1F7A54' }}>{m.closedCount}</b> of {m.registerTotal} findings ({closedPct}%) are closed, verified or accepted; <b>{m.totalOpen}</b> remain open.{m.fixAvailable > 0 ? <> A vendor fix is <b style={{ color: '#1F7A54' }}>already published</b> for {m.fixAvailable} of the open set — patch-ready wins sitting on the table.</> : ''}</>
             : <>No findings recorded yet.</>}</Insight>
           {m.statusTotal > 0 && (
-            <>
-              <div style={{ marginTop: 13, display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2, boxShadow: 'inset 0 1px 2px rgba(16,24,40,.07)' }}>
+            /* Grows to absorb any height the taller neighbour forces, centring the
+               lifecycle bar + legend so the slack reads as balanced breathing room
+               instead of one dead gap above the footer stats. */
+            <div style={{ flex: 1, minHeight: 0, marginTop: 14, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 13 }}>
+              <div style={{ display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2, boxShadow: 'inset 0 1px 2px rgba(16,24,40,.07)' }}>
                 {m.statusDist.map((s) => <i key={s.k} title={`${s.label}: ${s.n} (${pct(s.n, m.statusTotal)}%)`} style={{ width: `${(s.n / m.statusTotal) * 100}%`, background: `linear-gradient(180deg, ${s.c}D8, ${s.c})`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3)', minWidth: s.n > 0 ? 3 : 0 }} />)}
               </div>
-              <div style={{ marginTop: 11, display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
                 {m.statusDist.map((s) => (
                   <span key={s.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5 }}>
                     <span style={{ width: 9, height: 9, borderRadius: 3, background: s.c, flex: 'none' }} />
@@ -474,9 +500,9 @@ export default function VulnCommandCenter({
                   </span>
                 ))}
               </div>
-            </>
+            </div>
           )}
-          <div style={{ marginTop: 'auto', paddingTop: 14, display: 'flex', flexWrap: 'wrap', gap: 11 }}>
+          <div style={{ paddingTop: 14, display: 'flex', flexWrap: 'wrap', gap: 11 }}>
             <PostureStat Icon={ShieldCheck} label="Closed / verified / accepted" n={m.closedCount} tone="#1F7A54" />
             <PostureStat Icon={ShieldCheck} label="Vendor patch available" n={m.fixAvailable} tone={m.fixAvailable ? '#1F7A54' : MUTED} />
             <PostureStat Icon={ShieldCheck} label="Has a mitigation on file" n={m.mitigated} tone={m.mitigated ? AC : MUTED} />
@@ -551,6 +577,15 @@ export default function VulnCommandCenter({
           </div>
         </section>
       </div>
+
+      {assetModal != null && (
+        <AssetVulnModal
+          name={assetModal}
+          findings={m.assetVulnMap.get(assetModal.trim().toLowerCase()) ?? []}
+          onClose={() => setAssetModal(null)}
+          onView={(v) => { setAssetModal(null); onView(v); }}
+        />
+      )}
 
       <style>{`.ccrow:hover{background:#F6FAFD}.ccrow:hover td:first-child{box-shadow:inset 3px 0 0 ${AC}}`}</style>
     </div>
@@ -628,11 +663,11 @@ const lum = (hex: string) => {
 // Deeper ramp: the light end isn't washed out and the mid stops skip the murky zone where
 // neither dark nor white text reads — so every tile is legible (dark text ≤ idx2, white ≥ idx3).
 const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#2E77AB', '#0A5E97', '#064A78'];
-function AssetTreemap({ data, max }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number }) {
+function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number; onSelect?: (name: string) => void }) {
   return (
     <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700} content={<AssetCell max={max} />} />
+        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700} content={<AssetCell max={max} onSelect={onSelect} />} />
       </ResponsiveContainer>
     </div>
   );
@@ -642,6 +677,7 @@ function AssetCell(props: any) {
   if (depth !== 1 || !(width > 0) || !(height > 0)) return null;
   const n = props.value ?? props.size ?? 0;
   const max = props.max ?? 1;
+  const onSelect = props.onSelect as ((name: string) => void) | undefined;
   const t = Math.min(1, n / Math.max(1, max));
   const bg = TREE_RAMP[Math.max(0, Math.min(TREE_RAMP.length - 1, Math.round(t * (TREE_RAMP.length - 1))))];
   const dark = lum(bg) < 0.32;
@@ -651,10 +687,11 @@ function AssetCell(props: any) {
   const chars = Math.max(1, Math.floor(width / 7.2));
   const showNum = width > 34 && height > 22;
   const showName = width > 54 && height > 32;
+  const clickable = !!onSelect && !!nm;
   return (
-    <g>
-      <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}</title>
-      <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} />
+    <g style={clickable ? { cursor: 'pointer' } : undefined} onClick={clickable ? () => onSelect!(nm) : undefined}>
+      <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}{clickable ? ' · click for findings' : ''}</title>
+      <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} style={clickable ? { cursor: 'pointer' } : undefined} />
       {showNum && <text x={x + 10} y={y + 23} fontSize={height > 56 ? 19 : 15} fontWeight={700} fill={fg} style={TNUM}>{n}</text>}
       {showName && <text x={x + 10} y={y + (height > 56 ? 41 : 38)} fontSize={11} fill={sub}>{nm.length > chars ? nm.slice(0, Math.max(1, chars - 1)) + '…' : nm}</text>}
       {props.kev > 0 && width > 72 && height > 54 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={dark ? '#FFD9D6' : '#9A2A24'}>{props.kev} exploited</text>}
@@ -733,5 +770,90 @@ function HeatRow({ r, max }: { r: { asset_criticality: string; critical: number;
         return <div key={i} style={{ background: bg, color: fg, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
       })}
     </>
+  );
+}
+
+// ── Asset → its open findings: blur-background drill-down popup ──────────────
+// Mirrors the Inventory drill-down modal: a <body> portal (escapes the workspace's
+// zoom:0.8 + any page colour scope), a dim + backdrop-blur scrim, Esc / click-scrim
+// / X to close, and an internally scrolling body. Shows one host's OPEN findings —
+// a severity breakdown then a scrollable list; a row opens that finding through the
+// page's onView (client-side nav to /vulnerabilities/[id], which dodges the dev
+// hard-load SSR-worker 500).
+function AssetVulnModal({ name, findings, onClose, onView }: {
+  name: string; findings: Vulnerability[]; onClose: () => void; onView: (v: Vulnerability) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  if (typeof document === 'undefined') return null;
+
+  const sevCounts = SEV_ORDER.map((k) => ({ k, label: SEV[k].label, c: SEV[k].c, n: findings.filter((v) => normSev(v.severity) === k).length }));
+  const sorted = [...findings].sort((a, b) => (SEV_RANK[normSev(b.severity)] - SEV_RANK[normSev(a.severity)]) || ((ctx(b) ?? -1) - (ctx(a) ?? -1)));
+
+  return createPortal(
+    <div role="presentation" onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+               background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}>
+      <div role="dialog" aria-modal="true" aria-label={`Open findings on ${name}`} onClick={(e) => e.stopPropagation()}
+        style={{ width: 'min(600px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                 background: '#fff', borderRadius: 16, border: `1px solid ${BORDER}`, borderTop: `3px solid ${AC}`, boxShadow: '0 24px 64px rgba(15,23,42,0.3)', color: INK, fontSize: 13.5 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px 12px', borderBottom: `1px solid ${BORDER2}` }}>
+          <span style={{ width: 30, height: 30, borderRadius: 9, background: `${AC}14`, color: ACS, display: 'grid', placeItems: 'center', flex: 'none' }}><Server size={16} /></span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</div>
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{findings.length} open finding{findings.length === 1 ? '' : 's'} on this host</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, flex: 'none', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', color: SEC, cursor: 'pointer' }}>
+            <X size={15} />
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: 16 }}>
+          {findings.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, padding: '6px 2px' }}>No open findings in the register are linked to this host by name.</div>
+          ) : (
+            <>
+              {/* severity breakdown */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {sevCounts.map((s) => (
+                  <div key={s.k} style={{ flex: '1 1 84px', minWidth: 0, border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '7px 10px', background: s.n ? `${s.c}0D` : '#FBFCFD' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: s.n ? SEC : FAINT }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 3, background: s.c, flex: 'none', opacity: s.n ? 1 : 0.45 }} />{s.label}
+                    </div>
+                    <div style={{ fontSize: 19, fontWeight: 700, color: s.n ? INK : FAINT, ...TNUM }}>{s.n}</div>
+                  </div>
+                ))}
+              </div>
+              {/* findings — worst severity / highest contextual priority first */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {sorted.map((v) => {
+                  const sc = normSev(v.severity);
+                  return (
+                    <button key={v.id} type="button" onClick={() => onView(v)} className="avmrow"
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', cursor: 'pointer', font: 'inherit',
+                               border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '9px 11px', background: '#fff', color: INK }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: 84, flex: 'none' }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 3, background: SEV[sc].c, flex: 'none' }} />
+                        <span style={{ fontSize: 10, fontWeight: 700, color: SEV[sc].c, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{SEV[sc].label}</span>
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.title}>{shortenVulnTitle(v.title)}</span>
+                      {v.cve_id && <span style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, flex: 'none' }}>{v.cve_id}</span>}
+                      <ArrowRight size={13} color={FAINT} style={{ flex: 'none' }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        <style>{`.avmrow:hover{background:#F6FAFD;border-color:${AC}55}`}</style>
+      </div>
+    </div>,
+    document.body,
   );
 }

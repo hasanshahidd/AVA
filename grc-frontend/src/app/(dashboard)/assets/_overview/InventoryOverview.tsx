@@ -201,8 +201,9 @@ export default function InventoryOverview() {
       <AttentionCard estate={estateQ} inv={invQ} className="xl:col-span-4" />
 
       {/* ── Richer estate lenses around the core ── */}
-      {/* Paired by natural height so neither card in a row stretches to leave a blank gap:
-          tall with tall (software·security, coverage·compliance), the figure-light pair last. */}
+      {/* Equal-height rows (grid stretches each card to its taller sibling). Every card then fills
+          that height with no dead gap: data-rich cards spread/fill their sections, sparse ones
+          (Ownership, and any empty/loading state) centre so the stretch reads as intentional. */}
       <SoftwareCard q={estateQ} className="xl:col-span-6" />
       <SecurityCard q={estateQ} className="xl:col-span-6" />
       <CoverageCard q={estateQ} className="xl:col-span-6" />
@@ -249,7 +250,7 @@ const Eyebrow = ({ children }: { children: ReactNode }) => (
 function Fig({ label, value, sub, alarm }: { label: ReactNode; value: ReactNode; sub?: ReactNode; alarm?: boolean }) {
   return (
     <div className="min-w-0">
-      <p className="m-0 truncate text-[11px] font-medium text-[#64748B]">{label}</p>
+      <p className="m-0 truncate text-[11px] font-medium text-[#475569]">{label}</p>
       <p className="m-0 mt-0.5 flex items-baseline gap-1.5 text-[19px] font-semibold leading-[1.15]" style={{ color: alarm ? SEV.critical.ink : '#0F172A' }}>{value}</p>
       {sub && <p className="m-0 mt-0.5 truncate text-[11px] leading-[1.4] text-[#64748B]">{sub}</p>}
     </div>
@@ -774,23 +775,23 @@ function SoftwareCard({ q, className }: { q: Q<Estate>; className: string }) {
           return <Empty icon={<Package size={16} />} title="No software inventory yet" body="Installed software and versions appear once internal hosts are read with credentials or report through an agent; internet-facing tech is read from service banners." href="/asset-discovery" cta="Open Discovery" />;
         }
         return (
-          <div className="flex flex-1 flex-col gap-3.5">
+          <div className={`flex flex-1 flex-col gap-3 ${inst.length && ext.length ? 'justify-between' : 'justify-center'}`}>
             {inst.length > 0 && (
               <div className="flex flex-col">
-                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <div className="mb-1 flex items-baseline justify-between gap-2">
                   <Eyebrow>Installed on internal hosts</Eyebrow>
-                  <span className="text-[11px] text-[#64748B]">{plural(sw!.products, 'product')} · {plural(sw!.hosts_reporting, 'host')}</span>
+                  <span className="text-[11px] font-medium text-[#64748B]">{plural(sw!.products, 'product')} · {plural(sw!.hosts_reporting, 'host')}</span>
                 </div>
-                <SwList rows={inst} more={sw!.more} unit="host" />
+                <SwGrid rows={inst} more={sw!.more} unit="host" />
               </div>
             )}
             {ext.length > 0 && (
-              <div className={`flex flex-col ${inst.length ? 'border-t border-[#EEF1F5] pt-3.5' : ''}`}>
-                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <div className={`flex flex-col ${inst.length ? 'border-t border-[#EEF1F5] pt-3' : ''}`}>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
                   <Eyebrow>Internet-facing service software</Eyebrow>
-                  <span className="text-[11px] text-[#94A3B8]">read from service banners</span>
+                  <span className="text-[11px] font-medium text-[#64748B]">{plural(sw!.external.products, 'product')} · {plural(sw!.external.sites, 'site')}</span>
                 </div>
-                <SwList rows={ext} more={sw!.external.more} unit="site" />
+                <SwGrid rows={ext} more={sw!.external.more} unit="site" />
               </div>
             )}
           </div>
@@ -799,25 +800,21 @@ function SoftwareCard({ q, className }: { q: Q<Estate>; className: string }) {
     </Box>
   );
 }
-function SwList({ rows, more, unit }: { rows: SwRow[]; more: number; unit: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.n));
+/** Dense two-column product rows (name · version chip · count badge). Far shorter than a tall
+    stack of full-width bars, which let this card dwarf its row-partner. */
+function SwGrid({ rows, more, unit }: { rows: SwRow[]; more: number; unit: string }) {
   return (
     <>
-      <ul className="m-0 flex list-none flex-col gap-[9px] p-0">
+      <ul className="m-0 grid list-none grid-cols-1 gap-x-6 p-0 sm:grid-cols-2">
         {rows.map((s) => (
-          <li key={s.key} className="flex items-center gap-2.5 text-[12px]" title={`${s.label}${s.version ? ` ${s.version}` : ''} · ${plural(s.n, unit)}`}>
-            <span className="flex min-w-0 items-baseline gap-1.5" style={{ flex: '0 1 160px' }}>
-              <span className="min-w-0 truncate text-[#334155]">{s.label}</span>
-              {s.version && <span className="shrink-0 rounded bg-[#EEF1F5] px-1 text-[10.5px] font-medium tabular-nums text-[#475569]">{s.version}</span>}
-            </span>
-            <span className="relative block h-[8px] min-w-[40px] flex-1 overflow-hidden rounded-[4px] bg-[#EEF1F5]">
-              <i className="absolute inset-y-0 left-0 block rounded-[4px]" style={{ width: `${(s.n / max) * 100}%`, minWidth: s.n > 0 ? 3 : 0, background: T.base }} />
-            </span>
-            <b className="w-[42px] shrink-0 text-right font-semibold tabular-nums text-[#0F172A]">{nfmt(s.n)}</b>
+          <li key={s.key} className="flex items-center gap-2 border-b border-[#F1F4F8] py-[5px] text-[12px]" title={`${s.label}${s.version ? ` ${s.version}` : ''} · ${plural(s.n, unit)}`}>
+            <span className="min-w-0 flex-1 truncate text-[#334155]">{s.label}</span>
+            {s.version && <span className="shrink-0 rounded bg-[#EEF1F5] px-1 text-[10px] font-medium tabular-nums text-[#475569]">{s.version}</span>}
+            <span className="inline-flex min-w-[24px] shrink-0 items-center justify-center rounded-[5px] bg-[#EAF2F8] px-1.5 text-[11px] font-semibold tabular-nums text-[#005B96]">{nfmt(s.n)}</span>
           </li>
         ))}
       </ul>
-      {more > 0 && <p className="m-0 mt-2 text-[11px] text-[#94A3B8]">+{nfmt(more)} more {more === 1 ? 'product' : 'products'}</p>}
+      {more > 0 && <p className="m-0 mt-1.5 text-[11px] font-medium text-[#64748B]">+{nfmt(more)} more {more === 1 ? 'product' : 'products'}</p>}
     </>
   );
 }
@@ -839,11 +836,11 @@ function ClassificationCard({ q, className }: { q: Q<Estate>; className: string 
             </div>
             <StackBar parts={parts} label="Assets by criticality" height={12} />
             <div className="mt-2.5"><PartLegend parts={parts} total={d.total} cols={2} /></div>
-            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+            <div className="mt-3 flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
               <Eyebrow>Data classification</Eyebrow>
               {dc && dc.some((r) => r.n > 0)
-                ? <BarList rows={bars(dc)} />
-                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No data classification recorded yet.</p>}
+                ? <BarList fill rows={bars(dc)} />
+                : <p className="m-0 text-[11.5px] text-[#64748B]">No data classification recorded yet.</p>}
             </div>
           </div>
         );
@@ -865,13 +862,15 @@ function LifecycleCard({ q, className }: { q: Q<Estate>; className: string }) {
         const env = d.governance?.environment;
         return (
           <div className="flex flex-1 flex-col">
-            <Eyebrow>Lifecycle state</Eyebrow>
-            {life.length ? <BarList rows={bars(life)} /> : <p className="m-0 text-[11.5px] text-[#94A3B8]">No lifecycle data.</p>}
-            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+            <div className="flex flex-1 flex-col">
+              <Eyebrow>Lifecycle state</Eyebrow>
+              {life.length ? <BarList fill rows={bars(life)} /> : <p className="m-0 text-[11.5px] text-[#64748B]">No lifecycle data.</p>}
+            </div>
+            <div className="mt-3 flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
               <Eyebrow>Deployment environment</Eyebrow>
               {env && env.some((r) => r.n > 0)
-                ? <BarList rows={bars(env)} />
-                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No environment tagged yet.</p>}
+                ? <BarList fill rows={bars(env)} />
+                : <p className="m-0 text-[11.5px] text-[#64748B]">No environment tagged yet.</p>}
             </div>
           </div>
         );
@@ -894,17 +893,18 @@ function OwnershipCard({ q, className }: { q: Q<Estate>; className: string }) {
           { key: 'un', label: 'No owner', n: unowned, c: GREY },
         ];
         return (
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col justify-center">
             <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
               <Fig label="Owner assigned" value={share(owned, d.total) || '0%'} sub={`${nfmt(owned)} of ${nfmt(d.total)} assets`} />
               <Fig label="Without an owner" value={nfmt(unowned)} sub="need an accountable owner" alarm={unowned > 0} />
             </div>
             <div className="mt-3"><StackBar parts={parts} label="Ownership coverage" /></div>
-            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+            <div className="mt-2"><PartLegend parts={parts} total={d.total} cols={2} /></div>
+            <div className="mt-3 border-t border-[#EEF1F5] pt-3">
               <Eyebrow>Largest owning teams</Eyebrow>
               {o?.teams && o.teams.length
                 ? <BarList rows={bars(o.teams)} />
-                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No owning team or department recorded yet.</p>}
+                : <p className="m-0 text-[11.5px] text-[#64748B]">No owning team or department recorded yet.</p>}
             </div>
           </div>
         );
@@ -927,11 +927,13 @@ function ProvenanceCard({ q, className }: { q: Q<Estate>; className: string }) {
         ];
         return (
           <div className="flex flex-1 flex-col">
-            <Eyebrow>Origin</Eyebrow>
-            {p?.origin && p.origin.some((r) => r.n > 0)
-              ? <BarList rows={bars(p.origin)} />
-              : <p className="m-0 text-[11.5px] text-[#94A3B8]">Origin not recorded for any asset yet.</p>}
-            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+            <div className="flex flex-1 flex-col">
+              <Eyebrow>Origin</Eyebrow>
+              {p?.origin && p.origin.some((r) => r.n > 0)
+                ? <BarList fill rows={bars(p.origin)} />
+                : <p className="m-0 text-[11.5px] text-[#64748B]">Origin not recorded for any asset yet.</p>}
+            </div>
+            <div className="mt-3 border-t border-[#EEF1F5] pt-3">
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
                 <Eyebrow>Management state</Eyebrow>
                 <span className="text-[11px] text-[#64748B]">{nfmt(managed)} confirmed</span>
@@ -965,12 +967,12 @@ function ComplianceCard({ q, className }: { q: Q<Estate>; className: string }) {
               <Fig label="CDE (PCI)" value={nfmt(c.cde ?? 0)} sub="cardholder data" />
               <Fig label="ePHI (HIPAA)" value={nfmt(c.ephi ?? 0)} sub="health data" />
             </div>
-            <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+            <div className="mt-3 flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
               <Eyebrow>Regulated data type</Eyebrow>
-              {reg.length ? <BarList rows={bars(reg)} /> : <p className="m-0 text-[11.5px] text-[#94A3B8]">No regulated-data type set.</p>}
+              {reg.length ? <BarList fill rows={bars(reg)} /> : <p className="m-0 text-[11.5px] text-[#64748B]">No regulated-data type set.</p>}
             </div>
             {scopes.length > 0 && (
-              <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+              <div className="mt-3 border-t border-[#EEF1F5] pt-3">
                 <Eyebrow>Compliance frameworks in scope</Eyebrow>
                 <BarList rows={bars(scopes)} />
               </div>
@@ -995,8 +997,8 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
               <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(0, 5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
               <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
             </div>
-            <p className="m-0 mt-2.5 border-t border-[#EEF1F5] pt-2.5 text-[11px] leading-[1.5] text-[#94A3B8]">
-              Share of assets we hold each signal for. Host-only signals (<span className="text-[#64748B]">internal</span>) are measured against the internal estate — an outside-in asset can&rsquo;t carry them, so it isn&rsquo;t counted as a gap.
+            <p className="m-0 mt-2.5 border-t border-[#EEF1F5] pt-2.5 text-[11px] leading-[1.5] text-[#64748B]">
+              Share of assets we hold each signal for. Host-only signals (<span className="font-medium text-[#475569]">internal</span>) are measured against the internal estate — an outside-in asset can&rsquo;t carry them, so it isn&rsquo;t counted as a gap.
             </p>
           </div>
         );
@@ -1004,18 +1006,25 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
     </Box>
   );
 }
-function CovRow({ label, n, of, scope }: { label: string; n: number; of: number; scope?: string }) {
+function CovRow({ label, n, of, scope, bare }: { label: string; n: number; of: number; scope?: string; bare?: boolean }) {
   const pct = of > 0 ? pctOf(n, of) : 0;
+  const low = of > 0 && pct < 50;
+  // Two-line row: full label (never truncated) + big % on top, a full-width bar + fraction below.
+  // Far more legible than the old squeezed one-liner whose labels clipped to "Owner assig…".
   return (
-    <li className="flex items-center gap-2.5 border-b border-[#F4F6F8] py-[7px] text-[12px] last:border-0">
-      <span className="min-w-0 flex-1 truncate text-[#334155]" title={`${label}: ${nfmt(n)} of ${nfmt(of)}`}>
-        {label}{scope === 'internal' && <span className="ml-1.5 text-[10px] font-medium uppercase tracking-[.04em] text-[#94A3B8]">internal</span>}
-      </span>
-      <span className="h-[7px] w-[72px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
-        <span className="block h-full rounded-full" style={{ width: `${pct}%`, minWidth: n > 0 ? 3 : 0, background: T.base }} />
-      </span>
-      <span className="w-[62px] shrink-0 text-right text-[11px] tabular-nums text-[#94A3B8]">{nfmt(n)}/{nfmt(of)}</span>
-      <b className="w-[34px] shrink-0 text-right tabular-nums" style={{ color: of && pct < 50 ? SEV.medium.ink : '#0F172A' }}>{of ? `${pct}%` : '—'}</b>
+    <li className={`flex flex-col gap-[5px] py-[9px] ${bare ? '' : 'border-b border-[#F1F4F8] last:border-0'}`}>
+      <div className="flex items-baseline gap-2">
+        <span className="min-w-0 flex-1 text-[12.5px] font-medium text-[#334155]" title={`${label}: ${nfmt(n)} of ${nfmt(of)}`}>
+          {label}{scope === 'internal' && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-[.04em] text-[#64748B]">internal</span>}
+        </span>
+        <b className="shrink-0 text-[14px] font-semibold tabular-nums" style={{ color: of ? (low ? SEV.medium.ink : '#0F172A') : '#94A3B8' }}>{of ? `${pct}%` : '—'}</b>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <span className="h-[7px] min-w-[40px] flex-1 overflow-hidden rounded-full bg-[#EEF1F5]">
+          <span className="block h-full rounded-full" style={{ width: `${pct}%`, minWidth: n > 0 ? 3 : 0, background: low ? SEV.medium.c : T.base }} />
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-[#64748B]">{nfmt(n)} / {nfmt(of)}</span>
+      </div>
     </li>
   );
 }
@@ -1036,18 +1045,24 @@ function SecurityCard({ q, className }: { q: Q<Estate>; className: string }) {
           { label: 'CIS benchmarked', n: d.coverage.cis, of: scope },
         ];
         return (
-          <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col gap-3.5">
             <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
               <Fig label="Hosts read" value={share(s.posture, scope) || '0%'} sub={`${nfmt(s.posture)} of ${nfmt(scope)} internal`} />
               <Fig label="Packages catalogued" value={nfmt(s.packages)} sub={`on ${plural(s.inventoried, 'host')}`} />
               {s.edr_stopped > 0 && <Fig label="EDR stopped" value={nfmt(s.edr_stopped)} sub="installed but not running" alarm />}
             </div>
-            <ul className="m-0 mt-3 flex list-none flex-col p-0">{covRows.map((r) => <CovRow key={r.label} label={r.label} n={r.n} of={r.of} />)}</ul>
-            <div className="mt-auto border-t border-[#EEF1F5] pt-3">
+            {/* 2×2 posture grid — fills the width the old 4 thin rows left empty, and reads clearly. */}
+            <div>
+              <Eyebrow>Protection &amp; hardening coverage</Eyebrow>
+              <ul className="m-0 mt-0.5 grid list-none grid-cols-1 gap-x-7 gap-y-1 p-0 sm:grid-cols-2">
+                {covRows.map((r) => <CovRow key={r.label} label={r.label} n={r.n} of={r.of} bare />)}
+              </ul>
+            </div>
+            <div className="flex flex-1 flex-col border-t border-[#EEF1F5] pt-3">
               <Eyebrow>Security-relevant software · hosts running one</Eyebrow>
               {s.families && s.families.length
-                ? <BarList rows={bars(s.families)} max={scope} />
-                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No security tooling catalogued on hosts yet.</p>}
+                ? <BarList rows={bars(s.families)} max={scope} fill />
+                : <p className="m-0 text-[11.5px] text-[#64748B]">No security tooling catalogued on hosts yet.</p>}
             </div>
           </div>
         );
@@ -1077,7 +1092,7 @@ function ObsolescenceCard({ q, className }: { q: Q<Estate>; className: string })
               </div>
               {fresh?.buckets && fresh.buckets.some((b) => b.n > 0)
                 ? <BarList fill rows={fresh.buckets.map((b) => ({ key: b.label, label: b.label, n: b.n, c: b.gap ? '#E0A45E' : T.base, title: b.label }))} />
-                : <p className="m-0 text-[11.5px] text-[#94A3B8]">No last-seen timestamps yet.</p>}
+                : <p className="m-0 text-[11.5px] text-[#64748B]">No last-seen timestamps yet.</p>}
             </div>
           </div>
         );
@@ -1138,10 +1153,15 @@ function ScaleCard({ q, className }: { q: Q<Estate>; className: string }) {
           { label: 'Value recorded', value: c.valuation_n ? nfmt(Math.round(c.valuation_sum)) : '—', sub: c.valuation_n ? `on ${plural(c.valuation_n, 'asset')}` : 'not recorded' },
         ];
         return (
-          <div className="flex flex-1 flex-col justify-center">
-            <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
-              {cells.map((x) => <Fig key={x.label} label={x.label} value={x.value} sub={x.sub} />)}
-            </div>
+          // Stat tiles that fill the grid evenly — no more figures floated in the middle of a void.
+          <div className="grid flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3" style={{ gridAutoRows: '1fr' }}>
+            {cells.map((x) => (
+              <div key={x.label} className="flex min-w-0 flex-col justify-center rounded-[10px] border border-[#E9EDF3] bg-[#FBFCFE] px-3 py-2.5">
+                <p className="m-0 truncate text-[11px] font-medium text-[#475569]" title={x.label}>{x.label}</p>
+                <p className="m-0 mt-1 text-[18px] font-semibold leading-[1.1] text-[#0F172A]">{x.value}</p>
+                <p className="m-0 mt-0.5 truncate text-[11px] text-[#64748B]" title={x.sub}>{x.sub}</p>
+              </div>
+            ))}
           </div>
         );
       }, 3)}

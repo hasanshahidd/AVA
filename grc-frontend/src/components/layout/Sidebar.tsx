@@ -362,8 +362,6 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'teams',            label: 'Teams',                 icon: Users },
   { id: 'identity',         label: 'Identity Providers',    icon: Shield },
   { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
-  // Guided flows promoted into the menu — standalone routes, not /admin tabs.
-  { id: 'agents',           label: 'Scan Agents',           icon: Bot,       href: '/admin/agents' },
   { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },
   { id: 'cloud-connectors', label: 'Cloud Connectors',      icon: Globe },
   { id: 'connectors',       label: 'External Connectors',   icon: Layers },
