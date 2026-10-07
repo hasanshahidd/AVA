@@ -1000,16 +1000,78 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
         // Host-signal denominator = the internal estate size (what every internal-scoped dim is measured against).
         const intOf = dims.find((r) => r.scope === 'internal')?.of ?? 0;
         const sw = d.software;
+        const cap = d.capacity;
+        const sec = d.security;
+        const secScope = sec?.scope ?? 0;
+        const osFam = (d.internal?.os ?? []).filter((o) => o.n > 0);
         // Internal host names behind every domain — the same per-class samples the Internal-estate drill renders.
         const intSamples = (d.internal?.classes ?? []).flatMap((c) => c.samples ?? []);
         const intTotal = d.internal?.total ?? 0;
-        const domains: { key: string; label: string; blurb: string; rows: (CovDim | undefined)[] }[] = [
-          { key: 'hw', label: 'Hardware', blurb: 'CPU · RAM · disk telemetry', rows: [pick('hardware')] },
+        // Real telemetry PARAMETERS per domain — the same /estate-overview blocks the Hardware (capacity),
+        // Software (software + internal.os) and Endpoint-security (security) cards read, aggregated for the
+        // drill pop-up. Every figure is guarded; a missing block renders an honest "not collected yet".
+        const hwParams = cap && cap.hosts ? (
+          <>
+            <Eyebrow>Fleet hardware</Eyebrow>
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+              <Fig label="Hosts profiled" value={nfmt(cap.hosts)} sub={`${share(cap.hosts, intTotal) || '0%'} of internal`} />
+              <Fig label="Total compute" value={nfmt(cap.vcpu)} sub="vCPU across fleet" />
+              <Fig label="Total memory" value={gb(cap.ram_gb)} sub="RAM across fleet" />
+              <Fig label="Total storage" value={gb(cap.disk_gb)} sub="disk across fleet" />
+            </div>
+          </>
+        ) : null;
+        const swParams = sw && (sw.products || (sw.top?.length ?? 0) || sw.hosts_reporting) ? (
+          <>
+            <Eyebrow>Software inventory</Eyebrow>
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+              <Fig label="Products catalogued" value={nfmt(sw.products)} />
+              {sw.installs != null && <Fig label="Installs" value={nfmt(sw.installs)} />}
+              <Fig label="Hosts reporting" value={nfmt(sw.hosts_reporting)} sub={`${share(sw.hosts_reporting, intTotal) || '0%'} of internal`} />
+            </div>
+            {(sw.top?.length ?? 0) > 0 && (
+              <div className="mt-3">
+                <Eyebrow>Top products · version · hosts</Eyebrow>
+                <SwGrid rows={sw.top} more={sw.more} unit="host" />
+              </div>
+            )}
+            {osFam.length > 0 && (
+              <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+                <Eyebrow>Operating system family · hosts</Eyebrow>
+                <BarList fill rows={bars(osFam)} />
+              </div>
+            )}
+          </>
+        ) : null;
+        const secParams = sec && secScope ? (
+          <>
+            <Eyebrow>Endpoint protection</Eyebrow>
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+              <Fig label="Hosts read" value={share(sec.posture, secScope) || '0%'} sub={`${nfmt(sec.posture)} of ${nfmt(secScope)} internal`} />
+              <Fig label="Packages catalogued" value={nfmt(sec.packages)} sub={`on ${plural(sec.inventoried, 'host')}`} />
+              {sec.edr_stopped > 0 && <Fig label="EDR stopped" value={nfmt(sec.edr_stopped)} sub="installed, not running" alarm />}
+            </div>
+            <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-x-7 gap-y-1 p-0 sm:grid-cols-2">
+              {[
+                { label: 'Antivirus present', n: sec.antivirus, of: secScope },
+                { label: 'EDR running', n: sec.edr, of: secScope },
+                { label: 'Endpoint protected', n: sec.protected, of: secScope },
+                { label: 'CIS benchmarked', n: d.coverage.cis, of: secScope },
+              ].map((r) => <CovRow key={r.label} label={r.label} n={r.n} of={r.of} bare />)}
+            </ul>
+            <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+              <Eyebrow>Security-relevant software · hosts running one</Eyebrow>
+              {sec.families?.length ? <BarList rows={bars(sec.families)} max={secScope} fill /> : <p className="m-0 text-[11.5px] text-[#64748B]">No security tooling catalogued yet.</p>}
+            </div>
+          </>
+        ) : null;
+        const domains: { key: string; label: string; blurb: string; rows: (CovDim | undefined)[]; params: ReactNode }[] = [
+          { key: 'hw', label: 'Hardware', blurb: 'CPU · RAM · disk telemetry', rows: [pick('hardware')], params: hwParams },
           { key: 'sw', label: 'Software', blurb: 'OS & installed products', rows: [
             pick('os'),
             sw ? { label: 'Software inventoried', n: sw.hosts_reporting, of: intOf, note: `${nfmt(sw.products)} ${sw.products === 1 ? 'product' : 'products'}` } : undefined,
-          ] },
-          { key: 'sec', label: 'Security', blurb: 'Endpoint posture & hardening', rows: [pick('security'), pick('cis')] },
+          ], params: swParams },
+          { key: 'sec', label: 'Security', blurb: 'Endpoint posture & hardening', rows: [pick('security'), pick('cis')], params: secParams },
         ];
         const gov = (['classified', 'owner', 'criticality', 'lifecycle', 'environment', 'seen30'] as const)
           .map(pick).filter(Boolean) as CovDim[];
@@ -1017,7 +1079,7 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
           <div className="flex flex-1 flex-col">
             {/* The three domains spread to fill the card height; bars simply get more breathing room when tall. */}
             <div className="flex flex-1 flex-col justify-between gap-3.5">
-              {domains.map((dm) => <CovDomain key={dm.key} label={dm.label} blurb={dm.blurb} rows={dm.rows} samples={intSamples} total={intTotal} />)}
+              {domains.map((dm) => <CovDomain key={dm.key} label={dm.label} blurb={dm.blurb} rows={dm.rows} params={dm.params} samples={intSamples} total={intTotal} />)}
             </div>
             {gov.length > 0 && (
               <div className="mt-3 border-t border-[#EEF1F5] pt-2.5">
@@ -1040,8 +1102,8 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
     The whole band is a drill trigger → a blur pop-up (reused DrillModal) with the domain's coverage
     figures and the internal host NAMES those signals are measured across (the same per-class samples
     the Internal-estate drill renders via SampleNames). Per-host signal status isn't fabricated. */
-function CovDomain({ label, blurb, rows, samples, total }: {
-  label: string; blurb: string; rows: (CovDim | undefined)[]; samples: Sample[]; total: number;
+function CovDomain({ label, blurb, rows, params, samples, total }: {
+  label: string; blurb: string; rows: (CovDim | undefined)[]; params: ReactNode; samples: Sample[]; total: number;
 }) {
   const [open, setOpen] = useState(false);
   const real = rows.filter(Boolean) as CovDim[];
@@ -1063,10 +1125,21 @@ function CovDomain({ label, blurb, rows, samples, total }: {
       </button>
       {open && (
         <DrillModal color={T.base} onClose={() => setOpen(false)} title={label} meta={blurb}>
-          <Eyebrow>Coverage</Eyebrow>
-          {real.length === 0
-            ? <p className="m-0 text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
-            : <ul className="m-0 list-none p-0">{real.map((r) => <CovRow key={r.label} {...r} bare />)}</ul>}
+          {/* The real telemetry PARAMETERS for this domain (primary), then a one-line coverage summary
+              and the internal host names those signals are measured across. */}
+          {params ?? (
+            <>
+              <Eyebrow>{label} telemetry</Eyebrow>
+              <p className="m-0 text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
+            </>
+          )}
+          {real.length > 0 && (
+            <p className="m-0 mt-3 border-t border-[#EEF1F5] pt-3 text-[11.5px] leading-[1.6] text-[#64748B]">
+              <span className="font-semibold uppercase tracking-[.04em] text-[#94A3B8]">Coverage</span>
+              {' — '}
+              {real.map((r) => `${r.label} ${r.of ? pctOf(r.n, r.of) : 0}% (${nfmt(r.n)} of ${nfmt(r.of)})`).join('  ·  ')}
+            </p>
+          )}
           <div className="mt-3 border-t border-[#EEF1F5] pt-3">
             <p className="m-0 mb-2 text-[11.5px] leading-[1.5] text-[#64748B]">
               Internal hosts the {label.toLowerCase()} signals are measured across — per-host signal status isn&rsquo;t broken out here.
