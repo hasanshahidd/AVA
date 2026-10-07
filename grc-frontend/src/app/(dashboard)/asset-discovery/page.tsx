@@ -2192,13 +2192,13 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
   const connectDev = openFor != null ? devices.find((d: any) => d.observation_id === openFor && !d.in_inventory) : null;
 
   return (
-    <div className="cq-workspace">
+    <div className="cq-workspace" style={{ flex: '1 1 auto', minHeight: 0, gridTemplateRows: 'minmax(0, 1fr)' }}>
       {/* LEFT FILTER RAIL — same pattern as the IT Asset Inventory register's
           left rail (white card column, controls grouped under uppercase caps).
           Every control that used to crowd the top bar lives here now: the
           search / run / type filters, plus the bulk connect method and
           logins-to-try. Same state + filtering logic, only relocated. */}
-      <aside className="cq-rail">
+      <aside className="cq-rail" style={{ alignSelf: 'start', maxHeight: '100%', overflowY: 'auto' }}>
         <div className="cq-railcap">Search</div>
         <input className="input" placeholder="Search device, IP or hostname" value={search} onChange={(e) => setSearch(e.target.value)} />
 
@@ -2258,8 +2258,10 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
 
       {/* RIGHT — the device table, now with the freed horizontal width. The old
           crammed top bar is reduced to the primary Connect action (plus the two
-          contextual bulk actions, which still only appear when they apply). */}
-      <section className="panel">
+          contextual bulk actions, which still only appear when they apply).
+          height:100% + overflowY:auto → the table scrolls inside this column while the
+          left rail stays put (no page scroll, no empty left column). */}
+      <section className="panel" style={{ minHeight: 0, height: '100%', overflowY: 'auto' }}>
         <div className="cq-actionbar">
           <span className="push" />
           {namelessCount > 0 && <button className="btn btn-secondary" onClick={() => setDhcpOpen(true)} title="Pull real device names from your DHCP server lease table">Fill names <span className="count">{namelessCount}</span></button>}
@@ -2591,21 +2593,26 @@ function ConnectionsTab() {
   const cInv = devices.filter((d) => d.in_inventory).length;
   const savedCount = (credQ.data ?? []).length;
   return (
-    <div className="disc-cc">
-      <div className="page-line">
+    // Bounded flex column: header + sub-tabs stay fixed, the content below fills the rest and
+    // scrolls INTERNALLY — so the device TABLE scrolls, not the page, and the short left filter
+    // rail no longer drags an empty column through the viewport.
+    <div className="disc-cc" style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="page-line" style={{ flexShrink: 0 }}>
         <div><h2>Connect discovered devices</h2></div>
         <div className="actions">
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>＋ Add connection</button>
         </div>
       </div>
-      <nav className="tabs" style={{ marginBottom: 16 }}>
+      <nav className="tabs" style={{ marginBottom: 16, flexShrink: 0 }}>
         <a className={view === 'login' ? 'active' : ''} onClick={() => setView('login')}>Can log in <span className="count">{cLogin}</span></a>
         <a className={view === 'adopt' ? 'active' : ''} onClick={() => setView('adopt')}>Adopt-only <span className="count">{cAdopt}</span></a>
         <a className={view === 'inventory' ? 'active' : ''} onClick={() => setView('inventory')}>In inventory <span className="count">{cInv}</span></a>
         <a className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>All</a>
         <a className={view === 'logins' ? 'active' : ''} onClick={() => setView('logins')}>Saved logins <span className="count">{savedCount}</span></a>
       </nav>
-      {view === 'logins' ? <Credentials /> : <DiscoveredQueue seg={view} />}
+      {view === 'logins'
+        ? <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}><Credentials /></div>
+        : <DiscoveredQueue seg={view} />}
       {showAdd && <AddConnectionModal onClose={() => setShowAdd(false)} />}
     </div>
   );
