@@ -2132,6 +2132,43 @@ def resolve_observation_endpoint(
     return {"action": "ignore"}
 
 
+class BulkResolveIn(BaseModel):
+    observation_ids: List[int]
+    action: str = Field(default="adopt", pattern="^(adopt)$")  # only adopt is bulk-safe
+
+
+@router.post("/observations/bulk-resolve")
+def bulk_resolve_observations(
+    body: BulkResolveIn,
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+    _perm: bool = Depends(_require_discover),
+):
+    """Adopt many inbox observations as unmanaged (evidence-only) assets in ONE
+    transaction — the surface-inventory bulk action. Firewall-echo ghosts and
+    already-resolved rows are skipped (never adopted). Returns {adopted, skipped,
+    asset_ids}."""
+    from .services import resolver
+
+    tid = get_user_primary_tenant(current_user, db)
+    rows = db.query(DiscoveryObservation).filter(
+        DiscoveryObservation.id.in_(body.observation_ids),
+        DiscoveryObservation.tenant_id == tid,
+    ).all()
+    adopted, asset_ids, skipped = 0, [], 0
+    for obs in rows:
+        raw = obs.raw if isinstance(obs.raw, dict) else {}
+        if obs.resolution in ("created", "merged", "ignored") or raw.get("device_type") == "firewall_echo":
+            skipped += 1
+            continue
+        asset = resolver.manual_adopt(db, obs)
+        adopted += 1
+        asset_ids.append(asset.id)
+    skipped += len(body.observation_ids) - len(rows)  # ids not found in this tenant
+    db.commit()
+    return {"adopted": adopted, "skipped": skipped, "asset_ids": asset_ids}
+
+
 # ── Credential profiles (encrypted; secrets never returned) ──────────────────
 
 class CredentialIn(BaseModel):

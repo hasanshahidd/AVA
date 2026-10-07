@@ -1068,6 +1068,14 @@ class ITAssetResponse(BaseModel):
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     is_internet_facing: Optional[bool] = None
+    # Surface vs credentialed inventory view. Computed per-asset by the list/
+    # detail serializers (transient, not columns): scan_depth is 'surface' iff
+    # discovery_state=='unmanaged' (evidence-only, never logged into), else
+    # 'credentialed'. open_ports/device_type are the sweep's surface evidence,
+    # read from platform_properties['surface'] (fallback: discovery_classification).
+    scan_depth: Optional[str] = None
+    open_ports: Optional[List[int]] = None
+    device_type: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1230,6 +1238,11 @@ class AssetDetailResponse(BaseModel):
     pci_dss: Optional[Any] = None
     ephi_environment: Optional[bool] = None
     hipaa: Optional[Any] = None
+    # Surface vs credentialed view (see ITAssetResponse) — 'surface' iff
+    # discovery_state=='unmanaged'; open_ports/device_type from the sweep.
+    scan_depth: Optional[str] = None
+    open_ports: Optional[List[int]] = None
+    device_type: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -79,6 +79,37 @@ def list_asset_links(
         .all()
     )
     
+    # Other OPEN findings per affected asset — the "and this host has N more open
+    # issues" blast-radius signal. ONE grouped query (not N+1), and the current
+    # finding is excluded so the count reads as "other". Best-effort: a counting
+    # hiccup must never block the asset list, so it falls back to 0.
+    open_counts: dict = {}
+    asset_ids = [l.asset_id for l in links if l.asset_id]
+    if asset_ids:
+        try:
+            from .vulnerabilities import _LIST_CLOSED_STATUSES
+            for aid, cnt in (
+                db.query(
+                    VulnerabilityAssetLink.asset_id,
+                    func.count(func.distinct(Vulnerability.id)),
+                )
+                .join(Vulnerability, Vulnerability.id == VulnerabilityAssetLink.vulnerability_id)
+                .filter(
+                    VulnerabilityAssetLink.asset_id.in_(asset_ids),
+                    VulnerabilityAssetLink.vulnerability_id != vuln_id,
+                    Vulnerability.status.notin_(_LIST_CLOSED_STATUSES),
+                )
+                .group_by(VulnerabilityAssetLink.asset_id)
+                .all()
+            ):
+                open_counts[aid] = int(cnt)
+        except Exception:
+            open_counts = {}
+
+    def _asset_os(a):
+        # Human OS string first (e.g. "Microsoft Windows 11 Pro"), else the family.
+        return (getattr(a, "os_version", None) or getattr(a, "os_family", None)) if a else None
+
     return [
         VulnerabilityAssetLinkResponse(
             id=link.id,
@@ -92,6 +123,10 @@ def list_asset_links(
             asset_type=link.asset.asset_type if link.asset else None,
             asset_criticality=getattr(link.asset, "criticality", None) if link.asset else None,
             asset_criticality_score=getattr(link.asset, "criticality_score", None) if link.asset else None,
+            asset_ip=getattr(link.asset, "ip_address", None) if link.asset else None,
+            asset_os=_asset_os(link.asset),
+            asset_internet_facing=bool(getattr(link.asset, "internet_facing", False)) if link.asset else None,
+            asset_open_findings=open_counts.get(link.asset_id, 0),
             link_source=getattr(link, "link_source", "manual") or "manual",
             auto_linked=bool(getattr(link, "auto_linked", False)),
         )

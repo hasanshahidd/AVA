@@ -376,6 +376,13 @@ def promote_observation(db: Session, obs: DiscoveryObservation,
             db.delete(asset)
             db.flush()
         raise
+    # The authoritative "we logged in" flip: a successful authenticated collect means this host is
+    # managed, so a previously-unmanaged (surface-only) asset moves into the credentialed inventory view.
+    # Best-effort (older schemas may lack the column).
+    try:
+        asset.discovery_state = "managed"
+    except Exception:
+        pass
     obs.resolution = "created" if created else "merged"
     obs.resolved_asset_id = asset.id
     obs.resolution_note = f"credential '{profile.name}' succeeded — {'promoted to' if created else 'linked to existing'} asset #{asset.id}"

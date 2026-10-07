@@ -290,6 +290,21 @@ def get_rule_based_cia_recommendation(request: CIARecommendationRequest):
     }
 
 
+def _surface_fields(asset):
+    """(scan_depth, open_ports, device_type) for an asset — all derived, not stored.
+    scan_depth is 'surface' iff the asset is an unmanaged (evidence-only) row we never
+    logged into, else 'credentialed'. open_ports/device_type come from the sweep's
+    surface evidence in platform_properties['surface'] (stamped at adopt time),
+    falling back to the discovery_classification device_type."""
+    pp = getattr(asset, "platform_properties", None)
+    pp = pp if isinstance(pp, dict) else {}
+    surface = pp.get("surface") if isinstance(pp.get("surface"), dict) else {}
+    dc = pp.get("discovery_classification") if isinstance(pp.get("discovery_classification"), dict) else {}
+    depth = "surface" if getattr(asset, "discovery_state", None) == "unmanaged" else "credentialed"
+    ports = surface.get("open_ports")
+    return depth, (ports if isinstance(ports, list) else None), (surface.get("device_type") or dc.get("device_type"))
+
+
 @router.get("", response_model=List[ITAssetResponse])
 def list_assets(
     tenant_id: Optional[int] = None,
@@ -353,6 +368,10 @@ def list_assets(
         )
 
     assets = query.order_by(ITAsset.created_at.desc()).offset(skip).limit(limit).all()
+    # Attach the computed surface fields transiently (same pattern as open_findings)
+    # so the response_model picks them up without new columns on ITAsset.
+    for a in assets:
+        a.scan_depth, a.open_ports, a.device_type = _surface_fields(a)
     return assets
 
 
@@ -2072,6 +2091,8 @@ def get_asset_detail(
     def _g(name, default=None):
         return getattr(asset, name, default)
 
+    _scan_depth, _open_ports, _device_type = _surface_fields(asset)
+
     return AssetDetailResponse(
         id=asset.id,
         tenant_id=asset.tenant_id,
@@ -2180,6 +2201,10 @@ def get_asset_detail(
         # collect. This was the real reason the page looked "still old".
         platform_kind=_g("platform_kind"),
         platform_properties=_g("platform_properties"),
+        # Surface vs credentialed view + the sweep's surface evidence.
+        scan_depth=_scan_depth,
+        open_ports=_open_ports,
+        device_type=_device_type,
     )
 
 

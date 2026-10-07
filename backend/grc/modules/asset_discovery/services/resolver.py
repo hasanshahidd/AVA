@@ -273,6 +273,30 @@ def _apply_classification(asset: ITAsset, cls: Dict[str, Any], *, fill_only: boo
     asset.platform_properties = pp
 
 
+def _apply_surface(asset: ITAsset, raw: Dict[str, Any]) -> None:
+    """Carry the sweep's SURFACE evidence (open ports / banners / device type)
+    onto the asset under platform_properties['surface']. These live in the
+    observation raw and were previously dropped on adoption, so the inventory
+    'surface' view had nothing to show for a device we can't log into. Additive:
+    preserves every other platform_properties key, and omits blanks."""
+    fp = raw.get("fingerprint") if isinstance(raw.get("fingerprint"), dict) else {}
+    ports = raw.get("open_ports")
+    banners = {k: fp[k] for k in ("ssh_banner", "http_server", "http_title", "snmp_sysdescr")
+               if fp.get(k)}
+    surface = {
+        "open_ports": ports if isinstance(ports, list) else None,
+        "banners": banners or None,
+        "device_type": raw.get("device_type"),
+    }
+    surface = {k: v for k, v in surface.items() if v is not None}
+    if not surface:
+        return
+    pp = dict(asset.platform_properties or {})
+    prev = pp.get("surface")
+    pp["surface"] = {**prev, **surface} if isinstance(prev, dict) else surface
+    asset.platform_properties = pp
+
+
 def _create_from(db: Session, tenant_id: int, obs: DiscoveryObservation) -> ITAsset:
     """Create a new asset from an observation, tagged as discovered, carrying the
     protocol-aware classification so a network device / printer / DNS box keeps
@@ -298,6 +322,7 @@ def _create_from(db: Session, tenant_id: int, obs: DiscoveryObservation) -> ITAs
         discovery_state="discovered",
     )
     _apply_classification(asset, cls, fill_only=False)
+    _apply_surface(asset, raw)  # keep the sweep's open-ports/banners for the surface view
     db.add(asset)
     db.flush()  # assign id for the external-identity link + later same-run matches
     ext = raw.get("external_id")
