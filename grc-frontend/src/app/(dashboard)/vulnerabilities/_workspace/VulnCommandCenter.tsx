@@ -684,7 +684,9 @@ function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: num
   return (
     <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700} content={<AssetCell max={max} onSelect={onSelect} />} />
+        <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive animationDuration={700}
+          onClick={(node: any) => { const nm = node?.name ?? node?.payload?.name; if (nm && onSelect) onSelect(String(nm)); }}
+          content={<AssetCell max={max} onSelect={onSelect} />} />
       </ResponsiveContainer>
     </div>
   );
@@ -701,10 +703,12 @@ function AssetCell(props: any) {
   // deep-blue tiles, dark INK on the light / medium ones — legible on every tile,
   // never washed-out white on a pale fill.
   const useWhite = lum(bg) < 0.22;
-  const fg = useWhite ? '#fff' : INK;
-  // Crisp definition on the deep tiles only — a ZERO-blur 1px shadow (no soft halo,
-  // so white text can't read as fuzzy). Light (dark-ink) tiles need nothing.
-  const crisp = useWhite ? { textShadow: '0 1px 0 rgba(0,0,0,.4)' } : undefined;
+  // White ONLY on the deep-blue tiles; a DARK BLUE (not near-black, not washed-out
+  // white) on the light/medium tiles so every tile reads clearly.
+  const fg = useWhite ? '#fff' : '#012A4A';
+  // No text-shadow anywhere — pure, crystal-clear glyphs. Both white-on-deep and
+  // dark-blue-on-light have ample contrast without any shadow (a shadow read as fuzz).
+  const crisp = undefined;
   const nm = String(name ?? '');
   // Ellipsize to what actually fits (10px left pad + ~8px right margin, ~7.2px/char
   // at 11px) so a long host shortens to "DESKTO…" gracefully instead of a hard
