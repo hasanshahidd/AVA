@@ -679,7 +679,11 @@ const lum = (hex: string) => {
 };
 // Deeper ramp: the light end isn't washed out and the mid stops skip the murky zone where
 // neither dark nor white text reads — so every tile is legible (dark text ≤ idx2, white ≥ idx3).
-const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#2E77AB', '#0A5E97', '#064A78'];
+// No murky-middle stop: every tile is clearly LIGHT (dark text, lum ≥ .27) or clearly DEEP
+// (white text, lum ≤ .11). The old #2E77AB sat at lum .167 — under the .22 white threshold yet
+// visually a grey-blue, so white text read as "white on light grey". Replaced with #4F93CB (lum
+// .27 → dark text) so no stop lands in the zone where white-on-light can happen.
+const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#4F93CB', '#0A5E97', '#064A78'];
 function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number; onSelect?: (name: string) => void }) {
   return (
     <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
@@ -715,17 +719,25 @@ function AssetCell(props: any) {
   // mid-word cut; the full name stays in the <title> tooltip.
   const maxChars = Math.floor((width - 18) / 7.2);
   const label = nm.length > maxChars ? nm.slice(0, Math.max(1, maxChars - 1)) + '…' : nm;
-  const showNum = width > 34 && height > 22;
-  // Hide the name entirely where fewer than ~4 chars fit — keep just the count.
-  const showName = width > 60 && height > 34 && maxChars >= 4;
   const clickable = !!onSelect && !!nm;
+  // IDENTITY-FIRST: the host NAME is the information the tile exists to convey, so it wins the
+  // scarce space. Big tiles show count + name (+ exploited); mid/small tiles show the NAME alone
+  // (the count still reads from tile size + the hover title); only a tile too small for ~3 name
+  // chars falls back to the bare count. Every tile carries the full name in <title> + click-through.
+  const twoLines = width > 56 && height > 46 && maxChars >= 4;              // count (top) + name (below)
+  const nameOnly = !twoLines && width > 38 && height > 20 && maxChars >= 3; // name wins the one line
+  const numOnly  = !twoLines && !nameOnly && width > 26 && height > 15;     // last resort: bare count
   return (
     <g style={clickable ? { cursor: 'pointer' } : undefined} onClick={clickable ? () => onSelect!(nm) : undefined}>
       <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}{clickable ? ' · click for findings' : ''}</title>
       <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} style={clickable ? { cursor: 'pointer' } : undefined} />
-      {showNum && <text x={x + 10} y={y + 23} fontSize={height > 56 ? 19 : 15} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>}
-      {showName && <text x={x + 10} y={y + (height > 56 ? 41 : 38)} fontSize={11} fontWeight={600} fill={fg} style={crisp}>{label}</text>}
-      {props.kev > 0 && width > 72 && height > 54 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={useWhite ? '#FFD9D6' : '#9A2A24'} style={crisp}>{props.kev} exploited</text>}
+      {twoLines && <>
+        <text x={x + 10} y={y + 22} fontSize={height > 60 ? 18 : 15} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>
+        <text x={x + 10} y={y + (height > 60 ? 40 : 37)} fontSize={11} fontWeight={600} fill={fg} style={crisp}>{label}</text>
+        {props.kev > 0 && height > 58 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={useWhite ? '#FFD9D6' : '#9A2A24'} style={crisp}>{props.kev} exploited</text>}
+      </>}
+      {nameOnly && <text x={x + 8} y={y + height / 2 + 4} fontSize={11} fontWeight={700} fill={fg} style={crisp}>{label}</text>}
+      {numOnly && <text x={x + 8} y={y + height / 2 + 5} fontSize={13} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>}
     </g>
   );
 }
@@ -791,16 +803,17 @@ function MiniStat({ label, value, tone }: { label: string; value: number | strin
 }
 function HeatRow({ r, max }: { r: { asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }; max: number }) {
   const cells = [r.critical, r.high, r.medium, r.low, r.info];
-  // Pure Ava blue, light → deep brand #005B96 (no navy/teal at the dark end that
-  // read green on the live card). Every stop keeps blue dominant (B > G > R).
-  const ramp = ['#EAF2F9', '#CBE0F0', '#9FC4E4', '#5E9BCE', '#2E77AB', '#005B96'];
+  // Pure Ava blue, light → deep brand #005B96. Same no-murky-middle rule as the treemap:
+  // the old #2E77AB (lum .167) got white text yet looked grey-blue → "white on light grey".
+  // Replaced with #1766A0 (lum .12 → clearly deep, white text reads cleanly).
+  const ramp = ['#EAF2F9', '#CBE0F0', '#9FC4E4', '#5E9BCE', '#1766A0', '#005B96'];
   const shade = (t: number) => ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))];
   return (
     <>
       <div style={{ fontSize: 11, color: SEC, display: 'flex', alignItems: 'center', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.asset_criticality}>{r.asset_criticality || 'Unknown'}</div>
       {cells.map((n, i) => {
         const t = n / max; const bg = n === 0 ? '#F4F7FA' : shade(t); const white = n > 0 && lum(bg) < 0.22; const fg = n === 0 ? '#6B7787' : white ? '#fff' : INK;
-        return <div key={i} style={{ background: bg, color: fg, textShadow: white ? '0 1px 0 rgba(0,0,0,.4)' : undefined, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
+        return <div key={i} style={{ background: bg, color: fg, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
       })}
     </>
   );
