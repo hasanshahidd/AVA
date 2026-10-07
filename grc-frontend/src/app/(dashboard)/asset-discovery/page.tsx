@@ -2198,7 +2198,7 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
           Every control that used to crowd the top bar lives here now: the
           search / run / type filters, plus the bulk connect method and
           logins-to-try. Same state + filtering logic, only relocated. */}
-      <aside className="cq-rail" style={{ alignSelf: 'start', maxHeight: '100%', overflowY: 'auto' }}>
+      <aside className="cq-rail" style={{ alignSelf: 'start' }}>
         <div className="cq-railcap">Search</div>
         <input className="input" placeholder="Search device, IP or hostname" value={search} onChange={(e) => setSearch(e.target.value)} />
 
@@ -2623,7 +2623,7 @@ export default function AssetDiscoveryPage() {
   const inboxQ = useQuery({ queryKey: ['disc-inbox'], queryFn: async () => (await discoveryApi.inbox('open')).data.observations as any[] });
   const inboxN = (inboxQ.data ?? []).length;
   return (
-    <div className="asset-suite discovery-suite as-fadeup" style={{ padding: '4px 2px', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="asset-suite discovery-suite as-fadeup" style={{ padding: '4px 2px', zoom: 0.8, height: 'calc(100% / 0.8)', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="disc-cc" style={{ flexShrink: 0 }}><nav className="tabs" style={{ marginBottom: 18 }}>
         {TABS.map((t) => (
           <a key={t.id} className={t.id === tab ? 'active' : ''} onClick={() => setTab(t.id)}>
