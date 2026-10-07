@@ -1076,6 +1076,10 @@ class ITAssetResponse(BaseModel):
     scan_depth: Optional[str] = None
     open_ports: Optional[List[int]] = None
     device_type: Optional[str] = None
+    # Transient: the AI-Pentest fleet lane this asset routes to (external | internal-host |
+    # internal-ad | cloud | code | container), computed via pentest._classify_asset so the
+    # hub's 6-lane card and the launcher's lane filter agree by construction.
+    fleet_lane: Optional[str] = None
 
     class Config:
         from_attributes = True

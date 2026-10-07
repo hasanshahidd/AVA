@@ -305,6 +305,28 @@ def _surface_fields(asset):
     return depth, (ports if isinstance(ports, list) else None), (surface.get("device_type") or dc.get("device_type"))
 
 
+# AI-Pentest fleet lane per asset — reuse the engine's OWN classifier so the launcher's
+# lane filter matches the /pentest/fleet hub card by construction. target_type -> fleet key.
+_FLEET_LANE_BY_TARGET = {
+    "cloud": "cloud", "container": "container", "code": "code",
+    "ad": "internal-ad", "host": "internal-host",
+    "host-external": "external", "web": "external",
+}
+
+
+def _fleet_lane(asset):
+    """The AI-Pentest fleet-lane key for an asset (external | internal-host | internal-ad |
+    cloud | code | container), via pentest._classify_asset. vulns=[] is safe: vulns only split
+    web-vs-host-external, which both map to 'external', so the fleet key is unaffected. Lazy
+    import avoids a circular import at module load. Never raises."""
+    try:
+        from grc.modules.pentest.service import _classify_asset
+        target_type, _ = _classify_asset(asset, [])
+        return _FLEET_LANE_BY_TARGET.get(target_type)
+    except Exception:
+        return None
+
+
 @router.get("", response_model=List[ITAssetResponse])
 def list_assets(
     tenant_id: Optional[int] = None,
@@ -372,6 +394,7 @@ def list_assets(
     # so the response_model picks them up without new columns on ITAsset.
     for a in assets:
         a.scan_depth, a.open_ports, a.device_type = _surface_fields(a)
+        a.fleet_lane = _fleet_lane(a)
     return assets
 
 
