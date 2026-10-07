@@ -2009,7 +2009,11 @@ function CsDeviceRow({ d, checked, onToggle, onConnect, onAdopt, adopting }: any
   );
 }
 
-function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all' }) {
+function DiscoveredQueue({ seg, setSeg, counts }: {
+  seg: 'login' | 'adopt' | 'inventory' | 'all' | 'logins';
+  setSeg: (v: 'login' | 'adopt' | 'inventory' | 'all' | 'logins') => void;
+  counts: { cLogin: number; cAdopt: number; cInv: number; savedCount: number };
+}) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [adoptedN, setAdoptedN] = useState(0);   // last successful surface-adopt count → inline deep-link to inventory
@@ -2199,6 +2203,35 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
           search / run / type filters, plus the bulk connect method and
           logins-to-try. Same state + filtering logic, only relocated. */}
       <aside className="cq-rail" style={{ alignSelf: 'start' }}>
+        {/* VIEW — the five segments moved off the old horizontal sub-tab row into
+            the rail so the device table pulls up and shows more rows. Same views,
+            same counts, now a compact vertical list; it always shows (even for
+            Saved logins), the device filters below only show for device segs. */}
+        <div className="cq-railcap">View</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {([
+            { key: 'login', label: 'Can log in', n: counts.cLogin },
+            { key: 'adopt', label: 'Adopt-only', n: counts.cAdopt },
+            { key: 'inventory', label: 'In inventory', n: counts.cInv },
+            { key: 'all', label: 'All', n: null },
+            { key: 'logins', label: 'Saved logins', n: counts.savedCount },
+          ] as const).map((v) => {
+            const on = seg === v.key;
+            return (
+              <button key={v.key} onClick={() => setSeg(v.key)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                  width: '100%', textAlign: 'left', border: 'none', borderRadius: 9, cursor: 'pointer',
+                  padding: '7px 9px', fontSize: 12.5, fontWeight: 600,
+                  background: on ? 'var(--mint-soft)' : 'transparent', color: on ? 'var(--mint2)' : 'var(--muted)' }}>
+                <span>{v.label}</span>
+                {v.n != null && <span className="count" style={{ fontSize: 10, fontWeight: 700, borderRadius: 999,
+                  padding: '1px 7px', background: 'var(--amber-soft)', color: 'var(--amber)' }}>{v.n}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {seg !== 'logins' && (<>
         <div className="cq-railcap">Search</div>
         <input className="input" placeholder="Search device, IP or hostname" value={search} onChange={(e) => setSearch(e.target.value)} />
 
@@ -2254,6 +2287,7 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
             : <div className="cq-hint">No host login saved yet — use ＋ Add connection.</div>}
 
         {(ftype || search) && <button className="btn btn-secondary cq-wide" onClick={() => { setFtype(''); setSearch(''); }}>Clear filters</button>}
+        </>)}
       </aside>
 
       {/* RIGHT — the device table, now with the freed horizontal width. The old
@@ -2262,6 +2296,7 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
           height:100% + overflowY:auto → the table scrolls inside this column while the
           left rail stays put (no page scroll, no empty left column). */}
       <section className="panel" style={{ minHeight: 0, height: '100%', overflowY: 'auto' }}>
+        {seg === 'logins' ? <Credentials /> : (<>
         <div className="cq-actionbar">
           <span className="push" />
           {namelessCount > 0 && <button className="btn btn-secondary" onClick={() => setDhcpOpen(true)} title="Pull real device names from your DHCP server lease table">Fill names <span className="count">{namelessCount}</span></button>}
@@ -2394,6 +2429,7 @@ function DiscoveredQueue({ seg }: { seg: 'login' | 'adopt' | 'inventory' | 'all'
       )}
       {explainDev && <DeviceExplainerModal device={explainDev} onClose={() => setExplainFor(null)} />}
       {connectDev && <ConnectDeviceModal device={connectDev} onClose={() => setOpenFor(null)} onDone={() => { setOpenFor(null); qc.invalidateQueries({ queryKey: ['disc-discovered-devices'] }); }} />}
+      </>)}
       </section>
     </div>
   );
@@ -2603,16 +2639,7 @@ function ConnectionsTab() {
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>＋ Add connection</button>
         </div>
       </div>
-      <nav className="tabs" style={{ marginBottom: 16, flexShrink: 0 }}>
-        <a className={view === 'login' ? 'active' : ''} onClick={() => setView('login')}>Can log in <span className="count">{cLogin}</span></a>
-        <a className={view === 'adopt' ? 'active' : ''} onClick={() => setView('adopt')}>Adopt-only <span className="count">{cAdopt}</span></a>
-        <a className={view === 'inventory' ? 'active' : ''} onClick={() => setView('inventory')}>In inventory <span className="count">{cInv}</span></a>
-        <a className={view === 'all' ? 'active' : ''} onClick={() => setView('all')}>All</a>
-        <a className={view === 'logins' ? 'active' : ''} onClick={() => setView('logins')}>Saved logins <span className="count">{savedCount}</span></a>
-      </nav>
-      {view === 'logins'
-        ? <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}><Credentials /></div>
-        : <DiscoveredQueue seg={view} />}
+      <DiscoveredQueue seg={view} setSeg={setView} counts={{ cLogin, cAdopt, cInv, savedCount }} />
       {showAdd && <AddConnectionModal onClose={() => setShowAdd(false)} />}
     </div>
   );
