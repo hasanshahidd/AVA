@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, LabelList,
-  Treemap, ResponsiveContainer,
+  ResponsiveContainer,
 } from 'recharts';
 import { vulnManagementApi } from '@/lib/api';
 import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
@@ -685,67 +685,34 @@ const lum = (hex: string) => {
 // .27 → dark text) so no stop lands in the zone where white-on-light can happen.
 const TREE_RAMP = ['#DCEAF4', '#B9D6EA', '#7FB0D6', '#4F93CB', '#0A5E97', '#064A78'];
 function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: number; kev: number; crit: string | null }[]; max: number; onSelect?: (name: string) => void }) {
+  // Plain HTML/CSS tiles — NOT a recharts SVG. The workspace's zoom:0.8 density wrapper makes an SVG
+  // rasterize-then-downscale → blurry text + a bare-"12" fallback on tiny tiles (nested CSS zoom can't
+  // be reliably cancelled in Chrome). HTML lays out + rasterizes at the effective zoom, so text is
+  // crisp, and a flex min-width guarantees the host NAME always shows (CSS ellipsis, never dropped).
+  // Width ∝ open findings (heaviest host widest); colour = load (TREE_RAMP); wraps when many hosts.
+  const rampIdx = (n: number) => Math.max(0, Math.min(TREE_RAMP.length - 1, Math.round(Math.min(1, n / Math.max(1, max)) * (TREE_RAMP.length - 1))));
   return (
-    <div style={{ width: '100%', flex: 1, minHeight: 264, marginTop: 12 }}>
-      {/* The workspace wraps everything in zoom:0.8 for density. recharts sizes the SVG to the
-          PRE-zoom width, so the browser downscales the painted SVG → blurry treemap text (worse on
-          wide tiles). Counter it: an inner zoom:1.25 layer (×0.8 = net 1.0) sized 80% so it still
-          fills this slot exactly, so recharts measures + paints the treemap at 1:1 device px = crisp.
-          Animation off — the scale-in transition is the other source of transient fuzz. */}
-      <div style={{ width: '80%', height: '80%', zoom: 1.25 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <Treemap data={data} dataKey="size" aspectRatio={1.5} stroke="#fff" isAnimationActive={false}
-            onClick={(node: any) => { const nm = node?.name ?? node?.payload?.name; if (nm && onSelect) onSelect(String(nm)); }}
-            content={<AssetCell max={max} onSelect={onSelect} />} />
-        </ResponsiveContainer>
-      </div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1, minHeight: 264, marginTop: 12, alignContent: 'stretch' }}>
+      {data.map((d, i) => {
+        const bg = TREE_RAMP[rampIdx(d.size)];
+        const fg = lum(bg) < 0.22 ? '#fff' : '#012A4A';
+        const clickable = !!onSelect && !!d.name;
+        return (
+          <button key={`${d.name}-${i}`} type="button"
+            title={`${d.name} · ${d.size} open${d.kev > 0 ? ` · ${d.kev} exploited` : ''}${clickable ? ' · click for findings' : ''}`}
+            onClick={clickable ? () => onSelect!(d.name) : undefined}
+            style={{ flex: `${Math.max(d.size, 1)} 1 120px`, minWidth: 120, minHeight: 84, background: bg, color: fg,
+                     border: '2px solid #fff', borderRadius: 8, padding: '10px 12px', textAlign: 'left',
+                     display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 2,
+                     cursor: clickable ? 'pointer' : 'default', overflow: 'hidden' }}>
+            <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, ...TNUM }}>{d.size}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{d.name}</span>
+            {d.kev > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: fg === '#fff' ? '#FFD9D6' : '#9A2A24' }}>{d.kev} exploited</span>}
+          </button>
+        );
+      })}
+      {!data.length && <div style={{ flex: 1, display: 'grid', placeItems: 'center', minHeight: 264, color: FAINT, fontSize: 12 }}>No assets with open findings.</div>}
     </div>
-  );
-}
-function AssetCell(props: any) {
-  const { x, y, width, height, depth, name } = props;
-  if (depth !== 1 || !(width > 0) || !(height > 0)) return null;
-  const n = props.value ?? props.size ?? 0;
-  const max = props.max ?? 1;
-  const onSelect = props.onSelect as ((name: string) => void) | undefined;
-  const t = Math.min(1, n / Math.max(1, max));
-  const bg = TREE_RAMP[Math.max(0, Math.min(TREE_RAMP.length - 1, Math.round(t * (TREE_RAMP.length - 1))))];
-  // Luminance-based text colour, exactly like the heat grid: white ONLY on the
-  // deep-blue tiles, dark INK on the light / medium ones — legible on every tile,
-  // never washed-out white on a pale fill.
-  const useWhite = lum(bg) < 0.22;
-  // White ONLY on the deep-blue tiles; a DARK BLUE (not near-black, not washed-out
-  // white) on the light/medium tiles so every tile reads clearly.
-  const fg = useWhite ? '#fff' : '#012A4A';
-  // No text-shadow anywhere — pure, crystal-clear glyphs. Both white-on-deep and
-  // dark-blue-on-light have ample contrast without any shadow (a shadow read as fuzz).
-  const crisp = undefined;
-  const nm = String(name ?? '');
-  // Ellipsize to what actually fits (10px left pad + ~8px right margin, ~7.2px/char
-  // at 11px) so a long host shortens to "DESKTO…" gracefully instead of a hard
-  // mid-word cut; the full name stays in the <title> tooltip.
-  const maxChars = Math.floor((width - 18) / 7.2);
-  const label = nm.length > maxChars ? nm.slice(0, Math.max(1, maxChars - 1)) + '…' : nm;
-  const clickable = !!onSelect && !!nm;
-  // IDENTITY-FIRST: the host NAME is the information the tile exists to convey, so it wins the
-  // scarce space. Big tiles show count + name (+ exploited); mid/small tiles show the NAME alone
-  // (the count still reads from tile size + the hover title); only a tile too small for ~3 name
-  // chars falls back to the bare count. Every tile carries the full name in <title> + click-through.
-  const twoLines = width > 56 && height > 46 && maxChars >= 4;              // count (top) + name (below)
-  const nameOnly = !twoLines && width > 38 && height > 20 && maxChars >= 3; // name wins the one line
-  const numOnly  = !twoLines && !nameOnly && width > 26 && height > 15;     // last resort: bare count
-  return (
-    <g style={clickable ? { cursor: 'pointer' } : undefined} onClick={clickable ? () => onSelect!(nm) : undefined}>
-      <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}{clickable ? ' · click for findings' : ''}</title>
-      <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} style={clickable ? { cursor: 'pointer' } : undefined} />
-      {twoLines && <>
-        <text x={x + 10} y={y + 22} fontSize={height > 60 ? 18 : 15} fontWeight={800} fill={fg} style={TNUM}>{n}</text>
-        <text x={x + 10} y={y + (height > 60 ? 40 : 37)} fontSize={11} fontWeight={600} fill={fg} style={crisp}>{label}</text>
-        {props.kev > 0 && height > 58 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={useWhite ? '#FFD9D6' : '#9A2A24'} style={crisp}>{props.kev} exploited</text>}
-      </>}
-      {nameOnly && <text x={x + 8} y={y + height / 2 + 4} fontSize={11} fontWeight={700} fill={fg} style={crisp}>{label}</text>}
-      {numOnly && <text x={x + 8} y={y + height / 2 + 5} fontSize={13} fontWeight={800} fill={fg} style={TNUM}>{n}</text>}
-    </g>
   );
 }
 
