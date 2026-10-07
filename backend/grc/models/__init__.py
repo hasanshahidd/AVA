@@ -33,3 +33,4 @@ from ._pentest_exploit_results import PentestExploitResult  # noqa: F401 - AVA p
 from ._pentest_event_log import PentestEventLog  # noqa: F401 - AVA/GRC pentest all-stage event log
 from ._pentest_runs import PentestRun  # noqa: F401 - AVA pentest batch/run domain object (P1)
 from ._pentest_run_assets import PentestRunAsset  # noqa: F401 - AVA pentest per-asset run state (P1)
+from ._pentest_run_findings import PentestRunFinding  # noqa: F401 - AVA pentest immutable per-run finding snapshot
