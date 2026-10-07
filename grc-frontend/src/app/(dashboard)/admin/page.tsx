@@ -53,6 +53,10 @@ export default function AdminPage() {
 
   return (
     <div className="-m-4 lg:-m-5 text-slate-900">
+      {/* zoom:0.85 — same density knob the dashboards use; scales the tab bar
+          AND every tab's content uniformly so admin cards aren't oversized.
+          Kept off the negative-margin wrapper so edge alignment stays exact. */}
+      <div style={{ zoom: 0.85 }}>
       <div className="border-b border-slate-200 px-3 sm:px-6 pt-3 overflow-x-auto">
         <div className="flex items-center gap-0 min-w-max">
           {adminTabs.map(({ id, label, icon: Icon }) => {
@@ -87,6 +91,7 @@ export default function AdminPage() {
         {activeTab === 'cloud-connectors' && <CloudConnectorsAdminPage />}
         {activeTab === 'connectors' && <ConnectorsAdminPage />}
         {activeTab === 'audit' && <AuditLogsPage />}
+      </div>
       </div>
     </div>
   );

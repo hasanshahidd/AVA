@@ -984,21 +984,48 @@ function ComplianceCard({ q, className }: { q: Q<Estate>; className: string }) {
   );
 }
 
-/* ---------- 5a) Telemetry coverage — the knowledge-completeness matrix (signature) ---------- */
+/* ---------- 5a) Telemetry coverage — knowledge completeness by the 3 telemetry domains ---------- */
+/* PRIMARY structure = the product's three telemetry domains (Hardware · Software · Security),
+   each a labelled band of coverage rows. The estate-wide governance/freshness signals sit below
+   as a smaller secondary group. Every number is a regrouping of the same /estate-overview
+   completeness dims (+ the software products count the query already carries) — nothing invented. */
+type CovDim = { label: string; n: number; of: number; scope?: string; note?: ReactNode };
 function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
   return (
-    <Box title="Telemetry coverage" icon={<ShieldCheck size={15} />} sub="How complete our knowledge of the estate is — the signal held for each dimension, and where the blind spots are" busy={busy(q)} className={className}>
+    <Box title="Telemetry coverage" icon={<ShieldCheck size={15} />} sub="How complete our knowledge of the estate is — the signal held for each telemetry domain, and where the blind spots are" busy={busy(q)} className={className}>
       {body(q, 'Coverage', (d) => {
         const dims = d.completeness?.dims ?? [];
-        if (!dims.length || !d.total) return <Empty icon={<ShieldCheck size={16} />} title="Coverage appears with assets" body="Once the inventory holds assets, this maps how much telemetry each dimension carries." href="/asset-discovery" cta="Bring assets in" />;
+        if (!dims.length || !d.total) return <Empty icon={<ShieldCheck size={16} />} title="Coverage appears with assets" body="Once the inventory holds assets, this maps how much telemetry each domain carries." href="/asset-discovery" cta="Bring assets in" />;
+        const pick = (k: string): CovDim | undefined => { const x = dims.find((r) => r.key === k); return x ? { label: x.label, n: x.n, of: x.of } : undefined; };
+        // Host-signal denominator = the internal estate size (what every internal-scoped dim is measured against).
+        const intOf = dims.find((r) => r.scope === 'internal')?.of ?? 0;
+        const sw = d.software;
+        const domains: { key: string; label: string; blurb: string; rows: (CovDim | undefined)[] }[] = [
+          { key: 'hw', label: 'Hardware', blurb: 'CPU · RAM · disk telemetry', rows: [pick('hardware')] },
+          { key: 'sw', label: 'Software', blurb: 'OS & installed products', rows: [
+            pick('os'),
+            sw ? { label: 'Software inventoried', n: sw.hosts_reporting, of: intOf, note: `${nfmt(sw.products)} ${sw.products === 1 ? 'product' : 'products'}` } : undefined,
+          ] },
+          { key: 'sec', label: 'Security', blurb: 'Endpoint posture & hardening', rows: [pick('security'), pick('cis')] },
+        ];
+        const gov = (['classified', 'owner', 'criticality', 'lifecycle', 'environment', 'seen30'] as const)
+          .map(pick).filter(Boolean) as CovDim[];
         return (
           <div className="flex flex-1 flex-col">
-            <div className="grid flex-1 grid-cols-1 gap-x-10 gap-y-0 sm:grid-cols-2">
-              <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(0, 5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
-              <ul className="m-0 flex flex-1 list-none flex-col justify-between p-0">{dims.slice(5).map(({ key, ...dm }) => <CovRow key={key} {...dm} />)}</ul>
+            {/* The three domains spread to fill the card height; bars simply get more breathing room when tall. */}
+            <div className="flex flex-1 flex-col justify-between gap-3.5">
+              {domains.map((dm) => <CovDomain key={dm.key} label={dm.label} blurb={dm.blurb} rows={dm.rows} />)}
             </div>
+            {gov.length > 0 && (
+              <div className="mt-3 border-t border-[#EEF1F5] pt-2.5">
+                <Eyebrow>Governance &amp; freshness</Eyebrow>
+                <ul className="m-0 grid list-none grid-cols-2 gap-x-8 p-0 sm:grid-cols-3">
+                  {gov.map((r) => <CovRow key={r.label} {...r} bare />)}
+                </ul>
+              </div>
+            )}
             <p className="m-0 mt-2.5 border-t border-[#EEF1F5] pt-2.5 text-[11px] leading-[1.5] text-[#64748B]">
-              Share of assets we hold each signal for. Host-only signals (<span className="font-medium text-[#475569]">internal</span>) are measured against the internal estate — an outside-in asset can&rsquo;t carry them, so it isn&rsquo;t counted as a gap.
+              Share of assets we hold each signal for. The three domains are host-only signals, measured against the <span className="font-medium text-[#475569]">internal</span> estate — an outside-in asset can&rsquo;t carry them, so it isn&rsquo;t counted as a gap. Governance &amp; freshness span the whole estate.
             </p>
           </div>
         );
@@ -1006,7 +1033,24 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
     </Box>
   );
 }
-function CovRow({ label, n, of, scope, bare }: { label: string; n: number; of: number; scope?: string; bare?: boolean }) {
+/** One telemetry domain: a bold domain header + its coverage rows (full-width when one, 2-up when two). */
+function CovDomain({ label, blurb, rows }: { label: string; blurb: string; rows: (CovDim | undefined)[] }) {
+  const real = rows.filter(Boolean) as CovDim[];
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-5">
+      <div className="shrink-0 pt-[9px] sm:w-[118px]">
+        <p className="m-0 text-[11px] font-bold uppercase tracking-[.08em] text-[#0F172A]">{label}</p>
+        <p className="m-0 mt-0.5 text-[10.5px] leading-[1.3] text-[#94A3B8]">{blurb}</p>
+      </div>
+      {real.length === 0
+        ? <p className="m-0 flex-1 pt-[9px] text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
+        : <ul className={`m-0 min-w-0 flex-1 list-none p-0 ${real.length > 1 ? 'grid grid-cols-1 gap-x-8 sm:grid-cols-2' : ''}`}>
+            {real.map((r) => <CovRow key={r.label} {...r} bare />)}
+          </ul>}
+    </div>
+  );
+}
+function CovRow({ label, n, of, scope, bare, note }: { label: string; n: number; of: number; scope?: string; bare?: boolean; note?: ReactNode }) {
   const pct = of > 0 ? pctOf(n, of) : 0;
   const low = of > 0 && pct < 50;
   // Two-line row: full label (never truncated) + big % on top, a full-width bar + fraction below.
@@ -1016,6 +1060,7 @@ function CovRow({ label, n, of, scope, bare }: { label: string; n: number; of: n
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 text-[12.5px] font-medium text-[#334155]" title={`${label}: ${nfmt(n)} of ${nfmt(of)}`}>
           {label}{scope === 'internal' && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-[.04em] text-[#64748B]">internal</span>}
+          {note && <span className="ml-1.5 text-[10.5px] font-normal text-[#94A3B8]">· {note}</span>}
         </span>
         <b className="shrink-0 text-[14px] font-semibold tabular-nums" style={{ color: of ? (low ? SEV.medium.ink : '#0F172A') : '#94A3B8' }}>{of ? `${pct}%` : '—'}</b>
       </div>

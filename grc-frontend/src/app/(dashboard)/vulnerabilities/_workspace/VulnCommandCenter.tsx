@@ -479,18 +479,33 @@ export default function VulnCommandCenter({
       <div style={row}>
         <section style={{ ...card, padding: '15px 17px', flex: '1 1 360px', minWidth: 0 }}>
           <CardHead title="Remediation posture" sub="where findings sit in the lifecycle" Icon={GitBranch} />
-          <Insight>{m.registerTotal > 0
-            ? <><b style={{ color: '#1F7A54' }}>{m.closedCount}</b> of {m.registerTotal} findings ({closedPct}%) are closed, verified or accepted; <b>{m.totalOpen}</b> remain open.{m.fixAvailable > 0 ? <> A vendor fix is <b style={{ color: '#1F7A54' }}>already published</b> for {m.fixAvailable} of the open set — patch-ready wins sitting on the table.</> : ''}</>
-            : <>No findings recorded yet.</>}</Insight>
+          {/* Prominent headline — resolved vs open at a glance (leads the card). */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap', marginTop: 12 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: m.closedCount ? '#1F7A54' : INK, ...TNUM }}>{m.closedCount}</span>
+              <span style={{ fontSize: 12.5, color: SEC }}>resolved</span>
+            </span>
+            <span style={{ fontSize: 22, color: FAINT, lineHeight: 1 }}>/</span>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: m.totalOpen ? '#C0682F' : INK, ...TNUM }}>{m.totalOpen}</span>
+              <span style={{ fontSize: 12.5, color: SEC }}>open</span>
+            </span>
+            <span style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: 20, fontWeight: 700, lineHeight: 1, color: '#1F7A54', ...TNUM }}>{closedPct}%</span>
+              <span style={{ display: 'block', fontSize: 10.5, color: MUTED, marginTop: 3 }}>of {m.registerTotal} closed</span>
+            </span>
+          </div>
+          <p style={{ fontSize: 12, color: SEC, lineHeight: 1.5, margin: '9px 0 0' }}>
+            {m.registerTotal === 0 ? <>No findings recorded yet.</>
+              : m.fixAvailable > 0 ? <>A vendor fix is <b style={{ color: '#1F7A54' }}>already published</b> for <b>{m.fixAvailable}</b> open finding{m.fixAvailable === 1 ? '' : 's'} — patch-ready wins sitting on the table.</>
+              : <><b>{m.totalOpen}</b> finding{m.totalOpen === 1 ? '' : 's'} still open and awaiting remediation.</>}
+          </p>
           {m.statusTotal > 0 && (
-            /* Grows to absorb any height the taller neighbour forces, centring the
-               lifecycle bar + legend so the slack reads as balanced breathing room
-               instead of one dead gap above the footer stats. */
-            <div style={{ flex: 1, minHeight: 0, marginTop: 14, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 13 }}>
-              <div style={{ display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2, boxShadow: 'inset 0 1px 2px rgba(16,24,40,.07)' }}>
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', height: 28, borderRadius: 999, overflow: 'hidden', background: '#EEF1F3', gap: 2, boxShadow: 'inset 0 1px 2px rgba(16,24,40,.07)' }}>
                 {m.statusDist.map((s) => <i key={s.k} title={`${s.label}: ${s.n} (${pct(s.n, m.statusTotal)}%)`} style={{ width: `${(s.n / m.statusTotal) * 100}%`, background: `linear-gradient(180deg, ${s.c}D8, ${s.c})`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3)', minWidth: s.n > 0 ? 3 : 0 }} />)}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+              <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
                 {m.statusDist.map((s) => (
                   <span key={s.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5 }}>
                     <span style={{ width: 9, height: 9, borderRadius: 3, background: s.c, flex: 'none' }} />
@@ -502,7 +517,9 @@ export default function VulnCommandCenter({
               </div>
             </div>
           )}
-          <div style={{ paddingTop: 14, display: 'flex', flexWrap: 'wrap', gap: 11 }}>
+          {/* The 4 posture tiles fill the lower half as an even 2×2 that stretches
+             to the card's (tall, equal-to-neighbour) height — no dead bottom gap. */}
+          <div style={{ flex: 1, minHeight: 0, marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gridAutoRows: 'minmax(64px, 1fr)', gap: 11 }}>
             <PostureStat Icon={ShieldCheck} label="Closed / verified / accepted" n={m.closedCount} tone="#1F7A54" />
             <PostureStat Icon={ShieldCheck} label="Vendor patch available" n={m.fixAvailable} tone={m.fixAvailable ? '#1F7A54' : MUTED} />
             <PostureStat Icon={ShieldCheck} label="Has a mitigation on file" n={m.mitigated} tone={m.mitigated ? AC : MUTED} />
@@ -680,21 +697,31 @@ function AssetCell(props: any) {
   const onSelect = props.onSelect as ((name: string) => void) | undefined;
   const t = Math.min(1, n / Math.max(1, max));
   const bg = TREE_RAMP[Math.max(0, Math.min(TREE_RAMP.length - 1, Math.round(t * (TREE_RAMP.length - 1))))];
-  const dark = lum(bg) < 0.32;
-  const fg = dark ? '#fff' : INK;
-  const sub = dark ? 'rgba(255,255,255,.92)' : '#2E3A45';
+  // Luminance-based text colour, exactly like the heat grid: white ONLY on the
+  // deep-blue tiles, dark INK on the light / medium ones — legible on every tile,
+  // never washed-out white on a pale fill.
+  const useWhite = lum(bg) < 0.22;
+  const fg = useWhite ? '#fff' : INK;
+  // Crisp definition on the deep tiles only — a ZERO-blur 1px shadow (no soft halo,
+  // so white text can't read as fuzzy). Light (dark-ink) tiles need nothing.
+  const crisp = useWhite ? { textShadow: '0 1px 0 rgba(0,0,0,.4)' } : undefined;
   const nm = String(name ?? '');
-  const chars = Math.max(1, Math.floor(width / 7.2));
+  // Ellipsize to what actually fits (10px left pad + ~8px right margin, ~7.2px/char
+  // at 11px) so a long host shortens to "DESKTO…" gracefully instead of a hard
+  // mid-word cut; the full name stays in the <title> tooltip.
+  const maxChars = Math.floor((width - 18) / 7.2);
+  const label = nm.length > maxChars ? nm.slice(0, Math.max(1, maxChars - 1)) + '…' : nm;
   const showNum = width > 34 && height > 22;
-  const showName = width > 54 && height > 32;
+  // Hide the name entirely where fewer than ~4 chars fit — keep just the count.
+  const showName = width > 60 && height > 34 && maxChars >= 4;
   const clickable = !!onSelect && !!nm;
   return (
     <g style={clickable ? { cursor: 'pointer' } : undefined} onClick={clickable ? () => onSelect!(nm) : undefined}>
       <title>{nm} · {n} open{props.kev > 0 ? ` · ${props.kev} exploited` : ''}{clickable ? ' · click for findings' : ''}</title>
       <rect x={x} y={y} width={width} height={height} rx={7} ry={7} fill={bg} stroke="#fff" strokeWidth={2} style={clickable ? { cursor: 'pointer' } : undefined} />
-      {showNum && <text x={x + 10} y={y + 23} fontSize={height > 56 ? 19 : 15} fontWeight={700} fill={fg} style={TNUM}>{n}</text>}
-      {showName && <text x={x + 10} y={y + (height > 56 ? 41 : 38)} fontSize={11} fill={sub}>{nm.length > chars ? nm.slice(0, Math.max(1, chars - 1)) + '…' : nm}</text>}
-      {props.kev > 0 && width > 72 && height > 54 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={dark ? '#FFD9D6' : '#9A2A24'}>{props.kev} exploited</text>}
+      {showNum && <text x={x + 10} y={y + 23} fontSize={height > 56 ? 19 : 15} fontWeight={800} fill={fg} style={{ ...TNUM, ...crisp }}>{n}</text>}
+      {showName && <text x={x + 10} y={y + (height > 56 ? 41 : 38)} fontSize={11} fontWeight={600} fill={fg} style={crisp}>{label}</text>}
+      {props.kev > 0 && width > 72 && height > 54 && <text x={x + 10} y={y + height - 10} fontSize={9.5} fontWeight={700} fill={useWhite ? '#FFD9D6' : '#9A2A24'} style={crisp}>{props.kev} exploited</text>}
     </g>
   );
 }
@@ -760,14 +787,16 @@ function MiniStat({ label, value, tone }: { label: string; value: number | strin
 }
 function HeatRow({ r, max }: { r: { asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }; max: number }) {
   const cells = [r.critical, r.high, r.medium, r.low, r.info];
-  const ramp = ['#E7F0F8', '#C2DAEC', '#7FB0D6', '#2E77AB', '#0A5E97', '#064A78'];
+  // Pure Ava blue, light → deep brand #005B96 (no navy/teal at the dark end that
+  // read green on the live card). Every stop keeps blue dominant (B > G > R).
+  const ramp = ['#EAF2F9', '#CBE0F0', '#9FC4E4', '#5E9BCE', '#2E77AB', '#005B96'];
   const shade = (t: number) => ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))];
   return (
     <>
       <div style={{ fontSize: 11, color: SEC, display: 'flex', alignItems: 'center', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.asset_criticality}>{r.asset_criticality || 'Unknown'}</div>
       {cells.map((n, i) => {
-        const t = n / max; const bg = n === 0 ? '#F4F7FA' : shade(t); const fg = n === 0 ? '#6B7787' : lum(bg) < 0.32 ? '#fff' : INK;
-        return <div key={i} style={{ background: bg, color: fg, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
+        const t = n / max; const bg = n === 0 ? '#F4F7FA' : shade(t); const white = n > 0 && lum(bg) < 0.22; const fg = n === 0 ? '#6B7787' : white ? '#fff' : INK;
+        return <div key={i} style={{ background: bg, color: fg, textShadow: white ? '0 1px 0 rgba(0,0,0,.4)' : undefined, borderRadius: 6, height: '100%', minHeight: 34, display: 'grid', placeItems: 'center', fontSize: 12.5, fontWeight: n > 0 ? 700 : 500, boxShadow: n > 0 ? 'inset 0 1px 0 rgba(255,255,255,.18)' : 'none', ...TNUM }}>{n}</div>;
       })}
     </>
   );
