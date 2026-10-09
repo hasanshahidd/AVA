@@ -281,6 +281,23 @@ def _ensure_vulnerability_exploit_class(engine: Engine) -> None:
         ))
 
 
+def _ensure_pentest_run_columns(engine: Engine) -> None:
+    """Additive nullable column on grc_pentest_runs: classified_at, set the first time the authoritative
+    LLM classify runs for a run. run_findings/run_summary gate the provisional "exploitable" count on it,
+    and GET /runs/{id} selects the mapped column on every poll — so on an already-provisioned DB (create_all
+    only makes tables) the column MUST exist or every run read 500s. Additive + nullable → no backfill."""
+    if engine.dialect.name != "postgresql":
+        return
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    if not inspector.has_table("grc_pentest_runs"):
+        return
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE grc_pentest_runs ADD COLUMN IF NOT EXISTS classified_at TIMESTAMP"
+        ))
+
+
 def _ensure_asset_origin_source(engine: Engine) -> None:
     """Additive column: how an asset was BORN (easm | network_sweep | connect |
     agent | manual). last_seen_source mutates on every sync, so it cannot answer
@@ -481,6 +498,10 @@ def _init_tenant_schema(engine: Engine, slug: str) -> None:
             _ensure_vulnerability_exploit_class(engine)
         except Exception:
             logger.exception("vulnerability exploit_class ensure failed for slug=%s", slug)
+        try:
+            _ensure_pentest_run_columns(engine)
+        except Exception:
+            logger.exception("pentest_run classified_at ensure failed for slug=%s", slug)
         try:
             _ensure_asset_origin_source(engine)
         except Exception:
