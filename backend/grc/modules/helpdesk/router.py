@@ -395,11 +395,13 @@ def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
     # Article feedback (helpful / not) — HD Article Feedback has no ava_tenant, so
     # read it ONLY for this tenant's own articles (isolation via the parent).
     names = [r["name"] for r in rows]
+    # HD Article Feedback.feedback is a Select "1"=like/helpful, "2"=dislike
+    # (per helpdesk/api/article.py). Read only for this tenant's own articles.
     fb: Dict[str, Counter] = {}
     if names:
         for f in _resource(ctx, "HD Article Feedback", ["article", "feedback"],
                            filters=[["article", "in", names]]):
-            fb.setdefault(f.get("article"), Counter())[(f.get("feedback") or "").lower()] += 1
+            fb.setdefault(f.get("article"), Counter())[str(f.get("feedback"))] += 1
     cats = Counter(r.get("category") or "Uncategorised" for r in rows)
     articles = []
     for r in rows:
@@ -408,7 +410,7 @@ def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
             "name": r["name"], "title": r.get("title"), "category": r.get("category") or "Uncategorised",
             "status": r.get("status"), "author": r.get("author"), "modified": r.get("modified"),
             "views": r.get("views") or 0,
-            "helpful": c.get("helpful", 0), "not_helpful": c.get("not helpful", 0),
+            "helpful": c.get("1", 0), "not_helpful": c.get("2", 0),
         })
     return {"articles": articles,
             "categories": [{"name": n, "count": c} for n, c in sorted(cats.items())]}
