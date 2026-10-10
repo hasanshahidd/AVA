@@ -30,13 +30,19 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...routers.auth_router import require_auth
+from ...routers.auth_router import require_auth, require_tenant_permission
 from ...models import GRCUser, IntegrationConnection, get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk"])
 
 PROVIDER = "frappe_helpdesk"
+
+# RBAC — the Help Desk surfaces remediation tickets for findings, so it is gated
+# on the same tenant permissions as the ITSM push/sync endpoints. Authentication
+# alone is NOT enough: a Viewer without these rights must not read tenant tickets.
+VIEW = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:view"))
+EDIT = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:edit"))
 
 
 # ─── tenant context ────────────────────────────────────────────────
@@ -140,7 +146,7 @@ def _resource(ctx: Dict[str, Any], doctype: str, fields: List[str], filters: Opt
 
 # ─── endpoints ─────────────────────────────────────────────────────
 @router.get("/ping")
-def ping(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def ping(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     data = _get(ctx, "/api/method/frappe.ping")
     return {"configured": bool(ctx["key"]), "frappe_url": ctx["url"],
@@ -149,7 +155,7 @@ def ping(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def dashboard(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Ticket",
                      ["name", "subject", "status", "priority", "status_category", "modified", "agreement_status"],
@@ -169,7 +175,7 @@ def dashboard(db: Session = Depends(get_db), current_user: GRCUser = Depends(req
 
 @router.get("/tickets")
 def tickets(status: Optional[str] = None, q: Optional[str] = None,
-            db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+            db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     base = [["status", "=", status]] if status else []
     rows = _resource(ctx, "HD Ticket",
@@ -192,7 +198,7 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
 
 @router.get("/tickets/{name}")
 def ticket_detail(name: str, db: Session = Depends(get_db),
-                  current_user: GRCUser = Depends(require_auth)):
+                  current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     # Fetch via a partition-filtered query so a user cannot read another tenant's
     # ticket by guessing its name.
@@ -227,7 +233,7 @@ def _ticket_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
 
 
 @router.get("/agents")
-def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Agent", ["name", "agent_name", "user", "is_active"], order_by="agent_name asc")
     return {"agents": [{
@@ -238,7 +244,7 @@ def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(requir
 
 
 @router.get("/teams")
-def teams(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def teams(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Team", ["name", "team_name", "assignment_rule"], order_by="team_name asc")
     out = []
@@ -253,7 +259,7 @@ def teams(db: Session = Depends(get_db), current_user: GRCUser = Depends(require
 
 
 @router.get("/customers")
-def customers(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def customers(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Customer", ["name", "customer_name", "domain"], order_by="customer_name asc")
     return {"customers": [{
@@ -263,7 +269,7 @@ def customers(db: Session = Depends(get_db), current_user: GRCUser = Depends(req
 
 
 @router.get("/contacts")
-def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "Contact", ["name", "first_name", "last_name", "email_id", "phone", "company_name"],
                      order_by="modified desc")
@@ -274,7 +280,7 @@ def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
 
 
 @router.get("/articles")
-def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Article", ["name", "title", "category", "status", "author", "modified"],
                      order_by="modified desc")
@@ -285,7 +291,7 @@ def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
 
 
 @router.get("/canned-responses")
-def canned_responses(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+def canned_responses(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     for dt, title_field in (("HD Canned Response", "title"), ("HD Saved Reply", "subject")):
         rows = _resource(ctx, dt, ["name", title_field, "owner"], order_by="modified desc")
@@ -306,7 +312,7 @@ class ReplyBody(BaseModel):
 
 @router.post("/tickets/{name}/status")
 def set_ticket_status(name: str, body: StatusUpdate, db: Session = Depends(get_db),
-                      current_user: GRCUser = Depends(require_auth)):
+                      current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
     ctx = _ctx(db)
     if not _ticket_in_tenant(ctx, name):
         return {"ok": False, "error": "not found"}
@@ -316,7 +322,7 @@ def set_ticket_status(name: str, body: StatusUpdate, db: Session = Depends(get_d
 
 @router.post("/tickets/{name}/reply")
 def reply_ticket(name: str, body: ReplyBody, db: Session = Depends(get_db),
-                 current_user: GRCUser = Depends(require_auth)):
+                 current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
     ctx = _ctx(db)
     if not _ticket_in_tenant(ctx, name):
         return {"ok": False, "error": "not found"}
