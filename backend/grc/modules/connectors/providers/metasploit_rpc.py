@@ -365,6 +365,10 @@ class MsfRpc:
         is_windows = "win" in platform
         cmd = "whoami" if is_windows else "id"
 
+        # A freshly-opened session needs a moment before it accepts input and returns output — probing it the
+        # instant run_exploit detects it returned empty in live-fire (the same session read fine ~2s later).
+        time.sleep(1.5)
+
         def _data(out) -> str:
             d = out.get("data", "") if isinstance(out, dict) else out
             if isinstance(d, bytes):
