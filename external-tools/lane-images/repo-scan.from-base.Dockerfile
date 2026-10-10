@@ -148,11 +148,18 @@ COPY lane-images/conftest-policies /opt/conftest-policies
 # ---- pipx python tools: gato-x (CI/CD self-hosted-runner/injection abuse — GH_TOKEN-gated,
 #      honest-skips without a token), apkleaks + apkid (MOBILE — secrets/endpoints and
 #      packer/obfuscator ID inside a built .apk; complement mobsfscan's source scan),
-#      octoscan (GitHub Actions OFFLINE scanner — no release binary, so pip w/ git fallback).
+#      (octoscan is a Go project — built from source below, NOT pipx; `go install`
+#      fails on its go.mod replace directives, and it is not a Python package.)
 #      Non-fatal per tool. ----
 RUN for t in gato-x apkleaks apkid ; do pipx install "$t" || echo "skip pipx:$t" ; done ; \
-    ( pipx install octoscan || pipx install "git+https://github.com/synacktiv/octoscan" || echo "skip pipx:octoscan" ) ; \
     rm -rf /root/.cache ; true
+# ---- octoscan — GitHub Actions OFFLINE scanner, built from a clone (no release binary;
+#      go.mod replace directives break `go install`, so clone + `go build`). Non-fatal. ----
+RUN ( git clone --depth 1 https://github.com/synacktiv/octoscan /tmp/octoscan \
+        && cd /tmp/octoscan \
+        && ( go build -o /usr/local/bin/octoscan . || go build -o /usr/local/bin/octoscan ./cmd/octoscan ) \
+        && chmod +x /usr/local/bin/octoscan ) || echo "skip gobuild:octoscan" ; \
+    rm -rf /tmp/octoscan /root/go/pkg ; true
 
 # ---- OFFLINE DATA BAKE (so the air-gapped droplet never fetches at scan time).
 #      These ENV vars make trivy/grype read the baked caches and refuse to
