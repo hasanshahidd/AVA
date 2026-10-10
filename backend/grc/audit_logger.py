@@ -42,6 +42,9 @@ _AUDIT_DROPPED_POLLING = (
     ("GET", "/connect-wizard/status/"),
 )
 
+# Exact-match sensitive keys (kept for back-compat with the original redactor).
+# The substring list below is a superset of most of these, but "cookie" has no
+# substring match, so the exact set still carries real weight.
 SENSITIVE_KEYS = {
     "password",
     "password_hash",
@@ -54,13 +57,64 @@ SENSITIVE_KEYS = {
     "cookie",
 }
 
+# Case-insensitive SUBSTRING matches. Any key CONTAINING one of these is treated
+# as secret-bearing. This is what catches the connect-wizard fields the exact-key
+# redactor missed (agent_password, azure_client_secret, kubeconfig, k8s_token,
+# do_api_token, …) so domain-admin passwords / Azure secrets / cluster-admin
+# kubeconfigs never land in grc_audit_logs.changes in plaintext.
+SENSITIVE_KEY_SUBSTRINGS = (
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "kubeconfig",
+    "credential",
+    "client_secret",
+    "private_key",
+    "privatekey",
+    "access_key",
+    "auth",
+)
+
+_REDACTED = "***"
+
+
+def _key_is_sensitive(key: Any) -> bool:
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    if lowered in SENSITIVE_KEYS:
+        return True
+    return any(sub in lowered for sub in SENSITIVE_KEY_SUBSTRINGS)
+
+
+def _redact_sensitive(value: Any) -> Any:
+    """Redact a value living under a secret-bearing key.
+
+    Only secret-bearing STRING/bytes values are blanked to the placeholder.
+    Booleans, numbers, None and empty strings are benign metadata (e.g.
+    ``"has_secret": true``, ``"token_count": 5``) and pass through untouched.
+    Nested dicts/lists are recursed (not blanked) so a container named like a
+    secret still has its individual secret leaves redacted without destroying
+    the surrounding non-secret structure.
+    """
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    if isinstance(value, (str, bytes)):
+        return _REDACTED if value else value
+    if isinstance(value, (dict, list)):
+        return _sanitize_value(value)
+    return _REDACTED
+
 
 def _sanitize_value(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: Dict[str, Any] = {}
         for key, nested_value in value.items():
-            if key.lower() in SENSITIVE_KEYS:
-                sanitized[key] = "***"
+            if _key_is_sensitive(key):
+                sanitized[key] = _redact_sensitive(nested_value)
             else:
                 sanitized[key] = _sanitize_value(nested_value)
         return sanitized
