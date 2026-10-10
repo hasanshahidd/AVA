@@ -581,10 +581,10 @@ def test_amass_argv_bounded_gated_and_fallback():
     assert spec["fallback_for"] == "subfinder"                 # second opinion only when subfinder is dry
     assert 0 < int(spec["timeout"]) <= 600
     joined = " ".join(spec["argv"]("owasp.org", "http://owasp.org"))
-    assert "amass enum -d" in joined
-    assert "timeout 150 amass enum" in joined                  # HARD inner bound (amass ignores -timeout)
-    assert "cat /tmp/amass.txt" in joined                      # capture incrementally-written names if killed
+    assert "amass enum -passive" in joined                     # same invocation as the cloud-lane fallback
+    assert "-timeout 3" in joined and "| head -n 2000" in joined   # bounded; stdout captured (container timeout caps)
     assert "*[A-Za-z]*" in joined                              # bare-IP applicability gate (no domain -> skip)
+    assert "-silent" not in joined                             # NOT -silent: names must reach stdout to be read
 
 
 def test_amass_fallback_fires_only_on_subfinder_empty(monkeypatch):
