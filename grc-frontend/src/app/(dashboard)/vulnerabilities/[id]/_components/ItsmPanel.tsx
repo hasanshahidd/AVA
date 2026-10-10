@@ -77,11 +77,11 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
       <section className="cw-card rounded-xl p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
           <Ticket className="h-3.5 w-3.5 text-slate-500" strokeWidth={1.75} />
-          ITSM mobilisation
+          Help Desk
         </h2>
         <p className="text-xs text-slate-600">
-          No ticketing connector is configured yet, so this finding can&apos;t be pushed to a ticket system.
-          Connect ServiceNow (or another ITSM) and this panel becomes the &ldquo;push to ticket → track resolution&rdquo; step of the CTEM loop.
+          The Help Desk isn&apos;t set up for this workspace yet, so this finding can&apos;t be turned into a ticket.
+          Once it&apos;s enabled, this panel becomes the &ldquo;open a ticket → track resolution&rdquo; step for the finding.
         </p>
         {canEdit && (
           <Link href="/admin/connectors" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
@@ -97,7 +97,7 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
       <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
         <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
           <Ticket className="h-3.5 w-3.5 text-slate-500" strokeWidth={1.75} />
-          ITSM mobilisation
+          Help Desk
         </h2>
         {canEdit && ticketingConns.length > 0 && (
           <div className="flex items-center gap-1.5">
@@ -116,8 +116,8 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
               disabled={!pickConn || pushMut.isPending}
               className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-medium text-[#0a0a0a] hover:bg-primary-700 disabled:opacity-50"
             >
-              {pushMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
-              Push to ITSM
+              {pushMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ticket className="h-3.5 w-3.5" />}
+              Create Help Desk ticket
             </button>
           </div>
         )}
@@ -131,9 +131,9 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
 
       {tickets.length === 0 ? (
         <p className="text-xs text-slate-500">
-          Not yet pushed to a ticketing system. Pushing creates (or reuses) a remediation plan
-          and opens a ticket; resolving the ticket advances the plan to <em>applied</em> (a
-          proven fix still requires a re-scan).
+          No Help Desk ticket yet. Creating one also creates (or reuses) a remediation plan;
+          resolving the ticket advances the plan to <em>applied</em> (a proven fix still
+          requires a re-scan).
         </p>
       ) : (
         <ul className="divide-y divide-slate-100">

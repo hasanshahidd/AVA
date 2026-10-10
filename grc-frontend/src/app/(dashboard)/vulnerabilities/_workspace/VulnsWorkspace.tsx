@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
@@ -74,6 +74,8 @@ export interface VulnsWorkspaceProps {
   onView: (vuln: Vulnerability) => void; onEdit?: (vuln: Vulnerability) => void; onAssign?: (vuln: Vulnerability) => void;
   onChangeStatus?: (vuln: Vulnerability) => void; onDelete?: (vuln: Vulnerability) => void;
   onBulkAssign?: (ids: number[]) => void; onOpenFull: (id: number) => void;
+  /** Create Help Desk tickets for a set of findings (passed the currently-shown ids). Omitted → button hidden. */
+  onBulkCreateTickets?: (ids: number[]) => void;
   onTemplate: () => void; onBulkUpload: () => void; onImport: () => void; onAdd: () => void;
   bulkUploadState?: 'idle' | 'uploading' | 'done' | 'error'; bulkUploadMsg?: string | null;
 }
@@ -128,7 +130,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     vulns, filteredVulns, dashboard, domains = [], loading = false, scoped = false,
     registerType, setRegisterType, renderNcaRegister,
     searchTerm, setSearchTerm, canCreate, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
-    bulkUploadState = 'idle', bulkUploadMsg,
+    bulkUploadState = 'idle', bulkUploadMsg, onBulkCreateTickets,
   } = props;
 
   const [view, setView] = useState<TriageView>('all');
@@ -356,6 +358,20 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                 <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }}>
                   <option value="ctx">Sort: Contextual priority</option><option value="cvss">Sort: CVSS</option><option value="epss">Sort: EPSS</option>
                 </select>
+                {onBulkCreateTickets && rows.length > 0 && (
+                  <button
+                    style={{ ...btnGreen, height: 34 }}
+                    title="Open a Help Desk ticket for every finding shown in this view (idempotent — findings that already have a ticket are skipped)"
+                    onClick={() => {
+                      const ids = rows.map((v) => v.id);
+                      if (window.confirm(`Create Help Desk tickets for the ${ids.length} finding(s) shown? Findings that already have a ticket are skipped.`)) {
+                        onBulkCreateTickets(ids);
+                      }
+                    }}
+                  >
+                    <Ticket size={14} /> Create Help Desk tickets
+                  </button>
+                )}
               </div>
 
               {(

@@ -8,9 +8,10 @@ through here).
 """
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ....models import Vulnerability, IntegrationConnection, VulnTicketLink, GRCUser, get_db
@@ -57,6 +58,50 @@ def push_to_itsm(
     if result.get("error"):
         raise HTTPException(status_code=502, detail=f"ITSM push failed: {result['error']}")
     return result
+
+
+class BulkPushRequest(BaseModel):
+    vuln_ids: List[int]
+    connection_id: int
+
+
+@router.post("/vulnerabilities/bulk-push-to-itsm")
+def bulk_push_to_itsm(
+    body: BulkPushRequest,
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+    _perm: bool = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:edit")),
+):
+    """Create Help Desk tickets for many findings at once. Idempotent per finding
+    (a live ticket is a no-op), so re-running is safe. Routes through the same
+    `push_finding` path as the single-finding button."""
+    tenants = get_user_tenants(current_user, db)
+    conn = _conn_or_404(db, body.connection_id, tenants)
+    vulns = db.query(Vulnerability).filter(
+        Vulnerability.id.in_(body.vuln_ids),
+        Vulnerability.tenant_id.in_(tenants),
+    ).all()
+
+    created = skipped = failed = 0
+    errors: List[dict] = []
+    for v in vulns:
+        try:
+            r = itsm_service.push_finding(db, v, conn, user_id=current_user.id)
+            db.commit()
+            if r.get("error"):
+                failed += 1
+                errors.append({"vuln_id": v.id, "error": r["error"]})
+            elif r.get("created"):
+                created += 1
+            else:
+                skipped += 1  # already had a live ticket
+        except Exception as exc:  # noqa: BLE001 — one bad finding must not abort the batch
+            db.rollback()
+            logger.exception("bulk push failed for vuln %s", v.id)
+            failed += 1
+            errors.append({"vuln_id": v.id, "error": str(exc)[:300]})
+    return {"requested": len(body.vuln_ids), "matched": len(vulns),
+            "created": created, "skipped": skipped, "failed": failed, "errors": errors}
 
 
 @router.post("/itsm/connections/{connection_id}/sync-statuses")

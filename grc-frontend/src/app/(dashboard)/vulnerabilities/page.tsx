@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { vulnManagementApi } from '@/lib/api';
+import { vulnManagementApi, connectorsApi } from '@/lib/api';
 import apiClient from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTabParam } from '@/lib/useTabParam';
@@ -612,6 +612,32 @@ export default function VulnerabilitiesPage() {
     },
   });
 
+  // Help Desk — the single ticketing connection AVA opens tickets through. The
+  // client never picks "which system"; there is exactly one (the hidden engine),
+  // so bulk-create just uses the first ticketing connection.
+  const { data: ticketingConnData } = useQuery({
+    queryKey: ['ticketing-connectors'],
+    queryFn: async () => (await connectorsApi.list()).data,
+  });
+  const ticketingConnId: number | undefined = useMemo(
+    () => (ticketingConnData?.items || []).find((c: any) => c.category === 'ticketing')?.id,
+    [ticketingConnData],
+  );
+
+  const bulkTicketMutation = useMutation({
+    mutationFn: (ids: number[]) => {
+      if (!ticketingConnId) throw new Error('The Help Desk is not set up for this workspace yet.');
+      return vulnManagementApi.vulnerabilities.bulkPushToItsm(ids, ticketingConnId);
+    },
+    onSuccess: (res) => {
+      const d = res.data;
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+      setSelectedVulnIds(new Set());
+      alert(`Help Desk: ${d.created} created, ${d.skipped} already had a ticket${d.failed ? `, ${d.failed} failed` : ''}.`);
+    },
+    onError: (e: any) => alert(e?.response?.data?.detail || e?.message || 'Could not create tickets.'),
+  });
+
   const handleSelectVuln = (id: number) => {
     const newSelected = new Set(selectedVulnIds);
     if (newSelected.has(id)) {
@@ -1073,6 +1099,8 @@ export default function VulnerabilitiesPage() {
           onView={(v) => router.push(`/vulnerabilities/${v.id}`)}
           onOpenFull={(id) => router.push(`/vulnerabilities/${id}`)}
           onBulkAssign={(ids) => { setSelectedVulnIds(new Set(ids)); setShowBulkAssignModal(true); }}
+          onBulkCreateTickets={hasPermission('vulnerabilities:vulnerability_register:edit')
+            ? (ids) => bulkTicketMutation.mutate(ids) : undefined}
           onTemplate={downloadTemplate}
           onBulkUpload={() => {
             // Default the chooser to whichever register is currently active.
