@@ -100,8 +100,11 @@ _MUTATING = (" rm ", " rm -", " del ", "put-object", "put-bucket", "delete-objec
 
 def test_registry_specs_bounded_and_readonly():
     names = {s["name"] for s in cst.CLOUD_SCAN_TOOLS}
-    assert names == {"festin", "s3scanner", "gcpbucketbrute", "subfinder", "dnsx",
-                     "scoutsuite", "cloudsplaining", "cloudsploit", "kubescape", "kube-bench", "amass"}
+    assert names == {"festin", "s3scanner", "gcpbucketbrute", "subfinder", "dnsx", "prowler",
+                     "scoutsuite", "cloudsplaining", "cloudsploit", "kubescape", "kube-bench", "amass",
+                     # pass-3 credentialed / input / API-key tools
+                     "cloudfox", "enumerate-iam", "metabadger", "aws_public_ips", "cnspec", "monkey365",
+                     "shodan", "censys", "cloudlist"}
     for spec in cst.CLOUD_SCAN_TOOLS:
         assert callable(spec["parse"]) and callable(spec["argv"])
         assert isinstance(spec["timeout"], int) and 0 < spec["timeout"] <= 600
@@ -125,17 +128,19 @@ def test_bucket_candidates_bounded_and_valid():
 
 
 def test_deferred_list_is_honest():
-    # still-unwired / missing / broken heavy hitters are named, not pretended-wired
-    for t in ("prowler", "cloudfox", "pmapper", "checkov", "cartography", "steampipe", "cnquery", "pacu"):
+    # still-unwired / missing / broken heavy hitters are named, not pretended-wired. cloudfox/metabadger/
+    # aws_public_ips/monkey365 moved OUT of deferred in pass-3 (now wired), so they are no longer here.
+    for t in ("pmapper", "checkov", "steampipe", "cnquery", "pacu", "weirdAAL", "roadtx"):
         assert t in cst._DEFERRED_CLOUD_SCAN_TOOLS
     # every wired spec name is ABSENT from the deferred set (no half-wiring)
     for spec in cst.CLOUD_SCAN_TOOLS:
         assert spec["name"] not in cst._DEFERRED_CLOUD_SCAN_TOOLS
     # missing/broken tools carry a concrete rebuild reason
-    for t in ("prowler", "pmapper", "parliament", "cloud_enum", "CloudBrute", "trivy"):
+    for t in ("pmapper", "parliament", "cloud_enum", "CloudBrute", "trivy"):
         assert cst._MISSING_FROM_IMAGE.get(t)
-    # pass-2 present-but-unlinkable tools are catalogued with an honest reason, not fake-wired
-    for t in ("aws_public_ips", "KubiScan", "MicroBurst", "monkey365", "MFASweep", "GraphRunner", "BARK"):
+    # the honestly-unwirable tools (no one-shot finding stream / wrong-lane) keep an explicit reason
+    for t in ("weirdAAL", "BARK", "GraphRunner", "roadtx", "steampipe", "powerpipe", "cnquery", "checkov",
+              "KubiScan", "MicroBurst", "MFASweep", "o365spray"):
         assert t in cst._DEFERRED_CLOUD_SCAN_TOOLS
         assert cst._STILL_UNWIRED_CLOUD_SCAN_TOOLS.get(t)
 
@@ -362,3 +367,146 @@ def test_amass_is_a_fallback_for_subfinder():
     # and it is runnable, not dead: its argv is bounded + read-only
     argv = amass["argv"]("acme.com", "http://acme.com")
     assert argv and argv[0] in ("sh", "true")
+
+
+# ======================================================================================================
+# PASS-3: credentialed / input-gated / API-key tools (cloudfox, enumerate-iam, metabadger, aws_public_ips,
+# cnspec, monkey365, shodan, censys, cloudlist). Parsers fed CAPTURED sample output; argv self-gating asserted.
+# ======================================================================================================
+def test_cloudfox_csv_blocks_to_module_summaries():
+    out = "\n".join([
+        "===CF===/tmp/cf/cloudfox-output/aws/123/csv/endpoints.csv",
+        "Service,Region,URL", "s3,us-east-1,http://a", "apigw,us-east-1,http://b",
+        "===CF===/tmp/cf/cloudfox-output/aws/123/csv/secrets.csv",
+        "Service,Name,Value", "lambda,DB_PASS,redacted",
+        "===CF===/tmp/cf/cloudfox-output/aws/123/csv/empty.csv",
+        "Service,Region",                               # header only -> not a finding
+    ])
+    rows = cst.parse_tool("cloudfox", out, "acme.com", 30, "http://acme.com")
+    _assert_shape(rows)
+    by = {r["affected_component"]: r for r in rows}
+    assert set(by) == {"endpoints", "secrets"}          # empty.csv (header only) dropped
+    assert "2 item" in by["endpoints"]["fields"]["title"]
+    assert by["endpoints"]["fields"]["severity"] == "info"       # plain enumeration
+    assert by["secrets"]["fields"]["severity"] == "low"          # security-relevant module
+
+
+def test_enumerate_iam_worked_lines_to_one_summary():
+    out = "\n".join([
+        "2026-10-10 INFO -- starting enumeration",
+        "-- iam.get_account_summary() worked!",
+        "-- s3.list_buckets() worked!",
+        "-- s3.list_buckets() worked!",                 # dup -> collapsed
+        "-- ec2.describe_instances() failed",
+        "Run for the hills, get_account_authorization_details worked!",  # special flavor line (no parens)
+    ])
+    rows = cst.parse_tool("enumerate-iam", out, "acme.com", 31, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "low"
+    assert "3 API action" in rows[0]["fields"]["title"]
+    assert "s3.list_buckets" in rows[0]["fields"]["evidence"]
+    assert "get_account_authorization_details" in rows[0]["fields"]["evidence"]
+
+
+def test_metabadger_imdsv1_is_a_finding():
+    doc = json.dumps({"summary": {"total_instances": 5, "instances_imdsv1_optional": 3,
+                                  "instances_imdsv2_required": 2}})
+    rows = cst.parse_tool("metabadger", doc, "acme.com", 32, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium"
+    assert "3 instance" in rows[0]["fields"]["title"]
+    # no IMDSv1 -> info posture summary, not a medium finding
+    ok = cst.parse_tool("metabadger", json.dumps({"total_instances": 4, "imdsv2_required": 4}),
+                        "acme.com", 32, "http://acme.com")
+    assert len(ok) == 1 and ok[0]["fields"]["severity"] == "info"
+
+
+def test_aws_public_ips_summary():
+    for doc in (json.dumps(["1.2.3.4", "5.6.7.8", "1.2.3.4"]),          # flat list w/ dup
+                json.dumps({"ec2": ["1.2.3.4", "5.6.7.8"], "elb": ["1.2.3.4"]})):   # by-service dict
+        rows = cst.parse_tool("aws_public_ips", doc, "acme.com", 33, "http://acme.com")
+        _assert_shape(rows)
+        assert len(rows) == 1 and rows[0]["fields"]["severity"] == "low"
+        assert "2 address" in rows[0]["fields"]["title"]
+
+
+def test_cloudlist_per_provider_summary():
+    doc = json.dumps([
+        {"provider": "aws", "service": "ec2", "dns_name": "a.aws.com", "public_ipv4": "1.1.1.1"},
+        {"provider": "aws", "service": "s3", "id": "bucket-x"},
+        {"provider": "gcp", "service": "compute", "public_ipv4": "2.2.2.2"},
+    ])
+    rows = cst.parse_tool("cloudlist", doc, "acme.com", 34, "http://acme.com")
+    _assert_shape(rows)
+    by = {r["affected_component"]: r for r in rows}
+    assert set(by) == {"aws", "gcp"}
+    assert "2 cloud asset" in by["aws"]["fields"]["title"]
+
+
+def test_cnspec_reuses_ocsf_parser():
+    # cnspec -o ocsf-json emits the SAME OCSF schema as prowler -> reuses the verified parser, slug=cnspec
+    ocsf = json.dumps([{
+        "metadata": {"event_code": "mondoo-aws-01"}, "severity": "High", "status_code": "FAIL",
+        "status_detail": "S3 bucket is public", "finding_info": {"title": "S3 bucket public"},
+        "resources": [{"uid": "arn:aws:s3:::x", "region": "us-east-1", "group": {"name": "s3"}}],
+        "cloud": {"provider": "aws"},
+    }, {"metadata": {"event_code": "ok"}, "severity": "Low", "status_code": "PASS"}])
+    rows = cst.parse_tool("cnspec", ocsf, "acme.com", 35, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "high"
+    assert rows[0]["source_slug"] == "cnspec" and rows[0]["fields"]["source"] == "ai-pentest:cnspec"
+
+
+def test_monkey365_level_to_severity():
+    doc = json.dumps([
+        {"level": "High", "description": "Legacy auth enabled", "idSuffix": "m365-auth"},
+        {"level": "Medium", "description": "No MFA on admin", "idSuffix": "m365-mfa"},
+        {"level": "Good", "description": "fine", "idSuffix": "m365-ok"},     # Good -> not a finding
+    ])
+    rows = cst.parse_tool("monkey365", doc, "tenant", 36, "http://tenant")
+    _assert_shape(rows)
+    sev = {r["fields"]["title"]: r["fields"]["severity"] for r in rows}
+    assert sev == {"Legacy auth enabled": "high", "No MFA on admin": "medium"}
+
+
+def test_shodan_and_censys_surface_summaries():
+    shodan_out = "\n".join(["acme.com", "www    A    1.2.3.4", "mail    MX    10 mx.acme.com", "garbage line"])
+    rows = cst.parse_tool("shodan", shodan_out, "acme.com", 37, "http://acme.com")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "2 record" in rows[0]["fields"]["title"]
+    censys_out = json.dumps({"result": {"hits": [{"ip": "1.2.3.4"}, {"ip": "5.6.7.8"}]}})
+    crows = cst.parse_tool("censys", censys_out, "acme.com", 38, "http://acme.com")
+    _assert_shape(crows)
+    assert len(crows) == 1 and "2 host" in crows[0]["fields"]["title"]
+
+
+def test_pass3_parsers_never_raise_on_garbage():
+    junk = ["", "   ", "not json", "{bad", "null", "[]", "{}", "\x00\xff bin", "===CF===",
+            "worked!", '{"level": 123}', "===CF===/x/y.csv\nonlyheader"]
+    for name in ("cloudfox", "enumerate-iam", "metabadger", "aws_public_ips", "cnspec", "monkey365",
+                 "shodan", "censys", "cloudlist"):
+        for j in junk:
+            assert cst.parse_tool(name, j, "t.com", 9, "http://t.com") == []
+
+
+def test_pass3_credentialed_tools_armed_and_self_gate():
+    """Each pass-3 cred/input/key tool is ARMED (in the registry) and self-gates in its argv so it stays
+    DORMANT (honest []) until its input arrives — proves no fake greens without cloud keys."""
+    specs = {s["name"]: s for s in cst.CLOUD_SCAN_TOOLS}
+    # needs_creds cloud tools gate on the cloud cred env
+    for name, guard in (("cloudfox", "AWS_ACCESS_KEY_ID"), ("enumerate-iam", "AWS_ACCESS_KEY_ID"),
+                        ("metabadger", "AWS_ACCESS_KEY_ID"), ("aws_public_ips", "AWS_ACCESS_KEY_ID"),
+                        ("cnspec", "AWS_ACCESS_KEY_ID"), ("monkey365", "AZURE_CLIENT_ID")):
+        assert specs[name].get("needs_creds") is True
+        joined = " ".join(specs[name]["argv"]("acme.com", "http://acme.com"))
+        assert "exit 0" in joined and guard in joined
+    # API-key tools are PLAIN primaries that self-gate on their key env (needs-key, not needs_creds)
+    for name, guard in (("shodan", "SHODAN_API_KEY"), ("censys", "CENSYS_API_ID")):
+        assert not specs[name].get("needs_creds")
+        joined = " ".join(specs[name]["argv"]("acme.com", "http://acme.com"))
+        assert "exit 0" in joined and guard in joined
+    # cloudlist is input-gated on its provider-config FILE (not env creds)
+    joined = " ".join(specs["cloudlist"]["argv"]("acme.com", "http://acme.com"))
+    assert "exit 0" in joined and "provider-config.yaml" in joined
+    # cnspec is a posture fallback (dormant on a good prowler run)
+    assert specs["cnspec"].get("fallback_for") == "cloud-posture"
