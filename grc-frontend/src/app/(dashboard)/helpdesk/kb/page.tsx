@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BookOpen, Search, FileText } from "lucide-react";
+import { BookOpen, Search, FileText, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Chip, PageHeader, RefreshBtn, Empty, ErrorBanner, Loading, timeAgo, useHd } from "../_ui";
 
 export default function KnowledgeBasePage() {
@@ -44,6 +44,13 @@ export default function KnowledgeBasePage() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium text-[var(--color-text)]">{a.title || a.name}</div>
                         <div className="mt-1 text-xs text-slate-500">{a.author || "Unknown author"} · updated {timeAgo(a.modified)}</div>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-slate-400">
+                          <span className="inline-flex items-center gap-1"><Eye size={12} />{a.views ?? 0}</span>
+                          {(a.helpful > 0 || a.not_helpful > 0) && <>
+                            <span className="inline-flex items-center gap-1 text-emerald-600"><ThumbsUp size={12} />{a.helpful}</span>
+                            <span className="inline-flex items-center gap-1 text-slate-400"><ThumbsDown size={12} />{a.not_helpful}</span>
+                          </>}
+                        </div>
                       </div>
                       <Chip value={a.status || "Draft"} />
                     </div>

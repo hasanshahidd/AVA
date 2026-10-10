@@ -337,11 +337,14 @@ def _ticket_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
 @router.get("/agents")
 def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
-    rows = _resource(ctx, "HD Agent", ["name", "agent_name", "user", "is_active"],
+    rows = _resource(ctx, "HD Agent", ["name", "agent_name", "user", "is_active", "availability"],
                      filters=_tenant_filters(ctx), order_by="agent_name asc")
     return {"agents": [{
         "name": r["name"], "agent_name": r.get("agent_name") or r.get("user"),
-        "email": r.get("user"), "availability": "Active" if r.get("is_active") else "Unavailable",
+        "email": r.get("user"),
+        # Prefer the richer HD Agent Status (Available/Away/Busy); fall back to the
+        # active flag when no status is set.
+        "availability": r.get("availability") or ("Active" if r.get("is_active") else "Unavailable"),
         "is_active": bool(r.get("is_active")),
     } for r in rows]}
 
@@ -387,12 +390,28 @@ def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
 @router.get("/articles")
 def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
-    rows = _resource(ctx, "HD Article", ["name", "title", "category", "status", "author", "modified"],
+    rows = _resource(ctx, "HD Article", ["name", "title", "category", "status", "author", "modified", "views"],
                      filters=_tenant_filters(ctx), order_by="modified desc")
-    return {"articles": [{
-        "name": r["name"], "title": r.get("title"), "category": r.get("category"),
-        "status": r.get("status"), "author": r.get("author"), "modified": r.get("modified"),
-    } for r in rows]}
+    # Article feedback (helpful / not) — HD Article Feedback has no ava_tenant, so
+    # read it ONLY for this tenant's own articles (isolation via the parent).
+    names = [r["name"] for r in rows]
+    fb: Dict[str, Counter] = {}
+    if names:
+        for f in _resource(ctx, "HD Article Feedback", ["article", "feedback"],
+                           filters=[["article", "in", names]]):
+            fb.setdefault(f.get("article"), Counter())[(f.get("feedback") or "").lower()] += 1
+    cats = Counter(r.get("category") or "Uncategorised" for r in rows)
+    articles = []
+    for r in rows:
+        c = fb.get(r["name"], Counter())
+        articles.append({
+            "name": r["name"], "title": r.get("title"), "category": r.get("category") or "Uncategorised",
+            "status": r.get("status"), "author": r.get("author"), "modified": r.get("modified"),
+            "views": r.get("views") or 0,
+            "helpful": c.get("helpful", 0), "not_helpful": c.get("not helpful", 0),
+        })
+    return {"articles": articles,
+            "categories": [{"name": n, "count": c} for n, c in sorted(cats.items())]}
 
 
 @router.get("/canned-responses")
