@@ -90,10 +90,24 @@ def current_actor_workflow_id() -> Optional[int]:
     return _workflow_actor_workflow_id.get()
 
 
+# Exact-match sensitive keys (back-compat with the original redactor).
 SENSITIVE_KEYS = {
     "password", "password_hash", "token", "access_token",
     "refresh_token", "secret", "api_key", "authorization", "cookie",
 }
+
+# Case-insensitive SUBSTRING matches — any key CONTAINING one is secret-bearing.
+# KEEP IN SYNC with grc.audit_logger.SENSITIVE_KEY_SUBSTRINGS (the two redactors
+# must stay identical; a local copy avoids importing audit_logger here, which
+# would drag in the auth router and a hard SESSION_SECRET-at-import requirement
+# into this deliberately minimal, failure-isolated shim).
+SENSITIVE_KEY_SUBSTRINGS = (
+    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "kubeconfig", "credential", "client_secret", "private_key",
+    "privatekey", "access_key", "auth",
+)
+
+_REDACTED = "***"
 
 SKIP_INTERNAL_KEYS = {"_sa_instance_state"}
 
@@ -109,10 +123,33 @@ def model_to_dict(obj: Any) -> Dict[str, Any]:
     return result
 
 
+def _key_is_sensitive(key: Any) -> bool:
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    if lowered in SENSITIVE_KEYS:
+        return True
+    return any(sub in lowered for sub in SENSITIVE_KEY_SUBSTRINGS)
+
+
+def _redact_sensitive(value: Any) -> Any:
+    """Redact a value living under a secret-bearing key. Only non-empty
+    string/bytes are blanked; booleans/numbers/None/'' are benign metadata
+    (has_secret=True, token_count=5) and pass through; nested dicts/lists are
+    recursed so inner secret leaves are redacted without blanking structure."""
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    if isinstance(value, (str, bytes)):
+        return _REDACTED if value else value
+    if isinstance(value, (dict, list)):
+        return _sanitize(value)
+    return _REDACTED
+
+
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            k: "***" if k.lower() in SENSITIVE_KEYS else _sanitize(v)
+            k: _redact_sensitive(v) if _key_is_sensitive(k) else _sanitize(v)
             for k, v in value.items()
         }
     if isinstance(value, list):
@@ -193,13 +230,17 @@ def write_rich_audit_log(
             "summary": summary,
             "snapshot": merged_snapshot,
         }
+        # Redact secret-bearing fields before persisting. The snapshot/before/
+        # after payloads are raw model_to_dict() output and can carry secret
+        # columns (password_hash, *_secret, *_token, kubeconfig, …); without
+        # this they'd land in grc_audit_logs.changes in the clear.
         row = AuditLog(
             tenant_id=tenant_id,
             user_id=user_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
-            changes=changes,
+            changes=_sanitize(changes),
             ip_address=ip_address,
         )
         db.add(row)
