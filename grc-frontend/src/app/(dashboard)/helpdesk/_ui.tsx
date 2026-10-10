@@ -165,6 +165,16 @@ export function PropRow({ label, children }: { label: string; children: React.Re
 
 /** Timeline bubble: sent (agent) vs received (customer) vs internal note. */
 export function TimelineItem({ m }: { m: { type?: string; sender?: string; content?: string; date?: string } }) {
+  // Activity events render as a compact system line, not a bubble.
+  if (/activity/i.test(m.type || "")) {
+    return (
+      <div className="flex items-center gap-2 pl-11 text-xs text-slate-400">
+        <span className="h-1 w-1 rounded-full bg-slate-300" />
+        <span className="break-words">{m.content || "Activity"}</span>
+        <span className="ml-auto shrink-0" title={m.date || ""}>{timeAgo(m.date)}</span>
+      </div>
+    );
+  }
   const internal = /comment|note/i.test(m.type || "");
   const sent = /sent/i.test(m.type || "");
   const d = m.date && !isNaN(new Date(m.date).getTime()) ? new Date(m.date).toLocaleString() : "";

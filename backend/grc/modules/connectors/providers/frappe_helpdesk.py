@@ -77,6 +77,16 @@ class FrappeHelpdeskAdapter(TicketingAdapter):
     def _team(self, override: Optional[str]) -> Optional[str]:
         return override or self.config.get("agent_group")
 
+    def _team_exists(self, name: str) -> bool:
+        """Does an HD Team with this name exist? Guards the partition-default
+        below: linking a ticket to a non-existent team makes Frappe reject the
+        whole create (Link validation), which would break the push."""
+        try:
+            r = self._req("GET", f"/api/resource/HD Team/{name}")
+            return r.status_code == 200
+        except Exception:
+            return False
+
     def _find_by_finding_id(self, ext: str) -> Optional[str]:
         f = json.dumps([["ava_finding_id", "=", ext]])
         r = self._req(
@@ -123,6 +133,16 @@ class FrappeHelpdeskAdapter(TicketingAdapter):
         if request.extra_fields.get("raised_by"):
             payload["raised_by"] = request.extra_fields["raised_by"]
         team = self._team(request.assignment_group)
+        # ROOT-CAUSE FIX for assignment never firing: Frappe's assignment rule
+        # keys on agent_group (e.g. "status=='Open' and agent_group=='ava'"), but
+        # the platform-env push path sets no team, so agent_group stayed NULL and
+        # the rule never matched -> tickets were never auto-assigned. By AVA
+        # convention the tenant's team name IS its partition slug, so default
+        # agent_group to the partition when a team of that name exists.
+        if not team:
+            part = self.config.get("ava_tenant")
+            if part and self._team_exists(part):
+                team = part
         if team:
             payload["agent_group"] = team
         if self.config.get("ticket_type"):

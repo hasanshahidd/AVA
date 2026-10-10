@@ -206,7 +206,8 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
     ctx = _ctx(db)
     base = [["status", "=", status]] if status else []
     rows = _resource(ctx, "HD Ticket",
-                     ["name", "subject", "status", "priority", "agent_group", "customer",
+                     ["name", "subject", "status", "priority", "ticket_type", "agent_group",
+                      "_assign", "agreement_status", "customer",
                       "contact", "raised_by", "creation", "response_by", "resolution_by",
                       "ava_finding_id", "cve_id"],
                      filters=_tenant_filters(ctx, base), order_by="modified desc")
@@ -215,12 +216,42 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
         rows = [r for r in rows if s in (str(r.get("subject", "")) + str(r.get("name", ""))).lower()]
     out = [{
         "name": r["name"], "subject": r.get("subject"), "status": r.get("status"),
-        "priority": r.get("priority"), "team": r.get("agent_group"), "customer": r.get("customer"),
+        "priority": r.get("priority"), "type": r.get("ticket_type"),
+        "team": r.get("agent_group"), "agent": _assignee(r.get("_assign")),
+        "agreement_status": r.get("agreement_status"), "customer": r.get("customer"),
         "contact": r.get("contact") or r.get("raised_by"), "created": r.get("creation"),
-        "response_by": r.get("response_by"), "cve_id": r.get("cve_id"),
+        "response_by": r.get("response_by"), "resolution_by": r.get("resolution_by"),
+        "cve_id": r.get("cve_id"),
     } for r in rows]
     summary = dict(Counter(r.get("status") or "Open" for r in rows))
     return {"tickets": out, "summary": summary, "total": len(out)}
+
+
+def _assignee(raw: Any) -> Optional[str]:
+    """First user in Frappe's `_assign` field (a JSON string list)."""
+    try:
+        lst = json.loads(raw) if isinstance(raw, str) else (raw or [])
+        return lst[0] if lst else None
+    except Exception:
+        return None
+
+
+def _sla_block(t: Dict[str, Any]) -> Dict[str, Any]:
+    """Structure the SLA state from HD Ticket's native fields (no extra call).
+    `agreement_status` is Frappe's own verdict (Fulfilled / Failed / *Due)."""
+    status = t.get("agreement_status")
+    return {
+        "policy": t.get("sla"),
+        "agreement_status": status,
+        "response_by": t.get("response_by"),
+        "resolution_by": t.get("resolution_by"),
+        "first_responded_on": t.get("first_responded_on"),
+        "resolution_date": t.get("resolution_date"),
+        "on_hold_since": t.get("on_hold_since"),
+        "breached": status == "Failed",
+        "response_failed_by": t.get("first_response_failed_by"),
+        "resolution_failed_by": t.get("resolution_failed_by"),
+    }
 
 
 @router.get("/tickets/{name}")
@@ -231,22 +262,66 @@ def ticket_detail(name: str, db: Session = Depends(get_db),
     # ticket by guessing its name.
     rows = _resource(ctx, "HD Ticket",
                      ["name", "subject", "description", "status", "status_category", "priority",
-                      "ticket_type", "agent_group", "customer", "contact", "raised_by",
+                      "ticket_type", "agent_group", "_assign", "customer", "contact", "raised_by",
                       "response_by", "resolution_by", "agreement_status", "resolution_details",
+                      "sla", "first_responded_on", "resolution_date", "on_hold_since",
+                      "first_response_failed_by", "resolution_failed_by",
+                      "feedback", "feedback_rating", "feedback_extra",
                       "creation", "modified", "ava_finding_id", "cve_id", "cvss_score", "asset_host"],
                      filters=_tenant_filters(ctx, [["name", "=", name]]), limit=1)
     if not rows:
         return {"ticket": {"name": name, "not_found": True}, "conversation": []}
     ticket = rows[0]
-    conv = _resource(ctx, "Communication",
-                     ["name", "sender", "content", "communication_date", "sent_or_received"],
-                     filters=[["reference_doctype", "=", "HD Ticket"], ["reference_name", "=", name]],
-                     order_by="communication_date asc")
-    conversation = [{
-        "type": "received" if (c.get("sent_or_received") == "Received") else "sent",
-        "sender": c.get("sender"), "content": c.get("content"), "date": c.get("communication_date"),
-    } for c in conv]
-    return {"ticket": ticket, "conversation": conversation}
+    # Surface team + assignee under the names the UI reads.
+    ticket["team"] = ticket.get("agent_group")
+    ticket["agent"] = _assignee(ticket.get("_assign"))
+    ticket["sla"] = _sla_block(ticket)
+
+    # ── full conversation: public replies + internal notes + activity ──
+    # These child/related doctypes carry NO ava_tenant tag, so they are read
+    # ONLY by the key of a ticket we JUST confirmed is in-partition above —
+    # never by a global query (isolation via the parent, per the parity matrix).
+    conv: List[Dict[str, Any]] = []
+    for c in _resource(ctx, "Communication",
+                       ["name", "sender", "content", "communication_date", "sent_or_received"],
+                       filters=[["reference_doctype", "=", "HD Ticket"], ["reference_name", "=", name]],
+                       order_by="communication_date asc"):
+        conv.append({
+            "type": "received" if (c.get("sent_or_received") == "Received") else "sent",
+            "sender": c.get("sender"), "content": c.get("content"), "date": c.get("communication_date"),
+        })
+    for c in _resource(ctx, "HD Ticket Comment",
+                       ["name", "content", "commented_by", "creation"],
+                       filters=[["reference_ticket", "=", name]], order_by="creation asc"):
+        conv.append({"type": "comment", "sender": c.get("commented_by"),
+                     "content": c.get("content"), "date": c.get("creation")})
+    for a in _resource(ctx, "HD Ticket Activity",
+                       ["name", "action", "owner", "creation"],
+                       filters=[["ticket", "=", name]], order_by="creation asc"):
+        conv.append({"type": "activity", "sender": a.get("owner"),
+                     "content": a.get("action"), "date": a.get("creation")})
+    conv.sort(key=lambda m: m.get("date") or "")
+    return {"ticket": ticket, "conversation": conv}
+
+
+@router.get("/meta")
+def meta(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
+    """Global option lists for the ticket editor (priorities / types / statuses /
+    feedback options). These are shared enums — not tenant data — so they carry
+    no partition filter."""
+    ctx = _ctx(db)
+    priorities = _resource(ctx, "HD Ticket Priority", ["name"], order_by="name asc")
+    types = _resource(ctx, "HD Ticket Type", ["name"], filters=[["disabled", "=", 0]], order_by="name asc")
+    statuses = _resource(ctx, "HD Ticket Status", ["name", "category", "order"],
+                         filters=[["enabled", "=", 1]], order_by="order asc")
+    feedback = _resource(ctx, "HD Ticket Feedback Option", ["name", "label", "rating"],
+                         filters=[["disabled", "=", 0]], order_by="rating asc")
+    return {
+        "priorities": [p["name"] for p in priorities],
+        "ticket_types": [t["name"] for t in types],
+        "statuses": [{"name": s["name"], "category": s.get("category")} for s in statuses],
+        "feedback_options": [{"label": f.get("label") or f["name"], "rating": f.get("rating")} for f in feedback],
+    }
 
 
 def _ticket_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
@@ -338,7 +413,20 @@ class StatusUpdate(BaseModel):
 
 class ReplyBody(BaseModel):
     content: str = ""
+    body: str = ""          # FE sends `body`; `content` kept for back-compat
     internal: bool = False
+
+
+class FieldUpdate(BaseModel):
+    priority: Optional[str] = None
+    ticket_type: Optional[str] = None
+    status: Optional[str] = None
+    agent_group: Optional[str] = None
+
+
+class AssignBody(BaseModel):
+    agent: Optional[str] = None     # HD Agent user (email); None clears assignment
+    team: Optional[str] = None      # agent_group
 
 
 @router.post("/tickets/{name}/status")
@@ -357,13 +445,62 @@ def reply_ticket(name: str, body: ReplyBody, db: Session = Depends(get_db),
     ctx = _ctx(db)
     if not _ticket_in_tenant(ctx, name):
         return {"ok": False, "error": "not found"}
+    content = body.content or body.body
     if body.internal:
         ok = _write(ctx, "POST", "/api/resource/HD%20Ticket%20Comment",
-                    {"reference_ticket": name, "content": body.content})
+                    {"reference_ticket": name, "content": content})
     else:
         ok = _write(ctx, "POST", "/api/resource/Communication", {
             "communication_type": "Communication", "reference_doctype": "HD Ticket",
-            "reference_name": name, "content": body.content, "sent_or_received": "Sent",
+            "reference_name": name, "content": content, "sent_or_received": "Sent",
             "subject": f"Re: {name}",
         })
     return {"ok": ok}
+
+
+@router.post("/tickets/{name}/update")
+def update_ticket_fields(name: str, body: FieldUpdate, db: Session = Depends(get_db),
+                         current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
+    """Change priority / type / status / team on an in-partition ticket. Each
+    is a plain HD Ticket field, so one PUT covers them (assignee is separate —
+    see /assign — because it routes through Frappe's assign_to engine)."""
+    ctx = _ctx(db)
+    if not _ticket_in_tenant(ctx, name):
+        return {"ok": False, "error": "not found"}
+    payload = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not payload:
+        return {"ok": True, "unchanged": True}
+    ok = _write(ctx, "PUT", f"/api/resource/HD%20Ticket/{quote(name)}", payload)
+    return {"ok": ok, "updated": list(payload.keys())}
+
+
+def _agent_in_tenant(ctx: Dict[str, Any], user: str) -> bool:
+    """Only assign to an agent that belongs to this tenant's partition (HD Agent
+    carries ava_tenant). No partition (dev / per-tenant Frappe) → allow."""
+    if not ctx.get("partition"):
+        return True
+    rows = _resource(ctx, "HD Agent", ["name"],
+                     filters=_tenant_filters(ctx, [["user", "=", user]]), limit=1)
+    return bool(rows)
+
+
+@router.post("/tickets/{name}/assign")
+def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
+    """Manual assignment. Sets the team (agent_group) and/or assigns an agent via
+    Frappe's own assign_to engine (the same ToDo-backed mechanism the auto rule
+    uses, so the desk stays consistent). Guards: ticket in-partition, agent
+    in-partition."""
+    ctx = _ctx(db)
+    if not _ticket_in_tenant(ctx, name):
+        return {"ok": False, "error": "not found"}
+    team_ok = agent_ok = True
+    if body.team is not None:
+        team_ok = _write(ctx, "PUT", f"/api/resource/HD%20Ticket/{quote(name)}",
+                         {"agent_group": body.team})
+    if body.agent:
+        if not _agent_in_tenant(ctx, body.agent):
+            return {"ok": False, "error": "agent not in tenant"}
+        agent_ok = _write(ctx, "POST", "/api/method/frappe.desk.form.assign_to.add",
+                          {"doctype": "HD Ticket", "name": name, "assign_to": [body.agent]})
+    return {"ok": bool(team_ok and agent_ok), "agent": body.agent, "team": body.team}
