@@ -402,7 +402,7 @@ def test_fallback_fires_only_when_enum4linux_empty(monkeypatch):
     def _make_run(e4l_stdout):
         calls = []
 
-        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **_kw):
             calls.append(argv)
             cmd = " ".join(argv)
             if "enum4linux-ng" in cmd:
@@ -592,12 +592,112 @@ def test_wesng_creds_spec_armed_gated_and_secret_safe():
     assert "AVA_SMB_DOMAIN" in joined and "--local-auth" in joined
 
 
+# ---- CREDENTIALED AD-ENUM tier (needs_creds + DOMAIN-gated) — proactive read-only discovery -----------
+def test_getadusers_creds_user_inventory():
+    out = ("Impacket v0.13.1 - Copyright Fortra, LLC and its affiliated companies \n\n"
+           "[*] Querying corp.local for information about domain.\n"
+           "Name                  Email            PasswordLastSet      LastLogon           \n"
+           "--------------------  ---------------  -------------------  -------------------\n"
+           "Administrator                          2021-08-11 10:24:12  2021-09-01 08:00:00 \n"
+           "krbtgt                                 2021-08-11 10:20:00  <never>             \n"
+           "svc_sql               sql@corp.local   2021-08-12 09:00:00  2021-09-02 07:30:00 \n")
+    rows = wst.parse_tool("getadusers-creds", out, "10.10.10.5", 40, "http://10.10.10.5")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "info"
+    assert "enumerated with credentials: 3" in rows[0]["fields"]["title"]
+    assert rows[0]["affected_port"] == 389 and rows[0]["source_slug"] == "getadusers-creds"
+    assert "svc_sql" in rows[0]["fields"]["evidence"] and "Administrator" in rows[0]["fields"]["evidence"]
+    assert wst.parse_tool("getadusers-creds", "", "h", 40, "http://h") == []
+
+
+def test_getuserspns_creds_kerberoastable():
+    out = ("Impacket v0.13.1 - Copyright Fortra, LLC\n\n"
+           "ServicePrincipalName             Name     MemberOf   PasswordLastSet      LastLogon  Delegation\n"
+           "-------------------------------  -------  ---------  -------------------  ---------  ----------\n"
+           "MSSQLSvc/sql01.corp.local:1433   svc_sql  CN=g       2021-08-12 09:00:00  <never>              \n"
+           "HTTP/web01.corp.local            svc_web  CN=g       2021-07-01 09:00:00  <never>              \n")
+    rows = wst.parse_tool("getuserspns-creds", out, "10.10.10.5", 41, "http://10.10.10.5")
+    _assert_shape(rows)
+    summary = next(r for r in rows if r["fields"]["title"].startswith("Kerberoastable accounts"))
+    assert "discovered with credentials: 2" in summary["fields"]["title"]
+    acct = [r for r in rows if r["fields"]["title"].startswith("Kerberoastable account:")]
+    assert {r["affected_component"] for r in acct} == {"svc_sql", "svc_web"}
+    assert all(r["fields"]["severity"] == "medium" and r["affected_port"] == 88 for r in rows)
+    assert wst.parse_tool("getuserspns-creds", "", "h", 41, "http://h") == []
+
+
+def test_getnpusers_creds_asrep_roastable():
+    out = ("Impacket v0.13.1 - Copyright Fortra, LLC\n\n"
+           "Name       MemberOf     PasswordLastSet      LastLogon  UAC      \n"
+           "---------  -----------  -------------------  ---------  --------\n"
+           "svc_asrep  CN=Users     2021-08-12 09:00:00  <never>    0x410200 \n"
+           "guest                   <never>              <never>    0x410200 \n")
+    rows = wst.parse_tool("getnpusers-creds", out, "10.10.10.5", 42, "http://10.10.10.5")
+    _assert_shape(rows)
+    summary = next(r for r in rows if r["fields"]["title"].startswith("AS-REP roastable accounts"))
+    assert "discovered: 2" in summary["fields"]["title"]
+    assert all(r["fields"]["severity"] == "high" and r["affected_port"] == 88 for r in rows)
+    assert {r["affected_component"] for r in rows if "account (" in r["fields"]["title"]} == {"svc_asrep", "guest"}
+    # a 'No entries found' run (pre-auth enforced everywhere) -> honest skip
+    assert wst.parse_tool("getnpusers-creds", "Impacket v0.13.1\n\nNo entries found!\n", "h", 42, "http://h") == []
+
+
+def test_ldapdomaindump_creds_directory_and_flags():
+    out = ("===AVALDD:domain_users===\n"
+           "cn\tname\tsAMAccountName\tuserAccountControl\n"
+           "Administrator\tAdministrator\tAdministrator\tNORMAL_ACCOUNT\n"
+           "svc_asrep\tsvc_asrep\tsvc_asrep\tNORMAL_ACCOUNT, DONT_REQ_PREAUTH\n"
+           "dc01\tDC01\tDC01$\tSERVER_TRUST_ACCOUNT, TRUSTED_FOR_DELEGATION\n"
+           "===AVALDD:domain_groups===\n"
+           "cn\tname\n"
+           "Domain Admins\tDomain Admins\n"
+           "===AVALDD:domain_computers===\n"
+           "cn\tname\n"
+           "DC01\tDC01\n"
+           "===AVALDD:domain_trusts===\n"
+           "cn\ttrustDirection\n"
+           "child.corp.local\tBidirectional\n")
+    rows = wst.parse_tool("ldapdomaindump", out, "10.10.10.5", 43, "http://10.10.10.5")
+    _assert_shape(rows)
+    summary = next(r for r in rows if r["fields"]["title"].startswith("AD directory dumped"))
+    assert "3 users / 1 groups / 1 computers / 1 trusts" in summary["fields"]["title"]
+    asrep = next(r for r in rows if "AS-REP roastable accounts in directory" in r["fields"]["title"])
+    assert asrep["fields"]["severity"] == "high" and "svc_asrep" in asrep["fields"]["evidence"]
+    deleg = next(r for r in rows if "trusted for Kerberos delegation" in r["fields"]["title"])
+    assert deleg["fields"]["severity"] == "high" and "dc01" in deleg["fields"]["evidence"]
+    assert any("AD trust relationship: child.corp.local" in r["fields"]["title"] for r in rows)
+    assert all(r["source_slug"] == "ldapdomaindump" for r in rows)
+    # no marker (bind failed / tool absent) -> honest skip, never a fabricated row
+    assert wst.parse_tool("ldapdomaindump", "", "h", 43, "http://h") == []
+    assert wst.parse_tool("ldapdomaindump", "===AVALDD:domain_users===\ncn\tname\n", "h", 43, "http://h") == []
+
+
+def test_ad_enum_specs_armed_domain_gated_and_secret_safe():
+    """Every AD-enum spec is needs_creds, self-gates on BOTH $AVA_SMB_USER AND $AVA_SMB_DOMAIN (the
+    applicability gate — AD enum only against a domain), and references the password ONLY as the quoted
+    shell var "${AVA_SMB_PASS:-}" (never interpolated -> absent from the engine argv / ps / logs)."""
+    ad = [s for s in wst.WIN_SCAN_TOOLS
+          if s["name"] in ("getadusers-creds", "getuserspns-creds", "getnpusers-creds", "ldapdomaindump")]
+    assert len(ad) == 4
+    for spec in ad:
+        assert spec.get("needs_creds") is True
+        joined = " ".join(spec["argv"]("10.10.10.5", "http://10.10.10.5"))
+        assert '[ -n "${AVA_SMB_USER:-}" ] && [ -n "${AVA_SMB_DOMAIN:-}" ] || exit 0' in joined  # domain gate
+        assert "${AVA_SMB_PASS:-}" in joined                       # pass only as a shell-var expansion
+        assert "AVA_SMB_PASS=" not in joined                       # never a literal value / assignment
+        assert "-request" not in joined and "-save" not in joined  # discovery only — never a hash-grab
+    # the four tools wired here are REMOVED from the deferral ledger (no stale entry)
+    for gone in ("GetADUsers.py", "GetUserSPNs.py", "GetNPUsers.py", "ldapdomaindump"):
+        assert gone not in wst._STILL_UNWIRED_WIN_SCAN_TOOLS
+
+
 def test_parsers_never_raise_on_garbage():
     everyone = ("netexec", "nbtscan", "smbmap", "ldapsearch", "snmpcheck", "enum4linux",
                 "rpcclient", "nmblookup", "smbclient", "snmpwalk", "onesixtyone", "braa",
                 "lookupsid", "samrdump", "rpcdump", "sslscan", "rdp-sec-check", "polenum",
                 "nxc-creds-shares", "nxc-creds-users", "nxc-creds-admins", "nxc-creds-passpol",
-                "nxc-creds-loggedon", "wesng-creds")
+                "nxc-creds-loggedon", "wesng-creds",
+                "getadusers-creds", "getuserspns-creds", "getnpusers-creds", "ldapdomaindump")
     for name in everyone:
         assert wst.parse_tool(name, "", "h", 1, "http://h") == []            # empty -> nothing
         assert isinstance(wst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
