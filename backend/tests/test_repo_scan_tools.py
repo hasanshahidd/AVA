@@ -286,6 +286,195 @@ def test_actionlint_argv_does_not_append_second_json():
 
 
 # ======================================================================================================
+# ARM-REPO: CI/CD pipeline security (owner HIGH priority) — fixtures are REAL captured tool output
+# ======================================================================================================
+def test_poutine_joins_rule_level():
+    # real shape: findings[] carry rule_id + meta{path,line,details}; the level/title live in rules[id]
+    out = json.dumps({"findings": [
+        {"meta": {"details": "Sources: github.event.issue.title", "line": 16,
+                  "path": ".github/workflows/ci.yml", "job": "build", "step": "1"}, "rule_id": "injection"},
+        {"meta": {"line": 19, "path": ".github/workflows/ci.yml"}, "rule_id": "unverified_script_exec"},
+    ], "rules": {
+        "injection": {"id": "injection", "level": "warning", "title": "Injection"},
+        "unverified_script_exec": {"id": "unverified_script_exec", "level": "error", "title": "Script Exec"},
+    }})
+    rows = rst.parse_tool("poutine", out, T, A, U)
+    _assert_shape(rows)
+    by = {r["fields"]["title"].split(":")[0].split("[")[1].rstrip("]"): r["fields"]["severity"] for r in rows}
+    assert by == {"injection": "medium", "unverified_script_exec": "high"}  # warning->medium, error->high
+
+
+def test_zizmor_sarif_severity():
+    out = json.dumps({"runs": [{"results": [
+        {"ruleId": "zizmor/template-injection", "level": "error", "message": {"text": "code injection"},
+         "locations": [{"physicalLocation": {"artifactLocation": {"uri": ".github/workflows/ci.yml"},
+                                             "region": {"startLine": 17}}}]},
+        {"ruleId": "zizmor/artipacked", "level": "warning", "message": {"text": "credential persistence"},
+         "locations": [{"physicalLocation": {"artifactLocation": {"uri": ".github/workflows/ci.yml"},
+                                             "region": {"startLine": 12}}}]},
+    ]}]})
+    rows = rst.parse_tool("zizmor", out, T, A, U)
+    _assert_shape(rows)
+    sev = sorted(r["fields"]["severity"] for r in rows)
+    assert sev == ["high", "medium"]  # error->high, warning->medium
+    assert any("ci.yml" in (r["affected_component"] or "") for r in rows)
+
+
+def test_octoscan_kind_severity():
+    # octoscan --format json is the actionlint shape; severity keys on `kind`
+    out = json.dumps([
+        {"message": "Expression injection, untrusted.", "filepath": ".github/workflows/ci.yml",
+         "line": 17, "column": 39, "kind": "expression-injection"},
+        {"message": "Use of 'actions/checkout' with a custom ref.", "filepath": ".github/workflows/ci.yml",
+         "line": 14, "column": 16, "kind": "dangerous-checkout"},
+        {"message": "shellcheck SC2086", "filepath": ".github/workflows/ci.yml", "line": 20,
+         "column": 1, "kind": "shellcheck"},
+    ])
+    rows = rst.parse_tool("octoscan", out, T, A, U)
+    _assert_shape(rows)
+    sev = [r["fields"]["severity"] for r in rows]
+    assert sev == ["high", "high", "low"]  # injection+dangerous-checkout->high, shellcheck->low
+
+
+def test_gato_x_pinned_schema():
+    # schema pinned from gato-x source: enumeration.repositories[].risks[] + .accessible_runners[]
+    out = json.dumps({"username": "u", "enumeration": {"repositories": [
+        {"name": "org/repo",
+         "risks": [{"issue_type": "pwn_request", "confidence": "HIGH", "attack_complexity": "LOW",
+                    "initial_workflow": "ci.yml", "triggers": ["pull_request_target"]}],
+         "accessible_runners": [{"name": "r1"}]},
+    ]}})
+    rows = rst.parse_tool("gato-x", out, T, A, U)
+    _assert_shape(rows)
+    assert len(rows) == 2 and all(r["fields"]["severity"] == "high" for r in rows)
+    assert any("pwn_request" in r["fields"]["title"] for r in rows)
+    assert any("self-hosted runner" in r["fields"]["title"] for r in rows)
+
+
+# ======================================================================================================
+# ARM-REPO: mobile APK/DEX (owner HIGH priority)
+# ======================================================================================================
+def test_apkid_evasion_vs_compiler():
+    out = json.dumps({"files": [{"filename": "a.apk!classes.dex", "matches": {
+        "compiler": ["dx (possible dexmerge)"], "anti_vm": ["Build.MODEL check"],
+        "manipulator": ["dexmerge"]}}]})
+    rows = rst.parse_tool("apkid", out, T, A, U)
+    _assert_shape(rows)
+    by = {r["fields"]["evidence"].split(":")[0]: r["fields"]["severity"] for r in rows}
+    assert by == {"compiler": "info", "anti_vm": "medium", "manipulator": "medium"}
+
+
+def test_apkleaks_secret_is_high_and_redacted():
+    out = json.dumps({"package": "com.x", "results": [
+        {"name": "IP_Address", "matches": ["1.1.1.1", "10.0.2.2"]},
+        {"name": "AWS_API_Key", "matches": ["AKIAIOSFODNN7EXAMPLE"]},
+    ]})
+    rows = rst.parse_tool("apkleaks", out, T, A, U)
+    _assert_shape(rows)
+    ip = next(r for r in rows if "IP_Address" in r["fields"]["title"])
+    aws = next(r for r in rows if "AWS_API_Key" in r["fields"]["title"])
+    assert ip["fields"]["severity"] == "info"
+    assert aws["fields"]["severity"] == "high"
+    assert "AKIAIOSFODNN7EXAMPLE" not in aws["fields"]["evidence"]  # redacted
+
+
+# ======================================================================================================
+# ARM-REPO: Kubernetes manifest security + OPA/Rego (provisionable)
+# ======================================================================================================
+def test_kube_linter_reports():
+    out = json.dumps({"Reports": [
+        {"Check": "host-network", "Diagnostic": {"Message": "resource shares host's network namespace"},
+         "Object": {"Metadata": {"FilePath": "deployment.yaml"},
+                    "K8sObject": {"Name": "web", "GroupVersionKind": {"Kind": "Deployment"}}}},
+    ]})
+    rows = rst.parse_tool("kube-linter", out, T, A, U)
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["fields"]["severity"] == "medium"
+    assert rows[0]["affected_component"] == "Deployment/web"
+
+
+def test_kubesec_critical_only():
+    out = json.dumps([{"object": "Deployment/web.default", "fileName": "deployment.yaml", "score": -46,
+                       "scoring": {"critical": [
+                           {"id": "Privileged", "selector": "...", "reason": "Privileged containers", "points": -30}],
+                                   "advise": [{"id": "ApparmorAny", "reason": "advisory"}]}}])
+    rows = rst.parse_tool("kubesec", out, T, A, U)
+    _assert_shape(rows)
+    assert len(rows) == 1  # only scoring.critical -> findings; advise skipped
+    assert rows[0]["fields"]["severity"] == "high" and "Privileged" in rows[0]["fields"]["title"]
+
+
+def test_polaris_security_signal_only():
+    out = json.dumps({"Results": [{"Kind": "Deployment", "Name": "web", "Results": {
+        "deploymentMissingReplicas": {"ID": "deploymentMissingReplicas", "Message": "one replica",
+                                      "Success": False, "Severity": "warning", "Category": "Reliability"}},
+        "PodResult": {"Results": {
+            "hostNetworkSet": {"ID": "hostNetworkSet", "Message": "Host network", "Success": False,
+                               "Severity": "danger", "Category": "Security"}},
+            "ContainerResults": [{"Name": "web", "Results": {
+                "runAsPrivileged": {"ID": "runAsPrivileged", "Message": "privileged", "Success": False,
+                                    "Severity": "danger", "Category": "Security"},
+                "cpuLimitsMissing": {"ID": "cpuLimitsMissing", "Message": "cpu", "Success": False,
+                                     "Severity": "warning", "Category": "Efficiency"},
+                "passing": {"ID": "passing", "Message": "ok", "Success": True,
+                            "Severity": "danger", "Category": "Security"}}}]}}]})
+    rows = rst.parse_tool("polaris", out, T, A, U)
+    _assert_shape(rows)
+    # only FAILED Security/danger checks: hostNetworkSet + runAsPrivileged (reliability/efficiency + passing dropped)
+    assert len(rows) == 2 and all(r["fields"]["severity"] == "high" for r in rows)
+    ids = {r["fields"]["title"].split("[")[1].split("]")[0] for r in rows}
+    assert ids == {"hostNetworkSet", "runAsPrivileged"}
+
+
+def test_conftest_failures_and_warnings():
+    out = json.dumps([{"filename": "deployment.yaml",
+                       "failures": [{"msg": "runs privileged", "metadata": {"query": "data.main.deny"}}],
+                       "warnings": [{"msg": "latest tag", "metadata": {"query": "data.main.warn"}}]}])
+    rows = rst.parse_tool("conftest", out, T, A, U)
+    _assert_shape(rows)
+    by = {r["fields"]["severity"] for r in rows}
+    assert by == {"high", "low"}  # failures->high, warnings->low
+
+
+# ======================================================================================================
+# ARM-REPO: applicability gates + credential gating are present in the argv (not just the parser)
+# ======================================================================================================
+def test_cicd_tools_gate_on_workflows():
+    for name in ("poutine", "zizmor", "octoscan"):
+        spec = next(s for s in rst.REPO_SCAN_TOOLS if s["name"] == name)
+        cmd = spec["argv"]("/work", U)[-1]
+        assert ".github/workflows" in cmd or ".gitlab-ci" in cmd, f"{name} has no CI/CD applicability gate"
+        assert "exit 0" in cmd  # honest-skip path
+
+
+def test_gato_x_is_credential_gated():
+    spec = next(s for s in rst.REPO_SCAN_TOOLS if s["name"] == "gato-x")
+    assert spec.get("needs_creds") is True
+    cmd = spec["argv"]("/work", U)[-1]
+    assert "GH_TOKEN" in cmd and "exit 0" in cmd  # honest-skip without a token
+
+
+def test_k8s_tools_gate_on_manifests():
+    for name in ("kube-linter", "kubesec", "polaris", "conftest"):
+        spec = next(s for s in rst.REPO_SCAN_TOOLS if s["name"] == name)
+        cmd = spec["argv"]("/work", U)[-1]
+        assert "apiVersion|kind" in cmd and "exit 0" in cmd, f"{name} has no k8s applicability gate"
+
+
+def test_mobile_apk_tools_gate_on_package():
+    for name in ("apkid", "apkleaks"):
+        spec = next(s for s in rst.REPO_SCAN_TOOLS if s["name"] == name)
+        cmd = spec["argv"]("/work", U)[-1]
+        assert "*.apk" in cmd and "exit 0" in cmd, f"{name} has no mobile-package gate"
+
+
+def test_gh_slug_extraction():
+    assert rst._gh_slug("https://github.com/org/repo.git") == "org/repo"
+    assert rst._gh_slug("git@github.com:org/repo.git") == "org/repo"
+    assert rst._gh_slug("https://gitlab.com/org/repo") == ""  # not github
+
+
+# ======================================================================================================
 # ROBUSTNESS — every wired parser is garbage-safe (never raises, never fabricates on junk/empty)
 # ======================================================================================================
 def test_all_parsers_garbage_safe():
