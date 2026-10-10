@@ -235,7 +235,8 @@ def _ticket_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
 @router.get("/agents")
 def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
-    rows = _resource(ctx, "HD Agent", ["name", "agent_name", "user", "is_active"], order_by="agent_name asc")
+    rows = _resource(ctx, "HD Agent", ["name", "agent_name", "user", "is_active"],
+                     filters=_tenant_filters(ctx), order_by="agent_name asc")
     return {"agents": [{
         "name": r["name"], "agent_name": r.get("agent_name") or r.get("user"),
         "email": r.get("user"), "availability": "Active" if r.get("is_active") else "Unavailable",
@@ -246,7 +247,8 @@ def agents(db: Session = Depends(get_db), current_user: GRCUser = Depends(requir
 @router.get("/teams")
 def teams(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
-    rows = _resource(ctx, "HD Team", ["name", "team_name", "assignment_rule"], order_by="team_name asc")
+    rows = _resource(ctx, "HD Team", ["name", "team_name", "assignment_rule"],
+                     filters=_tenant_filters(ctx), order_by="team_name asc")
     out = []
     for r in rows:
         doc = _get(ctx, f"/api/resource/HD%20Team/{quote(r['name'])}")
@@ -261,7 +263,8 @@ def teams(db: Session = Depends(get_db), current_user: GRCUser = Depends(require
 @router.get("/customers")
 def customers(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
-    rows = _resource(ctx, "HD Customer", ["name", "customer_name", "domain"], order_by="customer_name asc")
+    rows = _resource(ctx, "HD Customer", ["name", "customer_name", "domain"],
+                     filters=_tenant_filters(ctx), order_by="customer_name asc")
     return {"customers": [{
         "name": r["name"], "customer_name": r.get("customer_name") or r["name"],
         "domain": r.get("domain"), "contacts_count": 0,
@@ -272,7 +275,7 @@ def customers(db: Session = Depends(get_db), current_user: GRCUser = Depends(req
 def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "Contact", ["name", "first_name", "last_name", "email_id", "phone", "company_name"],
-                     order_by="modified desc")
+                     filters=_tenant_filters(ctx), order_by="modified desc")
     return {"contacts": [{
         "name": r["name"], "first_name": r.get("first_name"), "last_name": r.get("last_name"),
         "email_id": r.get("email_id"), "phone": r.get("phone"), "company_name": r.get("company_name"),
@@ -283,7 +286,7 @@ def contacts(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
 def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     rows = _resource(ctx, "HD Article", ["name", "title", "category", "status", "author", "modified"],
-                     order_by="modified desc")
+                     filters=_tenant_filters(ctx), order_by="modified desc")
     return {"articles": [{
         "name": r["name"], "title": r.get("title"), "category": r.get("category"),
         "status": r.get("status"), "author": r.get("author"), "modified": r.get("modified"),
@@ -294,7 +297,8 @@ def articles(db: Session = Depends(get_db), current_user: GRCUser = Depends(requ
 def canned_responses(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
     ctx = _ctx(db)
     for dt, title_field in (("HD Canned Response", "title"), ("HD Saved Reply", "subject")):
-        rows = _resource(ctx, dt, ["name", title_field, "owner"], order_by="modified desc")
+        rows = _resource(ctx, dt, ["name", title_field, "owner"],
+                            filters=_tenant_filters(ctx), order_by="modified desc")
         if rows:
             return {"responses": [{"name": r["name"], "title": r.get(title_field) or r["name"],
                                    "owner": r.get("owner")} for r in rows]}
