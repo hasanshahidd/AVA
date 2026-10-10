@@ -238,9 +238,14 @@ class MsfRpc:
         pairs = [(p, p.lower()) for p in compatible]
         altering = ("adduser", "useradd", "chmod", "download", "/exec")
         pool = [(p, pl) for p, pl in pairs if not any(a in pl for a in altering)] or pairs
-        # 1) well-known bind command shells, most reliable first
-        for pref in ("generic/shell_bind_tcp", "cmd/unix/bind_perl", "cmd/unix/bind_ruby",
-                     "cmd/unix/bind_netcat", "cmd/unix/bind_netcat_gaping"):
+        # 1) well-known bind command shells, most reliable first. cmd/unix/bind_* (NATIVE command-shell
+        #    payloads) come BEFORE generic/shell_bind_tcp: a cmd-execution module (distcc / unrealircd /
+        #    samba / vsftpd backdoors) needs a cmd/unix payload — generic/shell_bind_tcp stages a BINARY the
+        #    cmd backdoor can't launch, so it was wrongly picked for unrealircd (553 compat payloads) and
+        #    opened no session. A windows module doesn't list cmd/unix/bind_perl as compatible, so generic
+        #    (or the windows bind from _msf_payload_for) still wins there — no regression.
+        for pref in ("cmd/unix/bind_perl", "cmd/unix/bind_ruby", "cmd/unix/bind_netcat",
+                     "cmd/unix/bind_netcat_gaping", "generic/shell_bind_tcp"):
             for p, pl in pool:
                 if pl == pref:
                     return p

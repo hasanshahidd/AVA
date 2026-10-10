@@ -20,9 +20,11 @@ def test_bind_preferred_over_reverse_without_callback():
     assert out == "cmd/unix/bind_perl"
 
 
-def test_generic_bind_is_top_preference():
-    out = sel(["cmd/unix/bind_perl", "generic/shell_bind_tcp"])
-    assert out == "generic/shell_bind_tcp"
+def test_cmd_unix_bind_preferred_over_generic():
+    # a cmd-exec module (distcc/unrealircd/samba backdoor) lists both; cmd/unix/bind_perl MUST win because
+    # generic/shell_bind_tcp stages a binary the cmd backdoor can't launch (this was the unrealircd no-session bug).
+    out = sel(["generic/shell_bind_tcp", "cmd/unix/bind_perl"])
+    assert out == "cmd/unix/bind_perl"
 
 
 def test_skips_target_altering_payloads():
