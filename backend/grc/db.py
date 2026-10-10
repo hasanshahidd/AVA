@@ -282,10 +282,12 @@ def _ensure_vulnerability_exploit_class(engine: Engine) -> None:
 
 
 def _ensure_pentest_run_columns(engine: Engine) -> None:
-    """Additive nullable column on grc_pentest_runs: classified_at, set the first time the authoritative
-    LLM classify runs for a run. run_findings/run_summary gate the provisional "exploitable" count on it,
-    and GET /runs/{id} selects the mapped column on every poll — so on an already-provisioned DB (create_all
-    only makes tables) the column MUST exist or every run read 500s. Additive + nullable → no backfill."""
+    """Additive nullable columns on grc_pentest_runs. create_all only makes tables, so an
+    already-provisioned DB needs these added or the mapped-column SELECT on every run read 500s.
+    Additive + nullable → no backfill:
+      * classified_at   — first authoritative LLM classify timestamp (provisional-count gate)
+      * credentialed_mode (FIX A) — off|on|auto run-wide credential posture; NULL reads as 'auto',
+        so existing runs keep today's have_profile behavior."""
     if engine.dialect.name != "postgresql":
         return
     from sqlalchemy import inspect as sa_inspect
@@ -295,6 +297,29 @@ def _ensure_pentest_run_columns(engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text(
             "ALTER TABLE grc_pentest_runs ADD COLUMN IF NOT EXISTS classified_at TIMESTAMP"
+        ))
+        conn.execute(text(
+            "ALTER TABLE grc_pentest_runs ADD COLUMN IF NOT EXISTS credentialed_mode VARCHAR(8)"
+        ))
+
+
+def _ensure_pentest_run_asset_columns(engine: Engine) -> None:
+    """Additive count columns on grc_pentest_run_assets (FIX D): exploitable_count + armed_count,
+    stamped from assess().summary when an asset finishes scanning. GET /runs/{id} and by_type SELECT
+    the mapped columns, so on an already-provisioned DB (create_all only makes tables) they MUST exist
+    or every run read 500s. Default 0 so existing rows report an honest zero until re-scanned."""
+    if engine.dialect.name != "postgresql":
+        return
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    if not inspector.has_table("grc_pentest_run_assets"):
+        return
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE grc_pentest_run_assets ADD COLUMN IF NOT EXISTS exploitable_count INTEGER DEFAULT 0"
+        ))
+        conn.execute(text(
+            "ALTER TABLE grc_pentest_run_assets ADD COLUMN IF NOT EXISTS armed_count INTEGER DEFAULT 0"
         ))
 
 
@@ -501,7 +526,11 @@ def _init_tenant_schema(engine: Engine, slug: str) -> None:
         try:
             _ensure_pentest_run_columns(engine)
         except Exception:
-            logger.exception("pentest_run classified_at ensure failed for slug=%s", slug)
+            logger.exception("pentest_run column ensure failed for slug=%s", slug)
+        try:
+            _ensure_pentest_run_asset_columns(engine)
+        except Exception:
+            logger.exception("pentest_run_asset column ensure failed for slug=%s", slug)
         try:
             _ensure_asset_origin_source(engine)
         except Exception:
