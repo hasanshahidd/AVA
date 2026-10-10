@@ -202,7 +202,7 @@ def test_registry_specs_bounded_and_readonly():
 
 # ---- wiring into the finder: additive (existing nmap/nuclei rows kept) + honest on missing image --------
 def test_finder_appends_arsenal_without_regressing_hexstrike(monkeypatch):
-    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
         tool = argv[0] if argv else ""
         if tool == "nmap":
             return {"stdout": "80/tcp open http", "stderr": "", "rc": 0, "error": None}
@@ -225,7 +225,7 @@ def test_finder_appends_arsenal_without_regressing_hexstrike(monkeypatch):
 
 def test_finder_web_arsenal_missing_image_is_honest(monkeypatch):
     monkeypatch.setattr(svc, "_lane_container_run", lambda lane, argv, timeout=0, input_bytes=None,
-                        phase="scan", subtype=None: {"stdout": "", "stderr": "", "rc": 125,
+                        phase="scan", subtype=None, **kwargs: {"stdout": "", "stderr": "", "rc": 125,
                                                      "error": f"lane image ava-{lane} not built"})
     assert svc._web_scan_arsenal_rows("h", 7) == []
     assert svc._lane_find_container("web", "h", 7) == []
@@ -348,19 +348,19 @@ def test_naabu_top_ports_100_not_200():
 
 
 def test_unwired_accounting_is_accurate():
-    """graphw00f + kiterunner are ABSENT from the deployed ava-web-scan image (verified read-only
-    2026-09-30 on d0eb2aca410a — only paramspider/waymore in pipx, `kr`/graphw00f/x8/ffuf/wpscan all
-    MISSING). They must be recorded as still-unwired (missing-from-image), never fabricated as working
-    specs — the module's contract is never-fabricate."""
+    """ARM-WEB-BINARIES (2026-10-10): the 7 formerly-unwired tools are now WIRED (ffuf+wpscan were already in
+    ava-web-scan:latest; cewl/graphw00f/joomscan/kiterunner/x8 built into ava-web-scan:armstage). They must
+    now appear as working specs and NOT in the still-unwired accounting; only the genuinely-non-applicable /
+    budget-blocked tools remain deferred. The module's contract stays never-fabricate (a wired/unwired name
+    can never appear in both)."""
     wired = {s["name"] for s in wst.WEB_SCAN_TOOLS}
     unwired = wst._STILL_UNWIRED_WEB_SCAN_TOOLS
-    # accurately listed as unwired...
-    for t in ("graphw00f", "kiterunner", "ffuf", "x8", "wpscan", "joomscan", "amass", "trufflehog"):
-        assert t in unwired and "missing" in unwired[t] or "installed" in unwired[t]
-    assert "missing-from-image" in unwired["graphw00f"]
-    assert "missing-from-image" in unwired["kiterunner"]
-    # ...and NOT masquerading as a working, wired tool
-    assert not ({"graphw00f", "kiterunner"} & wired)
+    # the newly-armed 7 are now wired specs...
+    for t in ("graphw00f", "kiterunner", "ffuf", "x8", "wpscan", "joomscan", "cewl"):
+        assert t in wired and t not in unwired
+    # ...and the remaining deferrals are only the honest ones (non-applicable / budget-blocked / config-only)
+    for t in ("amass", "trufflehog", "wapiti-auth"):
+        assert t in unwired and ("installed" in unwired[t] or "same tool" in unwired[t])
     # a wired/unwired name can never appear in both accountings
     assert not (wired & set(unwired))
 
@@ -377,7 +377,7 @@ def _dispatch(monkeypatch, outputs, url="http://h", **kw):
         joined = " ".join(argv)
         return next((n for n in names if n in joined), "")
 
-    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
         return {"stdout": outputs.get(which(argv), ""), "stderr": "", "rc": 0, "error": None}
 
     monkeypatch.setattr(svc, "_lane_container_run", fake_run)
@@ -427,7 +427,7 @@ def test_fallback_wiring_is_coherent():
     prim_names = {s["name"] for s in specs if not s.get("fallback_for")}
     expected = {
         "tls": {"testssl", "sslyze"},
-        "content-discovery": {"gobuster", "dirb", "dirsearch", "wfuzz"},
+        "content-discovery": {"gobuster", "dirb", "dirsearch", "wfuzz", "ffuf"},   # ffuf added (ARM-WEB-BINARIES)
         "crawl": {"gospider", "hakrawler", "cariddi"},
         "archive-urls": {"waybackurls", "urlfinder", "waymore"},
         "tech-fingerprint": {"webanalyze"},
@@ -436,6 +436,8 @@ def test_fallback_wiring_is_coherent():
         assert cls in classes                                          # the primary declares the class
         assert len([s for s in specs if s.get("vuln_class") == cls]) == 1  # exactly one primary per class
         assert {s["name"] for s in specs if s.get("fallback_for") == cls} == fbs
+    # x8 is a hidden-param fallback that targets the arjun PRIMARY by NAME (not a vuln_class)
+    assert {s["name"] for s in specs if s.get("fallback_for") == "arjun"} == {"x8"}
     for s in specs:
         fb = s.get("fallback_for")
         if not fb:
@@ -446,11 +448,119 @@ def test_fallback_wiring_is_coherent():
         assert isinstance(argv, list) and argv and callable(s["parse"]) and 0 < int(s["timeout"]) <= 600
 
 
-def test_deferred_feeder_and_credentialed_recorded_honestly():
-    """The web lane has no INSTALLED wordlist-maker (cewl) or genuinely-new credentialed scan tool, so those
-    two arm-and-gate categories are DEFERRED, not faked. They must be recorded with a reason and never appear
-    as wired specs."""
+def test_cewl_feeder_wired_credentialed_still_deferred():
+    """cewl is now a LIVE feeder into the content-discovery primary (no longer deferred). The only remaining
+    arm-and-gate deferral is the credentialed wapiti re-run (a config of an already-armed tool, not a new
+    binary)."""
+    specs = {s["name"]: s for s in wst.WEB_SCAN_TOOLS}
+    cewl = specs["cewl"]
+    assert cewl.get("feeds") == "feroxbuster" and callable(cewl.get("produce"))   # wired as a feeder
     unwired = wst._STILL_UNWIRED_WEB_SCAN_TOOLS
-    assert "cewl" in unwired and "wordlist" in unwired["cewl"].lower() and "feeds=" in unwired["cewl"]
+    assert "cewl" not in unwired                                                   # no longer deferred
     assert "wapiti-auth" in unwired and "wapiti" in unwired["wapiti-auth"]
-    assert not ({s["name"] for s in wst.WEB_SCAN_TOOLS} & set(unwired))   # never both wired and deferred
+    assert not (set(specs) & set(unwired))                                         # never both wired and deferred
+
+
+# ---- ARM-WEB-BINARIES: the 7 newly-wired scan tools, parsers fed REAL captured output ------------------
+# (live-fire 2026-10-10, ava-web-scan:armstage vs juice-shop / DVGA / php-apache / static CMS mocks).
+def test_cewl_feeder_producer_real_output():
+    # real cewl stdout: a 'CeWL <ver> ...' banner line, then one word per line. Producer skips the banner +
+    # non-word tokens, dedups (case-insensitive), caps, and returns a newline blob (None when empty).
+    out = ("CeWL 6.2.1 (More Fixes) Robin Wood (robin@digi.ninja) (https://digi.ninja/)\n"
+           "OWASP\nJuice\nShop\napplication\nOWASP\nhttp://skip.me\n!!\na\n")
+    wl = wst._cewl_wordlist(out, "juice", "http://juice:3000")
+    assert wl == "OWASP\nJuice\nShop\napplication"          # banner/url/short/dupe dropped, order kept
+    assert wst._cewl_wordlist("CeWL 6.2.1\n", "x", "http://x") is None   # nothing crawled -> None
+
+
+def test_feroxbuster_argv_merges_cewl_feed():
+    spec = next(s for s in wst.WEB_SCAN_TOOLS if s["name"] == "feroxbuster")
+    plain = " ".join(spec["argv"]("h", "http://h"))
+    assert "/wordlists/" in plain and "cewl.txt" not in plain           # no feed -> common.txt only (unchanged)
+    fed = " ".join(spec["argv"]("h", "http://h", "admin\nlogin"))
+    assert "cewl.txt" in fed and "sort -u" in fed and "/wordlists/" in fed  # feed -> common.txt UNION cewl words
+
+
+def test_graphw00f_engine_and_endpoint():
+    out = ("[*] GraphQL endpoint: http://h:5013/graphql\n"
+           "[!] Found GraphQL.\n"
+           "\x1b[92m[*] Discovered GraphQL Engine: (Graphene)\x1b[0m\n"
+           "[*] Completed.\n")
+    rows = wst.parse_tool("graphw00f", out, "h", 1, "http://h:5013")
+    _assert_shape(rows)
+    eng = next(r for r in rows if "engine" in r["fields"]["title"].lower())
+    assert eng["affected_component"] == "Graphene" and eng["fields"]["severity"] == "info"
+    assert any(r["fields"]["title"].startswith("GraphQL endpoint detected") for r in rows)
+    assert wst.parse_tool("graphw00f", "nothing graphql-ish here\n", "h", 1, "http://h") == []
+
+
+def test_kiterunner_api_routes_summary():
+    out = ("GET     301 [ 158,  6, 11] http://h:3000/api-docs -> /api-docs/\n"
+           "\x1b[33mGET     401 [ 972, 150, 50]\x1b[33m http://h:3000/api/users/admin \x1b[0m\n"
+           "\x1b[33mGET     401 [ 972, 150, 50]\x1b[33m http://h:3000/api/users/admin \x1b[0m\n")  # dup
+    rows = wst.parse_tool("kiterunner", out, "h", 1, "http://h:3000")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "route" in rows[0]["fields"]["title"] and "2 " in rows[0]["fields"]["title"]
+
+
+def test_ffuf_content_discovery_summary():
+    out = ".hta\n.htpasswd\n.htaccess\nindex.php\nserver-status\nindex.php\n"      # last line a dupe
+    rows = wst.parse_tool("ffuf", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert len(rows) == 1 and "path" in rows[0]["fields"]["title"] and "5 " in rows[0]["fields"]["title"]
+    assert ".htaccess" in rows[0]["fields"]["evidence"]
+
+
+def test_joomscan_no_false_positive_then_vuln():
+    # REAL joommock output (non-vulnerable): section headers + "not vulnerable" must NOT be flagged
+    clean = ("[+] FireWall Detector\n[++] Firewall not detected\n[+] Detecting Joomla Version\n"
+             "[+] Core Joomla Vulnerability\n[++] Target Joomla core is not vulnerable\n")
+    assert wst.parse_tool("joomscan", clean, "h", 1, "http://h") == []
+    # a real vulnerable fingerprint -> version info + high CVE/EDB rows
+    vuln = ("[++] Joomla 3.4.5\n[+] Core Joomla Vulnerability\nTitle : Core SQL Injection\n"
+            "CVE : CVE-2015-7297\nEDB : https://www.exploit-db.com/exploits/38977\n")
+    rows = wst.parse_tool("joomscan", vuln, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert any(r["fields"]["severity"] == "high" for r in rows)
+    assert any("3.4.5" in r["fields"]["title"] for r in rows)
+    assert any("CVE-2015-7297" in r["fields"]["evidence"] for r in rows)
+
+
+def test_wpscan_aborted_is_honest_and_vulns_parse():
+    # REAL captured abort (db missing / not WordPress) -> honest [] (no 'version'/'plugins' keys)
+    ab = ('{"scan_aborted": "Update required, you can not run a scan if a database file is missing.",'
+          ' "target_url": "http://h/"}')
+    assert wst.parse_tool("wpscan", ab, "h", 1, "http://h") == []
+    # a real wpscan JSON (db present) -> core + plugin vuln rows (first CVE) + version + interesting-finding
+    out = ('{"version":{"number":"5.0.3","status":"insecure","vulnerabilities":'
+           '[{"title":"WordPress 5.0.3 stored XSS","references":{"cve":["2019-9787"]}}]},'
+           '"plugins":{"contact-form-7":{"vulnerabilities":'
+           '[{"title":"CF7 unrestricted upload","references":{"cve":["2020-35489"]}}]}},'
+           '"interesting_findings":[{"to_s":"http://h/robots.txt","type":"robots_txt"}]}')
+    rows = wst.parse_tool("wpscan", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert any(r["cve_id"] == "CVE-2019-9787" for r in rows)
+    assert any(r["affected_component"] == "contact-form-7" and r["cve_id"] == "CVE-2020-35489" for r in rows)
+    assert any(r["fields"]["severity"] == "medium" and "5.0.3" in r["fields"]["title"] for r in rows)
+    assert any(r["fields"]["severity"] == "info" for r in rows)
+
+
+def test_x8_hidden_params_json():
+    # x8 -O json report: an array of request objects; the parser walks found/injected/reflected params for
+    # their names and emits one info component row each (same surface as arjun). (live-fire confirmed format.)
+    out = ('[{"method":"GET","url":"http://h/s","status":200,"size":120,'
+           '"found_params":[{"name":"debug","value":"1"},{"name":"admin","value":"1"}],'
+           '"injected_params":[]}]')
+    rows = wst.parse_tool("x8", out, "h", 1, "http://h")
+    _assert_shape(rows)
+    assert {r["affected_component"] for r in rows} == {"debug", "admin"}
+    assert all(r["fields"]["severity"] == "info" for r in rows)
+    assert wst.parse_tool("x8", "[]", "h", 1, "http://h") == []        # ran, found nothing -> honest []
+
+
+def test_new_arm_tools_never_raise_on_garbage():
+    for name in ("x8", "graphw00f", "joomscan", "wpscan", "ffuf", "kiterunner"):
+        assert wst.parse_tool(name, "", "h", 1, "http://h") == []
+        assert isinstance(wst.parse_tool(name, "\x00 junk {[ not json", "h", 1, "http://h"), list)
+    for name in ("x8", "wpscan"):                                    # JSON parsers reject non-JSON outright
+        assert wst.parse_tool(name, "\x00 not json", "h", 1, "http://h") == []
