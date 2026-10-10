@@ -380,11 +380,11 @@ class MsfRpc:
         # while a retry loop captured the real `id` output). Drain the banner first, write the probe, then poll.
         buf = ""
         if stype == "meterpreter":
-            try:
-                self._call("session.meterpreter_run_single", sid, cmd)
-            except Exception:
-                pass
-            for _ in range(6):
+            for _ in range(8):
+                try:
+                    self._call("session.meterpreter_run_single", sid, cmd)
+                except Exception:
+                    pass
                 time.sleep(0.8)
                 buf += _data(self._call("session.meterpreter_read", sid))
                 if buf.strip():
@@ -394,8 +394,11 @@ class MsfRpc:
                 self._call("session.shell_read", sid)       # drain any banner
             except Exception:
                 pass
-            self._call("session.shell_write", sid, cmd + "\n")
-            for _ in range(6):
+            # RE-SEND the probe each poll: a freshly-accepted command shell (e.g. the perl bind payload) can
+            # drop the FIRST line before its read loop is ready, so a single write races to empty output. `id`
+            # / `whoami` are READ-ONLY, so re-sending is safe and idempotent — proven in live-fire.
+            for _ in range(8):
+                self._call("session.shell_write", sid, cmd + "\n")
                 time.sleep(0.8)
                 buf += _data(self._call("session.shell_read", sid))
                 if buf.strip():
