@@ -248,6 +248,25 @@ PERMISSION_MATRIX = [
         ]
     },
     {
+        # AVA AI-Pentest. Write-endpoints are gated in
+        # backend/grc/modules/pentest/router.py via _require_scan
+        # (pentest:scan:execute) and _require_exploit (pentest:exploit:execute).
+        # Those two dependencies FAIL OPEN until any pentest:* permission exists
+        # in the tenant, so adding this module never locks out existing users;
+        # Administrator + primary-contact bypass as everywhere. run:execute /
+        # gate:approve / view are declared here for finer-grained role design and
+        # appear in the Admin > Roles matrix.
+        "module": "pentest",
+        "display_name": "AI Pentest (AVA)",
+        "submodules": [
+            {"name": "scan", "display_name": "Run Scans", "actions": ["execute"]},
+            {"name": "exploit", "display_name": "Run Exploits", "actions": ["execute"]},
+            {"name": "run", "display_name": "Batch Runs", "actions": ["execute"]},
+            {"name": "gate", "display_name": "Approve Exploit Gate", "actions": ["approve"]},
+            {"name": "workspace", "display_name": "Pentest Workspace", "actions": ["view"]},
+        ]
+    },
+    {
         "module": "assets",
         "display_name": "Asset Management",
         "submodules": [
