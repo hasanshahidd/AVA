@@ -423,8 +423,8 @@ def test_parsers_never_raise_on_garbage():
                 "ldapsearch", "nbtscan", "sslscan", "testssl", "sslyze", "whatweb", "httpx", "wafw00f",
                 "snmp-check", "snmpwalk", "braa", "smbclient", "rpcclient", "redis-cli", "mysql", "psql",
                 "ike-scan", "smtp-user-enum", "wpscan", "joomscan", "eyewitness", "ldapdomaindump",
-                "feroxbuster", "ffuf", "gobuster", "dirsearch", "arjun", "dnsx", "subfinder", "dnsrecon",
-                "fierce", "gau", "katana", "gowitness", "netexec", "enum4linux-ng")
+                "feroxbuster", "ffuf", "gobuster", "dirsearch", "arjun", "dnsx", "subfinder", "amass",
+                "dnsrecon", "fierce", "gau", "katana", "gowitness", "netexec", "enum4linux-ng")
     for name in everyone:
         assert lst.parse_tool(name, "", "h", 1, "http://h") == []                     # empty -> nothing
         assert isinstance(lst.parse_tool(name, "\x00 not\n valid {[", "h", 1, "http://h"), list)  # no raise
@@ -459,7 +459,7 @@ def test_registry_specs_bounded_and_readonly():
 
 # ---- wiring: the convention dispatcher loads THIS module for (internal, linux) + honest on unmapped ------
 def test_dispatcher_loads_linux_module_by_convention(monkeypatch):
-    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
         if argv and argv[0] == "showmount":
             return {"stdout": "Export list for h:\n/data *\n", "stderr": "", "rc": 0, "error": None}
         return {"stdout": "", "stderr": "", "rc": 0, "error": None}
@@ -510,7 +510,7 @@ def test_enum4linux_null_session_parse():
 
 # ---- NEW: netexec is creds-GATED at the dispatcher (dormant w/o creds, fires with) ---------------------
 def test_netexec_creds_gated_dispatcher(monkeypatch):
-    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+    def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
         j = " ".join(argv)
         if "nxc smb" in j:
             return {"stdout": "SMB 10.0.0.5 445 DC01  Data  READ,WRITE  File share\n"
@@ -531,7 +531,7 @@ def test_enum4linux_fallback_fires_only_on_rpcclient_empty(monkeypatch):
     e4l = ('{"users": {"1001": {"username": "administrator"}}, "shares": {"public": {}}}')
 
     def make_fake(rpcclient_out):
-        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None):
+        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
             j = " ".join(argv)
             if "rpcclient" in j:
                 return {"stdout": rpcclient_out, "stderr": "", "rc": 0, "error": None}
@@ -550,3 +550,61 @@ def test_enum4linux_fallback_fires_only_on_rpcclient_empty(monkeypatch):
     fb = svc._lane_scan_arsenal_rows("internal", "linux", "h", 1, "http://h")
     assert not any(r["source_slug"] == "rpcclient" for r in fb)
     assert any(r["source_slug"] == "enum4linux-ng" for r in fb)
+
+
+# ---- NEW: amass — deeper passive subdomain OSINT, wired fallback_for="subfinder" -----------------------
+# REAL amass v4 relationship-format output (captured from a live `amass enum -d owasp.org`): the valuable
+# discovered FQDNs sit in the LEFT column; ASN/Netblock/IP tokens are dropped by _extract_hosts/_HOST_RE.
+_AMASS_SAMPLE = (
+    "owasp.org (FQDN) --> ns_record --> fay.ns.cloudflare.com (FQDN)\n"
+    "owasp.org (FQDN) --> mx_record --> aspmx.l.google.com (FQDN)\n"
+    "genai.owasp.org (FQDN) --> a_record --> 192.0.78.146 (IPAddress)\n"
+    "training.owasp.org (FQDN) --> a_record --> 104.20.44.163 (IPAddress)\n"
+    "devsecops.owasp.org (FQDN) --> aaaa_record --> 2606:4700:10::6814:2ca3 (IPAddress)\n"
+    "192.0.64.0/18 (Netblock) --> contains --> 192.0.78.146 (IPAddress)\n"
+    "2635 (ASN) --> managed_by --> AUTOMATTIC - Automattic, Inc (RIROrganization)\n")
+
+
+def test_amass_subdomain_summary_from_relationship_output():
+    rows = lst.parse_tool("amass", _AMASS_SAMPLE, "owasp.org", 1, "http://owasp.org")
+    _assert_shape(rows)
+    assert len(rows) == 1 and rows[0]["source_slug"] == "amass"
+    # left-column FQDNs only (owasp.org deduped, 3 subs) — ASN 2635 + Netblock 192.0.64.0/18 dropped
+    assert "4 subdomain" in rows[0]["fields"]["title"]
+    ev = rows[0]["fields"]["evidence"]
+    assert "genai.owasp.org" in ev and "2635" not in ev and "192.0.64.0/18" not in ev
+    assert lst.parse_tool("amass", "", "owasp.org", 1, "http://owasp.org") == []    # empty -> honest skip
+
+
+def test_amass_argv_bounded_gated_and_fallback():
+    spec = next(s for s in lst.LINUX_SCAN_TOOLS if s["name"] == "amass")
+    assert spec["fallback_for"] == "subfinder"                 # second opinion only when subfinder is dry
+    assert 0 < int(spec["timeout"]) <= 600
+    joined = " ".join(spec["argv"]("owasp.org", "http://owasp.org"))
+    assert "amass enum -passive" in joined                     # same invocation as the cloud-lane fallback
+    assert "-timeout 3" in joined and "| head -n 2000" in joined   # bounded; stdout captured (container timeout caps)
+    assert "*[A-Za-z]*" in joined                              # bare-IP applicability gate (no domain -> skip)
+    assert "-silent" not in joined                             # NOT -silent: names must reach stdout to be read
+
+
+def test_amass_fallback_fires_only_on_subfinder_empty(monkeypatch):
+    def make_fake(subfinder_out):
+        def fake_run(lane, argv, timeout=0, input_bytes=None, phase="scan", subtype=None, **kwargs):
+            j = " ".join(argv)
+            if "subfinder -d" in j:
+                return {"stdout": subfinder_out, "stderr": "", "rc": 0, "error": None}
+            if "amass enum" in j:
+                return {"stdout": _AMASS_SAMPLE, "stderr": "", "rc": 0, "error": None}
+            return {"stdout": "", "stderr": "", "rc": 0, "error": None}
+        return fake_run
+
+    # subfinder SUCCEEDS -> amass fallback stays DORMANT (zero added cost)
+    monkeypatch.setattr(svc, "_lane_container_run", make_fake("www.owasp.org\napi.owasp.org\n"))
+    ok = svc._lane_scan_arsenal_rows("internal", "linux", "owasp.org", 1, "http://owasp.org")
+    assert any(r["source_slug"] == "subfinder" for r in ok)
+    assert not any(r["source_slug"] == "amass" for r in ok)
+    # subfinder EMPTY -> amass fires and contributes its rows
+    monkeypatch.setattr(svc, "_lane_container_run", make_fake(""))
+    fb = svc._lane_scan_arsenal_rows("internal", "linux", "owasp.org", 1, "http://owasp.org")
+    assert not any(r["source_slug"] == "subfinder" for r in fb)
+    assert any(r["source_slug"] == "amass" for r in fb)
