@@ -19,9 +19,12 @@ MSF_RPC_SSL ("1"/"true" => https).
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     import msgpack as _msgpack
@@ -61,11 +64,10 @@ class MsfRpc:
         self.host = host or os.getenv("MSF_RPC_HOST", "127.0.0.1")
         self.port = int(port or os.getenv("MSF_RPC_PORT", "55553"))
         self.user = user or os.getenv("MSF_RPC_USER", "msf")
-        self.password = (
-            password
-            or os.getenv("MSF_RPC_PASSWORD")
-            or "avaMsfPass1"
-        )
+        # No hardcoded default: an unset MSF_RPC_PASSWORD fails closed (available()
+        # is False, every public method degrades) rather than connecting with a
+        # known password. Generate a strong per-deployment value (see .env.example).
+        self.password = password or os.getenv("MSF_RPC_PASSWORD") or None
         if ssl is None:
             ssl = os.getenv("MSF_RPC_SSL", "").strip().lower() in ("1", "true", "yes")
         self.ssl = bool(ssl)
@@ -110,6 +112,11 @@ class MsfRpc:
         return self._decode(_msgpack.unpackb(resp.content, raw=False))
 
     def _login(self) -> Optional[str]:
+        if not self.password:
+            logger.warning(
+                "MSF_RPC_PASSWORD is not set — Metasploit RPC disabled (fail-closed, "
+                "no default password). Set a strong per-deployment value (see .env.example).")
+            return None
         reply = self._post(["auth.login", self.user, self.password])
         token = reply.get("token") if isinstance(reply, dict) else None
         self._token = token
@@ -329,10 +336,26 @@ def demo() -> None:
     assert isinstance(chk, dict) and chk["code"] in {"error", "unknown"}, chk
     ex = c.run_exploit("exploit/windows/smb/ms17_010_eternalblue", "10.0.0.1", 445)
     assert ex["session"] is None and ex["error"], ex
-    # env override + default password
-    d = MsfRpc()
-    assert d.host == os.getenv("MSF_RPC_HOST", "127.0.0.1")
-    assert d.password  # env or the default
+    # fail-closed: unset password -> no connect, available() False, no default literal
+    _saved = os.environ.pop("MSF_RPC_PASSWORD", None)
+    try:
+        u = MsfRpc()
+        assert u.password is None, u.password
+        assert u.available() is False
+    finally:
+        if _saved is not None:
+            os.environ["MSF_RPC_PASSWORD"] = _saved
+    # set password -> client uses the env value verbatim (never a default)
+    os.environ["MSF_RPC_PASSWORD"] = "env-set-pw-xyz"
+    try:
+        d = MsfRpc()
+        assert d.host == os.getenv("MSF_RPC_HOST", "127.0.0.1")
+        assert d.password == "env-set-pw-xyz", d.password
+    finally:
+        if _saved is not None:
+            os.environ["MSF_RPC_PASSWORD"] = _saved
+        else:
+            os.environ.pop("MSF_RPC_PASSWORD", None)
     assert d._split("exploit/windows/smb/x") == ("exploit", "windows/smb/x")
     assert d._split("x") == ("exploit", "x")
     assert _CHECK_MAP["appears"] == "vulnerable" and _CHECK_MAP["safe"] == "safe"
