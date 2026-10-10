@@ -107,7 +107,11 @@ class MsfRpc:
         )
         if resp.status_code != 200:
             raise RuntimeError(f"msfrpcd HTTP {resp.status_code}: {resp.text[:120]}")
-        return self._decode(_msgpack.unpackb(resp.content, raw=False))
+        # strict_map_key=False is REQUIRED: session.list / job.list key their maps by INTEGER id
+        # ({1: {...}}). With msgpack's default strict_map_key=True, unpackb RAISES on those int keys, so
+        # _session_ids() (which swallows the error -> empty set) could NEVER see an opened session, and every
+        # real exploit reported "no session opened". This is the one-line reason detonations didn't register.
+        return self._decode(_msgpack.unpackb(resp.content, raw=False, strict_map_key=False))
 
     def _login(self) -> Optional[str]:
         reply = self._post(["auth.login", self.user, self.password])
@@ -361,25 +365,38 @@ class MsfRpc:
         is_windows = "win" in platform
         cmd = "whoami" if is_windows else "id"
 
+        def _data(out) -> str:
+            d = out.get("data", "") if isinstance(out, dict) else out
+            if isinstance(d, bytes):
+                d = d.decode(errors="replace")
+            return str(d or "")
+
+        # ACCUMULATE reads: a command shell BUFFERS, so a single immediate read after the write often returns
+        # empty even though the session is live + rooted (observed in live-fire — the proof came back empty
+        # while a retry loop captured the real `id` output). Drain the banner first, write the probe, then poll.
+        buf = ""
         if stype == "meterpreter":
             try:
                 self._call("session.meterpreter_run_single", sid, cmd)
             except Exception:
                 pass
-            time.sleep(1.0)
-            out = self._call("session.meterpreter_read", sid)
+            for _ in range(6):
+                time.sleep(0.8)
+                buf += _data(self._call("session.meterpreter_read", sid))
+                if buf.strip():
+                    break
         else:
-            # shell session
+            try:
+                self._call("session.shell_read", sid)       # drain any banner
+            except Exception:
+                pass
             self._call("session.shell_write", sid, cmd + "\n")
-            time.sleep(1.2)
-            out = self._call("session.shell_read", sid)
-        if isinstance(out, dict):
-            data = out.get("data", "")
-        else:
-            data = out
-        if isinstance(data, bytes):
-            data = data.decode(errors="replace")
-        return str(data or "").strip()[:2000]
+            for _ in range(6):
+                time.sleep(0.8)
+                buf += _data(self._call("session.shell_read", sid))
+                if buf.strip():
+                    break
+        return buf.strip()[:2000]
 
 
 def demo() -> None:
@@ -400,6 +417,13 @@ def demo() -> None:
     assert d._split("exploit/windows/smb/x") == ("exploit", "windows/smb/x")
     assert d._split("x") == ("exploit", "x")
     assert _CHECK_MAP["appears"] == "vulnerable" and _CHECK_MAP["safe"] == "safe"
+    # payload selector — compatible BIND shell preferred, target-altering skipped, reverse only with a route
+    assert MsfRpc._select_payload([]) is None
+    assert MsfRpc._select_payload(["cmd/unix/reverse_bash", "cmd/unix/bind_perl"]) == "cmd/unix/bind_perl"
+    assert MsfRpc._select_payload(["cmd/unix/bind_perl", "generic/shell_bind_tcp"]) == "generic/shell_bind_tcp"
+    assert MsfRpc._select_payload(["cmd/unix/adduser", "cmd/unix/bind_perl"]) == "cmd/unix/bind_perl"
+    assert MsfRpc._select_payload(["cmd/unix/reverse"], reverse_ok=False) is None
+    assert MsfRpc._select_payload(["cmd/unix/reverse"], reverse_ok=True) == "cmd/unix/reverse"
     print("metasploit_rpc demo OK (msgpack=%s requests=%s)" % (
         _msgpack is not None, _requests is not None))
 
