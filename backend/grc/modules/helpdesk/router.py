@@ -31,7 +31,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...routers.auth_router import require_auth, require_tenant_permission
-from ...models import GRCUser, IntegrationConnection, get_db
+from ...models import GRCUser, IntegrationConnection, Tenant, get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk"])
@@ -64,9 +64,42 @@ def _resolve_connection(db: Session) -> Optional[IntegrationConnection]:
         return None
 
 
+def _tenant_partition(db: Session) -> Optional[str]:
+    """The tenant's partition, derived SERVER-SIDE from the tenant itself.
+
+    Deliberately NOT customer-supplied: a tenant must never see — let alone
+    change — which partition it reads. `get_db` already bound this request to
+    the tenant's own database, so the single Tenant row here IS the caller.
+    """
+    try:
+        t = db.query(Tenant).first()
+        if t is not None:
+            return getattr(t, "slug", None) or getattr(t, "subdomain", None) or None
+    except Exception:
+        logger.exception("helpdesk: tenant partition lookup failed")
+    return None
+
+
 def _ctx(db: Session) -> Dict[str, Any]:
-    """Resolve the Frappe endpoint + credentials + tenant partition for THIS
-    request's tenant. Connection first (per-tenant), env fallback for dev."""
+    """Frappe is AVA's OWN infrastructure — not a customer-owned third party.
+
+    Credentials therefore come from PLATFORM config (server env, set once by the
+    operator), NEVER from a per-tenant connector the customer fills in: the
+    client must never learn that an external engine exists. Tenant separation is
+    still absolute — enforced by a partition derived from the tenant itself.
+
+    The IntegrationConnection branch survives only as an operator-level override
+    (e.g. pinning one tenant to a dedicated Frappe). It is hidden from the
+    customer-facing connectors UI and never asks the client for anything.
+    """
+    partition = _tenant_partition(db)
+    url = (os.getenv("HELPDESK_FRAPPE_URL") or "").rstrip("/")
+    key = os.getenv("HELPDESK_FRAPPE_KEY") or ""
+    secret = os.getenv("HELPDESK_FRAPPE_SECRET") or ""
+    if url and key:
+        return {"url": url, "key": key, "secret": secret, "partition": partition,
+                "verify": True, "source": "platform"}
+
     conn = _resolve_connection(db)
     if conn is not None:
         try:
@@ -76,23 +109,17 @@ def _ctx(db: Session) -> Dict[str, Any]:
             logger.exception("helpdesk: credential decrypt failed")
             creds = {}
         cfg = conn.provider_config or {}
-        partition = (str(cfg.get("ava_tenant") or "").strip() or None)
         return {
             "url": (conn.console_url or "").rstrip("/"),
             "key": creds.get("api_key", ""),
             "secret": creds.get("api_secret", ""),
+            # partition stays tenant-derived — never read from provider_config
             "partition": partition,
             "verify": bool(cfg.get("verify_ssl", True)),
-            "source": "connection",
+            "source": "operator-override",
         }
-    return {
-        "url": (os.getenv("HELPDESK_FRAPPE_URL") or "http://localhost:8088").rstrip("/"),
-        "key": os.getenv("HELPDESK_FRAPPE_KEY") or "",
-        "secret": os.getenv("HELPDESK_FRAPPE_SECRET") or "",
-        "partition": None,
-        "verify": True,
-        "source": "env",
-    }
+    return {"url": "", "key": "", "secret": "", "partition": partition,
+            "verify": True, "source": "unconfigured"}
 
 
 def _tenant_filters(ctx: Dict[str, Any], base: Optional[list] = None) -> Optional[list]:

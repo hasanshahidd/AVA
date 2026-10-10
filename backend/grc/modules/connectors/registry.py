@@ -41,6 +41,11 @@ class ProviderMeta:
     beta: bool = False
     oauth_scopes: List[str] = field(default_factory=list)
     docs_url: Optional[str] = None
+    # AVA-OWNED infrastructure rather than a customer-owned third party. Such a
+    # provider is registered (so the adapter resolves) but NEVER listed in the
+    # customer-facing connectors UI — the client must not learn it exists, and
+    # is never asked for its credentials. Operators configure it platform-side.
+    internal: bool = False
 
 
 # Registry is populated below from each adapter module's

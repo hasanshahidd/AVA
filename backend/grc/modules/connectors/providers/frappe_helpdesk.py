@@ -185,9 +185,12 @@ META = ProviderMeta(
     provider="frappe_helpdesk",
     label="Frappe Helpdesk",
     category="ticketing",
-    description="Push vulnerabilities to Frappe Helpdesk tickets and sync status back.",
+    description="Internal AVA Help Desk engine (platform-managed, not customer-configurable).",
     auth_method="token",
     adapter_cls=FrappeHelpdeskAdapter,
+    # AVA's own infrastructure — registered so the adapter resolves, but hidden
+    # from the customer-facing connectors UI. Clients never see it or supply keys.
+    internal=True,
     fields=[
         ProviderField("console_url", "Base URL", "url", required=True,
                       placeholder="https://helpdesk.example.com", is_credential=False),

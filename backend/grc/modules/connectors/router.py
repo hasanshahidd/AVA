@@ -146,7 +146,12 @@ def get_providers(
     return {
         "encryption_enabled": has_master_key(),
         "categories": ["ticketing", "siem", "pentest", "collab", "transcribe", "easm_source"],
-        "providers": [_serialise_provider(p) for p in list_providers(category)],
+        # `internal` providers are AVA's own infrastructure (e.g. the Help Desk
+        # engine), configured platform-side. They are deliberately NOT offered to
+        # customers — the client must never be asked to wire up, or even see, an
+        # engine we run ourselves.
+        "providers": [_serialise_provider(p) for p in list_providers(category)
+                      if not getattr(p, "internal", False)],
     }
 
 
