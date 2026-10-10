@@ -6,15 +6,29 @@
 // The page title lives in the top bar (Header PAGE_TITLES '/reports'), so the
 // body renders only the report cards — no second heading.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Landmark, Download, ChevronDown, Search, Loader2, AlertCircle, FileSpreadsheet,
+  FileText, FileCode2, Table, Boxes, BarChart3, Clock,
   type LucideIcon,
 } from 'lucide-react';
 import { apiClient, assetsApi } from '@/lib/api';
 import type { ITAsset } from '@/types';
 
 const ACCENT = 'var(--color-base)';
+
+// Push a fetched blob to the browser as a download. Prefers the server's
+// Content-Disposition filename, falls back to the passed one.
+function saveBlob(res: { data: unknown; headers?: Record<string, string> }, fallback: string) {
+  const cd = res.headers?.['content-disposition'] || '';
+  const m = /filename="?([^"]+)"?/.exec(cd);
+  const name = m ? m[1] : fallback;
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // Trigger a browser download of the SBP workbook. assetId omitted → whole tenant;
 // present → just that asset's row (backend ?asset_id=).
@@ -25,12 +39,7 @@ async function downloadSbp(assetId?: number, label?: string) {
   });
   const today = new Date().toISOString().slice(0, 10);
   const slug = label ? label.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) : '';
-  const url = URL.createObjectURL(res.data as Blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `SBP-Inventory-${slug ? slug + '-' : ''}${today}.xlsx`;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+  saveBlob(res, `SBP-Inventory-${slug ? slug + '-' : ''}${today}.xlsx`);
 }
 
 // ── Generic card shell: icon + title + description, right-aligned actions, and
@@ -187,8 +196,153 @@ function SbpReportCard() {
   );
 }
 
-// Report registry — add another component here to add a second report card.
-const REPORTS: React.ComponentType[] = [SbpReportCard];
+// ── IT asset-inventory reports (backend: /asset-reports) ──────────────────────
+type AssetReportType = { key: string; title: string; description: string; detail: boolean };
+type GeneratedReport = {
+  id: number; report_key: string; report_title: string; fmt: string;
+  filename: string; size_bytes: number; asset_count: number;
+  generated_by: string | null; generated_at: string | null;
+};
+
+// The four standard downloadable formats, in a fixed display order.
+const FORMAT_META: Record<string, { label: string; icon: LucideIcon }> = {
+  pdf: { label: 'PDF', icon: FileText },
+  xlsx: { label: 'Excel', icon: FileSpreadsheet },
+  csv: { label: 'CSV', icon: Table },
+  html: { label: 'HTML', icon: FileCode2 },
+};
+const FORMAT_ORDER = ['pdf', 'xlsx', 'csv', 'html'];
+const REPORT_ICON: Record<string, LucideIcon> = { inventory: Boxes, executive: BarChart3 };
+
+function AssetReportCard({ report }: { report: AssetReportType }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async (fmt: string) => {
+    setBusy(fmt); setErr(null);
+    try {
+      const res = await apiClient.post('/asset-reports/generate', null, {
+        params: { report: report.key, fmt }, responseType: 'blob',
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      saveBlob(res, `${report.key}-${today}.${fmt}`);
+      qc.invalidateQueries({ queryKey: ['asset-reports-history'] });
+    } catch {
+      setErr('Generation failed — please try again.');
+    } finally { setBusy(null); }
+  };
+
+  const actions = (
+    <>
+      {FORMAT_ORDER.map((fmt) => {
+        const meta = FORMAT_META[fmt];
+        const Icon = meta.icon;
+        return (
+          <button key={fmt} onClick={() => run(fmt)} disabled={busy !== null}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-subtle)] disabled:opacity-60">
+            {busy === fmt ? <Loader2 size={15} className="animate-spin" /> : <Icon size={15} />}
+            {meta.label}
+          </button>
+        );
+      })}
+    </>
+  );
+
+  return (
+    <ReportCardShell
+      icon={REPORT_ICON[report.key] || FileText}
+      title={report.title}
+      description={report.description}
+      actions={actions}>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--color-border)] pt-3 text-[13px]">
+        <span className="text-[var(--color-muted)]">
+          {report.detail ? 'Estate summary + full asset register' : 'Estate summary only — no per-asset rows'}
+          {' · '}Pulled live from the IT asset inventory
+        </span>
+        {err && (
+          <span className="inline-flex items-center gap-1 text-[var(--color-danger)]">
+            <AlertCircle size={14} /> {err}
+          </span>
+        )}
+      </div>
+    </ReportCardShell>
+  );
+}
+
+function fmtSize(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// History of generated asset reports — each one re-downloadable as the exact
+// point-in-time file it was (backend stores the bytes).
+function GeneratedReportsHistory() {
+  const [busy, setBusy] = useState<number | null>(null);
+  const { data, isLoading } = useQuery({
+    queryKey: ['asset-reports-history'],
+    queryFn: async () => (await apiClient.get('/asset-reports')).data as GeneratedReport[],
+  });
+
+  const download = async (r: GeneratedReport) => {
+    setBusy(r.id);
+    try {
+      const res = await apiClient.get(`/asset-reports/${r.id}/download`, { responseType: 'blob' });
+      saveBlob(res, r.filename);
+    } finally { setBusy(null); }
+  };
+
+  if (!isLoading && (!data || data.length === 0)) return null;
+
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <Clock size={16} style={{ color: ACCENT }} />
+        <h2 className="text-[15px] font-semibold text-[var(--color-text)]">Generated reports</h2>
+      </div>
+      {isLoading ? (
+        <div className="flex items-center gap-2 py-3 text-sm text-[var(--color-muted)]">
+          <Loader2 size={14} className="animate-spin" /> Loading…
+        </div>
+      ) : (
+        <div className="divide-y divide-[var(--color-border)]">
+          {data!.map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
+              <div className="min-w-0">
+                <span className="block truncate text-sm font-medium text-[var(--color-text)]">
+                  {r.report_title} <span className="uppercase text-[var(--color-muted)]">· {r.fmt}</span>
+                </span>
+                <span className="block truncate text-xs text-[var(--color-muted)]">
+                  {r.asset_count} asset{r.asset_count === 1 ? '' : 's'} · {fmtSize(r.size_bytes)}
+                  {r.generated_at ? ` · ${new Date(r.generated_at).toLocaleString()}` : ''}
+                  {r.generated_by ? ` · ${r.generated_by}` : ''}
+                </span>
+              </div>
+              <button onClick={() => download(r)} disabled={busy === r.id}
+                className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-subtle)] disabled:opacity-60">
+                {busy === r.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                Download
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Fetches the asset-report catalogue and renders a card per report type.
+function AssetReportCards() {
+  const { data } = useQuery({
+    queryKey: ['asset-report-types'],
+    queryFn: async () => (await apiClient.get('/asset-reports/types')).data as { reports: AssetReportType[] },
+  });
+  return <>{(data?.reports || []).map((r) => <AssetReportCard key={r.key} report={r} />)}</>;
+}
+
+// Report registry — add another component here to add a report card.
+const REPORTS: React.ComponentType[] = [SbpReportCard, AssetReportCards, GeneratedReportsHistory];
 
 export default function ReportsPage() {
   return (
