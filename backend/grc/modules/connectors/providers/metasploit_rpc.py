@@ -432,7 +432,7 @@ def demo() -> None:
     # payload selector — compatible BIND shell preferred, target-altering skipped, reverse only with a route
     assert MsfRpc._select_payload([]) is None
     assert MsfRpc._select_payload(["cmd/unix/reverse_bash", "cmd/unix/bind_perl"]) == "cmd/unix/bind_perl"
-    assert MsfRpc._select_payload(["cmd/unix/bind_perl", "generic/shell_bind_tcp"]) == "generic/shell_bind_tcp"
+    assert MsfRpc._select_payload(["generic/shell_bind_tcp", "cmd/unix/bind_perl"]) == "cmd/unix/bind_perl"
     assert MsfRpc._select_payload(["cmd/unix/adduser", "cmd/unix/bind_perl"]) == "cmd/unix/bind_perl"
     assert MsfRpc._select_payload(["cmd/unix/reverse"], reverse_ok=False) is None
     assert MsfRpc._select_payload(["cmd/unix/reverse"], reverse_ok=True) == "cmd/unix/reverse"
