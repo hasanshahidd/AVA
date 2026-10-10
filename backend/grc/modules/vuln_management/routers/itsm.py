@@ -73,6 +73,49 @@ def sync_itsm_statuses(
     return counts
 
 
+@router.get("/helpdesk/tickets")
+def helpdesk_tickets(
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+    _perm: bool = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:view")),
+):
+    """Help Desk board — every ticket AVA has opened for this tenant, joined to
+    its finding, with a status summary. Powers AVA's native Help Desk screen;
+    the ticket engine (Frappe) stays invisible behind the connector."""
+    tenants = get_user_tenants(current_user, db)
+    rows = (
+        db.query(VulnTicketLink, Vulnerability, IntegrationConnection)
+        .join(Vulnerability, Vulnerability.id == VulnTicketLink.vulnerability_id)
+        .outerjoin(IntegrationConnection, IntegrationConnection.id == VulnTicketLink.connection_id)
+        .filter(VulnTicketLink.tenant_id.in_(tenants))
+        .order_by(VulnTicketLink.pushed_at.desc().nullslast())
+        .all()
+    )
+    tickets = []
+    summary = {"new": 0, "in_progress": 0, "on_hold": 0, "resolved": 0, "closed": 0, "cancelled": 0}
+    for link, vuln, conn in rows:
+        status = link.normalised_status or "new"
+        if status in summary:
+            summary[status] += 1
+        tickets.append({
+            "ticket_id": link.external_ticket_id,
+            "status": status,
+            "raw_status": link.ticket_status,
+            "finding_id": vuln.id,
+            "vuln_id": vuln.vuln_id,
+            "title": vuln.title,
+            "severity": vuln.severity,
+            "cve_id": vuln.cve_id,
+            "affected_host": vuln.affected_host,
+            "connection": conn.connection_name if conn else None,
+            "pushed_at": link.pushed_at.isoformat() if link.pushed_at else None,
+            "last_synced_at": link.last_synced_at.isoformat() if link.last_synced_at else None,
+            "resolved_at": link.resolved_at.isoformat() if link.resolved_at else None,
+            "push_error": link.push_error,
+        })
+    return {"tickets": tickets, "summary": summary, "total": len(tickets)}
+
+
 @router.get("/vulnerabilities/{vuln_id}/itsm-tickets")
 def list_itsm_tickets(
     vuln_id: int,

@@ -170,6 +170,9 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
           })}
         </ul>
       )}
+      <Link href="/helpdesk/tickets" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
+        <ExternalLink className="h-3.5 w-3.5" /> View in Help Desk →
+      </Link>
       {tickets.length > 0 && (
         <p className="mt-1.5 text-[10px] text-slate-400">
           Statuses as of the last manual sync — there is no scheduler in this deployment; use the

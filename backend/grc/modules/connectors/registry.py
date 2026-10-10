@@ -101,6 +101,7 @@ def _bootstrap() -> None:
     provider_modules = [
         # Ticketing — vuln ticketing
         "grc.modules.connectors.providers.servicenow",
+        "grc.modules.connectors.providers.frappe_helpdesk",
         # SIEM — exploitation-signal pulls
         "grc.modules.connectors.providers.splunk",
         "grc.modules.connectors.providers.wazuh",

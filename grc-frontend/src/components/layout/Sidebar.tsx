@@ -39,6 +39,11 @@ import {
   PlayCircle,
   Bookmark,
   Building2,
+  Ticket,
+  UsersRound,
+  Contact,
+  BookOpen,
+  MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -91,26 +96,43 @@ const extractModuleFromPerm = (perm: string): string => {
 };
 
 const navigation: NavEntry[] = [
+  // Cross-product home — no perm gate: always visible.
+  { name: 'Performance', href: '/dashboard', icon: LayoutDashboard },
   {
-    name: 'Cybersecurity Assurance',
-    icon: ShieldCheck,
+    name: 'IT Asset',
+    icon: Server,
     items: [
-      // Performance dashboard — Admin + Team views across all Ava modules.
-      // No perm gate: it's the product's home surface, always visible.
-      { name: 'Performance',               href: '/dashboard',                     icon: LayoutDashboard },
-      // IT Asset Discovery — from feat/pdpl-ndmo-assessment.
-      // Preview UI wired into nav; confirm discovery endpoints before customer demos.
       { name: 'IT Asset Discovery',        href: '/asset-discovery',               icon: Radar,         requiredPermissions: ['assets:asset_inventory:*'] },
-      // CIS Benchmark merged into IT Asset Inventory as a tab (/assets?tab=cis).
       { name: 'IT Asset Inventory',        href: '/assets',                        icon: Server,        requiredPermissions: ['assets:asset_inventory:*'] },
       { name: 'Assets Risk Posture',       href: '/risk-posture',                  icon: Activity,      requiredPermissions: ['erm:risks:*'] },
-      // Hidden until wired to real data (was showing demo/seed assessments). Route + feature stay intact at /assets/criticality-assessments.
-      // { name: 'Criticality Assessments',   href: '/assets/criticality-assessments', icon: ClipboardCheck, requiredPermissions: ['assets:criticality_assessments:view'] },
-      { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
-      { name: 'AI Pentest',              href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
-      { name: 'Reports',                 href: '/reports',                       icon: FileText,      requiredPermissions: ['assets:asset_inventory:*'] },
     ],
   },
+  {
+    name: 'Cybersecurity',
+    icon: ShieldCheck,
+    items: [
+      { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
+      { name: 'AI Pentest',                href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
+    ],
+  },
+  {
+    // Help Desk — AVA-native service desk; findings become remediation tickets.
+    // Backed by an isolated Frappe engine over REST (tenant-scoped proxy).
+    name: 'Help Desk',
+    icon: LifeBuoy,
+    items: [
+      { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard },
+      { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket },
+      { name: 'Agents',           href: '/helpdesk/agents',     icon: Users },
+      { name: 'Teams',            href: '/helpdesk/teams',      icon: UsersRound },
+      { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2 },
+      { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact },
+      { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen },
+      { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText },
+    ],
+  },
+  // Reports — its own top-level module.
+  { name: 'Reports', href: '/reports', icon: FileText, requiredPermissions: ['assets:asset_inventory:*'] },
 ];
 
 function isGroup(item: NavEntry): item is NavGroup {
@@ -273,10 +295,10 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
       <button
         onClick={() => setIsOpen(prev => !prev)}
         className={clsx(
-          'group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150',
+          'group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[14px] font-semibold transition-colors duration-150',
           hasActiveChild
-            ? 'font-semibold text-[var(--color-text)]'
-            : 'font-normal text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--color-text)]'
+            ? 'text-[var(--color-text)]'
+            : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--color-text)]'
         )}
       >
         {GroupIcon && (
@@ -581,7 +603,7 @@ export default function Sidebar() {
     }, []);
   // Ava is a cybersecurity-assurance product only. Show just that section; the
   // rest of the cloned GRC nav (Governance, Compliance, ERM, …) is hidden.
-  const CYBER_SECTIONS = new Set(['Cybersecurity Assurance']);
+  const CYBER_SECTIONS = new Set(['Performance', 'IT Asset', 'Cybersecurity', 'Help Desk', 'Reports']);
   const filteredNavigation: NavEntry[] = loaded
     ? filterEntries(navigation).filter((e) => CYBER_SECTIONS.has(e.name))
     : [];

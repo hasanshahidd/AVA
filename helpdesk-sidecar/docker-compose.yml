@@ -1,0 +1,45 @@
+# Frappe Helpdesk — isolated sidecar next to AVA.
+# AVA talks to it ONLY over REST (http://localhost:8000). Data lives in a named
+# Docker volume (NOT in this OneDrive folder) so sync never touches the DB.
+# Based on frappe/helpdesk's own docker/docker-compose.yml (unmodified app).
+#
+# Run:   docker compose up -d       (first boot builds the bench — several minutes)
+# Logs:  docker compose logs -f frappe
+# URL:   http://helpdesk.localhost:8000   (login Administrator / admin)
+services:
+  mariadb:
+    image: mariadb:10.8
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: "123"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+
+  frappe:
+    image: frappe/bench:latest
+    command: bash /workspace/init.sh
+    environment:
+      - SHELL=/bin/bash
+      - FRAPPE_BRANCH=${FRAPPE_BRANCH:-version-15}
+      - HELPDESK_BRANCH=${HELPDESK_BRANCH:-version-15}
+    working_dir: /home/frappe
+    volumes:
+      - .:/workspace
+      - bench-data:/home/frappe
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    depends_on:
+      - mariadb
+      - redis
+
+volumes:
+  mariadb-data:
+  bench-data:
