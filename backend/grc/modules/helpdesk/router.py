@@ -696,7 +696,7 @@ def _canned_spec(ctx: Dict[str, Any]) -> tuple:
     The existence probe is itself PARTITION-FILTERED so it can never surface
     another tenant's reply names: an empty list ([]) still proves the doctype
     exists, while None means it does not (or the query errored)."""
-    for dt, tf in (("HD Canned Response", "title"), ("HD Saved Reply", "subject")):
+    for dt, tf in (("HD Canned Response", "title"), ("HD Saved Reply", "title")):
         probe = _resource(ctx, dt, ["name"], filters=_tenant_filters(ctx), limit=1)
         # _resource returns [] on a successful empty result AND on error, so
         # fall back to a raw _get only to distinguish doctype-missing from empty.
