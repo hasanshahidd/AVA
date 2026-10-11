@@ -149,7 +149,10 @@ def _auto_cfg(conn: IntegrationConnection) -> Dict[str, Any]:
         limit = int(os.getenv("HELPDESK_AUTO_LIMIT") or cfg.get("auto_limit", 25))
     except (TypeError, ValueError):
         limit = 25
-    return {"enabled": enabled, "severities": sevs, "limit": max(1, limit)}
+    inet_env = (os.getenv("HELPDESK_AUTO_INTERNET_FACING") or "").strip().lower()
+    require_internet = (inet_env in ("1", "true", "yes")) if inet_env else bool(cfg.get("auto_internet_facing", False))
+    return {"enabled": enabled, "severities": sevs, "limit": max(1, limit),
+            "require_internet_facing": require_internet}
 
 
 def _ticketing_status_sync(conn: IntegrationConnection, db: Session) -> SyncResult:
@@ -214,6 +217,23 @@ def _sync_ticketing(adapter: TicketingAdapter, conn: IntegrationConnection, db: 
         .order_by(Vulnerability.id.desc())
         .all()
     )
+    # Policy filter: internet-facing only. A finding is internet-facing when any of
+    # its linked assets is exposed — same definition the register KPI uses
+    # (ITAsset.internet_facing OR is_internet_facing). Computed as one set query.
+    if cfg.get("require_internet_facing") and candidates:
+        from sqlalchemy import or_ as _or
+        from ...models import VulnerabilityAssetLink, ITAsset
+        cand_ids = [v.id for v in candidates]
+        exposed_ids = {
+            row[0] for row in db.query(VulnerabilityAssetLink.vulnerability_id)
+            .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
+            .filter(
+                VulnerabilityAssetLink.vulnerability_id.in_(cand_ids),
+                _or(ITAsset.internet_facing.is_(True), ITAsset.is_internet_facing.is_(True)),
+            ).all()
+        }
+        candidates = [v for v in candidates if v.id in exposed_ids]
+
     todo = [v for v in candidates
             if v.id not in linked and (v.status or "open") in OPEN_STATES][:cfg["limit"]]
 
@@ -236,6 +256,7 @@ def _sync_ticketing(adapter: TicketingAdapter, conn: IntegrationConnection, db: 
     result.details.update(status.details)
     result.errors.extend(status.errors)
     result.details["auto"] = {"severities": cfg["severities"], "limit": cfg["limit"],
+                              "internet_facing_only": cfg.get("require_internet_facing", False),
                               "considered": len(todo)}
     result.success = not result.errors
     return result

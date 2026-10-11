@@ -9,7 +9,8 @@ import pytest
 
 from grc.modules.connectors.sync_runner import _auto_cfg
 
-ENV_KEYS = ("HELPDESK_AUTO_TICKET", "HELPDESK_AUTO_SEVERITIES", "HELPDESK_AUTO_LIMIT")
+ENV_KEYS = ("HELPDESK_AUTO_TICKET", "HELPDESK_AUTO_SEVERITIES", "HELPDESK_AUTO_LIMIT",
+            "HELPDESK_AUTO_INTERNET_FACING")
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +25,18 @@ def _conn(cfg=None):
 
 def test_default_off_critical_only():
     c = _auto_cfg(_conn(None))
-    assert c == {"enabled": False, "severities": ["critical"], "limit": 25}
+    assert c == {"enabled": False, "severities": ["critical"], "limit": 25,
+                 "require_internet_facing": False}
+
+
+def test_critical_plus_internet_facing_policy(monkeypatch):
+    monkeypatch.setenv("HELPDESK_AUTO_TICKET", "true")
+    monkeypatch.setenv("HELPDESK_AUTO_SEVERITIES", "critical")
+    monkeypatch.setenv("HELPDESK_AUTO_INTERNET_FACING", "true")
+    c = _auto_cfg(_conn(None))
+    assert c["enabled"] is True
+    assert c["severities"] == ["critical"]
+    assert c["require_internet_facing"] is True
 
 
 def test_env_enables_and_overrides_config(monkeypatch):
@@ -39,7 +51,8 @@ def test_env_enables_and_overrides_config(monkeypatch):
 
 def test_per_connection_config_when_no_env():
     c = _auto_cfg(_conn({"auto_ticket": True, "auto_severities": ["High"], "auto_limit": 10}))
-    assert c == {"enabled": True, "severities": ["high"], "limit": 10}
+    assert c == {"enabled": True, "severities": ["high"], "limit": 10,
+                 "require_internet_facing": False}
 
 
 def test_bad_limit_falls_back():
