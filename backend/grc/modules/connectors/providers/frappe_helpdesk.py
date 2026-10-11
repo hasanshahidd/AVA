@@ -10,6 +10,7 @@ No asset sync: the affected host rides along as a custom field, not a CMDB row.
 """
 from __future__ import annotations
 
+import html
 import json
 import logging
 from datetime import datetime
@@ -26,6 +27,22 @@ from ..base import (
 from ..registry import ProviderField, ProviderMeta
 
 logger = logging.getLogger(__name__)
+
+
+def _fit_subject(text: Optional[str], limit: int = 140) -> str:
+    """Frappe's HD Ticket `subject` is a Data field capped at `limit` chars, and
+    Frappe stores it HTML-ESCAPED — so a raw title that fits can still overflow
+    once `<`→`&lt;` etc. expand it (CharacterLengthExceededError 417). Real finding
+    titles are full of `<package>`/`<version>`, so trim against the ESCAPED length,
+    not the raw one, leaving room for a trailing ellipsis. Full title stays in the
+    ticket body."""
+    text = (text or "Finding").strip()
+    if len(html.escape(text)) <= limit:
+        return text
+    while text and len(html.escape(text + "…")) > limit:
+        text = text[:-1]
+    return (text + "…") if text else "Finding"
+
 
 # severity -> HD Ticket Priority (seeded names). Confirm names at connect time
 # with GET /api/resource/HD Ticket Priority if an instance renames them.
@@ -121,7 +138,7 @@ class FrappeHelpdeskAdapter(TicketingAdapter):
         if existing:
             return existing
         payload: Dict[str, Any] = {
-            "subject": request.summary[:140],
+            "subject": _fit_subject(request.summary),
             "description": request.description,
             "priority": _SEV_TO_PRIORITY.get(request.severity, "Medium"),
             "ava_finding_id": request.external_id,

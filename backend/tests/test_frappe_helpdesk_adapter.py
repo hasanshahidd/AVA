@@ -6,10 +6,26 @@ were never auto-assigned. The adapter now defaults `agent_group` to the tenant
 partition (`ava_tenant`) when a team of that name exists. These tests pin that
 behaviour without touching a live Frappe.
 """
+import html
 from types import SimpleNamespace
 
 from grc.modules.connectors.base import TicketRequest
-from grc.modules.connectors.providers.frappe_helpdesk import FrappeHelpdeskAdapter
+from grc.modules.connectors.providers.frappe_helpdesk import FrappeHelpdeskAdapter, _fit_subject
+
+
+def test_fit_subject_fits_escaped_length():
+    # Real failing title: lots of <package>/<version> that balloon when escaped.
+    t = ("Dockerfile DL3013: Pin versions in pip. Instead of `pip install <package>` "
+         "use `pip install <package>==<version>` or `pip install --requirement "
+         "<requirements file>`")
+    s = _fit_subject(t)
+    assert len(html.escape(s)) <= 140   # Frappe validates the ESCAPED length
+    assert s.endswith("…")
+
+
+def test_fit_subject_leaves_short_titles():
+    assert _fit_subject("CVE-2026-1 in pkg") == "CVE-2026-1 in pkg"
+    assert _fit_subject("") == "Finding"
 
 
 def _adapter(config):
