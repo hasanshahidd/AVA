@@ -104,6 +104,22 @@ class FrappeHelpdeskAdapter(TicketingAdapter):
         except Exception:
             return False
 
+    def _ensure_team(self, name: str) -> bool:
+        """Make onboarding automatic: a NEW tenant has no HD Team yet, so
+        agent_group couldn't be set and auto-assignment never fired until someone
+        manually created a team named == the partition. Auto-create it (tagged with
+        the tenant partition for isolation) on first ticket so routing works for
+        every tenant with zero manual setup. Returns True if the team now exists."""
+        if self._team_exists(name):
+            return True
+        try:
+            r = self._req("POST", "/api/resource/HD Team",
+                          json={"team_name": name, "ava_tenant": name})
+            return r.status_code in (200, 201)
+        except Exception:
+            logger.exception("frappe_helpdesk: auto-create team %s failed", name)
+            return False
+
     def _find_by_finding_id(self, ext: str) -> Optional[str]:
         f = json.dumps([["ava_finding_id", "=", ext]])
         r = self._req(
@@ -158,7 +174,7 @@ class FrappeHelpdeskAdapter(TicketingAdapter):
         # agent_group to the partition when a team of that name exists.
         if not team:
             part = self.config.get("ava_tenant")
-            if part and self._team_exists(part):
+            if part and self._ensure_team(part):  # auto-creates the team if new → onboarding is automatic
                 team = part
         if team:
             payload["agent_group"] = team

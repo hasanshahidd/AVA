@@ -41,15 +41,19 @@ def _req(kind="vulnerability"):
                          extra_fields={"cve_id": "CVE-1", "affected_host": "h"})
 
 
-def _stub(adapter, *, team_exists, existing=None):
+def _stub(adapter, *, team_exists, team_create_ok=True, existing=None):
     """Capture the create payload; simulate _find_by_finding_id + team lookup +
-    a successful create — no network."""
-    captured = {}
+    team auto-create + a successful ticket create — no network."""
+    captured = {"team_created": False}
 
     def fake_req(method, path, **kw):
-        if path.startswith("/api/resource/HD Team/"):
+        if path.startswith("/api/resource/HD Team/"):           # GET existence probe
             return SimpleNamespace(status_code=200 if team_exists else 404)
-        if path.startswith("/api/resource/HD Ticket?"):   # idempotency probe
+        if method == "POST" and path == "/api/resource/HD Team":  # auto-create
+            captured["team_created"] = True
+            return SimpleNamespace(status_code=201 if team_create_ok else 417,
+                                   json=lambda: {"data": {"name": kw.get("json", {}).get("team_name")}})
+        if path.startswith("/api/resource/HD Ticket?"):         # idempotency probe
             return SimpleNamespace(status_code=200, json=lambda: {"data": ([{"name": existing}] if existing else [])})
         if method == "POST" and path == "/api/resource/HD Ticket":
             captured["payload"] = kw.get("json")
@@ -66,13 +70,24 @@ def test_agent_group_defaults_to_partition_when_team_exists():
     a.create_ticket(_req())
     assert cap["payload"]["agent_group"] == "ava"      # rule can now fire
     assert cap["payload"]["ava_tenant"] == "ava"
+    assert cap["team_created"] is False                # existing team → no create
 
 
-def test_agent_group_omitted_when_no_team_exists():
-    a = _adapter({"ava_tenant": "ghosttenant"})
-    cap = _stub(a, team_exists=False)
+def test_new_tenant_team_is_auto_created_then_assigned():
+    # Onboarding is automatic: a tenant with no team yet gets one created on first
+    # ticket, and agent_group is set so auto-assignment still fires.
+    a = _adapter({"ava_tenant": "newtenant"})
+    cap = _stub(a, team_exists=False, team_create_ok=True)
     a.create_ticket(_req())
-    # No such team → must NOT set agent_group (would fail Frappe link validation).
+    assert cap["team_created"] is True
+    assert cap["payload"]["agent_group"] == "newtenant"
+
+
+def test_agent_group_omitted_when_team_create_fails():
+    # If the team can't be created, don't set agent_group (would fail Frappe link validation).
+    a = _adapter({"ava_tenant": "ghosttenant"})
+    cap = _stub(a, team_exists=False, team_create_ok=False)
+    a.create_ticket(_req())
     assert "agent_group" not in cap["payload"]
 
 

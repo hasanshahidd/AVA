@@ -99,17 +99,19 @@ def _ensure_remediation_plan(db: Session, vuln, connection, *, user_id: Optional
             logger.exception("department-assignment lookup failed for vuln_id=%s", vuln.id)
 
     now = datetime.utcnow()
-    approver = f"ITSM push · {connection.connection_name}"
+    # Customer-facing text: NEVER name the ticket engine (invisible-engine rule) —
+    # no connection_name/provider, no "ITSM". It's just the Help Desk.
+    approver = "Help Desk ticket"
     db.add(VulnRemediationPlan(
         tenant_id=vuln.tenant_id, vulnerability_id=vuln.id,
         fix_type="patch",
-        title=f"Remediate {vuln.vuln_id} via ITSM",
-        summary=(f"Created by an ITSM push to {connection.connection_name} "
-                 f"({connection.integration_type}). Remediation is tracked in the "
-                 f"linked ticket; this plan makes the mobilisation visible to "
-                 f"reporting. System-attributed — not a human approval."),
-        fix_artifact="See the linked ITSM ticket for remediation steps and status.",
-        rationale="Finding mobilised to ITSM for remediation.",
+        title=f"Remediate {vuln.vuln_id} via the Help Desk",
+        summary=("Created when a Help Desk ticket was opened for this finding. "
+                 "Remediation is tracked in the linked ticket; this plan makes the "
+                 "mobilisation visible to reporting. System-attributed — not a human "
+                 "approval."),
+        fix_artifact="See the linked Help Desk ticket for remediation steps and status.",
+        rationale="Finding mobilised to the Help Desk for remediation.",
         source="itsm",
         # Auto-approve only with an owner; otherwise leave it for the gate.
         status="approved" if has_owner else "recommended",
