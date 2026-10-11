@@ -110,6 +110,44 @@ def compute_analytics(rows: List[Dict[str, Any]], now: Optional[datetime] = None
     }
 
 
+def _fmt_duration(seconds: Any) -> Optional[str]:
+    """Frappe Duration fields store seconds. Render a compact human target
+    (e.g. 4h, 2d) for the read-only SLA display. None on junk / non-positive."""
+    try:
+        s = int(float(seconds))
+    except (TypeError, ValueError):
+        return None
+    if s <= 0:
+        return None
+    if s % 86400 == 0:
+        return f"{s // 86400}d"
+    if s % 3600 == 0:
+        return f"{s // 3600}h"
+    if s < 3600:
+        return f"{s // 60}m"
+    return f"{round(s / 3600, 1)}h"
+
+
+def _sla_targets(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Pure projection of an HD Service Level Agreement doc → the read-only
+    config payload (per-priority response/resolution + service days). No I/O,
+    no engine names, so it is unit-testable."""
+    priorities = [{
+        "priority": p.get("priority"),
+        "response": _fmt_duration(p.get("response_time")),
+        "resolution": _fmt_duration(p.get("resolution_time")),
+    } for p in (doc.get("priorities") or [])]
+    service_days = [{
+        "day": d.get("workday"), "start": d.get("start_time"), "end": d.get("end_time"),
+    } for d in (doc.get("support_and_resolution") or [])]
+    return {
+        "policy": doc.get("service_level") or doc.get("name"),
+        "priorities": priorities,
+        "service_days": service_days,
+        "holiday_list": doc.get("holiday_list"),
+    }
+
+
 def _subj(value: Any) -> str:
     """Frappe stores the ticket subject HTML-ESCAPED (`<`→`&lt;`). Un-escape it for
     display so titles read `<package>` not `&lt;package&gt;`. Safe: the UI (React)
@@ -246,7 +284,7 @@ def _write(ctx: Dict[str, Any], method: str, path: str, payload: dict) -> bool:
                      "Content-Type": "application/json", "Accept": "application/json"},
             json=payload, verify=ctx.get("verify", True), timeout=12,
         )
-        return r.status_code in (200, 201)
+        return r.status_code in (200, 201, 202)  # 202: Frappe DELETE
     except Exception as exc:
         logger.warning("helpdesk write %s %s failed: %s", method, path, exc)
         return False
@@ -543,6 +581,8 @@ class ReplyBody(BaseModel):
     content: str = ""
     body: str = ""          # FE sends `body`; `content` kept for back-compat
     internal: bool = False
+    cc: Optional[str] = None   # public reply only; comma-separated addresses
+    bcc: Optional[str] = None
 
 
 class FieldUpdate(BaseModel):
@@ -578,11 +618,20 @@ def reply_ticket(name: str, body: ReplyBody, db: Session = Depends(get_db),
         ok = _write(ctx, "POST", "/api/resource/HD%20Ticket%20Comment",
                     {"reference_ticket": name, "content": content})
     else:
-        ok = _write(ctx, "POST", "/api/resource/Communication", {
+        payload = {
             "communication_type": "Communication", "reference_doctype": "HD Ticket",
             "reference_name": name, "content": content, "sent_or_received": "Sent",
             "subject": f"Re: {name}",
-        })
+        }
+        # Cc/Bcc pass through to the logged Communication. NOTE: this only RECORDS
+        # the reply (+ addressees); outbound email delivery depends on the engine
+        # having SMTP configured. Creating the Communication never fails for lack
+        # of SMTP, so the reply always logs even when email isn't set up.
+        if body.cc:
+            payload["cc"] = body.cc
+        if body.bcc:
+            payload["bcc"] = body.bcc
+        ok = _write(ctx, "POST", "/api/resource/Communication", payload)
     return {"ok": ok}
 
 
@@ -632,3 +681,107 @@ def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
         agent_ok = _write(ctx, "POST", "/api/method/frappe.desk.form.assign_to.add",
                           {"doctype": "HD Ticket", "name": name, "assign_to": [body.agent]})
     return {"ok": bool(team_ok and agent_ok), "agent": body.agent, "team": body.team}
+
+
+# ─── Settings: saved replies (the one genuinely per-tenant, safe-to-edit config) ──
+# All other Settings surfaces (SLA policies, business holidays, assignment rules,
+# email accounts) are GLOBAL engine config shared across tenants and are NOT
+# ava_tenant-tagged — editing them from a tenant UI would mutate shared state, so
+# they are DISPLAY-ONLY via /config below. Saved replies carry ava_tenant, so they
+# are the only writable Settings area.
+def _canned_spec(ctx: Dict[str, Any]) -> tuple:
+    """(doctype, title_field) for this engine's saved-reply doctype — prefers
+    HD Canned Response, falls back to HD Saved Reply. Body field is `message`."""
+    for dt, tf in (("HD Canned Response", "title"), ("HD Saved Reply", "subject")):
+        if _get(ctx, f"/api/resource/{quote(dt)}?limit_page_length=1") is not None:
+            return dt, tf
+    return "HD Canned Response", "title"
+
+
+def _canned_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
+    """Guard: saved reply belongs to the caller's partition (ava_tenant-tagged).
+    No partition (dev / per-tenant engine) → allow."""
+    if not ctx.get("partition"):
+        return True
+    dt, _tf = _canned_spec(ctx)
+    rows = _resource(ctx, dt, ["name"],
+                     filters=_tenant_filters(ctx, [["name", "=", name]]), limit=1)
+    return bool(rows)
+
+
+class SavedReplyBody(BaseModel):
+    title: Optional[str] = None
+    message: str = ""
+
+
+@router.get("/saved-replies")
+def saved_replies(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
+    """Full saved replies (with body) for this tenant — partition-filtered."""
+    ctx = _ctx(db)
+    dt, tf = _canned_spec(ctx)
+    rows = _resource(ctx, dt, ["name", tf, "message", "owner", "modified"],
+                     filters=_tenant_filters(ctx), order_by="modified desc")
+    return {"saved_replies": [{
+        "name": r["name"], "title": r.get(tf) or r["name"],
+        "message": r.get("message") or "", "owner": r.get("owner"), "modified": r.get("modified"),
+    } for r in rows]}
+
+
+@router.post("/saved-replies")
+def create_saved_reply(body: SavedReplyBody, db: Session = Depends(get_db),
+                       current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
+    ctx = _ctx(db)
+    dt, tf = _canned_spec(ctx)
+    payload: Dict[str, Any] = {tf: body.title or "Untitled", "message": body.message}
+    if ctx.get("partition"):
+        payload["ava_tenant"] = ctx["partition"]   # tag so the list stays tenant-scoped
+    ok = _write(ctx, "POST", f"/api/resource/{quote(dt)}", payload)
+    return {"ok": ok}
+
+
+@router.put("/saved-replies/{name}")
+def update_saved_reply(name: str, body: SavedReplyBody, db: Session = Depends(get_db),
+                       current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
+    ctx = _ctx(db)
+    if not _canned_in_tenant(ctx, name):
+        return {"ok": False, "error": "not found"}
+    dt, tf = _canned_spec(ctx)
+    payload: Dict[str, Any] = {"message": body.message}
+    if body.title is not None:
+        payload[tf] = body.title
+    ok = _write(ctx, "PUT", f"/api/resource/{quote(dt)}/{quote(name)}", payload)
+    return {"ok": ok}
+
+
+@router.delete("/saved-replies/{name}")
+def delete_saved_reply(name: str, db: Session = Depends(get_db),
+                       current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
+    ctx = _ctx(db)
+    if not _canned_in_tenant(ctx, name):
+        return {"ok": False, "error": "not found"}
+    dt, _tf = _canned_spec(ctx)
+    ok = _write(ctx, "DELETE", f"/api/resource/{quote(dt)}/{quote(name)}", {})
+    return {"ok": ok}
+
+
+@router.get("/config")
+def config(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
+    """READ-ONLY 'how your Help Desk is configured' panel: the active SLA targets,
+    business hours, and whether auto-assignment is on. SLA/holidays are GLOBAL
+    engine config (not tenant-tagged) so they are shown but NOT editable here.
+    Auto-assignment is inferred from the tenant's own team (partition-safe)."""
+    ctx = _ctx(db)
+    slas = _resource(ctx, "HD Service Level Agreement", ["name", "default_sla", "enabled"],
+                     order_by="modified desc")
+    doc: Dict[str, Any] = {}
+    if slas:
+        pick = next((s for s in slas if s.get("default_sla")), slas[0])
+        full = _get(ctx, f"/api/resource/HD%20Service%20Level%20Agreement/{quote(pick['name'])}")
+        if isinstance(full, dict):
+            doc = full
+    teams = _resource(ctx, "HD Team", ["name", "assignment_rule"], filters=_tenant_filters(ctx))
+    return {
+        "sla": _sla_targets(doc),
+        "auto_assignment": any(t.get("assignment_rule") for t in teams),
+        "managed": True,   # UI labels this "Managed by your administrator"
+    }
