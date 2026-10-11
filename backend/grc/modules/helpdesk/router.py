@@ -155,7 +155,7 @@ def _subj(value: Any) -> str:
     return html.unescape(value) if isinstance(value, str) else (value or "")
 
 import requests
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -691,16 +691,26 @@ def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
 # are the only writable Settings area.
 def _canned_spec(ctx: Dict[str, Any]) -> tuple:
     """(doctype, title_field) for this engine's saved-reply doctype — prefers
-    HD Canned Response, falls back to HD Saved Reply. Body field is `message`."""
+    HD Canned Response, falls back to HD Saved Reply. Body field is `message`.
+
+    The existence probe is itself PARTITION-FILTERED so it can never surface
+    another tenant's reply names: an empty list ([]) still proves the doctype
+    exists, while None means it does not (or the query errored)."""
     for dt, tf in (("HD Canned Response", "title"), ("HD Saved Reply", "subject")):
-        if _get(ctx, f"/api/resource/{quote(dt)}?limit_page_length=1") is not None:
+        probe = _resource(ctx, dt, ["name"], filters=_tenant_filters(ctx), limit=1)
+        # _resource returns [] on a successful empty result AND on error, so
+        # fall back to a raw _get only to distinguish doctype-missing from empty.
+        if probe or _get(ctx, f"/api/resource/{quote(dt)}?limit_page_length=0") is not None:
             return dt, tf
     return "HD Canned Response", "title"
 
 
-def _canned_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
-    """Guard: saved reply belongs to the caller's partition (ava_tenant-tagged).
-    No partition (dev / per-tenant engine) → allow."""
+def _saved_reply_in_tenant(ctx: Dict[str, Any], name: str) -> bool:
+    """ISOLATION GUARD for saved-reply edit/delete. Confirms the target record
+    is in THIS tenant's partition by querying it WITH the ava_tenant filter —
+    an out-of-partition id returns no rows, so a crafted id can never edit or
+    delete another tenant's reply. No partition (dev / per-tenant engine) →
+    allow. Mirrors `_ticket_in_tenant`."""
     if not ctx.get("partition"):
         return True
     dt, _tf = _canned_spec(ctx)
@@ -743,8 +753,9 @@ def create_saved_reply(body: SavedReplyBody, db: Session = Depends(get_db),
 def update_saved_reply(name: str, body: SavedReplyBody, db: Session = Depends(get_db),
                        current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
     ctx = _ctx(db)
-    if not _canned_in_tenant(ctx, name):
-        return {"ok": False, "error": "not found"}
+    # 404 (not 403) on an out-of-partition id so cross-tenant existence isn't confirmed.
+    if not _saved_reply_in_tenant(ctx, name):
+        raise HTTPException(status_code=404, detail="not found")
     dt, tf = _canned_spec(ctx)
     payload: Dict[str, Any] = {"message": body.message}
     if body.title is not None:
@@ -757,8 +768,8 @@ def update_saved_reply(name: str, body: SavedReplyBody, db: Session = Depends(ge
 def delete_saved_reply(name: str, db: Session = Depends(get_db),
                        current_user: GRCUser = Depends(require_auth), _perm: bool = EDIT):
     ctx = _ctx(db)
-    if not _canned_in_tenant(ctx, name):
-        return {"ok": False, "error": "not found"}
+    if not _saved_reply_in_tenant(ctx, name):
+        raise HTTPException(status_code=404, detail="not found")
     dt, _tf = _canned_spec(ctx)
     ok = _write(ctx, "DELETE", f"/api/resource/{quote(dt)}/{quote(name)}", {})
     return {"ok": ok}
