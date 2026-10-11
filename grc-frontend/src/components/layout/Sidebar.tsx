@@ -44,6 +44,7 @@ import {
   Contact,
   BookOpen,
   MessageSquareText,
+  Home,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -121,6 +122,7 @@ const navigation: NavEntry[] = [
     name: 'Help Desk',
     icon: LifeBuoy,
     items: [
+      { name: 'Home',             href: '/helpdesk/home',       icon: Home },
       { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard },
       { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket },
       { name: 'Agents',           href: '/helpdesk/agents',     icon: Users },
@@ -129,6 +131,7 @@ const navigation: NavEntry[] = [
       { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact },
       { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen },
       { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText },
+      { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings },
     ],
   },
   // Reports — its own top-level module.

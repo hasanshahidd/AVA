@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, Activity, Mail } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd } from "../../_ui";
+import { RichComposer, isEmptyHtml } from "../../RichText";
 
 const fmt = (v?: string | null) => (v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString() : "—");
 const doneRe = /replied|resolved|closed/i;
+type ConvTab = "replies" | "comments" | "activity";
 
 export default function TicketDetail() {
   const params = useParams();
@@ -19,7 +21,12 @@ export default function TicketDetail() {
   const { data: agentsData } = useHd<any>("/helpdesk/agents");
   const { data: teamsData } = useHd<any>("/helpdesk/teams");
   const [tab, setTab] = useState<"reply" | "comment">("reply");
+  const [convTab, setConvTab] = useState<ConvTab>("replies");
   const [draft, setDraft] = useState("");
+  const [composerKey, setComposerKey] = useState(0); // remount to re-seed RichComposer
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
+  const [showCc, setShowCc] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [showAssign, setShowAssign] = useState(false);
   const [savedReply, setSavedReply] = useState("");
@@ -30,14 +37,31 @@ export default function TicketDetail() {
   const conv: any[] = data?.conversation || [];
   const sla = t?.sla || {};
 
+  // ── group the conversation into the three tabs (default Replies) ──
+  const { replies, comments, activity } = useMemo(() => {
+    const replies: any[] = [], comments: any[] = [], activity: any[] = [];
+    if (t?.description) replies.push({ type: "received", sender: t.contact || t.raised_by || t.customer || "Customer", content: t.description, date: t.created || t.creation });
+    for (const m of conv) {
+      if (/activity/i.test(m.type || "")) activity.push(m);
+      else if (/comment|note/i.test(m.type || "")) comments.push(m);
+      else replies.push(m);
+    }
+    return { replies, comments, activity };
+  }, [conv, t]);
+  const shown = convTab === "comments" ? comments : convTab === "activity" ? activity : replies;
+
+  const resetDraft = () => { setDraft(""); setCc(""); setBcc(""); setShowCc(false); setComposerKey((k) => k + 1); };
   const act = async (path: string, body: any, ok: string) => {
     try { await apiClient.post(`${base}/${path}`, body); setNote(ok); reload(); return true; }
     catch { setNote("Action isn't available yet — the engine connector may be read-only."); return false; }
   };
   const send = async () => {
-    if (!draft.trim()) return;
-    const ok = await act("reply", { content: draft, body: draft, internal: tab === "comment" }, tab === "comment" ? "Note added." : "Reply sent.");
-    if (ok) setDraft("");
+    const isComment = tab === "comment";
+    if (isComment ? !draft.trim() : isEmptyHtml(draft)) return;
+    const body: any = { content: draft, body: draft, internal: isComment };
+    if (!isComment) { if (cc.trim()) body.cc = cc.trim(); if (bcc.trim()) body.bcc = bcc.trim(); }
+    const ok = await act("reply", body, isComment ? "Note added." : "Reply logged.");
+    if (ok) resetDraft();
   };
   const assign = async (agent?: string | null, team?: string | null) => {
     const ok = await act("assign", { agent: agent ?? null, team: team ?? null }, "Assignment updated.");
@@ -118,34 +142,57 @@ export default function TicketDetail() {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* conversation tabs: Replies (default) / Comments / Activity */}
+          <div className="flex items-center gap-1 border-b border-slate-100 bg-white px-6 pt-3">
+            {([["replies", "Replies", replies.length, MessageSquare], ["comments", "Comments", comments.length, StickyNote], ["activity", "Activity", activity.length, Activity]] as const).map(([k, label, count, Icon]) => (
+              <button key={k} onClick={() => setConvTab(k)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${convTab === k ? "border-[var(--color-base)] text-[var(--color-text)]" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                <Icon size={14} /> {label} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{count}</span>
+              </button>
+            ))}
+          </div>
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            {t.description && (
-              <TimelineItem m={{ type: "received", sender: t.contact || t.raised_by || t.customer || "Customer", content: t.description, date: t.created || t.creation }} />
-            )}
-            {conv.length === 0 && !t.description ? (
-              <div className="py-8 text-center text-xs text-slate-300">No activity yet.</div>
-            ) : conv.map((m, i) => <TimelineItem key={i} m={m} />)}
+            {shown.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-300">
+                {convTab === "replies" ? "No replies yet." : convTab === "comments" ? "No internal comments." : "No activity yet."}
+              </div>
+            ) : shown.map((m, i) => <TimelineItem key={i} m={m} />)}
           </div>
 
           <div className="border-t border-slate-200 bg-white px-6 py-3">
             <div className="mb-2 flex items-center gap-1.5">
-              <button onClick={() => setTab("reply")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "reply" ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><MessageSquare size={14} /> Reply</button>
-              <button onClick={() => setTab("comment")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "comment" ? "bg-amber-100 text-amber-800" : "text-slate-500"}`}><StickyNote size={14} /> Internal note</button>
+              <button onClick={() => { if (tab !== "reply") { setTab("reply"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "reply" ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><MessageSquare size={14} /> Reply</button>
+              <button onClick={() => { if (tab !== "comment") { setTab("comment"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "comment" ? "bg-amber-100 text-amber-800" : "text-slate-500"}`}><StickyNote size={14} /> Internal note</button>
+              {tab === "reply" && (
+                <button onClick={() => setShowCc((v) => !v)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${showCc ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><Mail size={14} /> Cc/Bcc</button>
+              )}
               {tab === "reply" && cannedList.length > 0 && (
                 <select value={savedReply} onChange={(e) => {
                   const r = cannedList.find((c) => c.name === e.target.value);
-                  if (r) { setDraft((d) => (d ? d + "\n\n" : "") + (r.message || r.title || "")); setSavedReply(""); }
+                  if (r) { const add = r.message || r.title || ""; setDraft((d) => (d && !isEmptyHtml(d) ? d : "") + add); setComposerKey((k) => k + 1); setSavedReply(""); }
                 }} className="ml-auto rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-500">
                   <option value="">Insert canned reply…</option>
                   {cannedList.map((c) => <option key={c.name} value={c.name}>{c.title || c.name}</option>)}
                 </select>
               )}
             </div>
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3}
-              placeholder={tab === "reply" ? "Reply to the customer…" : "Add an internal note…"}
-              className={`w-full resize-none rounded-lg border p-3 text-sm focus:border-[var(--color-base)] focus:outline-none ${tab === "comment" ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`} />
+            {tab === "reply" && showCc && (
+              <div className="mb-2 space-y-1.5">
+                <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc (comma-separated)"
+                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+                <input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Bcc (comma-separated)"
+                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+              </div>
+            )}
+            {tab === "reply" ? (
+              <RichComposer key={composerKey} value={draft} onChange={setDraft} />
+            ) : (
+              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3}
+                placeholder="Add an internal note…"
+                className="w-full resize-none rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+            )}
             <div className="mt-2 flex items-center justify-end">
-              <button onClick={send} disabled={!draft.trim()} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send" : "Add note"}</button>
+              <button onClick={send} disabled={tab === "comment" ? !draft.trim() : isEmptyHtml(draft)} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send" : "Add note"}</button>
             </div>
           </div>
         </div>
