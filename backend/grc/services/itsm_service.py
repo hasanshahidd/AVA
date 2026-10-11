@@ -222,7 +222,7 @@ def sync_ticket_statuses(db: Session, connection, *, limit: int = 500) -> Dict[s
                     plan.status = "applied"
                     plan.applied_at = plan.applied_at or now
                     if hasattr(plan, "applied_by_name"):
-                        plan.applied_by_name = f"ITSM:{connection.integration_type}"
+                        plan.applied_by_name = "Help Desk"  # never name the engine (invisible-engine rule)
                     link.plan_advanced_at = now
                     counts["plans_advanced"] += 1
                     _audit(db, link.tenant_id, connection.id, None,
