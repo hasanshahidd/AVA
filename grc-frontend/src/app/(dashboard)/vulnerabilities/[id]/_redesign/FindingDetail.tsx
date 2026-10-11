@@ -21,6 +21,7 @@ import { ArrowLeft, ShieldAlert, ShieldCheck, Biohazard, Shield, Lock, ChevronRi
 import { vulnManagementApi, assetsApi, entityExtrasApi } from '@/lib/api';
 import { exploitMaturity } from '../_components/RiskAnalysisPanel';
 import RemediationPlanCard from '../_components/RemediationPlanCard';
+import ItsmPanel from '../_components/ItsmPanel';
 import { shortenVulnTitle, assessmentType } from '../../_workspace/lib';
 import { NotesPanel } from '@/components/shared/EntityExtras';
 
@@ -189,7 +190,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
 
           {tab === 'an' && <Analysis v={v} asset={riskAsset} reach={reach} score={score} vTone={vTone} hasAsset={!!primaryAssetId} onExploit={() => setTab('ex')} />}
           {tab === 'ex' && <ExploitTest reach={reach} vTone={vTone} hasAsset={!!primaryAssetId} v={v} score={score} />}
-          {tab === 'rm' && <div style={card}><RemediationPlanCard vulnId={vulnId} hasOwner={!!v.assigned_to} /></div>}
+          {tab === 'rm' && <><div style={card}><RemediationPlanCard vulnId={vulnId} hasOwner={!!v.assigned_to} /></div><div style={{ marginTop: 12 }}><ItsmPanel vulnId={vulnId} /></div></>}
           {tab === 'hi' && <HistoryTimeline vulnId={vulnId} />}
           {tab === 'no' && <div style={card}><NotesPanel entityType="vulnerability" entityId={vulnId} /></div>}
           {tab === 'xc' && <ExceptionPanel vulnId={vulnId} v={v} onChanged={() => qc.invalidateQueries({ queryKey: ['vulnerability', vulnId] })} />}

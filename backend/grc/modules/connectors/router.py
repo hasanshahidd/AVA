@@ -93,6 +93,13 @@ def _serialise_provider(meta: ProviderMeta) -> Dict[str, Any]:
     }
 
 
+def _conn_is_internal(conn: IntegrationConnection) -> bool:
+    """True when this connection is an AVA-owned internal engine (its provider is
+    flagged internal), so it must stay hidden from the customer connector list."""
+    meta = PROVIDER_REGISTRY.get(conn.integration_type)
+    return bool(meta and getattr(meta, "internal", False))
+
+
 def _serialise_connection(conn: IntegrationConnection) -> Dict[str, Any]:
     meta = PROVIDER_REGISTRY.get(conn.integration_type)
     cat = conn.category or (meta.category if meta else "vuln_scanner")
@@ -178,6 +185,10 @@ def list_connectors(
         .order_by(IntegrationConnection.created_at.desc())
         .all()
     )
+    # Internal-engine connections (e.g. the Help Desk's Frappe engine) are AVA's
+    # own infrastructure, never a customer-owned third party — they must NOT appear
+    # in the customer connector list or their name would leak the hidden engine.
+    rows = [r for r in rows if not _conn_is_internal(r)]
     return {"items": [_serialise_connection(r) for r in rows]}
 
 

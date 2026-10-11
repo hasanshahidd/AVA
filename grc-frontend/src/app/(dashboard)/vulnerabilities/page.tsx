@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { vulnManagementApi, connectorsApi } from '@/lib/api';
+import { vulnManagementApi } from '@/lib/api';
 import apiClient from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTabParam } from '@/lib/useTabParam';
@@ -612,23 +612,10 @@ export default function VulnerabilitiesPage() {
     },
   });
 
-  // Help Desk — the single ticketing connection AVA opens tickets through. The
-  // client never picks "which system"; there is exactly one (the hidden engine),
-  // so bulk-create just uses the first ticketing connection.
-  const { data: ticketingConnData } = useQuery({
-    queryKey: ['ticketing-connectors'],
-    queryFn: async () => (await connectorsApi.list()).data,
-  });
-  const ticketingConnId: number | undefined = useMemo(
-    () => (ticketingConnData?.items || []).find((c: any) => c.category === 'ticketing')?.id,
-    [ticketingConnData],
-  );
-
+  // Help Desk — the backend resolves the (invisible) Help Desk connection
+  // server-side, so the client never names it. Just send the finding ids.
   const bulkTicketMutation = useMutation({
-    mutationFn: (ids: number[]) => {
-      if (!ticketingConnId) throw new Error('The Help Desk is not set up for this workspace yet.');
-      return vulnManagementApi.vulnerabilities.bulkPushToItsm(ids, ticketingConnId);
-    },
+    mutationFn: (ids: number[]) => vulnManagementApi.vulnerabilities.bulkPushToItsm(ids),
     onSuccess: (res) => {
       const d = res.data;
       queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });

@@ -19,11 +19,19 @@ still renders.
 from __future__ import annotations
 
 import json
+import html
 import logging
 import os
 from collections import Counter
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
+
+
+def _subj(value: Any) -> str:
+    """Frappe stores the ticket subject HTML-ESCAPED (`<`→`&lt;`). Un-escape it for
+    display so titles read `<package>` not `&lt;package&gt;`. Safe: the UI (React)
+    re-escapes on render, so no markup is injected."""
+    return html.unescape(value) if isinstance(value, str) else (value or "")
 
 import requests
 from fastapi import APIRouter, Depends
@@ -191,7 +199,7 @@ def dashboard(db: Session = Depends(get_db), current_user: GRCUser = Depends(req
     by_priority = Counter(r.get("priority") or "—" for r in rows)
     cat = Counter((r.get("status_category") or "Open") for r in rows)
     overdue = sum(1 for r in rows if (r.get("agreement_status") == "Failed"))
-    recent = [{"name": r["name"], "subject": r.get("subject"), "status": r.get("status"),
+    recent = [{"name": r["name"], "subject": _subj(r.get("subject")), "status": r.get("status"),
                "priority": r.get("priority"), "modified": r.get("modified")} for r in rows[:8]]
     return {
         "open": cat.get("Open", 0), "resolved": cat.get("Resolved", 0),
@@ -215,7 +223,7 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
         s = q.lower()
         rows = [r for r in rows if s in (str(r.get("subject", "")) + str(r.get("name", ""))).lower()]
     out = [{
-        "name": r["name"], "subject": r.get("subject"), "status": r.get("status"),
+        "name": r["name"], "subject": _subj(r.get("subject")), "status": r.get("status"),
         "priority": r.get("priority"), "type": r.get("ticket_type"),
         "team": r.get("agent_group"), "agent": _assignee(r.get("_assign")),
         "agreement_status": r.get("agreement_status"), "customer": r.get("customer"),
@@ -272,6 +280,7 @@ def ticket_detail(name: str, db: Session = Depends(get_db),
     if not rows:
         return {"ticket": {"name": name, "not_found": True}, "conversation": []}
     ticket = rows[0]
+    ticket["subject"] = _subj(ticket.get("subject"))  # un-escape for display (description stays HTML)
     # Surface team + assignee under the names the UI reads.
     ticket["team"] = ticket.get("agent_group")
     ticket["agent"] = _assignee(ticket.get("_assign"))

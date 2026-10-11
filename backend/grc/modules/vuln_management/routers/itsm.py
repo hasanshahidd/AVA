@@ -38,10 +38,24 @@ def _conn_or_404(db, connection_id, tenants) -> IntegrationConnection:
     return conn
 
 
+def _helpdesk_conn(db, tenants) -> IntegrationConnection:
+    """Resolve the tenant's Help Desk ticketing connection SERVER-SIDE so the
+    client never has to name it — the engine (Frappe) stays invisible. There is
+    exactly one ticketing connection per tenant (the hidden engine)."""
+    conn = db.query(IntegrationConnection).filter(
+        IntegrationConnection.tenant_id.in_(tenants),
+        IntegrationConnection.category == "ticketing",
+        IntegrationConnection.is_active == True,  # noqa: E712
+    ).order_by(IntegrationConnection.id.asc()).first()
+    if not conn:
+        raise HTTPException(status_code=409, detail="Help Desk is not set up for this workspace")
+    return conn
+
+
 @router.post("/vulnerabilities/{vuln_id}/push-to-itsm")
 def push_to_itsm(
     vuln_id: int,
-    connection_id: int,
+    connection_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: GRCUser = Depends(require_auth),
     _perm: bool = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:edit")),
@@ -51,7 +65,9 @@ def push_to_itsm(
         Vulnerability.id == vuln_id, Vulnerability.tenant_id.in_(tenants)).first()
     if not vuln:
         raise HTTPException(status_code=404, detail="Vulnerability not found")
-    conn = _conn_or_404(db, connection_id, tenants)
+    # connection_id optional: the Help Desk engine is invisible, so the client
+    # doesn't pass it — resolve it server-side.
+    conn = _conn_or_404(db, connection_id, tenants) if connection_id else _helpdesk_conn(db, tenants)
 
     result = itsm_service.push_finding(db, vuln, conn, user_id=current_user.id)
     db.commit()
@@ -62,7 +78,7 @@ def push_to_itsm(
 
 class BulkPushRequest(BaseModel):
     vuln_ids: List[int]
-    connection_id: int
+    connection_id: Optional[int] = None
 
 
 @router.post("/vulnerabilities/bulk-push-to-itsm")
@@ -76,7 +92,7 @@ def bulk_push_to_itsm(
     (a live ticket is a no-op), so re-running is safe. Routes through the same
     `push_finding` path as the single-finding button."""
     tenants = get_user_tenants(current_user, db)
-    conn = _conn_or_404(db, body.connection_id, tenants)
+    conn = _conn_or_404(db, body.connection_id, tenants) if body.connection_id else _helpdesk_conn(db, tenants)
     vulns = db.query(Vulnerability).filter(
         Vulnerability.id.in_(body.vuln_ids),
         Vulnerability.tenant_id.in_(tenants),

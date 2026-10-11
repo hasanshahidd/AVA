@@ -2476,10 +2476,12 @@ export const vulnManagementApi = {
     // CTEM Phase 5 — ITSM mobilisation (push a finding to a ticketing connector,
     // list its tickets). Live sync advances the plan to applied on resolution.
     itsmTickets: (id: number) => apiClient.get(`/vuln-management/vulnerabilities/${id}/itsm-tickets`),
-    pushToItsm: (id: number, connectionId: number) =>
-      apiClient.post(`/vuln-management/vulnerabilities/${id}/push-to-itsm?connection_id=${connectionId}`),
-    bulkPushToItsm: (vulnIds: number[], connectionId: number) =>
-      apiClient.post(`/vuln-management/vulnerabilities/bulk-push-to-itsm`, { vuln_ids: vulnIds, connection_id: connectionId }),
+    // connectionId optional: the Help Desk engine is invisible, so the client omits
+    // it and the backend resolves the tenant's Help Desk connection server-side.
+    pushToItsm: (id: number, connectionId?: number) =>
+      apiClient.post(`/vuln-management/vulnerabilities/${id}/push-to-itsm${connectionId ? `?connection_id=${connectionId}` : ''}`),
+    bulkPushToItsm: (vulnIds: number[], connectionId?: number) =>
+      apiClient.post(`/vuln-management/vulnerabilities/bulk-push-to-itsm`, { vuln_ids: vulnIds, ...(connectionId ? { connection_id: connectionId } : {}) }),
     syncItsmStatuses: (connectionId: number) =>
       apiClient.post(`/vuln-management/itsm/connections/${connectionId}/sync-statuses`),
     // AI attacker-walkthrough for the same (finding × asset): a runtime narration
