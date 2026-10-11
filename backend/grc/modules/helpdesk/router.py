@@ -23,8 +23,91 @@ import html
 import logging
 import os
 from collections import Counter
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
+
+
+def _parse_dt(value: Any) -> Optional[datetime]:
+    """Parse a Frappe datetime string ("YYYY-MM-DD HH:MM:SS[.ffffff]"). None on
+    anything unparseable, so the aggregation never raises on dirty data."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.strip())
+    except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(value.strip(), fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def _mean(xs: List[float]) -> Optional[float]:
+    return round(sum(xs) / len(xs), 2) if xs else None
+
+
+def compute_analytics(rows: List[Dict[str, Any]], now: Optional[datetime] = None) -> Dict[str, Any]:
+    """Pure aggregation over HD Ticket rows → the dashboard-analytics payload.
+
+    Factored out (no I/O, no engine names) so the math is unit-testable. Expects
+    raw Frappe field names on each row; emits de-branded JSON.
+    """
+    now = now or datetime.now()
+    total = len(rows)
+
+    # SLA: % Fulfilled among tickets that actually carry an SLA verdict.
+    with_sla = [r for r in rows if r.get("agreement_status")]
+    fulfilled = sum(1 for r in with_sla if r.get("agreement_status") == "Fulfilled")
+    sla_pct = round(fulfilled / len(with_sla) * 100, 1) if with_sla else None
+
+    # Avg first response (hours) and resolution (days), from timestamp deltas.
+    resp_hrs, res_days = [], []
+    for r in rows:
+        c = _parse_dt(r.get("creation"))
+        fr = _parse_dt(r.get("first_responded_on"))
+        rd = _parse_dt(r.get("resolution_date"))
+        if c and fr and fr >= c:
+            resp_hrs.append((fr - c).total_seconds() / 3600)
+        if c and rd and rd >= c:
+            res_days.append((rd - c).total_seconds() / 86400)
+
+    # Avg feedback on a 0–5 scale (Frappe stores a 0–1 fraction).
+    ratings = [float(r["feedback_rating"]) for r in rows
+               if r.get("feedback_rating") not in (None, 0, "0", "")]
+    avg_feedback = round(_mean(ratings) * 5, 2) if ratings else None
+
+    # 30-day daily trend: created-per-day vs resolved-per-day.
+    start = (now - timedelta(days=29)).date()
+    days = [start + timedelta(days=i) for i in range(30)]
+    created_by, resolved_by = Counter(), Counter()
+    for r in rows:
+        c = _parse_dt(r.get("creation"))
+        if c and c.date() >= start:
+            created_by[c.date()] += 1
+        rd = _parse_dt(r.get("resolution_date"))
+        if rd and rd.date() >= start:
+            resolved_by[rd.date()] += 1
+    trend = [{"date": d.isoformat(), "created": created_by.get(d, 0),
+              "resolved": resolved_by.get(d, 0)} for d in days]
+
+    def _by(field: str, default: str) -> Dict[str, int]:
+        return dict(Counter(r.get(field) or default for r in rows))
+
+    return {
+        "total": total,
+        "sla_fulfilled_pct": sla_pct,
+        "avg_first_response_hours": _mean(resp_hrs),
+        "avg_resolution_days": _mean(res_days),
+        "avg_feedback_rating": avg_feedback,
+        "feedback_count": len(ratings),
+        "trend": trend,
+        "by_team": _by("agent_group", "Unassigned"),
+        "by_priority": _by("priority", "—"),
+        "by_type": _by("ticket_type", "Unset"),
+        "by_status_category": _by("status_category", "Open"),
+    }
 
 
 def _subj(value: Any) -> str:
@@ -208,6 +291,19 @@ def dashboard(db: Session = Depends(get_db), current_user: GRCUser = Depends(req
     }
 
 
+@router.get("/dashboard-analytics")
+def dashboard_analytics(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
+    """Rich dashboard metrics for this tenant: KPIs, 30-day trend, breakdowns.
+    Partition-filtered (tenant-scoped) + VIEW-gated like every other read."""
+    ctx = _ctx(db)
+    rows = _resource(ctx, "HD Ticket",
+                     ["name", "status", "status_category", "priority", "agent_group",
+                      "ticket_type", "agreement_status", "feedback_rating",
+                      "creation", "first_responded_on", "resolution_date", "response_by"],
+                     filters=_tenant_filters(ctx), order_by="creation desc")
+    return compute_analytics(rows)
+
+
 @router.get("/tickets")
 def tickets(status: Optional[str] = None, q: Optional[str] = None,
             db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth), _perm: bool = VIEW):
@@ -216,8 +312,8 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
     rows = _resource(ctx, "HD Ticket",
                      ["name", "subject", "status", "priority", "ticket_type", "agent_group",
                       "_assign", "agreement_status", "customer",
-                      "contact", "raised_by", "creation", "response_by", "resolution_by",
-                      "ava_finding_id", "cve_id"],
+                      "contact", "raised_by", "creation", "modified", "response_by", "resolution_by",
+                      "feedback_rating", "ava_finding_id", "cve_id"],
                      filters=_tenant_filters(ctx, base), order_by="modified desc")
     if q:
         s = q.lower()
@@ -228,7 +324,9 @@ def tickets(status: Optional[str] = None, q: Optional[str] = None,
         "team": r.get("agent_group"), "agent": _assignee(r.get("_assign")),
         "agreement_status": r.get("agreement_status"), "customer": r.get("customer"),
         "contact": r.get("contact") or r.get("raised_by"), "created": r.get("creation"),
+        "modified": r.get("modified"),
         "response_by": r.get("response_by"), "resolution_by": r.get("resolution_by"),
+        "feedback_rating": r.get("feedback_rating"),
         "cve_id": r.get("cve_id"),
     } for r in rows]
     summary = dict(Counter(r.get("status") or "Open" for r in rows))
