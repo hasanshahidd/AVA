@@ -1,0 +1,555 @@
+from ._56_scf_catalog_models import *  # noqa: F401,F403 — pulls Base, Column types, datetime via the section chain
+from sqlalchemy import Time  # Frappe `Time` fields (opening_time, service-day hours); not re-exported by _00_base
+
+# =============================================================================
+# AVA-native Help Desk data model (engine conversion, step 1)
+# =============================================================================
+#
+# Source of truth: the forked + rebranded Frappe Helpdesk DocType JSON under
+# helpdesk-app/helpdesk/helpdesk/doctype/<name>/<name>.json. This module
+# re-implements those DocTypes as native AVA SQLAlchemy models so the Help Desk
+# can run inside AVA's own FastAPI/Postgres stack (one server) instead of on the
+# Frappe framework. The proxy (grc/modules/helpdesk/router.py) is untouched; the
+# native engine is built alongside it and cut over later.
+#
+# Conventions (see docs/HELPDESK_NATIVE_MODEL_MAP.md for the full field map):
+#   * Table name  = "grc_hd_<name>".
+#   * Surrogate   = id (Integer PK). Frappe's string `name` is kept as a column
+#                   ONLY where it carries data (autoname Prompt doctypes).
+#   * Tenancy     = tenant_id FK on every top-level table (AVA's per-tenant
+#                   `ava_tenant` partition becomes a real FK). Child tables are
+#                   scoped through their parent, so they carry no tenant_id.
+#   * Frappe Link -> converted doctype  => real FK "<fieldname>_id" + relationship.
+#   * Frappe Link -> framework doctype we do NOT convert (User, Contact, Email
+#                   Account, Country, Assignment Rule, HD Agent Status)  => plain
+#                   String holding the external name, noted in the map.
+#   * Frappe Table/Table MultiSelect => a child model with parent FK + `idx`.
+#   * Frappe Duration (seconds) -> Float. Rating -> Float. Time -> Time.
+#     Section/Column/Tab Break, HTML, Button, virtual fields are layout-only and
+#     dropped.
+
+
+# ----------------------------------------------------------------------------
+# CORE
+# ----------------------------------------------------------------------------
+class HDTicketStatus(Base):
+    __tablename__ = "grc_hd_ticket_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    label_agent = Column(String(140), nullable=False)      # reqd, unique per tenant (Frappe autoname = this)
+    label_customer = Column(String(140), nullable=True)
+    different_view = Column(Boolean, default=False)
+    category = Column(String(30), nullable=False)          # Open | Paused | Resolved
+    color = Column(String(30), nullable=True)
+    order = Column(Integer, nullable=True)
+    enabled = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_ticket_status_label", "tenant_id", "label_agent", unique=True),
+    )
+
+
+class HDTicketPriority(Base):
+    __tablename__ = "grc_hd_ticket_priority"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    name = Column(String(140), nullable=True)              # Frappe doc name (autoname Prompt) — the priority identifier
+    level = Column(String(60), nullable=False, default="Medium")  # Urgent | High | Medium | Low
+    description = Column(Text, nullable=True)
+    disabled = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class HDTicketType(Base):
+    __tablename__ = "grc_hd_ticket_type"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    name = Column(String(140), nullable=True)              # Frappe doc name (autoname Prompt) — the type identifier
+    description = Column(Text, nullable=True)
+    priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)  # default priority
+    is_system = Column(Boolean, default=False)
+    disabled = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    priority = relationship("HDTicketPriority")
+
+
+class HDTicketTemplateField(Base):
+    """Child of HD Ticket Template (istable)."""
+    __tablename__ = "grc_hd_ticket_template_field"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    idx = Column(Integer, nullable=True)                   # row order within the parent
+
+    fieldname = Column(String(140), nullable=True)
+    required = Column(Boolean, default=False)
+    visible_to = Column(String(30), nullable=True)         # Everyone | Agents
+    editable_after_creation = Column(Boolean, default=True)
+    url_method = Column(String(255), nullable=True)
+    placeholder = Column(String(255), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    template = relationship("HDTicketTemplate", back_populates="fields")
+
+
+class HDTicketTemplate(Base):
+    __tablename__ = "grc_hd_ticket_template"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    template_name = Column(String(140), nullable=False)    # reqd, unique per tenant
+    about = Column(Text, nullable=True)                    # Frappe Code(HTML)
+    description_template = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    fields = relationship("HDTicketTemplateField", back_populates="template",
+                          cascade="all, delete-orphan", order_by="HDTicketTemplateField.idx")
+
+    __table_args__ = (
+        Index("uq_hd_ticket_template_name", "tenant_id", "template_name", unique=True),
+    )
+
+
+class HDTicket(Base):
+    __tablename__ = "grc_hd_ticket"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    # --- subject / identity ---
+    subject = Column(String(255), nullable=False)          # reqd
+    raised_by = Column(String(255), nullable=True)         # reporter email
+    key = Column(String(255), nullable=True)
+
+    # --- classification (converted-doctype links) ---
+    status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True, index=True)  # reqd in Frappe
+    status_category = Column(String(60), nullable=True)    # fetched from status.category (Open/Paused/Resolved)
+    priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
+    ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
+    agent_group_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # "Team"
+    template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id"), nullable=True)
+
+    # --- body ---
+    description = Column(Text, nullable=True)
+    summary = Column(Text, nullable=True)
+    resolution_details = Column(Text, nullable=True)
+
+    # --- SLA ---
+    sla_id = Column(Integer, ForeignKey("grc_hd_service_level_agreement.id"), nullable=True, index=True)
+    agreement_status = Column(String(60), nullable=True)   # First Response Due | Resolution Due | Failed | Fulfilled | Paused
+    response_by = Column(DateTime, nullable=True)
+    resolution_by = Column(DateTime, nullable=True)
+    service_level_agreement_creation = Column(DateTime, nullable=True)
+    on_hold_since = Column(DateTime, nullable=True)
+    total_hold_time = Column(Float, nullable=True)         # Duration (seconds)
+    raised_outside_working_hours = Column(Boolean, default=False)
+
+    # --- response metrics ---
+    first_response_time = Column(Float, nullable=True)     # Duration
+    first_responded_on = Column(DateTime, nullable=True)
+    first_response_failed_by = Column(Float, nullable=True)
+    avg_response_time = Column(Float, nullable=True)
+    last_agent_response = Column(DateTime, nullable=True)
+    last_customer_response = Column(DateTime, nullable=True)
+
+    # --- resolution metrics ---
+    opening_date = Column(Date, nullable=True)
+    opening_time = Column(Time, nullable=True)
+    resolution_date = Column(DateTime, nullable=True)
+    resolution_time = Column(Float, nullable=True)         # Duration
+    user_resolution_time = Column(Float, nullable=True)
+    resolution_failed_by = Column(Float, nullable=True)
+
+    # --- reference (framework links kept as String) ---
+    contact = Column(String(255), nullable=True)           # -> Frappe Contact
+    customer_id = Column(Integer, ForeignKey("grc_hd_customer.id"), nullable=True)
+    email_account = Column(String(255), nullable=True)     # -> Frappe Email Account
+    via_customer_portal = Column(Boolean, default=False)
+
+    # --- split & merge (self references) ---
+    is_merged = Column(Boolean, default=False)
+    merged_with_id = Column(Integer, ForeignKey("grc_hd_ticket.id"), nullable=True)
+    ticket_split_from_id = Column(Integer, ForeignKey("grc_hd_ticket.id"), nullable=True)
+
+    # --- feedback / CSAT ---
+    feedback_rating = Column(Float, nullable=True)         # Rating (0..1)
+    feedback_id = Column(Integer, ForeignKey("grc_hd_ticket_feedback_option.id"), nullable=True)
+    feedback_extra = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    status = relationship("HDTicketStatus")
+    priority = relationship("HDTicketPriority")
+    ticket_type = relationship("HDTicketType")
+    team = relationship("HDTeam")
+    sla = relationship("HDServiceLevelAgreement")
+    customer = relationship("HDCustomer")
+    feedback = relationship("HDTicketFeedbackOption")
+    merged_with = relationship("HDTicket", remote_side=[id], foreign_keys=[merged_with_id])
+    split_from = relationship("HDTicket", remote_side=[id], foreign_keys=[ticket_split_from_id])
+
+    __table_args__ = (
+        Index("ix_hd_ticket_tenant_status", "tenant_id", "status_id"),
+    )
+
+
+class HDTicketComment(Base):
+    """Internal agent comment on a ticket. (Frappe doctype is deprecated but
+    still the comment store; carried for parity.)"""
+    __tablename__ = "grc_hd_ticket_comment"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    reference_ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                                 nullable=True, index=True)
+    content = Column(Text, nullable=True)
+    commented_by = Column(String(255), nullable=True)      # -> Frappe User
+    is_pinned = Column(Boolean, default=False)
+    # `reactions` (Table HD Comment Reaction) deferred — reactions not converted.
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    ticket = relationship("HDTicket")
+
+
+class HDTicketActivity(Base):
+    """Audit-timeline row for a ticket. (Frappe doctype is deprecated but still
+    the activity store; carried for parity.)"""
+    __tablename__ = "grc_hd_ticket_activity"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                       nullable=True, index=True)
+    action = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    ticket = relationship("HDTicket")
+
+
+# ----------------------------------------------------------------------------
+# PEOPLE
+# ----------------------------------------------------------------------------
+class HDAgent(Base):
+    __tablename__ = "grc_hd_agent"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    user = Column(String(255), nullable=False)             # -> Frappe/AVA User (login email), reqd
+    agent_name = Column(String(255), nullable=False)       # reqd
+    user_image = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True)
+    availability = Column(String(60), nullable=True)       # -> HD Agent Status (not converted)
+    availability_changed_on = Column(DateTime, nullable=True)
+    availability_changed_by = Column(String(255), nullable=True)  # -> Frappe User
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_agent_user", "tenant_id", "user", unique=True),
+    )
+
+
+class HDTeamMember(Base):
+    """Child of HD Team (istable, Table MultiSelect of users)."""
+    __tablename__ = "grc_hd_team_member"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("grc_hd_team.id", ondelete="CASCADE"),
+                     nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    user = Column(String(255), nullable=True)              # -> Frappe/AVA User
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    team = relationship("HDTeam", back_populates="users")
+
+
+class HDTeam(Base):
+    __tablename__ = "grc_hd_team"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    team_name = Column(String(140), nullable=False)        # reqd, unique per tenant
+    assignment_rule = Column(String(255), nullable=True)   # -> Frappe Assignment Rule (not converted)
+    ignore_restrictions = Column(Boolean, default=False)
+    disabled = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    users = relationship("HDTeamMember", back_populates="team",
+                         cascade="all, delete-orphan", order_by="HDTeamMember.idx")
+
+    __table_args__ = (
+        Index("uq_hd_team_name", "tenant_id", "team_name", unique=True),
+    )
+
+
+class HDCustomer(Base):
+    __tablename__ = "grc_hd_customer"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    image = Column(String(255), nullable=True)
+    customer_name = Column(String(255), nullable=True)     # unique per tenant
+    customer_type = Column(String(30), nullable=True)      # Company | Individual | Partnership
+    domain = Column(String(255), nullable=True)
+    erpnext_customer = Column(String(255), nullable=True)  # hidden external ref
+    country = Column(String(140), nullable=True)           # -> Frappe Country
+    primary_contact = Column(String(255), nullable=True)   # -> Frappe Contact
+    email_id = Column(String(255), nullable=True)
+    mobile_no = Column(String(60), nullable=True)
+    # `contacts` (Table HD Customer Member) deferred — child doctype not in scope.
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_customer_name", "tenant_id", "customer_name", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
+# SLA
+# ----------------------------------------------------------------------------
+class HDServiceLevelPriority(Base):
+    """Child of HD Service Level Agreement (istable): per-priority targets."""
+    __tablename__ = "grc_hd_service_level_priority"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sla_id = Column(Integer, ForeignKey("grc_hd_service_level_agreement.id", ondelete="CASCADE"),
+                    nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
+    default_priority = Column(Boolean, default=False)
+    response_time = Column(Float, nullable=True)           # Duration (seconds)
+    resolution_time = Column(Float, nullable=True)         # Duration (seconds)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    sla = relationship("HDServiceLevelAgreement", back_populates="priorities")
+    priority = relationship("HDTicketPriority")
+
+
+class HDServiceDay(Base):
+    """Child of HD Service Level Agreement (istable): working hours per weekday."""
+    __tablename__ = "grc_hd_service_day"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sla_id = Column(Integer, ForeignKey("grc_hd_service_level_agreement.id", ondelete="CASCADE"),
+                    nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    workday = Column(String(20), nullable=False)           # Monday..Sunday, reqd
+    start_time = Column(Time, nullable=True)               # reqd in Frappe
+    end_time = Column(Time, nullable=True)                 # reqd in Frappe
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    sla = relationship("HDServiceLevelAgreement", back_populates="service_days")
+
+
+class HDHoliday(Base):
+    """Child of HD Service Holiday List (istable)."""
+    __tablename__ = "grc_hd_holiday"
+
+    id = Column(Integer, primary_key=True, index=True)
+    holiday_list_id = Column(Integer, ForeignKey("grc_hd_service_holiday_list.id", ondelete="CASCADE"),
+                             nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    holiday_date = Column(Date, nullable=False)            # reqd
+    description = Column(Text, nullable=True)              # reqd in Frappe
+    weekly_off = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    holiday_list = relationship("HDServiceHolidayList", back_populates="holidays")
+
+
+class HDServiceHolidayList(Base):
+    __tablename__ = "grc_hd_service_holiday_list"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    holiday_list_name = Column(String(140), nullable=False)  # reqd, unique per tenant
+    from_date = Column(Date, nullable=True)                # reqd in Frappe
+    to_date = Column(Date, nullable=True)                  # reqd in Frappe
+    total_holidays = Column(Integer, nullable=True)
+    weekly_off = Column(String(20), nullable=True)
+    color = Column(String(30), nullable=True)
+    description = Column(String(255), nullable=True)
+    recurring_holidays = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    holidays = relationship("HDHoliday", back_populates="holiday_list",
+                            cascade="all, delete-orphan", order_by="HDHoliday.idx")
+
+    __table_args__ = (
+        Index("uq_hd_holiday_list_name", "tenant_id", "holiday_list_name", unique=True),
+    )
+
+
+class HDServiceLevelAgreement(Base):
+    __tablename__ = "grc_hd_service_level_agreement"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    service_level = Column(String(140), nullable=False)    # reqd, unique per tenant
+    description = Column(String(255), nullable=True)
+    enabled = Column(Boolean, default=True)
+    default_sla = Column(Boolean, default=False)
+    rank = Column(Integer, nullable=True)
+    condition = Column(Text, nullable=True)                # Python expression
+    condition_json = Column(Text, nullable=True)           # portal-generated condition
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    apply_sla_for_resolution = Column(Boolean, default=True)
+
+    holiday_list_id = Column(Integer, ForeignKey("grc_hd_service_holiday_list.id"), nullable=True)  # reqd in Frappe
+    default_priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
+    default_ticket_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)
+    ticket_reopen_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    priorities = relationship("HDServiceLevelPriority", back_populates="sla",
+                              cascade="all, delete-orphan", order_by="HDServiceLevelPriority.idx")
+    service_days = relationship("HDServiceDay", back_populates="sla",
+                                cascade="all, delete-orphan", order_by="HDServiceDay.idx")
+    holiday_list = relationship("HDServiceHolidayList", foreign_keys=[holiday_list_id])
+    default_priority = relationship("HDTicketPriority", foreign_keys=[default_priority_id])
+    default_ticket_status = relationship("HDTicketStatus", foreign_keys=[default_ticket_status_id])
+    ticket_reopen_status = relationship("HDTicketStatus", foreign_keys=[ticket_reopen_status_id])
+
+    __table_args__ = (
+        Index("uq_hd_sla_service_level", "tenant_id", "service_level", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
+# KNOWLEDGE BASE
+# ----------------------------------------------------------------------------
+class HDArticleCategory(Base):
+    __tablename__ = "grc_hd_article_category"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    category_name = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    icon = Column(String(140), nullable=True)
+    # Frappe nested-set (nsm_parent_field=parent_hd_article_category) -> self-FK:
+    parent_category_id = Column(Integer, ForeignKey("grc_hd_article_category.id"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    parent = relationship("HDArticleCategory", remote_side=[id])
+
+
+class HDArticle(Base):
+    __tablename__ = "grc_hd_article"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    title = Column(String(255), nullable=False)            # reqd
+    category_id = Column(Integer, ForeignKey("grc_hd_article_category.id"), nullable=True)
+    status = Column(String(30), nullable=True, default="Draft")  # Published | Draft | Archived
+    published_on = Column(DateTime, nullable=True)
+    author = Column(String(255), nullable=True)            # -> Frappe User
+    views = Column(Integer, nullable=True, default=0)
+    content = Column(Text, nullable=True)
+    # title_slug is a Frappe virtual (computed) field -> not stored.
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    category = relationship("HDArticleCategory")
+
+
+# ----------------------------------------------------------------------------
+# SAVED REPLIES
+# ----------------------------------------------------------------------------
+class HDSavedReply(Base):
+    __tablename__ = "grc_hd_saved_reply"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    title = Column(String(255), nullable=False)            # reqd, unique per tenant
+    message = Column(Text, nullable=False)                 # reqd
+    scope = Column(String(20), nullable=False, default="Global")  # Global | Team | Personal
+    actions = Column(JSON, nullable=True)
+    # `teams` (Table MultiSelect HD Saved Reply Team) deferred — child doctype not in scope.
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_saved_reply_title", "tenant_id", "title", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
+# FEEDBACK
+# ----------------------------------------------------------------------------
+class HDTicketFeedbackOption(Base):
+    __tablename__ = "grc_hd_ticket_feedback_option"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    rating = Column(Float, nullable=True)                  # Frappe Rating (0..1)
+    label = Column(String(140), nullable=True)             # unique per tenant
+    disabled = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_feedback_option_label", "tenant_id", "label", unique=True),
+    )
