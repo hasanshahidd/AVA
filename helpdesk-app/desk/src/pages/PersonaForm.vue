@@ -217,7 +217,6 @@ const questions = [
       { label: __("X (Twitter)"), value: "x" },
       { label: __("Reddit"), value: "reddit" },
       { label: __("A friend or colleague"), value: "word_of_mouth" },
-      { label: __("A partner or consultant"), value: "partner" },
       { label: __("An event or conference"), value: "event" },
       { label: __("Other"), value: "other" },
     ],
