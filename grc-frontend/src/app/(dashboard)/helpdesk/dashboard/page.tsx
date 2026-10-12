@@ -162,7 +162,7 @@ export default function HelpDeskDashboard() {
           {/* Breakdowns */}
           <div>
             <Eyebrow className="mb-2">Breakdowns</Eyebrow>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Breakdown title="By priority" sub="Demand by urgency" data={a?.by_priority} kind="priority" href="/helpdesk/tickets" />
               <Breakdown title="By status" sub="Where tickets sit" data={a?.by_status_category} kind="status" href="/helpdesk/tickets" />
               <Breakdown title="By team" sub="Load across teams" data={a?.by_team} href="/helpdesk/teams" />
