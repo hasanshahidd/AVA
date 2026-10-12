@@ -114,43 +114,87 @@ def run_inline_sync(conn: IntegrationConnection, db: Session) -> Dict[str, Any]:
         return {"success": False, "errors": [str(exc)]}
 
 
-def escalate_after_scan(slug: str) -> Dict[str, Any]:
-    """Run the Help Desk escalation for a tenant right after a scan/pentest run
-    completes — the "scan done → critical+internet-facing findings become tickets"
-    trigger. Reuses the normal ticketing sync (escalation + status pull), so the
-    escalation POLICY (HELPDESK_AUTO_* / _sync_ticketing) stays the single source of
-    truth. BEST-EFFORT: never raises — a ticketing hiccup must never fail a scan's
-    finalization. No-op when auto-ticketing is off (the sync just pulls statuses)."""
+def escalate_after_scan(slug: str, run_id: int) -> Dict[str, Any]:
+    """On scan/pentest-run completion, escalate that run's findings to Help Desk
+    tickets — the "scan done → critical+internet-facing findings become tickets"
+    trigger. Deliberately scoped so it is SAFE to run on every scan, incl. lab/test:
+      • RUN-SCOPED — only findings on THIS run's assets, never the whole tenant
+        backlog (the backlog stays a separate, explicit owner decision).
+      • INVENTORY-ONLY — skips transient ad-hoc / external targets (lab hosts like
+        ms2 are ad-hoc internet-facing assets; auto-ticketing them would flood the
+        queue with non-work). Ticketing external targets is a separate opt-in.
+    Reuses the SAME policy (`_auto_cfg`) and the SAME idempotent push path
+    (`itsm_service.push_finding`) as the manual button and the sync trigger, so the
+    policy stays the single source of truth. BEST-EFFORT: never raises — a ticketing
+    hiccup must never fail a scan's finalization. No-op when auto-ticket is off."""
+    out: Dict[str, Any] = {"tenant": slug, "run_id": run_id, "considered": 0, "created": 0}
     try:
+        from sqlalchemy import or_ as _or
         from ...db import open_tenant_session
-        from ...models import IntegrationConnection
+        from ...models import (IntegrationConnection, Vulnerability, VulnerabilityAssetLink,
+                                ITAsset, VulnTicketLink, PentestRunAsset)
+        from ...services import itsm_service
     except Exception:
         logger.exception("escalate_after_scan: imports failed")
-        return {"error": "import"}
-    out: Dict[str, Any] = {"tenant": slug, "connections": 0, "pushed": 0}
+        return {**out, "error": "import"}
     try:
         db = open_tenant_session(slug)
     except Exception:
-        logger.exception("escalate_after_scan: cannot open tenant session for %s", slug)
-        return {"error": "session", **out}
+        logger.exception("escalate_after_scan: session open failed for %s", slug)
+        return {**out, "error": "session"}
     try:
-        conns = db.query(IntegrationConnection).filter(
+        conn = db.query(IntegrationConnection).filter(
             IntegrationConnection.is_active.is_(True),
             IntegrationConnection.category == "ticketing",
-        ).all()
-        for conn in conns:
+        ).order_by(IntegrationConnection.id.asc()).first()
+        if not conn:
+            return {**out, "note": "no ticketing connection"}
+        cfg = _auto_cfg(conn)
+        if not cfg["enabled"]:
+            return {**out, "note": "auto-ticket off"}
+
+        run_asset_ids = [r[0] for r in db.query(PentestRunAsset.asset_id)
+                         .filter(PentestRunAsset.run_id == run_id,
+                                 PentestRunAsset.asset_id.isnot(None)).all()]
+        if not run_asset_ids:
+            return out
+
+        # INVENTORY assets among the scanned ones (skip transient ad-hoc/lab targets:
+        # status 'adhoc' + source 'pentest-adhoc'), optionally internet-facing per policy.
+        afilt = [ITAsset.id.in_(run_asset_ids),
+                 _or(ITAsset.status != "adhoc", ITAsset.last_seen_source != "pentest-adhoc")]
+        if cfg.get("require_internet_facing"):
+            afilt.append(_or(ITAsset.internet_facing.is_(True), ITAsset.is_internet_facing.is_(True)))
+        asset_ids = [row[0] for row in db.query(ITAsset.id).filter(*afilt).all()]
+        if not asset_ids:
+            return out
+
+        already = {l.vulnerability_id for l in db.query(VulnTicketLink.vulnerability_id).filter(
+            VulnTicketLink.connection_id == conn.id, VulnTicketLink.resolved_at.is_(None)).all()}
+        OPEN_STATES = ("open", "in_progress", "reopened")
+        cand = (db.query(Vulnerability)
+                .join(VulnerabilityAssetLink, VulnerabilityAssetLink.vulnerability_id == Vulnerability.id)
+                .filter(VulnerabilityAssetLink.asset_id.in_(asset_ids),
+                        Vulnerability.tenant_id == conn.tenant_id,
+                        Vulnerability.severity.in_(cfg["severities"]))
+                .distinct().all())
+        todo = [v for v in cand if v.id not in already and (v.status or "open") in OPEN_STATES][:cfg["limit"]]
+        out["considered"] = len(todo)
+        for v in todo:
             try:
-                res = run_inline_sync(conn, db)
-                out["connections"] += 1
-                out["pushed"] += int((res.get("stats") or {}).get("pushed") or 0)
+                r = itsm_service.push_finding(db, v, conn, user_id=None)
+                db.commit()
+                if r.get("created"):
+                    out["created"] += 1
             except Exception:
-                logger.exception("escalate_after_scan: sync failed for conn %s", conn.id)
+                db.rollback()
+                logger.exception("escalate_after_scan: push failed for vuln %s", v.id)
+        return out
     except Exception:
-        logger.exception("escalate_after_scan: enumerate connections failed for %s", slug)
-        out["error"] = "enumerate"
+        logger.exception("escalate_after_scan failed for %s run %s", slug, run_id)
+        return {**out, "error": "run"}
     finally:
         db.close()
-    return out
 
 
 def _dispatch_sync(adapter, conn: IntegrationConnection, db: Session) -> SyncResult:
