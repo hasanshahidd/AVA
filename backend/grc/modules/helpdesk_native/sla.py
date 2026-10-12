@@ -14,13 +14,27 @@ returns a 200-safe shape and never raises on empty input.
 """
 from __future__ import annotations
 
-from datetime import datetime, time as dtime, timedelta
-from typing import Optional
+import json
+from datetime import date, datetime, time as dtime, timedelta
+from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ...models import HDServiceLevelAgreement, HDTeam
-from .common import iso
+from ...models import (
+    HDHoliday,
+    HDServiceDay,
+    HDServiceHolidayList,
+    HDServiceLevelAgreement,
+    HDServiceLevelPriority,
+    HDTeam,
+    HDTicket,
+    HDTicketPriority,
+    get_db,
+)
+from .common import iso, require_edit, require_view, tenant_id
 
 RESOLVED = "Resolved"
 PAUSED = "Paused"
@@ -430,6 +444,704 @@ def config(db: Session, tid: int) -> dict:
     return {"sla": sla_block, "auto_assignment": auto_assignment, "managed": True}
 
 
+# =============================================================================
+# CONFIG WRITE-SIDE — native port of the Frappe doctype controllers' validate /
+# before_save / on_update logic (CODE CONVERSION, not a redesign). Sources:
+#   * hd_service_level_agreement/hd_service_level_agreement.py (validate*,
+#     before_save, get_repeated)
+#   * hd_service_holiday_list/hd_service_holiday_list.py (validate_days,
+#     get_weekly_off_date*, clear_table, on_update -> recalculate_sla)
+# Frappe Documents become native SQLAlchemy rows; frappe.throw -> HTTP 400;
+# msgprint warnings -> returned `warnings` (never thrown — spec: "warn_* become
+# no-ops or returned warnings"). Everything tenant-scoped.
+# =============================================================================
+
+# ─── parsing + small helpers ─────────────────────────────────────────────────
+def _parse_time(v) -> Optional[dtime]:
+    """'HH:MM[:SS]' / Time -> datetime.time (service-day start/end columns)."""
+    if v in (None, ""):
+        return None
+    if isinstance(v, dtime):
+        return v
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(str(v), fmt).time()
+        except ValueError:
+            continue
+    raise HTTPException(status_code=400, detail=f"invalid time '{v}'")
+
+
+def _parse_date(v) -> Optional[date]:
+    """'YYYY-MM-DD' / date -> datetime.date (holiday + SLA window columns)."""
+    if v in (None, ""):
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    try:
+        return date.fromisoformat(str(v)[:10])
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"invalid date '{v}'")
+
+
+def _get_repeated(values) -> str:
+    """hd_service_level_agreement.py:get_repeated — space-joined duplicates."""
+    seen, dupes = set(), []
+    for v in values:
+        if v in seen and v not in dupes:
+            dupes.append(v)
+        seen.add(v)
+    return " ".join(str(v) for v in dupes)
+
+
+def _priority_labels(db: Session, tid: int, ids) -> dict:
+    ids = [i for i in ids if i]
+    if not ids:
+        return {}
+    return {
+        r.id: (r.name or r.level)
+        for r in db.query(HDTicketPriority)
+        .filter(HDTicketPriority.tenant_id == tid, HDTicketPriority.id.in_(ids))
+        .all()
+    }
+
+
+# ─── SLA validators (hd_service_level_agreement.py) ──────────────────────────
+def _validate_priority_rows(rows, apply_resolution: bool, labels: dict) -> None:
+    """validate_priorities -> validate_priority_defaults + validate_response_and
+    _resolution_time + validate_unique_priorities (:41–:77)."""
+    if sum(1 for p in rows if p.default_priority) > 1:
+        raise HTTPException(status_code=400,
+                            detail="You cannot set more than one Default Priority.")
+    pids = []
+    for i, p in enumerate(rows, start=1):
+        lbl = labels.get(p.priority_id, p.priority_id)
+        if not p.response_time:
+            raise HTTPException(status_code=400,
+                                detail=f"Set Response Time for Priority {lbl} in row {i}.")
+        if apply_resolution:
+            if not p.resolution_time:
+                raise HTTPException(status_code=400,
+                                    detail=f"Set Resolution Time for Priority {lbl} in row {i}.")
+            if (p.response_time or 0) > (p.resolution_time or 0):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(f"Response Time for {lbl} priority in row {i} "
+                            "can't be greater than Resolution Time."))
+        pids.append(p.priority_id)
+    if len(pids) != len(set(pids)):
+        raise HTTPException(status_code=400,
+                            detail=f"Priority {_get_repeated(pids)} has been repeated.")
+
+
+def _validate_service_days(rows) -> None:
+    """validate_support_and_resolution (:121) — start < end, no repeated workday.
+    Frappe marks start/end reqd, so a missing bound is a config error here too."""
+    days = []
+    for i, d in enumerate(rows, start=1):
+        if d.start_time is None or d.end_time is None:
+            raise HTTPException(status_code=400,
+                                detail=f"Start Time and End Time are required in row {i}.")
+        if d.start_time >= d.end_time:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Start Time can't be greater than or equal to End Time in row {i}.")
+        days.append(d.workday)
+    if len(set(days)) != len(days):
+        raise HTTPException(status_code=400,
+                            detail=f"Workday {_get_repeated(days)} has been repeated.")
+
+
+def _validate_condition(condition, condition_json) -> None:
+    """validate_condition (:160). The expression is checked against the SAME
+    doc-only context the runtime selector (_get_sla) evaluates it in — narrower
+    than Frappe's get_context (which also exposes frappe.utils), so a condition
+    that validates here is one the runtime can actually evaluate."""
+    if condition:
+        try:
+            eval(condition, {"__builtins__": {}}, _ctx_empty())  # noqa: S307
+        except Exception as e:  # noqa: BLE001 — surfaced to the author as 400
+            raise HTTPException(status_code=400,
+                                detail=f"The condition '{condition}' is invalid: {e}")
+    if condition_json:
+        # is_json_valid (helpdesk/utils.py:487) == json-parseable.
+        try:
+            json.loads(condition_json)
+        except Exception:  # noqa: BLE001
+            raise HTTPException(
+                status_code=400,
+                detail=("The condition json is invalid; use the portal view, "
+                        "e.g. [['status','==','open']]."))
+
+
+def _ctx_empty() -> dict:
+    """get_context(new_doc) — an empty ticket: every field reads None (_Doc.get)."""
+    return {"doc": _Doc()}
+
+
+def _resolve_default_priority(rows) -> int:
+    """before_save (:180) — the SLA's default_priority is the flagged child row;
+    Frappe throws when none is flagged."""
+    for p in rows:
+        if p.default_priority:
+            return p.priority_id
+    raise HTTPException(status_code=400, detail="Select a Default Priority.")
+
+
+def _enforce_single_default(db: Session, tid: int, is_default: bool,
+                            new_name: str, self_id: Optional[int]) -> List[str]:
+    """validate_default_sla (:143) — only one default SLA per tenant; setting
+    this one flips the previous default off (returned as a warning)."""
+    if not is_default:
+        return []
+    q = db.query(HDServiceLevelAgreement).filter(
+        HDServiceLevelAgreement.tenant_id == tid,
+        HDServiceLevelAgreement.default_sla == True,  # noqa: E712
+    )
+    if self_id is not None:
+        q = q.filter(HDServiceLevelAgreement.id != self_id)
+    other = q.first()
+    if not other:
+        return []
+    other.default_sla = False
+    return [f"Setting '{new_name}' as the default SLA removes '{other.service_level}' "
+            f"as the default SLA. Add a condition to '{other.service_level}' for it "
+            "to keep applying."]
+
+
+def _open_ticket_count(db: Session, tid: int, sla_id: int,
+                       priority_id: Optional[int] = None) -> int:
+    """count_open_tickets (:114) — on-the-clock tickets (Paused counts; Resolved
+    does not) on this SLA, optionally filtered to one priority."""
+    q = db.query(func.count(HDTicket.id)).filter(
+        HDTicket.tenant_id == tid,
+        HDTicket.sla_id == sla_id,
+        HDTicket.status_category != RESOLVED,
+    )
+    if priority_id is not None:
+        q = q.filter(HDTicket.priority_id == priority_id)
+    return q.scalar() or 0
+
+
+def _detach_warnings(db: Session, tid: int, before: Optional[dict], sla) -> List[str]:
+    """warn_removed_priorities (:79) + warn_detach_on_untick (:99) as returned
+    warnings. `before` is the pre-save snapshot (None on create -> no warning)."""
+    if not before:
+        return []
+    warns = []
+    now_pids = {p.priority_id for p in sla.priorities}
+    for pid in before["priority_ids"] - now_pids:
+        c = _open_ticket_count(db, tid, sla.id, pid)
+        if c:
+            lbl = before["labels"].get(pid, pid)
+            warns.append(f"{c} open ticket(s) use priority {lbl}. They lose this "
+                         "SLA the next time they are updated.")
+    for field, was_set in (("default_sla", before["default_sla"]),
+                           ("enabled", before["enabled"])):
+        if was_set and not getattr(sla, field):
+            c = _open_ticket_count(db, tid, sla.id)
+            if c:
+                warns.append(f"{c} open ticket(s) will lose this SLA the next time "
+                             "they are updated, unless another policy matches them.")
+    return warns
+
+
+# ─── SLA row builders + serialization ────────────────────────────────────────
+def _build_priority_rows(payload_list) -> list:
+    return [
+        HDServiceLevelPriority(
+            idx=i,
+            priority_id=p.get("priority_id"),
+            default_priority=bool(p.get("default_priority")),
+            response_time=p.get("response_time") or 0,
+            resolution_time=p.get("resolution_time"),
+        )
+        for i, p in enumerate(payload_list or [], start=1)
+    ]
+
+
+def _build_service_day_rows(payload_list) -> list:
+    return [
+        HDServiceDay(
+            idx=i,
+            workday=d.get("workday"),
+            start_time=_parse_time(d.get("start_time")),
+            end_time=_parse_time(d.get("end_time")),
+        )
+        for i, d in enumerate(payload_list or [], start=1)
+    ]
+
+
+_SLA_SCALARS = (
+    "service_level", "description", "enabled", "default_sla", "rank",
+    "condition", "condition_json", "apply_sla_for_resolution",
+    "holiday_list_id", "default_priority_id",
+    "default_ticket_status_id", "ticket_reopen_status_id",
+)
+
+
+def _apply_sla_scalars(sla, payload: dict) -> None:
+    for f in _SLA_SCALARS:
+        if f in payload and payload[f] is not None:
+            setattr(sla, f, payload[f])
+    if "start_date" in payload:
+        sla.start_date = _parse_date(payload.get("start_date"))
+    if "end_date" in payload:
+        sla.end_date = _parse_date(payload.get("end_date"))
+
+
+def _sla_detail(sla) -> dict:
+    return {
+        "name": str(sla.id),
+        "service_level": sla.service_level,
+        "description": sla.description,
+        "enabled": bool(sla.enabled),
+        "default_sla": bool(sla.default_sla),
+        "rank": sla.rank,
+        "condition": sla.condition,
+        "condition_json": sla.condition_json,
+        "start_date": sla.start_date.isoformat() if sla.start_date else None,
+        "end_date": sla.end_date.isoformat() if sla.end_date else None,
+        "apply_sla_for_resolution": bool(sla.apply_sla_for_resolution),
+        "holiday_list_id": sla.holiday_list_id,
+        "holiday_list": sla.holiday_list.holiday_list_name if sla.holiday_list else None,
+        "default_priority_id": sla.default_priority_id,
+        "priorities": [
+            {
+                "id": p.id,
+                "priority_id": p.priority_id,
+                "priority": (p.priority.name or p.priority.level) if p.priority else None,
+                "default_priority": bool(p.default_priority),
+                "response_time": p.response_time,
+                "resolution_time": p.resolution_time,
+            }
+            for p in sla.priorities
+        ],
+        "service_days": [
+            {
+                "id": d.id,
+                "workday": d.workday,
+                "start_time": d.start_time.strftime("%H:%M:%S") if d.start_time else None,
+                "end_time": d.end_time.strftime("%H:%M:%S") if d.end_time else None,
+            }
+            for d in sla.service_days
+        ],
+    }
+
+
+def _get_sla_row(db: Session, tid: int, name: str):
+    """Tenant-scoped fetch by contract `name` (int PK) — the isolation guard."""
+    try:
+        pk = int(name)
+    except (TypeError, ValueError):
+        return None
+    return (
+        db.query(HDServiceLevelAgreement)
+        .filter(HDServiceLevelAgreement.id == pk,
+                HDServiceLevelAgreement.tenant_id == tid)
+        .first()
+    )
+
+
+# ─── SLA config endpoints (business functions) ───────────────────────────────
+def list_sla(db: Session, tid: int) -> dict:
+    rows = (
+        db.query(HDServiceLevelAgreement)
+        .filter(HDServiceLevelAgreement.tenant_id == tid)
+        .order_by(HDServiceLevelAgreement.default_sla.desc(),
+                  HDServiceLevelAgreement.service_level.asc())
+        .all()
+    )
+    return {"slas": [_sla_detail(s) for s in rows]}
+
+
+def get_sla_config(db: Session, tid: int, name: str) -> dict:
+    sla = _get_sla_row(db, tid, name)
+    if not sla:
+        raise HTTPException(status_code=404, detail="not found")
+    return _sla_detail(sla)
+
+
+def _validate_and_finalize_sla(db, tid, sla, apply_resolution, before) -> List[str]:
+    """Frappe validate() + before_save() order on the in-memory row."""
+    warns = _enforce_single_default(db, tid, bool(sla.default_sla),
+                                    sla.service_level, sla.id)
+    labels = _priority_labels(db, tid, [p.priority_id for p in sla.priorities])
+    _validate_priority_rows(sla.priorities, apply_resolution, labels)
+    _validate_service_days(sla.service_days)
+    _validate_condition(sla.condition, sla.condition_json)
+    warns += _detach_warnings(db, tid, before, sla)
+    sla.default_priority_id = _resolve_default_priority(sla.priorities)  # before_save
+    return warns
+
+
+def create_sla(db: Session, tid: int, payload: dict) -> dict:
+    sla = HDServiceLevelAgreement(tenant_id=tid, service_level=payload.get("service_level"))
+    _apply_sla_scalars(sla, payload)
+    sla.priorities = _build_priority_rows(payload.get("priorities"))
+    sla.service_days = _build_service_day_rows(payload.get("service_days"))
+    warns = _validate_and_finalize_sla(
+        db, tid, sla, bool(sla.apply_sla_for_resolution), before=None)
+    db.add(sla)
+    db.commit()
+    return {"ok": True, "name": str(sla.id), "warnings": warns}
+
+
+def update_sla(db: Session, tid: int, name: str, payload: dict) -> dict:
+    sla = _get_sla_row(db, tid, name)
+    if not sla:
+        raise HTTPException(status_code=404, detail="not found")
+    before = {
+        "priority_ids": {p.priority_id for p in sla.priorities},
+        "labels": {p.priority_id: (p.priority.name or p.priority.level)
+                   for p in sla.priorities if p.priority},
+        "default_sla": bool(sla.default_sla),
+        "enabled": bool(sla.enabled),
+    }
+    _apply_sla_scalars(sla, payload)
+    if payload.get("priorities") is not None:
+        sla.priorities = _build_priority_rows(payload["priorities"])
+    if payload.get("service_days") is not None:
+        sla.service_days = _build_service_day_rows(payload["service_days"])
+    warns = _validate_and_finalize_sla(
+        db, tid, sla, bool(sla.apply_sla_for_resolution), before=before)
+    db.commit()
+    return {"ok": True, "name": str(sla.id), "warnings": warns}
+
+
+# ─── Holiday list write-side (hd_service_holiday_list.py) ─────────────────────
+def _validate_holiday_days(hl) -> None:
+    """validate_days (:43) — from <= to, every holiday inside [from, to]."""
+    if hl.from_date and hl.to_date and hl.from_date > hl.to_date:
+        raise HTTPException(status_code=400, detail="To Date cannot be before From Date")
+    for h in hl.holidays:
+        if hl.from_date and hl.to_date and not (hl.from_date <= h.holiday_date <= hl.to_date):
+            raise HTTPException(
+                status_code=400,
+                detail=f"The holiday on {h.holiday_date.isoformat()} is not between "
+                       "From Date and To Date")
+
+
+def _weekly_off_date_list(start_date: date, end_date: date, weekly_off: str,
+                          existing: set) -> list:
+    """get_weekly_off_date_list (:59) — every `weekly_off` weekday in
+    [start, end] not already present. Stdlib weekday math replaces
+    dateutil.relativedelta: _WEEKDAYS is Monday=0..Sunday=6, same as
+    date.weekday(), so `(target - start.weekday()) % 7` is the first occurrence
+    on/after start_date (what relativedelta(weekday=...) returns)."""
+    try:
+        target = _WEEKDAYS.index(weekly_off.strip().capitalize())
+    except (AttributeError, ValueError):
+        raise HTTPException(status_code=400, detail="Please select a valid weekly off day")
+    ref = start_date + timedelta(days=(target - start_date.weekday()) % 7)
+    out = []
+    while ref <= end_date:
+        if ref not in existing:
+            out.append(ref)
+        ref += timedelta(days=7)
+    return out
+
+
+def _recalculate_sla(db: Session, tid: int, hl) -> None:
+    """on_update -> recalculate_sla (:83). Every Open ticket on each SLA that
+    links this holiday list is re-flowed through the engine so new/removed
+    holidays shift its deadlines. Frappe re-saves the ticket (-> apply); here we
+    call the already-converted recompute() per ticket. prev_status_category =
+    the ticket's own category: a holiday edit is not a status change, so this
+    must not look like a pause/resume transition."""
+    sla_ids = [
+        row[0] for row in db.query(HDServiceLevelAgreement.id)
+        .filter(HDServiceLevelAgreement.tenant_id == tid,
+                HDServiceLevelAgreement.holiday_list_id == hl.id)
+        .all()
+    ]
+    for sla_id in sla_ids:
+        tickets = (
+            db.query(HDTicket)
+            .filter(HDTicket.tenant_id == tid,
+                    HDTicket.sla_id == sla_id,
+                    HDTicket.status_category == "Open")
+            .all()
+        )
+        for t in tickets:
+            recompute(db, t, prev_status_category=t.status_category)
+
+
+def _build_holiday_rows(payload_list) -> list:
+    return [
+        HDHoliday(
+            idx=i,
+            holiday_date=_parse_date(h.get("holiday_date")),
+            description=h.get("description"),
+            weekly_off=bool(h.get("weekly_off")),
+        )
+        for i, h in enumerate(payload_list or [], start=1)
+    ]
+
+
+def _holiday_list_detail(hl) -> dict:
+    return {
+        "name": str(hl.id),
+        "holiday_list_name": hl.holiday_list_name,
+        "from_date": hl.from_date.isoformat() if hl.from_date else None,
+        "to_date": hl.to_date.isoformat() if hl.to_date else None,
+        "total_holidays": hl.total_holidays,
+        "weekly_off": hl.weekly_off,
+        "color": hl.color,
+        "description": hl.description,
+        "holidays": [
+            {
+                "id": h.id,
+                "holiday_date": h.holiday_date.isoformat() if h.holiday_date else None,
+                "description": h.description,
+                "weekly_off": bool(h.weekly_off),
+            }
+            for h in hl.holidays
+        ],
+    }
+
+
+def _get_holiday_list_row(db: Session, tid: int, name: str):
+    try:
+        pk = int(name)
+    except (TypeError, ValueError):
+        return None
+    return (
+        db.query(HDServiceHolidayList)
+        .filter(HDServiceHolidayList.id == pk,
+                HDServiceHolidayList.tenant_id == tid)
+        .first()
+    )
+
+
+def list_holiday_lists(db: Session, tid: int) -> dict:
+    rows = (
+        db.query(HDServiceHolidayList)
+        .filter(HDServiceHolidayList.tenant_id == tid)
+        .order_by(HDServiceHolidayList.holiday_list_name.asc())
+        .all()
+    )
+    return {"holiday_lists": [_holiday_list_detail(h) for h in rows]}
+
+
+def get_holiday_list(db: Session, tid: int, name: str) -> dict:
+    hl = _get_holiday_list_row(db, tid, name)
+    if not hl:
+        raise HTTPException(status_code=404, detail="not found")
+    return _holiday_list_detail(hl)
+
+
+def create_holiday_list(db: Session, tid: int, payload: dict) -> dict:
+    hl = HDServiceHolidayList(
+        tenant_id=tid,
+        holiday_list_name=payload.get("holiday_list_name"),
+        from_date=_parse_date(payload.get("from_date")),
+        to_date=_parse_date(payload.get("to_date")),
+        weekly_off=payload.get("weekly_off"),
+        color=payload.get("color"),
+        description=payload.get("description"),
+    )
+    hl.holidays = _build_holiday_rows(payload.get("holidays"))
+    _validate_holiday_days(hl)
+    hl.total_holidays = len(hl.holidays)          # validate() tail
+    db.add(hl)
+    db.commit()
+    # on_update.recalculate_sla returns early when is_new() -> no recalc on create.
+    return {"ok": True, "name": str(hl.id)}
+
+
+def update_holiday_list(db: Session, tid: int, name: str, payload: dict) -> dict:
+    hl = _get_holiday_list_row(db, tid, name)
+    if not hl:
+        raise HTTPException(status_code=404, detail="not found")
+    for f in ("holiday_list_name", "weekly_off", "color", "description"):
+        if payload.get(f) is not None:
+            setattr(hl, f, payload[f])
+    if "from_date" in payload:
+        hl.from_date = _parse_date(payload.get("from_date"))
+    if "to_date" in payload:
+        hl.to_date = _parse_date(payload.get("to_date"))
+    if payload.get("holidays") is not None:
+        hl.holidays = _build_holiday_rows(payload["holidays"])
+    _validate_holiday_days(hl)
+    hl.total_holidays = len(hl.holidays)
+    db.commit()
+    _recalculate_sla(db, tid, hl)                 # on_update (not is_new)
+    db.commit()
+    return {"ok": True, "name": str(hl.id)}
+
+
+def delete_holiday_list(db: Session, tid: int, name: str) -> dict:
+    hl = _get_holiday_list_row(db, tid, name)
+    if not hl:
+        raise HTTPException(status_code=404, detail="not found")
+    linked = (
+        db.query(func.count(HDServiceLevelAgreement.id))
+        .filter(HDServiceLevelAgreement.tenant_id == tid,
+                HDServiceLevelAgreement.holiday_list_id == hl.id)
+        .scalar()
+    )
+    if linked:
+        raise HTTPException(status_code=400,
+                            detail=f"{linked} SLA(s) link this holiday list; detach them first.")
+    db.delete(hl)
+    db.commit()
+    return {"ok": True}
+
+
+def generate_weekly_off(db: Session, tid: int, name: str) -> dict:
+    """get_weekly_off_dates (:22) — append the generated weekly-off holidays and
+    re-save (so on_update.recalculate_sla fires)."""
+    hl = _get_holiday_list_row(db, tid, name)
+    if not hl:
+        raise HTTPException(status_code=404, detail="not found")
+    if not hl.weekly_off:                          # validate_values (:39)
+        raise HTTPException(status_code=400, detail="Please select weekly off day")
+    if not hl.from_date or not hl.to_date:
+        raise HTTPException(status_code=400, detail="From Date and To Date are required")
+    existing = {h.holiday_date for h in hl.holidays}
+    last_idx = max([h.idx or 0 for h in hl.holidays] or [0])
+    for i, d in enumerate(_weekly_off_date_list(hl.from_date, hl.to_date,
+                                                hl.weekly_off, existing)):
+        hl.holidays.append(HDHoliday(idx=last_idx + i + 1, holiday_date=d,
+                                     description=hl.weekly_off, weekly_off=True))
+    _validate_holiday_days(hl)
+    hl.total_holidays = len(hl.holidays)
+    db.commit()
+    _recalculate_sla(db, tid, hl)
+    db.commit()
+    return {"ok": True, "name": str(hl.id), "total_holidays": hl.total_holidays}
+
+
+def clear_holidays(db: Session, tid: int, name: str) -> dict:
+    """clear_table (:106) — drop all holiday rows and re-save."""
+    hl = _get_holiday_list_row(db, tid, name)
+    if not hl:
+        raise HTTPException(status_code=404, detail="not found")
+    hl.holidays = []                               # cascade delete-orphan
+    hl.total_holidays = 0
+    db.commit()
+    _recalculate_sla(db, tid, hl)
+    db.commit()
+    return {"ok": True, "name": str(hl.id)}
+
+
+# ─── request bodies + router (main session mounts config_router) ──────────────
+class SLAPriorityIn(BaseModel):
+    priority_id: int
+    default_priority: bool = False
+    response_time: float = 0
+    resolution_time: Optional[float] = None
+
+
+class SLAServiceDayIn(BaseModel):
+    workday: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+
+
+class SLAConfigIn(BaseModel):
+    service_level: str
+    description: Optional[str] = None
+    enabled: bool = True
+    default_sla: bool = False
+    rank: Optional[int] = None
+    condition: Optional[str] = None
+    condition_json: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    apply_sla_for_resolution: bool = True
+    holiday_list_id: Optional[int] = None
+    default_priority_id: Optional[int] = None
+    default_ticket_status_id: Optional[int] = None
+    ticket_reopen_status_id: Optional[int] = None
+    priorities: Optional[List[SLAPriorityIn]] = None
+    service_days: Optional[List[SLAServiceDayIn]] = None
+
+
+class HolidayIn(BaseModel):
+    holiday_date: str
+    description: Optional[str] = None
+    weekly_off: bool = False
+
+
+class HolidayListIn(BaseModel):
+    holiday_list_name: str
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    weekly_off: Optional[str] = None
+    color: Optional[str] = None
+    description: Optional[str] = None
+    holidays: Optional[List[HolidayIn]] = None
+
+
+config_router = APIRouter()
+
+
+@config_router.get("/sla")
+def list_sla_ep(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    return list_sla(db, tenant_id(db))
+
+
+@config_router.get("/sla/{name}")
+def get_sla_ep(name: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    return get_sla_config(db, tenant_id(db), name)
+
+
+@config_router.post("/sla")
+def create_sla_ep(body: SLAConfigIn, db: Session = Depends(get_db),
+                  _: bool = Depends(require_edit)):
+    return create_sla(db, tenant_id(db), body.model_dump())
+
+
+@config_router.put("/sla/{name}")
+def update_sla_ep(name: str, body: SLAConfigIn, db: Session = Depends(get_db),
+                  _: bool = Depends(require_edit)):
+    return update_sla(db, tenant_id(db), name, body.model_dump())
+
+
+@config_router.get("/holiday-lists")
+def list_holiday_lists_ep(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    return list_holiday_lists(db, tenant_id(db))
+
+
+@config_router.get("/holiday-lists/{name}")
+def get_holiday_list_ep(name: str, db: Session = Depends(get_db),
+                        _: bool = Depends(require_view)):
+    return get_holiday_list(db, tenant_id(db), name)
+
+
+@config_router.post("/holiday-lists")
+def create_holiday_list_ep(body: HolidayListIn, db: Session = Depends(get_db),
+                           _: bool = Depends(require_edit)):
+    return create_holiday_list(db, tenant_id(db), body.model_dump())
+
+
+@config_router.put("/holiday-lists/{name}")
+def update_holiday_list_ep(name: str, body: HolidayListIn, db: Session = Depends(get_db),
+                           _: bool = Depends(require_edit)):
+    return update_holiday_list(db, tenant_id(db), name, body.model_dump())
+
+
+@config_router.delete("/holiday-lists/{name}")
+def delete_holiday_list_ep(name: str, db: Session = Depends(get_db),
+                           _: bool = Depends(require_edit)):
+    return delete_holiday_list(db, tenant_id(db), name)
+
+
+@config_router.post("/holiday-lists/{name}/weekly-off")
+def generate_weekly_off_ep(name: str, db: Session = Depends(get_db),
+                           _: bool = Depends(require_edit)):
+    return generate_weekly_off(db, tenant_id(db), name)
+
+
+@config_router.post("/holiday-lists/{name}/clear")
+def clear_holidays_ep(name: str, db: Session = Depends(get_db),
+                      _: bool = Depends(require_edit)):
+    return clear_holidays(db, tenant_id(db), name)
+
+
 if __name__ == "__main__":
     # Self-check for the business-hours math (no DB). 9–17 Mon–Fri.
     from types import SimpleNamespace
@@ -451,4 +1163,51 @@ if __name__ == "__main__":
     assert _calc_elapsed_time(mon, datetime(2024, 1, 1, 13, 0), set(), wd) == 4 * 3600
     assert _calc_elapsed_time(datetime(2024, 1, 1, 16, 0), datetime(2024, 1, 2, 10, 0), set(), wd) == 2 * 3600
     assert _fmt_duration(14400) == "4h" and _fmt_duration(172800) == "2d"
+
+    # ── config write-side validators (pure, no DB) ──────────────────────────
+    def _p(pid, dflt=False, resp=3600, reso=7200):
+        return SimpleNamespace(priority_id=pid, default_priority=dflt,
+                               response_time=resp, resolution_time=reso)
+
+    def _raises(fn):
+        try:
+            fn()
+        except HTTPException:
+            return True
+        return False
+
+    # priorities: ok / >1 default / missing response / response>resolution / dup
+    _validate_priority_rows([_p(1, True), _p(2)], True, {})
+    assert _raises(lambda: _validate_priority_rows([_p(1, True), _p(2, True)], True, {}))
+    assert _raises(lambda: _validate_priority_rows([_p(1, True, resp=0)], True, {}))
+    assert _raises(lambda: _validate_priority_rows([_p(1, True, resp=9000, reso=3600)], True, {}))
+    assert _raises(lambda: _validate_priority_rows([_p(1, True), _p(1)], True, {}))
+    # apply_resolution=False skips the resolution checks
+    _validate_priority_rows([_p(1, True, reso=None)], False, {})
+
+    # service days: start<end, no repeat, both present
+    sd = lambda day, s, e: SimpleNamespace(workday=day, start_time=s, end_time=e)
+    _validate_service_days([sd("Monday", dtime(9), dtime(17))])
+    assert _raises(lambda: _validate_service_days([sd("Monday", dtime(17), dtime(9))]))
+    assert _raises(lambda: _validate_service_days([sd("Monday", dtime(9), dtime(17)),
+                                                   sd("Monday", dtime(9), dtime(17))]))
+    assert _raises(lambda: _validate_service_days([sd("Monday", None, dtime(17))]))
+
+    # condition: valid expr ok, garbage rejected; json validity
+    _validate_condition("doc.priority == 'High'", None)
+    assert _raises(lambda: _validate_condition("doc ==", None))
+    _validate_condition(None, '[["status","==","open"]]')
+    assert _raises(lambda: _validate_condition(None, "{not json"))
+
+    # default priority resolution (before_save)
+    assert _resolve_default_priority([_p(1), _p(2, True)]) == 2
+    assert _raises(lambda: _resolve_default_priority([_p(1), _p(2)]))
+
+    # weekly-off date list: Sundays in Jan 2024 (7,14,21,28), 14th pre-existing
+    wk = _weekly_off_date_list(date(2024, 1, 1), date(2024, 1, 31), "Sunday",
+                               {date(2024, 1, 14)})
+    assert wk == [date(2024, 1, 7), date(2024, 1, 21), date(2024, 1, 28)], wk
+    assert _raises(lambda: _weekly_off_date_list(date(2024, 1, 1), date(2024, 1, 31), "Funday", set()))
+    assert _get_repeated(["Mon", "Tue", "Mon", "Mon"]) == "Mon"
+
     print("sla self-check ok")
