@@ -114,6 +114,45 @@ def run_inline_sync(conn: IntegrationConnection, db: Session) -> Dict[str, Any]:
         return {"success": False, "errors": [str(exc)]}
 
 
+def escalate_after_scan(slug: str) -> Dict[str, Any]:
+    """Run the Help Desk escalation for a tenant right after a scan/pentest run
+    completes — the "scan done → critical+internet-facing findings become tickets"
+    trigger. Reuses the normal ticketing sync (escalation + status pull), so the
+    escalation POLICY (HELPDESK_AUTO_* / _sync_ticketing) stays the single source of
+    truth. BEST-EFFORT: never raises — a ticketing hiccup must never fail a scan's
+    finalization. No-op when auto-ticketing is off (the sync just pulls statuses)."""
+    try:
+        from ...db import open_tenant_session
+        from ...models import IntegrationConnection
+    except Exception:
+        logger.exception("escalate_after_scan: imports failed")
+        return {"error": "import"}
+    out: Dict[str, Any] = {"tenant": slug, "connections": 0, "pushed": 0}
+    try:
+        db = open_tenant_session(slug)
+    except Exception:
+        logger.exception("escalate_after_scan: cannot open tenant session for %s", slug)
+        return {"error": "session", **out}
+    try:
+        conns = db.query(IntegrationConnection).filter(
+            IntegrationConnection.is_active.is_(True),
+            IntegrationConnection.category == "ticketing",
+        ).all()
+        for conn in conns:
+            try:
+                res = run_inline_sync(conn, db)
+                out["connections"] += 1
+                out["pushed"] += int((res.get("stats") or {}).get("pushed") or 0)
+            except Exception:
+                logger.exception("escalate_after_scan: sync failed for conn %s", conn.id)
+    except Exception:
+        logger.exception("escalate_after_scan: enumerate connections failed for %s", slug)
+        out["error"] = "enumerate"
+    finally:
+        db.close()
+    return out
+
+
 def _dispatch_sync(adapter, conn: IntegrationConnection, db: Session) -> SyncResult:
     """Route to the right adapter call based on category."""
     cat = (conn.category or "").lower()
