@@ -2192,9 +2192,10 @@ _CRED_CATEGORY = {
     "winrm": "host", "ssh": "host",
     "cisco": "network",
     "postgres": "database", "mysql": "database", "mssql": "database", "oracle": "database",
-    "aws": "cloud", "azure": "cloud", "digitalocean": "cloud",
+    "aws": "cloud", "azure": "cloud", "gcp": "cloud", "digitalocean": "cloud",
     "k8s": "cluster",
     "ldap": "identity",
+    "github": "repo",
 }
 
 
@@ -2289,8 +2290,9 @@ def create_credential(
         raise HTTPException(400, f"Invalid kind. One of: {', '.join(CREDENTIAL_KINDS)}")
     if body.secret_kind not in SECRET_KINDS:
         raise HTTPException(400, f"Invalid secret_kind. One of: {', '.join(SECRET_KINDS)}")
-    # SNMP (community-only) and k8s (token-only) carry no username; everything else needs one.
-    if body.kind not in ("snmp", "k8s") and not (body.username or "").strip():
+    # SNMP (community-only), k8s (token-only), github (PAT-only) and gcp (service-account
+    # JSON) carry no username; everything else needs one.
+    if body.kind not in ("snmp", "k8s", "github", "gcp") and not (body.username or "").strip():
         raise HTTPException(400, "A username is required for this credential kind.")
     for cidr in (body.applies_to_cidrs or []):
         try:
