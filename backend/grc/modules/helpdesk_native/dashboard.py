@@ -55,12 +55,31 @@ def recent(db: Session, tid: int) -> dict:
     } for t in rows]}
 
 
-def analytics(db: Session, tid: int) -> dict:
-    """§A2. KPIs + 30-day trend + 4 donuts, matching compute_analytics()."""
-    rows = db.query(HDTicket).filter(HDTicket.tenant_id == tid).all()
+def analytics(db: Session, tid: int, from_date=None, to_date=None) -> dict:
+    """§A2. KPIs + trend + 4 donuts, matching compute_analytics().
+
+    With no dates: KPIs/breakdowns over ALL tickets + a 30-day trailing trend
+    (unchanged — this is what /dashboard-analytics serves). When from_date and/or
+    to_date are given (the 7/30/90-day selector, via /dashboard-overview), the
+    KPIs + breakdowns are scoped to tickets CREATED in [from, to] and the trend
+    spans those days. Empty → zeros/None/empty, never 4xx (§E)."""
+    all_rows = db.query(HDTicket).filter(HDTicket.tenant_id == tid).all()
     # Native timestamps are UTC (datetime.utcnow); the proxy used datetime.now().
-    # Using utcnow keeps the 30-day window aligned with how rows are stamped.
+    # Using utcnow keeps the window aligned with how rows are stamped.
     now = datetime.utcnow()
+
+    if from_date or to_date:
+        to_d = _to_date(to_date, now.date())
+        from_d = _to_date(from_date, to_d - timedelta(days=29))
+        lo = datetime.combine(from_d, datetime.min.time())
+        hi = datetime.combine(to_d + timedelta(days=1), datetime.min.time())
+        rows = [t for t in all_rows if t.created_at and lo <= t.created_at < hi]
+        start = from_d
+        span = (to_d - from_d).days + 1
+    else:
+        rows = all_rows
+        start = (now - timedelta(days=29)).date()
+        span = 30
     total = len(rows)
 
     # SLA: % Fulfilled among tickets that actually carry an SLA verdict.
@@ -82,14 +101,16 @@ def analytics(db: Session, tid: int) -> dict:
                if t.feedback_rating not in (None, 0, "0", "")]
     avg_feedback = round(_mean(ratings) * 5, 2) if ratings else None
 
-    # 30-day daily trend: created-per-day vs resolved-per-day.
-    start = (now - timedelta(days=29)).date()
-    days = [start + timedelta(days=i) for i in range(30)]
+    # Daily trend: created-per-day vs resolved-per-day across the window. Counted
+    # over ALL tickets (membership in the day set) so a ticket resolved in the
+    # window but created before it still lands in the resolved line.
+    days = [start + timedelta(days=i) for i in range(span)]
+    day_set = set(days)
     created_by, resolved_by = Counter(), Counter()
-    for t in rows:
-        if t.created_at and t.created_at.date() >= start:
+    for t in all_rows:
+        if t.created_at and t.created_at.date() in day_set:
             created_by[t.created_at.date()] += 1
-        if t.resolution_date and t.resolution_date.date() >= start:
+        if t.resolution_date and t.resolution_date.date() in day_set:
             resolved_by[t.resolution_date.date()] += 1
     trend = [{"date": d.isoformat(), "created": created_by.get(d, 0),
               "resolved": resolved_by.get(d, 0)} for d in days]
@@ -472,13 +493,16 @@ def dashboard_data(
     current_user: GRCUser = Depends(require_auth),
     _: bool = Depends(require_view),
 ):
-    """§ get_dashboard_data. Manager-gated + agent/team scoped. Non-managers may
-    only read their own agent data and no team (403 otherwise, matching Frappe)."""
-    if not _is_manager(db, current_user) and (agent != current_user.email or team):
-        raise HTTPException(status_code=403,
-                            detail="You are not allowed to view this dashboard data.")
+    """§ get_dashboard_data. Agent/team scoped. A non-manager may read the
+    tenant-wide aggregate (no agent, no team — read-only, same rollup the ungated
+    /dashboard-analytics already exposes) and their OWN agent data, but not
+    another agent's or a team's (403). Resolve @me FIRST so an agent reading
+    their own stats passes the gate."""
     if agent == "@me":
         agent = current_user.email
+    if not _is_manager(db, current_user) and (team or (agent and agent != current_user.email)):
+        raise HTTPException(status_code=403,
+                            detail="You are not allowed to view this dashboard data.")
 
     nd = NativeDashboard(db, tenant_id(db), from_date, to_date, team, agent)
     if dashboard_type == "number_card":
@@ -491,6 +515,19 @@ def dashboard_data(
         from . import analytics  # lazy: analytics imports this module (Frappe does the same)
         return analytics.tag_charts(nd)
     return []
+
+
+@dashboard_router.get("/dashboard-overview")
+def dashboard_overview(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_view),
+):
+    """Tenant-wide analytics() with an optional window — the range-aware twin of
+    /dashboard-analytics that backs the UI's 7/30/90-day selector. Same shape;
+    KPIs + breakdowns scoped to the window, trend spans it. Ungated read-only."""
+    return analytics(db, tenant_id(db), from_date, to_date)
 
 
 if __name__ == "__main__":

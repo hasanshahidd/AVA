@@ -66,7 +66,11 @@ def _resolve_customer_id(db: Session, tid: int, name) -> Optional[int]:
 
 
 def _scope_match(t, scope: str, identifier, customer_id: Optional[int]) -> bool:
-    """analytics_utils._apply_scope — agent/customer/contact predicate."""
+    """analytics_utils._apply_scope — agent/customer/contact predicate.
+    `all` is the AVA net-new tenant-wide scope (every ticket; backs the
+    dashboard's tenant-wide feedback distribution + SLA-breach trend)."""
+    if scope == "all":
+        return True
     if scope == "agent":
         return t.assigned_agent == identifier
     if scope == "customer":
@@ -731,6 +735,23 @@ def avg_resolution(dt: str, dn: str, period: str = "last month",
     scope = _resolve_scope(dt)
     validate_agent_access(db, current_user, scope, dn)
     return get_avg_time_metric(db, tenant_id(db), period, "resolution_time", scope, dn)
+
+
+@router.get("/analytics/sla-violations-overview")
+def sla_violations_overview(period: str = "last month",
+                            db: Session = Depends(get_db),
+                            _: bool = Depends(require_view)):
+    """Tenant-wide Failed-SLA time-series (no customer/contact scope) — the
+    dashboard's SLA-breach trend. Ungated read-only; empty → zeros (§E)."""
+    return get_sla_violations(db, tenant_id(db), "all", None, period)
+
+
+@router.get("/analytics/feedback-overview")
+def feedback_overview(db: Session = Depends(get_db),
+                      _: bool = Depends(require_view)):
+    """Tenant-wide 1–5 star CSAT distribution + weighted average — the
+    dashboard's feedback histogram. Ungated read-only; empty → zeros (§E)."""
+    return get_feedback_received(db, tenant_id(db), "all", None)
 
 
 @router.get("/analytics/ticket/{name}")
