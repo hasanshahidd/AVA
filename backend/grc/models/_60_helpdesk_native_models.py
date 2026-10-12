@@ -78,6 +78,7 @@ class HDTicketType(Base):
     name = Column(String(140), nullable=True)              # Frappe doc name (autoname Prompt) — the type identifier
     description = Column(Text, nullable=True)
     priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)  # default priority
+    department_id = Column(Integer, ForeignKey("grc_hd_department.id"), nullable=True)  # AVA net-new: null = global type; set = dept-scoped category
     is_system = Column(Boolean, default=False)
     disabled = Column(Boolean, default=False)
 
@@ -147,6 +148,7 @@ class HDTicket(Base):
     priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
     ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
     agent_group_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # "Team"
+    department_id = Column(Integer, ForeignKey("grc_hd_department.id"), nullable=True, index=True)  # AVA net-new: intake department
     template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id"), nullable=True)
     # Native equivalent of Frappe core `_assign` (JSON list), flattened to the
     # single assignee the Help Desk UI exposes as `agent` (A15 assign endpoint).
@@ -213,6 +215,7 @@ class HDTicket(Base):
     feedback = relationship("HDTicketFeedbackOption")
     merged_with = relationship("HDTicket", remote_side=[id], foreign_keys=[merged_with_id])
     split_from = relationship("HDTicket", remote_side=[id], foreign_keys=[ticket_split_from_id])
+    department = relationship("HDDepartment", foreign_keys=[department_id])
 
     __table_args__ = (
         Index("ix_hd_ticket_tenant_status", "tenant_id", "status_id"),
@@ -542,6 +545,7 @@ class HDArticle(Base):
     status = Column(String(30), nullable=True, default="Draft")  # Published | Draft | Archived
     published_on = Column(DateTime, nullable=True)
     author = Column(String(255), nullable=True)            # -> Frappe User
+    idx = Column(Integer, nullable=True)                   # publish-order within a category (Frappe before_save append)
     views = Column(Integer, nullable=True, default=0)
     content = Column(Text, nullable=True)
     # title_slug is a Frappe virtual (computed) field -> not stored.
@@ -564,6 +568,7 @@ class HDSavedReply(Base):
     title = Column(String(255), nullable=False)            # reqd, unique per tenant
     message = Column(Text, nullable=False)                 # reqd
     scope = Column(String(20), nullable=False, default="Global")  # Global | Team | Personal
+    owner = Column(String(255), nullable=True, index=True)  # creator email — Personal-scope read grant (Frappe doc owner)
     actions = Column(JSON, nullable=True)
     # `teams` (Table MultiSelect HD Saved Reply Team) deferred — child doctype not in scope.
 
@@ -874,4 +879,33 @@ class HDSettings(Base):
 
     __table_args__ = (
         Index("uq_hd_settings_tenant", "tenant_id", unique=True),
+    )
+
+
+# =============================================================================
+# NET-NEW (not in Frappe) — Departments: a general multi-department intake layer
+# over the converted engine. Frappe Helpdesk has only HD Team; AVA adds a thin
+# Department that maps to a default Team so the EXISTING assignment + SLA engines
+# route a ticket onwards unchanged. HDTicket.department_id / HDTicketType.department_id
+# carry the link; routing (department -> default_team -> agent_group) happens in
+# the create-ticket path.
+# =============================================================================
+class HDDepartment(Base):
+    __tablename__ = "grc_hd_department"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    name = Column(String(140), nullable=False)             # Sales, Finance, IT/Security, HR, ...
+    description = Column(Text, nullable=True)
+    default_team_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # tickets route here
+    enabled = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    default_team = relationship("HDTeam", foreign_keys=[default_team_id])
+
+    __table_args__ = (
+        Index("uq_hd_department_name", "tenant_id", "name", unique=True),
     )

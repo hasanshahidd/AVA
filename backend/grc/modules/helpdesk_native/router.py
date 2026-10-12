@@ -27,7 +27,10 @@ from sqlalchemy.orm import Session
 
 from ...models import GRCUser, get_db
 from ...routers.auth_router import require_auth
-from . import tickets, sla, assignment, people, kb, replies, dashboard  # noqa: F401 (assignment used by tickets)
+from . import (  # noqa: F401 (assignment used by tickets)
+    tickets, sla, assignment, people, kb, replies, dashboard,
+    masters, agent_status, contacts, tags, views, settings, analytics, department,
+)
 from .common import tenant_id, require_view, require_edit
 
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk (native)"])
@@ -68,6 +71,7 @@ class TicketCreate(BaseModel):
     agent_group_id: Optional[int] = None
     customer_id: Optional[int] = None
     contact: Optional[str] = None
+    department_id: Optional[int] = None    # AVA net-new: multi-department intake
 
 
 class SavedReplyBody(BaseModel):
@@ -106,7 +110,15 @@ def ticket_detail(name: str, db: Session = Depends(get_db), _: bool = Depends(re
 @router.post("/tickets")
 def create_ticket(body: TicketCreate, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
-    return tickets.create_ticket(db, tenant_id(db), body.model_dump(), raised_by=current_user.email)
+    tid = tenant_id(db)
+    data = body.model_dump()
+    # NET-NEW department routing: a chosen department stamps the ticket's Team, then
+    # the existing assignment + SLA pipeline runs unchanged. An explicit agent_group wins.
+    if data.get("department_id") and not data.get("agent_group_id"):
+        team_id = department.resolve_department_team(db, tid, data["department_id"])
+        if team_id:
+            data["agent_group_id"] = team_id
+    return tickets.create_ticket(db, tid, data, raised_by=current_user.email)
 
 
 @router.post("/tickets/{name}/status")
@@ -149,9 +161,7 @@ def customers(db: Session = Depends(get_db), _: bool = Depends(require_view)):
     return people.list_customers(db, tenant_id(db))
 
 
-@router.get("/contacts")
-def contacts(db: Session = Depends(get_db), _: bool = Depends(require_view)):
-    return people.list_contacts(db, tenant_id(db))
+# /contacts is now served by contacts.router (full contact store).
 
 
 # ─── knowledge base (stub) ──────────────────────────────────────────────────
@@ -188,7 +198,26 @@ def delete_saved_reply(name: str, db: Session = Depends(get_db), _: bool = Depen
     return replies.delete_saved_reply(db, tenant_id(db), name)
 
 
-# ─── config (stub) ──────────────────────────────────────────────────────────
-@router.get("/config")
-def config(db: Session = Depends(get_db), _: bool = Depends(require_view)):
-    return sla.config(db, tenant_id(db))
+# /config is now served by settings.router (real HD Settings public subset).
+
+
+# ─── aggregate: the full native surface main.py mounts ──────────────────────
+# The core `router` (prefix /helpdesk) above + every converted module's sub-router.
+# Sub-routers that are prefix-less (masters, sla config) are mounted under /helpdesk
+# here; the rest already carry their own /helpdesk path and mount as-is.
+helpdesk_native_router = APIRouter()
+helpdesk_native_router.include_router(router)                               # ticket core + reads
+helpdesk_native_router.include_router(masters.router, prefix="/helpdesk")   # status/type/template/feedback CRUD
+helpdesk_native_router.include_router(sla.config_router, prefix="/helpdesk")  # SLA + holiday-list config CRUD
+helpdesk_native_router.include_router(tickets.extra_router)                 # bulk-reply/assign-agent/customer-reply/delete
+helpdesk_native_router.include_router(people.people_write_router)           # agent/customer/membership write
+helpdesk_native_router.include_router(agent_status.router)                  # /helpdesk/agent-statuses
+helpdesk_native_router.include_router(contacts.router)                      # /helpdesk/contacts (store)
+helpdesk_native_router.include_router(replies.actions_router)               # rendered + apply-saved-reply-actions
+helpdesk_native_router.include_router(kb.kb_write_router)                   # article/category CRUD + feedback
+helpdesk_native_router.include_router(dashboard.dashboard_router)           # /helpdesk/dashboard-data
+helpdesk_native_router.include_router(analytics.router)                     # /helpdesk/analytics/*
+helpdesk_native_router.include_router(tags.router)                          # /helpdesk/tags, ticket tags
+helpdesk_native_router.include_router(views.router)                         # /helpdesk/views
+helpdesk_native_router.include_router(settings.router)                      # /helpdesk/settings + /helpdesk/config
+helpdesk_native_router.include_router(department.router)                    # /helpdesk/departments (NET-NEW)

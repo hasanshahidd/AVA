@@ -269,6 +269,7 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
         priority_id=payload.get("priority_id"),
         ticket_type_id=payload.get("ticket_type_id"),
         agent_group_id=payload.get("agent_group_id"),
+        department_id=payload.get("department_id"),  # AVA net-new intake department
         customer_id=payload.get("customer_id"),
         contact=payload.get("contact"),
     )
