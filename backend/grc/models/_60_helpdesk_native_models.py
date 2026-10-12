@@ -147,7 +147,7 @@ class HDTicket(Base):
     status_category = Column(String(60), nullable=True)    # fetched from status.category (Open/Paused/Resolved)
     priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
     ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
-    agent_group_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # "Team"
+    agent_group_id = Column(Integer, ForeignKey("grc_teams.id"), nullable=True)  # "Team" — AVA Administration team (grc_teams), managed in one place
     department_id = Column(Integer, ForeignKey("grc_hd_department.id"), nullable=True, index=True)  # AVA net-new: intake department
     template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id"), nullable=True)
     # Native equivalent of Frappe core `_assign` (JSON list), flattened to the
@@ -209,7 +209,7 @@ class HDTicket(Base):
     status = relationship("HDTicketStatus")
     priority = relationship("HDTicketPriority")
     ticket_type = relationship("HDTicketType")
-    team = relationship("HDTeam")
+    team = relationship("Team")  # AVA Administration team (grc_teams)
     sla = relationship("HDServiceLevelAgreement")
     customer = relationship("HDCustomer")
     feedback = relationship("HDTicketFeedbackOption")
@@ -322,8 +322,13 @@ class HDAgent(Base):
     )
 
 
+# NOTE: HDTeam / HDTeamMember are UNUSED by routing as of the teams unification.
+# Help Desk routing teams are now AVA Administration teams (grc_teams / Team),
+# managed in Administration → Teams. These two classes are kept only so the
+# (empty) legacy tables still map; nothing reads or writes them. Safe to drop in
+# a later cleanup migration.
 class HDTeamMember(Base):
-    """Child of HD Team (istable, Table MultiSelect of users)."""
+    """Child of HD Team (istable, Table MultiSelect of users). UNUSED — see note above."""
     __tablename__ = "grc_hd_team_member"
 
     id = Column(Integer, primary_key=True)
@@ -720,13 +725,13 @@ class HDSavedReplyTeam(Base):
                             nullable=False, index=True)
     idx = Column(Integer, nullable=True)
 
-    team_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)
+    team_id = Column(Integer, ForeignKey("grc_teams.id"), nullable=True)  # AVA Administration team (grc_teams)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     saved_reply = relationship("HDSavedReply", backref="teams")
-    team = relationship("HDTeam")
+    team = relationship("Team")
 
 
 # ----------------------------------------------------------------------------
@@ -898,13 +903,13 @@ class HDDepartment(Base):
 
     name = Column(String(140), nullable=False)             # Sales, Finance, IT/Security, HR, ...
     description = Column(Text, nullable=True)
-    default_team_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # tickets route here
+    default_team_id = Column(Integer, ForeignKey("grc_teams.id"), nullable=True)  # tickets route here — AVA Administration team (grc_teams)
     enabled = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    default_team = relationship("HDTeam", foreign_keys=[default_team_id])
+    default_team = relationship("Team", foreign_keys=[default_team_id])
 
     __table_args__ = (
         Index("uq_hd_department_name", "tenant_id", "name", unique=True),

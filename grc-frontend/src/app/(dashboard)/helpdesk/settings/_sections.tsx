@@ -8,8 +8,9 @@
  * real Create / Edit / Delete buttons.
  *
  * Teams and roles are NOT managed here — they live in AVA Administration
- * (Role Management / Teams). The team dropdowns below still read /helpdesk/teams
- * (ticket assignment is bound to the Help Desk's own team table).
+ * (Role Management / Teams). The team dropdowns below read /helpdesk/teams, which
+ * now sources the AVA Administration teams (grc_teams): the Help Desk USES those
+ * teams for routing/assignment, it no longer keeps its own team table.
  */
 import { useState } from "react";
 import { Pencil, Trash2, Check, Minus } from "lucide-react";

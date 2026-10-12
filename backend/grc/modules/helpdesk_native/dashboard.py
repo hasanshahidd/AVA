@@ -20,7 +20,7 @@ from ...models import (
     GRCUser,
     HDTicket,
     HDTicketStatus,
-    HDTeam,
+    Team,
     Permission,
     Role,
     RolePermission,
@@ -126,7 +126,7 @@ def analytics(db: Session, tid: int, from_date=None, to_date=None) -> dict:
         "avg_feedback_rating": avg_feedback,
         "feedback_count": len(ratings),
         "trend": trend,
-        "by_team": _by(lambda t: t.team.team_name if t.team else None, "Unassigned"),
+        "by_team": _by(lambda t: t.team.name if t.team else None, "Unassigned"),
         "by_priority": _by(
             lambda t: (t.priority.name or t.priority.level) if t.priority else None, "—"),
         "by_type": _by(lambda t: t.ticket_type.name if t.ticket_type else None, "Unset"),
@@ -252,12 +252,13 @@ class NativeDashboard:
         self.open_ids = cats.get(OPEN, set())
         self.resolved_ids = cats.get(RESOLVED, set())
 
-        # team filter is by name in Frappe (agent_group == team); resolve to the
-        # FK id. An unknown team name matches nothing (sentinel -1).
+        # team filter is by name (agent_group == team); resolve to the FK id.
+        # Teams are the AVA Administration teams (grc_teams) post-unification. An
+        # unknown team name matches nothing (sentinel -1).
         self.team_id = None
         if team:
-            row = (db.query(HDTeam)
-                   .filter(HDTeam.tenant_id == tid, HDTeam.team_name == team).first())
+            row = (db.query(Team)
+                   .filter(Team.tenant_id == tid, Team.name == team).first())
             self.team_id = row.id if row else -1
 
         self.rows = db.query(HDTicket).filter(HDTicket.tenant_id == tid).all()
@@ -456,7 +457,7 @@ class NativeDashboard:
                     xAxis={"type": "category", "title": title_noun})
 
     def _by_team(self) -> dict:
-        rows = self._counts(lambda t: t.team.team_name if t.team else "No Team")
+        rows = self._counts(lambda t: t.team.name if t.team else "No Team")
         return self._pie_or_bar(rows, None, "team", "team", "Team")
 
     def _by_type(self) -> dict:

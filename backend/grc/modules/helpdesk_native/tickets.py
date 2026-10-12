@@ -22,7 +22,7 @@ from ...models import (
     HDTicketStatus,
     HDTicketPriority,
     HDTicketType,
-    HDTeam,
+    Team,
     HDAgent,
     HDSettings,
     HDCommunication,
@@ -385,8 +385,8 @@ def update(db: Session, tid: int, name: str, payload: dict) -> dict:
             ticket.ticket_type_id = t.id
     if payload.get("agent_group"):
         team = (
-            db.query(HDTeam)
-            .filter(HDTeam.tenant_id == tid, HDTeam.team_name == payload["agent_group"])
+            db.query(Team)
+            .filter(Team.tenant_id == tid, Team.name == payload["agent_group"])
             .first()
         )
         if team:
@@ -410,7 +410,7 @@ def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optiona
     ticket.assigned_agent = agent
     _activity(db, tid, ticket, f"assigned to {agent}" if agent else "cleared assignee")
     t = (
-        db.query(HDTeam).filter(HDTeam.tenant_id == tid, HDTeam.team_name == team).first()
+        db.query(Team).filter(Team.tenant_id == tid, Team.name == team).first()
         if team else None
     )
     ticket.agent_group_id = t.id if t else None

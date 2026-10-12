@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import HDDepartment, HDTeam, HDTicketType, get_db
+from ...models import HDDepartment, Team, HDTicketType, get_db
 from .common import require_edit, require_view, tenant_id
 
 router = APIRouter(prefix="/helpdesk/departments", tags=["Help Desk (native)"])
@@ -39,7 +39,7 @@ def _serialize(d: HDDepartment) -> dict:
         "name": d.name,
         "description": d.description,
         "default_team_id": d.default_team_id,
-        "default_team": d.default_team.team_name if d.default_team else None,
+        "default_team": d.default_team.name if d.default_team else None,
         "enabled": bool(d.enabled),
     }
 
@@ -99,8 +99,8 @@ def create_department(body: DepartmentBody, db: Session = Depends(get_db),
                                      HDDepartment.name == name).first():
         raise HTTPException(status_code=400, detail="A department with this name already exists")
     if body.default_team_id is not None and not (
-        db.query(HDTeam).filter(HDTeam.tenant_id == tid,
-                                HDTeam.id == body.default_team_id).first()
+        db.query(Team).filter(Team.tenant_id == tid,
+                                Team.id == body.default_team_id).first()
     ):
         raise HTTPException(status_code=400, detail="Default team not found")
     d = HDDepartment(
@@ -130,8 +130,8 @@ def update_department(dept_id: int, body: DepartmentBody, db: Session = Depends(
     if clash:
         raise HTTPException(status_code=400, detail="A department with this name already exists")
     if body.default_team_id is not None and not (
-        db.query(HDTeam).filter(HDTeam.tenant_id == tid,
-                                HDTeam.id == body.default_team_id).first()
+        db.query(Team).filter(Team.tenant_id == tid,
+                                Team.id == body.default_team_id).first()
     ):
         raise HTTPException(status_code=400, detail="Default team not found")
     d.name = name

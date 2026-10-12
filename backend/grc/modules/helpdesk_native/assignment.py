@@ -30,7 +30,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ...models import HDTicket
+from ...models import HDAgent, HDTicket
 
 # Status whose label is exactly "Open" — the core assign_condition keys on the
 # status *label* string `status == 'Open'` (hd_team.py:assign_condition), and the
@@ -42,16 +42,31 @@ OPEN_CATEGORY = "Open"
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
-def _members(team) -> list:
-    """The team's member logins in child-row order, deduped — mirrors the rule's
-    `users` list synced from `HD Team.users` (hd_team.py:sync_users)."""
+def _members(db: Session, tid: int, team) -> list:
+    """The team's assignable member logins, in membership order, deduped.
+
+    SOURCE CHANGE (teams unification): members now come from the AVA Administration
+    team (grc_teams → Team.members, each a GRCUser), not the retired HDTeamMember
+    list. The login we rotate over is the member's GRCUser.email — the same value
+    HDAgent.user holds. Restricted to members who are HD agents of this tenant, so
+    a non-agent team member is never auto-assigned a ticket. The selection BEHAVIOUR
+    (round-robin / load-balance over this ordered list) is unchanged.
+    """
     seen: set = set()
-    out: list = []
-    for m in team.users:  # ordered by HDTeamMember.idx
-        if m.user and m.user not in seen:
-            seen.add(m.user)
-            out.append(m.user)
-    return out
+    emails: list = []
+    for m in team.members:  # TeamMember rows (grc_team_members)
+        email = m.user.email if m.user else None
+        if email and email not in seen:
+            seen.add(email)
+            emails.append(email)
+    if not emails:
+        return []
+    agents = {
+        r[0] for r in db.query(HDAgent.user)
+        .filter(HDAgent.tenant_id == tid, HDAgent.user.in_(emails))
+        .all()
+    }
+    return [e for e in emails if e in agents]
 
 
 def _next_in_cycle(members: list, last):
@@ -147,9 +162,9 @@ def auto_assign(db: Session, ticket) -> None:
     if status is None or status.label_agent != OPEN_LABEL:
         return
     team = ticket.team
-    if team is None or team.disabled:
+    if team is None or not team.is_active:  # AVA Team uses is_active (was HDTeam.disabled)
         return
-    members = _members(team)
+    members = _members(db, ticket.tenant_id, team)
     if not members:
         return
     agent = _select(db, ticket, team, members)
@@ -174,9 +189,9 @@ def remove_if_not_in_team(db: Session, ticket) -> None:
     team = ticket.team
     # users_present_in_team_assignment_rule (hd_ticket.py:453): a disabled rule or a
     # rule with no users must NOT trigger a clear.
-    if team is None or team.disabled:
+    if team is None or not team.is_active:  # AVA Team uses is_active (was HDTeam.disabled)
         return
-    members = _members(team)
+    members = _members(db, ticket.tenant_id, team)
     if not members:
         return
     # agent_in_assigned_team (hd_ticket.py:444): assignee present in the new team?

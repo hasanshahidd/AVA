@@ -41,10 +41,9 @@ from ...models import (
     HDContact,
     HDCustomer,
     HDCustomerMember,
-    HDTeam,
-    HDTeamMember,
     HDTicket,
     Role,
+    Team,
     UserRole,
     get_db,
 )
@@ -79,23 +78,30 @@ def list_agents(db: Session, tid: int) -> dict:
 
 
 def list_teams(db: Session, tid: int) -> dict:
-    """§A7. `name` == team_name on purpose: the ticket assign/update endpoints
-    resolve a team by its name (tickets.assign/update), and that's the value the
-    team dropdown sends back. members carry only `user` (user→grc_users join is
-    deferred, so no full_name)."""
+    """§A7. SOURCE CHANGE (teams unification): Help Desk routing teams are the AVA
+    Administration teams (grc_teams / Team), managed in Administration → Teams — the
+    Help Desk only USES them. The response shape is unchanged so the ticket
+    assign/update endpoints and the FE dropdowns need no change:
+      * `name` == `team_name` == Team.name — the value the dropdown sends back and
+        the assign/update endpoints resolve a team by.
+      * `id` is the grc_teams PK the dropdown / department default-team key on.
+      * `members` carry each member's login email (GRCUser.email == HDAgent.user).
+    `assignment_rule` is always null (AVA teams have no per-team rule) and `disabled`
+    mirrors the inactive flag. All teams are listed (active + inactive) with the flag,
+    preserving the prior read behaviour."""
     rows = (
-        db.query(HDTeam)
-        .filter(HDTeam.tenant_id == tid)
-        .order_by(HDTeam.team_name.asc())
+        db.query(Team)
+        .filter(Team.tenant_id == tid)
+        .order_by(Team.name.asc())
         .all()
     )
     return {"teams": [{
-        "name": t.team_name,
-        "id": t.id,                       # real PK — the write endpoints + Team dropdown key on it
-        "team_name": t.team_name,
-        "assignment_rule": t.assignment_rule,
-        "disabled": bool(t.disabled),
-        "members": [{"name": m.user} for m in t.users],
+        "name": t.name,
+        "id": t.id,
+        "team_name": t.name,
+        "assignment_rule": None,
+        "disabled": not bool(t.is_active),
+        "members": [{"name": m.user.email} for m in t.members if m.user and m.user.email],
     } for t in rows]}
 
 
@@ -508,160 +514,6 @@ def customer_remove_contact(name: str, contact: str, db: Session = Depends(get_d
 def customer_primary_contact(name: str, body: PrimaryBody, db: Session = Depends(get_db),
                              _: bool = Depends(require_edit)):
     return set_customer_primary_contact(db, tenant_id(db), name, body.contact)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# WRITE — HD Team (doctype/hd_team/hd_team.py)
-#
-# Frappe HD Team is a simple org group: a unique team_name + a Table MultiSelect
-# of member users (HDTeamMember), plus an assignment_rule hook. The read side
-# (list_teams, §A7) already existed; this adds create / update / delete and
-# member add/remove so the Settings UI can build teams without seeding. Same
-# tenant-isolation contract as the customer writes above: the tenant filter is
-# the guard, a cross-tenant id resolves to 404.
-# ═══════════════════════════════════════════════════════════════════════════
-class TeamCreate(BaseModel):
-    team_name: str
-    assignment_rule: str | None = None
-    disabled: bool = False
-    members: list[str] | None = None          # member login emails/usernames
-
-
-class TeamUpdate(BaseModel):
-    team_name: str | None = None
-    assignment_rule: str | None = None
-    disabled: bool | None = None
-
-
-class TeamMemberBody(BaseModel):
-    user: str                                 # member login email/username
-
-
-def _get_team(db: Session, tid: int, team_id: int) -> HDTeam | None:
-    return (
-        db.query(HDTeam)
-        .filter(HDTeam.id == team_id, HDTeam.tenant_id == tid)
-        .first()
-    )
-
-
-def _team_name_clash(db: Session, tid: int, name: str, self_id: int | None) -> bool:
-    q = db.query(HDTeam).filter(HDTeam.tenant_id == tid, HDTeam.team_name == name)
-    if self_id is not None:
-        q = q.filter(HDTeam.id != self_id)
-    return q.first() is not None
-
-
-def create_team(db: Session, tid: int, payload: dict) -> dict:
-    name = (payload.get("team_name") or "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Team name is required")
-    if _team_name_clash(db, tid, name, None):
-        raise HTTPException(status_code=400, detail="A team with this name already exists")
-    team = HDTeam(
-        tenant_id=tid,
-        team_name=name,
-        assignment_rule=payload.get("assignment_rule"),
-        disabled=bool(payload.get("disabled")),
-    )
-    # dedup members within the batch, drop blanks
-    seen: set[str] = set()
-    for i, raw in enumerate(payload.get("members") or []):
-        u = (raw or "").strip()
-        if not u or u in seen:
-            continue
-        seen.add(u)
-        team.users.append(HDTeamMember(user=u, idx=len(seen)))
-    db.add(team)
-    db.commit()
-    return {"ok": True, "id": team.id}
-
-
-def update_team(db: Session, tid: int, team_id: int, payload: dict) -> dict:
-    team = _get_team(db, tid, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    if payload.get("team_name") is not None:
-        name = (payload["team_name"] or "").strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="Team name is required")
-        if _team_name_clash(db, tid, name, team_id):
-            raise HTTPException(status_code=400, detail="A team with this name already exists")
-        team.team_name = name
-    if "assignment_rule" in payload and payload["assignment_rule"] is not None:
-        team.assignment_rule = payload["assignment_rule"]
-    if payload.get("disabled") is not None:
-        team.disabled = bool(payload["disabled"])
-    db.commit()
-    return {"ok": True}
-
-
-def delete_team(db: Session, tid: int, team_id: int) -> dict:
-    team = _get_team(db, tid, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    # Detach the team from any tickets/departments that point at it so the FK
-    # doesn't orphan; members cascade with the team (delete-orphan).
-    db.query(HDTicket).filter(HDTicket.tenant_id == tid, HDTicket.agent_group_id == team_id)\
-        .update({HDTicket.agent_group_id: None}, synchronize_session=False)
-    db.delete(team)
-    db.commit()
-    return {"ok": True}
-
-
-def add_team_member(db: Session, tid: int, team_id: int, user: str) -> dict:
-    team = _get_team(db, tid, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    u = (user or "").strip()
-    if not u:
-        raise HTTPException(status_code=400, detail="Member user is required")
-    if any(m.user == u for m in team.users):
-        return {"ok": True}                    # idempotent — already a member
-    team.users.append(HDTeamMember(user=u, idx=len(team.users) + 1))
-    db.commit()
-    return {"ok": True}
-
-
-def remove_team_member(db: Session, tid: int, team_id: int, user: str) -> dict:
-    team = _get_team(db, tid, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    m = next((m for m in team.users if m.user == user), None)
-    if m:
-        db.delete(m)
-        db.commit()
-    return {"ok": True}
-
-
-@people_write_router.post("/teams")
-def team_create(body: TeamCreate, db: Session = Depends(get_db),
-                _: bool = Depends(require_edit)):
-    return create_team(db, tenant_id(db), body.model_dump())
-
-
-@people_write_router.put("/teams/{team_id}")
-def team_update(team_id: int, body: TeamUpdate, db: Session = Depends(get_db),
-                _: bool = Depends(require_edit)):
-    return update_team(db, tenant_id(db), team_id, body.model_dump(exclude_unset=True))
-
-
-@people_write_router.delete("/teams/{team_id}")
-def team_delete(team_id: int, db: Session = Depends(get_db),
-                _: bool = Depends(require_edit)):
-    return delete_team(db, tenant_id(db), team_id)
-
-
-@people_write_router.post("/teams/{team_id}/members")
-def team_add_member(team_id: int, body: TeamMemberBody, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
-    return add_team_member(db, tenant_id(db), team_id, body.user)
-
-
-@people_write_router.delete("/teams/{team_id}/members/{user}")
-def team_remove_member(team_id: int, user: str, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
-    return remove_team_member(db, tenant_id(db), team_id, user)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

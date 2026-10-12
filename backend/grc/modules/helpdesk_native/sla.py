@@ -29,7 +29,7 @@ from ...models import (
     HDServiceHolidayList,
     HDServiceLevelAgreement,
     HDServiceLevelPriority,
-    HDTeam,
+    Team,
     HDTicket,
     HDTicketPriority,
     get_db,
@@ -161,7 +161,7 @@ def _ctx(ticket) -> dict:
         status_category=ticket.status_category,
         priority=(ticket.priority.name or ticket.priority.level) if ticket.priority else None,
         ticket_type=ticket.ticket_type.name if ticket.ticket_type else None,
-        agent_group=ticket.team.team_name if ticket.team else None,
+        agent_group=ticket.team.name if ticket.team else None,
         customer=ticket.customer.customer_name if ticket.customer else None,
         contact=ticket.contact,
         raised_by=ticket.raised_by,
@@ -431,13 +431,13 @@ def config(db: Session, tid: int) -> dict:
             ],
             "holiday_list": sla.holiday_list.holiday_list_name if sla.holiday_list else None,
         }
+    # auto_assignment indicator: the native engine auto-assigns (round-robin /
+    # load-balance) for any routed team that has agent members — there is no
+    # per-team Frappe "assignment rule" string on the unified AVA teams. So the
+    # signal is simply "at least one active AVA Administration team exists".
     auto_assignment = (
-        db.query(HDTeam)
-        .filter(
-            HDTeam.tenant_id == tid,
-            HDTeam.assignment_rule.isnot(None),
-            HDTeam.assignment_rule != "",
-        )
+        db.query(Team)
+        .filter(Team.tenant_id == tid, Team.is_active.is_(True))
         .first()
         is not None
     )

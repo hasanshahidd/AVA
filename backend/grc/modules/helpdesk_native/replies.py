@@ -46,8 +46,6 @@ from ...models import (
     HDSavedReplyTeam,
     HDSettings,
     HDTag,
-    HDTeam,
-    HDTeamMember,
     HDTicketActivity,
     HDTicketComment,
     HDTicketPriority,
@@ -55,6 +53,8 @@ from ...models import (
     HDTicketTag,
     HDTicketType,
     Role,
+    Team,
+    TeamMember,
     Tenant,
     UserRole,
     get_db,
@@ -97,7 +97,7 @@ ACTIONS: dict[str, dict] = {
     },
     "Set Team": {
         "kind": "field", "update_key": "agent_group",
-        "target": (HDTeam, "team_name", {"disabled": False}),
+        "target": (Team, "name", {"is_active": True}),  # AVA Administration team
     },
     "Set Ticket Type": {
         "kind": "field", "update_key": "ticket_type",
@@ -236,14 +236,16 @@ def _hd_settings(db: Session, tid: int) -> Optional[HDSettings]:
 
 
 def _user_teams(db: Session, tid: int, email: Optional[str]) -> list[str]:
-    """Team names the user is a member of — native get_agents_team(user): join the
-    team-member child to its parent team (members carry no tenant_id of their own)."""
+    """Team names the user is a member of — native get_agents_team(user). SOURCE
+    CHANGE (teams unification): reads the AVA Administration teams (grc_teams), whose
+    members are GRCUsers, matched to the Help Desk login by GRCUser.email."""
     if not email:
         return []
     rows = (
-        db.query(HDTeam.team_name)
-        .join(HDTeamMember, HDTeamMember.team_id == HDTeam.id)
-        .filter(HDTeam.tenant_id == tid, HDTeamMember.user == email)
+        db.query(Team.name)
+        .join(TeamMember, TeamMember.team_id == Team.id)
+        .join(GRCUser, GRCUser.id == TeamMember.user_id)
+        .filter(Team.tenant_id == tid, GRCUser.email == email)
         .all()
     )
     return [r[0] for r in rows if r[0]]
@@ -275,8 +277,8 @@ def _team_scoped_ids(db: Session, user_teams: list[str]):
     HDSavedReplyTeam ∩ user's teams join)."""
     return (
         db.query(HDSavedReplyTeam.saved_reply_id)
-        .join(HDTeam, HDSavedReplyTeam.team_id == HDTeam.id)
-        .filter(HDTeam.team_name.in_(user_teams))
+        .join(Team, HDSavedReplyTeam.team_id == Team.id)
+        .filter(Team.name.in_(user_teams))
     )
 
 
@@ -344,10 +346,10 @@ def _set_teams(db: Session, tid: int, reply: HDSavedReply, teams) -> None:
         return
     db.query(HDSavedReplyTeam).filter_by(saved_reply_id=reply.id).delete()
     for i, t in enumerate(teams):
-        team = db.query(HDTeam).filter_by(tenant_id=tid, team_name=t).first()
+        team = db.query(Team).filter_by(tenant_id=tid, name=t).first()
         if not team:
             try:
-                team = db.query(HDTeam).filter_by(tenant_id=tid, id=int(t)).first()
+                team = db.query(Team).filter_by(tenant_id=tid, id=int(t)).first()
             except (TypeError, ValueError):
                 team = None
         if team:
@@ -452,7 +454,7 @@ def _render_context(ticket, user: Optional[GRCUser]) -> dict:
     ctx["status"] = ticket.status.label_agent if ticket.status else None
     ctx["priority"] = (ticket.priority.name or ticket.priority.level) if ticket.priority else None
     ctx["ticket_type"] = ticket.ticket_type.name if ticket.ticket_type else None
-    ctx["agent_group"] = ticket.team.team_name if ticket.team else None
+    ctx["agent_group"] = ticket.team.name if ticket.team else None
     ctx["customer"] = ticket.customer.customer_name if ticket.customer else None
     if user is not None:
         for f in ("email", "display_name", "username", "department", "designation", "division", "group"):
