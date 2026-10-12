@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { CARD_SHADOW, Card, Eyebrow, SEV, T, alpha, nfmt, pctOf, type Tone } from "../dashboard/_components/kit";
 import { BarList, PartLegend, StackBar, type BarRow, type Part } from "../dashboard/_components/charts";
-import { Avatar } from "../_ui";
+import { Avatar } from "./_ui";
 
 /* ---------- tokens shared with the breakdowns ---------- */
 export const ACCENT = T.base;
