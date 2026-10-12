@@ -111,7 +111,7 @@ const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 // Why-fix-this drivers — turns the action queue from a list into "fix BECAUSE".
 const drivers = (v: Vulnerability): { t: string; c: string }[] => {
   const out: { t: string; c: string }[] = [];
-  if (v.kev_flag) out.push({ t: 'Exploited', c: '#C2453F' });
+  if (v.kev_flag) out.push({ t: 'KEV', c: '#C2453F' });
   if ((v.public_exploit_count ?? 0) > 0 || (v.exploitdb_count ?? 0) > 0) out.push({ t: 'Public exploit', c: '#C0682F' });
   if (isExposed(v)) out.push({ t: 'Internet-facing', c: EXPOSED_TONE });
   if ((v.cvss_score ?? 0) >= 9) out.push({ t: `CVSS ${(v.cvss_score as number).toFixed(1)}`, c: '#9A6410' });
@@ -321,7 +321,7 @@ export default function VulnCommandCenter({
 
   // Threat-intel / SLA coverage figures — populated or honest, for the signal-coverage card.
   const covStats: { label: string; value: number | string; tone: string }[] = [
-    { label: 'Exploited (KEV)', value: m.kev, tone: m.kev ? '#C2453F' : FAINT },
+    { label: 'KEV CVEs', value: m.kev, tone: m.kev ? '#C2453F' : FAINT },
     { label: 'Public exploit', value: m.publicExploit, tone: m.publicExploit ? '#C0682F' : FAINT },
     { label: 'Probability-scored', value: m.epssScored, tone: m.epssScored ? AC : FAINT },
     { label: 'Overdue', value: m.overdue, tone: m.overdue ? '#C2453F' : FAINT },
@@ -699,7 +699,7 @@ function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: num
         const clickable = !!onSelect && !!d.name;
         return (
           <button key={`${d.name}-${i}`} type="button"
-            title={`${d.name} · ${d.size} open${d.kev > 0 ? ` · ${d.kev} exploited` : ''}${clickable ? ' · click for findings' : ''}`}
+            title={`${d.name} · ${d.size} open${d.kev > 0 ? ` · ${d.kev} KEV (known exploited in the wild)` : ''}${clickable ? ' · click for findings' : ''}`}
             onClick={clickable ? () => onSelect!(d.name) : undefined}
             style={{ flex: `${Math.max(d.size, 1)} 1 120px`, minWidth: 120, minHeight: 84, background: bg, color: fg,
                      border: '2px solid #fff', borderRadius: 8, padding: '10px 12px', textAlign: 'left',
@@ -707,7 +707,7 @@ function AssetTreemap({ data, max, onSelect }: { data: { name: string; size: num
                      cursor: clickable ? 'pointer' : 'default', overflow: 'hidden' }}>
             <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, ...TNUM }}>{d.size}</span>
             <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{d.name}</span>
-            {d.kev > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: fg === '#fff' ? '#FFD9D6' : '#9A2A24' }}>{d.kev} exploited</span>}
+            {d.kev > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: fg === '#fff' ? '#FFD9D6' : '#9A2A24' }}>{d.kev} CVE</span>}
           </button>
         );
       })}
