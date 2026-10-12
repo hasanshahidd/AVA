@@ -35,7 +35,7 @@ from sqlalchemy import Time  # Frappe `Time` fields (opening_time, service-day h
 class HDTicketStatus(Base):
     __tablename__ = "grc_hd_ticket_status"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     label_agent = Column(String(140), nullable=False)      # reqd, unique per tenant (Frappe autoname = this)
@@ -57,7 +57,7 @@ class HDTicketStatus(Base):
 class HDTicketPriority(Base):
     __tablename__ = "grc_hd_ticket_priority"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     name = Column(String(140), nullable=True)              # Frappe doc name (autoname Prompt) — the priority identifier
@@ -72,7 +72,7 @@ class HDTicketPriority(Base):
 class HDTicketType(Base):
     __tablename__ = "grc_hd_ticket_type"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     name = Column(String(140), nullable=True)              # Frappe doc name (autoname Prompt) — the type identifier
@@ -92,7 +92,7 @@ class HDTicketTemplateField(Base):
     """Child of HD Ticket Template (istable)."""
     __tablename__ = "grc_hd_ticket_template_field"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id", ondelete="CASCADE"),
                          nullable=False, index=True)
     idx = Column(Integer, nullable=True)                   # row order within the parent
@@ -113,7 +113,7 @@ class HDTicketTemplateField(Base):
 class HDTicketTemplate(Base):
     __tablename__ = "grc_hd_ticket_template"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     template_name = Column(String(140), nullable=False)    # reqd, unique per tenant
@@ -134,7 +134,7 @@ class HDTicketTemplate(Base):
 class HDTicket(Base):
     __tablename__ = "grc_hd_ticket"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     # --- subject / identity ---
@@ -229,7 +229,7 @@ class HDTicketComment(Base):
     deprecated; here the table is the live internal-notes store."""
     __tablename__ = "grc_hd_ticket_comment"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     reference_ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
@@ -259,7 +259,7 @@ class HDCommunication(Base):
     """
     __tablename__ = "grc_hd_communication"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     reference_ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
@@ -284,7 +284,7 @@ class HDTicketActivity(Base):
     ticket core appends to on status/assignment/field changes."""
     __tablename__ = "grc_hd_ticket_activity"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
@@ -303,7 +303,7 @@ class HDTicketActivity(Base):
 class HDAgent(Base):
     __tablename__ = "grc_hd_agent"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     user = Column(String(255), nullable=False)             # -> Frappe/AVA User (login email), reqd
@@ -326,7 +326,7 @@ class HDTeamMember(Base):
     """Child of HD Team (istable, Table MultiSelect of users)."""
     __tablename__ = "grc_hd_team_member"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     team_id = Column(Integer, ForeignKey("grc_hd_team.id", ondelete="CASCADE"),
                      nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -342,7 +342,7 @@ class HDTeamMember(Base):
 class HDTeam(Base):
     __tablename__ = "grc_hd_team"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     team_name = Column(String(140), nullable=False)        # reqd, unique per tenant
@@ -364,7 +364,7 @@ class HDTeam(Base):
 class HDCustomer(Base):
     __tablename__ = "grc_hd_customer"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     image = Column(String(255), nullable=True)
@@ -393,7 +393,7 @@ class HDServiceLevelPriority(Base):
     """Child of HD Service Level Agreement (istable): per-priority targets."""
     __tablename__ = "grc_hd_service_level_priority"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     sla_id = Column(Integer, ForeignKey("grc_hd_service_level_agreement.id", ondelete="CASCADE"),
                     nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -414,7 +414,7 @@ class HDServiceDay(Base):
     """Child of HD Service Level Agreement (istable): working hours per weekday."""
     __tablename__ = "grc_hd_service_day"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     sla_id = Column(Integer, ForeignKey("grc_hd_service_level_agreement.id", ondelete="CASCADE"),
                     nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -433,7 +433,7 @@ class HDHoliday(Base):
     """Child of HD Service Holiday List (istable)."""
     __tablename__ = "grc_hd_holiday"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     holiday_list_id = Column(Integer, ForeignKey("grc_hd_service_holiday_list.id", ondelete="CASCADE"),
                              nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -451,7 +451,7 @@ class HDHoliday(Base):
 class HDServiceHolidayList(Base):
     __tablename__ = "grc_hd_service_holiday_list"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     holiday_list_name = Column(String(140), nullable=False)  # reqd, unique per tenant
@@ -477,7 +477,7 @@ class HDServiceHolidayList(Base):
 class HDServiceLevelAgreement(Base):
     __tablename__ = "grc_hd_service_level_agreement"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     service_level = Column(String(140), nullable=False)    # reqd, unique per tenant
@@ -519,7 +519,7 @@ class HDServiceLevelAgreement(Base):
 class HDArticleCategory(Base):
     __tablename__ = "grc_hd_article_category"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     category_name = Column(String(255), nullable=True)
@@ -537,7 +537,7 @@ class HDArticleCategory(Base):
 class HDArticle(Base):
     __tablename__ = "grc_hd_article"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     title = Column(String(255), nullable=False)            # reqd
@@ -562,7 +562,7 @@ class HDArticle(Base):
 class HDSavedReply(Base):
     __tablename__ = "grc_hd_saved_reply"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     title = Column(String(255), nullable=False)            # reqd, unique per tenant
@@ -586,7 +586,7 @@ class HDSavedReply(Base):
 class HDTicketFeedbackOption(Base):
     __tablename__ = "grc_hd_ticket_feedback_option"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     rating = Column(Float, nullable=True)                  # Frappe Rating (0..1)
@@ -619,7 +619,7 @@ class HDAgentStatus(Base):
     Frappe's Link stores the doc name.)"""
     __tablename__ = "grc_hd_agent_status"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     agent_status = Column(String(140), nullable=True)      # unique per tenant (Frappe autoname = this)
@@ -643,7 +643,7 @@ class HDContact(Base):
     inline (what Help Desk reads), with the child rows dropped as layout detail."""
     __tablename__ = "grc_hd_contact"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     first_name = Column(String(140), nullable=True)
@@ -668,7 +668,7 @@ class HDCustomerMember(Base):
     flag that HD Customer's role/permission logic depends on."""
     __tablename__ = "grc_hd_customer_member"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey("grc_hd_customer.id", ondelete="CASCADE"),
                          nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -690,7 +690,7 @@ class HDArticleFeedback(Base):
     """`HD Article Feedback` — one row per (user, article): 0 none / 1 like / 2 dislike."""
     __tablename__ = "grc_hd_article_feedback"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     article_id = Column(Integer, ForeignKey("grc_hd_article.id", ondelete="CASCADE"),
@@ -715,7 +715,7 @@ class HDSavedReplyTeam(Base):
     """Child of HD Saved Reply (istable): the teams a Team-scoped reply is visible to."""
     __tablename__ = "grc_hd_saved_reply_team"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     saved_reply_id = Column(Integer, ForeignKey("grc_hd_saved_reply.id", ondelete="CASCADE"),
                             nullable=False, index=True)
     idx = Column(Integer, nullable=True)
@@ -736,7 +736,7 @@ class HDView(Base):
     """`HD View` — a saved list/group_by/kanban view (filters/columns/order)."""
     __tablename__ = "grc_hd_view"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     label = Column(String(140), nullable=True)
@@ -768,7 +768,7 @@ class HDTag(Base):
     """Native tag master (Frappe used core `Tag` with app=helpdesk + a color)."""
     __tablename__ = "grc_hd_tag"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     name = Column(String(140), nullable=True)
@@ -786,7 +786,7 @@ class HDTicketTag(Base):
     """Ticket<->tag join (Frappe core `Tag Link`)."""
     __tablename__ = "grc_hd_ticket_tag"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
                        nullable=False, index=True)
     tag_id = Column(Integer, ForeignKey("grc_hd_tag.id", ondelete="CASCADE"),
@@ -812,7 +812,7 @@ class HDSettings(Base):
     faithful parity even where the outbound-mail workflow is not yet wired."""
     __tablename__ = "grc_hd_settings"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     # --- defaults (links to converted doctypes) ---
@@ -893,7 +893,7 @@ class HDSettings(Base):
 class HDDepartment(Base):
     __tablename__ = "grc_hd_department"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
 
     name = Column(String(140), nullable=False)             # Sales, Finance, IT/Security, HR, ...
