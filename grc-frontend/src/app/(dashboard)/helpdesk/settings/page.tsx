@@ -8,12 +8,12 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Settings, Building2, Users2, ShieldCheck, UserCog, CircleDot,
+  Settings, Building2, UserCog, CircleDot,
   ListChecks, Tag, Flag, FileText, Timer, Star,
 } from "lucide-react";
 import { PageHeader } from "../_ui";
 import {
-  GeneralSection, AgentsSection, AgentStatusesSection, TeamsSection, RolesSection,
+  GeneralSection, AgentsSection, AgentStatusesSection,
   DepartmentsSection, TicketTypesSection, TicketStatusesSection, PrioritiesSection,
   TemplatesSection, FeedbackSection, SlaSection,
 } from "./_sections";
@@ -22,8 +22,6 @@ const TABS: { key: string; label: string; icon: any; render: () => JSX.Element }
   { key: "general", label: "General", icon: Settings, render: () => <GeneralSection /> },
   { key: "agents", label: "Agents", icon: UserCog, render: () => <AgentsSection /> },
   { key: "agent-statuses", label: "Agent statuses", icon: CircleDot, render: () => <AgentStatusesSection /> },
-  { key: "teams", label: "Teams", icon: Users2, render: () => <TeamsSection /> },
-  { key: "roles", label: "Roles & permissions", icon: ShieldCheck, render: () => <RolesSection /> },
   { key: "departments", label: "Departments", icon: Building2, render: () => <DepartmentsSection /> },
   { key: "ticket-statuses", label: "Ticket statuses", icon: ListChecks, render: () => <TicketStatusesSection /> },
   { key: "ticket-types", label: "Ticket types", icon: Tag, render: () => <TicketTypesSection /> },
@@ -47,7 +45,7 @@ function SettingsInner() {
 
   return (
     <div className="flex flex-col gap-4 text-[#0F172A]">
-      <PageHeader icon={Settings} title="Help Desk settings" subtitle="Set up departments, teams, agents, roles, ticket config and SLAs — all here." />
+      <PageHeader icon={Settings} title="Help Desk settings" subtitle="Set up departments, agents, ticket config and SLAs. Teams and roles live in Administration." />
       <div className="flex flex-col gap-5 lg:flex-row">
         <nav className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-56 lg:flex-col">
           {TABS.map((t) => {

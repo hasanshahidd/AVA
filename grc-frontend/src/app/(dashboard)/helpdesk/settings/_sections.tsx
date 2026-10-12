@@ -1,19 +1,17 @@
 "use client";
 
 /**
- * Help Desk Settings — every admin section, each self-contained (reads via
- * useHd, mutates via hdCall). All wired to existing /helpdesk/* endpoints plus
- * the new people.py Team + HD-role endpoints. Nothing is seeded: the owner
- * creates every department, team, agent, status, type, template, feedback
- * option and SLA here through real Create / Edit / Delete buttons.
+ * Help Desk Settings — every Help-Desk-specific admin section, each
+ * self-contained (reads via useHd, mutates via hdCall), wired to the
+ * /helpdesk/* endpoints. Nothing is seeded: the owner creates every department,
+ * agent, status, type, priority, template, feedback option and SLA here through
+ * real Create / Edit / Delete buttons.
  *
- * Known API gaps (no owned endpoint to close them — flagged, not faked):
- *   • Ticket Types list returns no id → create works, row edit/delete disabled.
- *   • Priorities have no CRUD endpoint at all → read-only from /meta.
- *   • SLA priority rows need priority ids (same gap) → policy create needs at
- *     least one existing priority id to reference.
+ * Teams and roles are NOT managed here — they live in AVA Administration
+ * (Role Management / Teams). The team dropdowns below still read /helpdesk/teams
+ * (ticket assignment is bound to the Help Desk's own team table).
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Pencil, Trash2, Check, Minus } from "lucide-react";
 import { Chip, Empty, ErrorBanner, Loading, Table, useHd } from "../_ui";
 import {
@@ -65,6 +63,7 @@ export function DepartmentsSection() {
     <Section title="Departments" description="Generic service-desk groups (Sales, Finance, IT…). Tickets routed to a department flow to its default team."
       action={<NewBtn label="New department" onClick={() => start()} />}>
       {error && <ErrorBanner msg={error} />}
+      <Note>Teams are managed in Administration → Teams.</Note>
       {loading ? <Loading what="departments" />
         : rows.length === 0 ? <Empty icon={Pencil} title="No departments yet" hint="Create one so new tickets can be routed." />
         : (
@@ -121,161 +120,6 @@ function DepartmentForm({ row, teams, onClose, onSaved }: { row: any | null; tea
         <Toggle checked={enabled} onChange={setEnabled} label="Enabled" />
       </div>
     </Modal>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// TEAMS  (full CRUD + members — uses the new people.py endpoints)
-// ════════════════════════════════════════════════════════════════════════════
-export function TeamsSection() {
-  const { data, loading, error, reload } = useHd<{ teams: any[] }>("/helpdesk/teams");
-  const agents = useHd<{ agents: any[] }>("/helpdesk/agents");
-  const [edit, setEdit] = useState<any | null>(null);
-  const [open, setOpen] = useState(false);
-  const del = useConfirmDelete();
-  const rows = data?.teams || [];
-
-  return (
-    <Section title="Teams" description="Groups of agents that tickets are assigned to. Members and a team can be managed here."
-      action={<NewBtn label="New team" onClick={() => { setEdit(null); setOpen(true); }} />}>
-      {error && <ErrorBanner msg={error} />}
-      {loading ? <Loading what="teams" />
-        : rows.length === 0 ? <Empty icon={Pencil} title="No teams yet" hint="Create a team and add agents to it." />
-        : (
-          <Table head={["Team", "Members", "Assignment rule", "Disabled", ""]}>
-            {rows.map((t) => (
-              <tr key={t.id} className="hover:bg-[#F9FAFC]">
-                <td className="px-4 py-2.5 font-medium text-[#0F172A]">{t.team_name}</td>
-                <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{(t.members || []).length} member{(t.members || []).length === 1 ? "" : "s"}</td>
-                <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.assignment_rule || "—"}</td>
-                <td className="px-4 py-2.5">{yesNo(!!t.disabled)}</td>
-                <td className="px-4 py-2.5">
-                  <RowActions onEdit={() => { setEdit(t); setOpen(true); }} deleting={del.pending === String(t.id)}
-                    onDelete={() => del.run(String(t.id), t.team_name, () => hdCall("delete", `/helpdesk/teams/${t.id}`), reload)} />
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      {open && <TeamForm row={edit} agents={agents.data?.agents || []} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }} />}
-    </Section>
-  );
-}
-
-function TeamForm({ row, agents, onClose, onSaved }: { row: any | null; agents: any[]; onClose: () => void; onSaved: () => void }) {
-  const [teamName, setTeamName] = useState(row?.team_name || "");
-  const [assignmentRule, setAssignmentRule] = useState(row?.assignment_rule || "");
-  const [disabled, setDisabled] = useState(!!row?.disabled);
-  const [members, setMembers] = useState<string[]>((row?.members || []).map((m: any) => m.name));
-  const [addUser, setAddUser] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const addMember = () => {
-    const u = addUser.trim();
-    if (u && !members.includes(u)) setMembers([...members, u]);
-    setAddUser("");
-  };
-
-  const save = async () => {
-    if (!teamName.trim()) { setErr("Team name is required."); return; }
-    setBusy(true); setErr(null);
-    if (row) {
-      // update scalars, then diff membership against the server list
-      const upd = await hdCall("put", `/helpdesk/teams/${row.id}`, { team_name: teamName.trim(), assignment_rule: assignmentRule.trim() || null, disabled });
-      if (!upd.ok) { setBusy(false); setErr(upd.error || "Save failed."); return; }
-      const before: string[] = (row.members || []).map((m: any) => m.name);
-      for (const u of members.filter((m) => !before.includes(m))) await hdCall("post", `/helpdesk/teams/${row.id}/members`, { user: u });
-      for (const u of before.filter((m) => !members.includes(m))) await hdCall("delete", `/helpdesk/teams/${row.id}/members/${encodeURIComponent(u)}`);
-    } else {
-      const r = await hdCall("post", "/helpdesk/teams", { team_name: teamName.trim(), assignment_rule: assignmentRule.trim() || null, disabled, members });
-      if (!r.ok) { setBusy(false); setErr(r.error || "Create failed."); return; }
-    }
-    setBusy(false);
-    onSaved();
-  };
-
-  return (
-    <Modal open onClose={() => !busy && onClose()} title={row ? "Edit team" : "New team"}
-      footer={<><Btn onClick={onClose} disabled={busy}>Cancel</Btn><Btn variant="primary" onClick={save} busy={busy}>Save</Btn></>}>
-      <FormError msg={err} />
-      <div className="flex flex-col gap-3.5">
-        <Field label="Team name" required><Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Tier 1 Support" autoFocus /></Field>
-        <Field label="Assignment rule" hint="Optional reference to an assignment rule name."><Input value={assignmentRule} onChange={(e) => setAssignmentRule(e.target.value)} /></Field>
-        <Field label="Members">
-          <div className="flex gap-2">
-            <Select value={addUser} onChange={(e) => setAddUser(e.target.value)}>
-              <option value="">— Pick an agent —</option>
-              {agents.filter((a) => !members.includes(a.email)).map((a) => <option key={a.email} value={a.email}>{a.agent_name || a.email}</option>)}
-            </Select>
-            <Btn onClick={addMember} disabled={!addUser}>Add</Btn>
-          </div>
-          {members.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {members.map((m) => (
-                <span key={m} className="inline-flex items-center gap-1 rounded-full bg-[#F1F5F9] px-2.5 py-1 text-[12px] text-[#334155]">
-                  {m}
-                  <button onClick={() => setMembers(members.filter((x) => x !== m))} className="text-[#94A3B8] hover:text-rose-500">×</button>
-                </span>
-              ))}
-            </div>
-          )}
-        </Field>
-        <Toggle checked={disabled} onChange={setDisabled} label="Disabled" />
-      </div>
-    </Modal>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// ROLES & PERMISSIONS  (grant/revoke HD roles — uses new people.py endpoints)
-// ════════════════════════════════════════════════════════════════════════════
-export function RolesSection() {
-  const { data, loading, error, reload } = useHd<{ roles: { key: string; label: string }[]; users: any[] }>("/helpdesk/hd-roles");
-  const [pending, setPending] = useState<string | null>(null);
-  const roles = data?.roles || [];
-  const users = data?.users || [];
-
-  const toggle = async (userId: number, roleKey: string, has: boolean) => {
-    const k = `${userId}:${roleKey}`;
-    setPending(k);
-    const r = await hdCall("post", `/helpdesk/hd-roles/${has ? "revoke" : "grant"}`, { user_id: userId, role: roleKey });
-    setPending(null);
-    if (r.ok) reload(); else window.alert(r.error || "Could not update the role.");
-  };
-
-  return (
-    <Section title="Roles & permissions" description="Make a user an Agent / Agent Manager, or a Customer / Customer Manager. Grants are tenant-scoped RBAC role memberships.">
-      {error && <ErrorBanner msg={error} />}
-      {loading ? <Loading what="users" />
-        : users.length === 0 ? <Empty icon={Pencil} title="No users found" hint="Users appear here once they exist in this tenant." />
-        : (
-          <Table head={["User", ...roles.map((r) => r.label)]}>
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-[#F9FAFC]">
-                <td className="px-4 py-2.5">
-                  <div className="font-medium text-[#0F172A]">{u.display_name}</div>
-                  <div className="text-[11.5px] text-[#94A3B8]">{u.email}</div>
-                </td>
-                {roles.map((r) => {
-                  const has = (u.roles || []).includes(r.key);
-                  const k = `${u.id}:${r.key}`;
-                  return (
-                    <td key={r.key} className="px-4 py-2.5">
-                      <button onClick={() => toggle(u.id, r.key, has)} disabled={pending === k}
-                        className={`inline-flex h-7 min-w-[64px] items-center justify-center rounded-full px-3 text-[11.5px] font-semibold transition disabled:opacity-50 ${
-                          has ? "bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-600" : "border border-[#E2E5EC] text-[#94A3B8] hover:bg-[#F6F7FB]"
-                        }`}>
-                        {has ? "Granted" : "Grant"}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </Table>
-        )}
-    </Section>
   );
 }
 
@@ -522,83 +366,143 @@ function TicketStatusForm({ row, onClose, onSaved }: { row: any | null; onClose:
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// TICKET TYPES  (list + create; edit/delete unavailable — API exposes no id)
+// TICKET TYPES  (full CRUD — list carries id; system types can't be deleted)
 // ════════════════════════════════════════════════════════════════════════════
 export function TicketTypesSection() {
   const { data, loading, error, reload } = useHd<{ ticket_types: any[] }>("/helpdesk/ticket-types");
+  const [edit, setEdit] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
+  const del = useConfirmDelete();
   const rows = data?.ticket_types || [];
 
   return (
     <Section title="Ticket types" description="Categories a ticket can be filed under (Question, Incident, Bug…)."
-      action={<NewBtn label="New type" onClick={() => setOpen(true)} />}>
+      action={<NewBtn label="New type" onClick={() => { setEdit(null); setOpen(true); }} />}>
       {error && <ErrorBanner msg={error} />}
-      <Note>The API returns ticket types without an id, so row edit/delete isn’t available here yet (create works). Tracked as a backend gap.</Note>
       {loading ? <Loading what="ticket types" />
         : rows.length === 0 ? <Empty icon={Pencil} title="No ticket types yet" hint="Create the first type." />
         : (
-          <Table head={["Type", "Description", "System", "Disabled"]}>
+          <Table head={["Type", "Description", "System", "Disabled", ""]}>
             {rows.map((t) => (
-              <tr key={t.name} className="hover:bg-[#F9FAFC]">
+              <tr key={t.id} className="hover:bg-[#F9FAFC]">
                 <td className="px-4 py-2.5 font-medium text-[#0F172A]">{t.name}</td>
                 <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.description || "—"}</td>
                 <td className="px-4 py-2.5">{yesNo(!!t.is_system)}</td>
                 <td className="px-4 py-2.5">{yesNo(!!t.disabled)}</td>
+                <td className="px-4 py-2.5">
+                  <RowActions onEdit={() => { setEdit(t); setOpen(true); }} deleting={del.pending === String(t.id)}
+                    deleteDisabled={!!t.is_system} title={t.is_system ? "System types can't be deleted" : undefined}
+                    onDelete={() => del.run(String(t.id), t.name, () => hdCall("delete", `/helpdesk/ticket-types/${t.id}`), reload)} />
+                </td>
               </tr>
             ))}
           </Table>
         )}
-      {open && <TicketTypeForm onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }} />}
+      {open && <TicketTypeForm row={edit} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }} />}
     </Section>
   );
 }
 
-function TicketTypeForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+function TicketTypeForm({ row, onClose, onSaved }: { row: any | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(row?.name || "");
+  const [description, setDescription] = useState(row?.description || "");
+  const [disabled, setDisabled] = useState(!!row?.disabled);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const save = async () => {
     if (!name.trim()) { setErr("Name is required."); return; }
     setBusy(true); setErr(null);
-    const r = await hdCall("post", "/helpdesk/ticket-types", { name: name.trim(), description: description.trim() || null });
+    const body = { name: name.trim(), description: description.trim() || null, disabled };
+    const r = row ? await hdCall("put", `/helpdesk/ticket-types/${row.id}`, body) : await hdCall("post", "/helpdesk/ticket-types", body);
     setBusy(false);
-    r.ok ? onSaved() : setErr(r.error || "Create failed.");
+    r.ok ? onSaved() : setErr(r.error || "Save failed.");
   };
 
   return (
-    <Modal open onClose={() => !busy && onClose()} title="New ticket type"
-      footer={<><Btn onClick={onClose} disabled={busy}>Cancel</Btn><Btn variant="primary" onClick={save} busy={busy}>Create</Btn></>}>
+    <Modal open onClose={() => !busy && onClose()} title={row ? "Edit ticket type" : "New ticket type"}
+      footer={<><Btn onClick={onClose} disabled={busy}>Cancel</Btn><Btn variant="primary" onClick={save} busy={busy}>Save</Btn></>}>
       <FormError msg={err} />
       <div className="flex flex-col gap-3.5">
         <Field label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Incident" autoFocus /></Field>
         <Field label="Description"><Textarea value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+        <Toggle checked={disabled} onChange={setDisabled} label="Disabled" />
       </div>
     </Modal>
   );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PRIORITIES  (read-only — no CRUD endpoint exists)
+// PRIORITIES  (full CRUD — /helpdesk/priorities)
 // ════════════════════════════════════════════════════════════════════════════
+const PRIORITY_LEVELS = ["Urgent", "High", "Medium", "Low"];
+
 export function PrioritiesSection() {
-  const { data, loading, error } = useHd<{ priorities: string[] }>("/helpdesk/meta");
+  const { data, loading, error, reload } = useHd<{ priorities: any[] }>("/helpdesk/priorities");
+  const [edit, setEdit] = useState<any | null>(null);
+  const [open, setOpen] = useState(false);
+  const del = useConfirmDelete();
   const rows = data?.priorities || [];
+
   return (
-    <Section title="Priorities" description="The urgency levels tickets can carry.">
+    <Section title="Priorities" description="The urgency levels tickets can carry."
+      action={<NewBtn label="New priority" onClick={() => { setEdit(null); setOpen(true); }} />}>
       {error && <ErrorBanner msg={error} />}
-      <Note>Priority management has no backend CRUD endpoint yet, so this list is read-only. Tracked as a backend gap.</Note>
       {loading ? <Loading what="priorities" />
-        : rows.length === 0 ? <Empty icon={Pencil} title="No priorities configured" hint="Priorities are provisioned on the backend." />
+        : rows.length === 0 ? <Empty icon={Pencil} title="No priorities yet" hint="Create the urgency levels tickets can carry." />
         : (
-          <Table head={["Priority"]}>
+          <Table head={["Priority", "Level", "Description", "Disabled", ""]}>
             {rows.map((p) => (
-              <tr key={p}><td className="px-4 py-2.5"><Chip value={p} /></td></tr>
+              <tr key={p.id} className="hover:bg-[#F9FAFC]">
+                <td className="px-4 py-2.5 font-medium text-[#0F172A]">{p.name}</td>
+                <td className="px-4 py-2.5"><Chip value={p.level} /></td>
+                <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{p.description || "—"}</td>
+                <td className="px-4 py-2.5">{yesNo(!!p.disabled)}</td>
+                <td className="px-4 py-2.5">
+                  <RowActions onEdit={() => { setEdit(p); setOpen(true); }} deleting={del.pending === String(p.id)}
+                    onDelete={() => del.run(String(p.id), p.name, () => hdCall("delete", `/helpdesk/priorities/${p.id}`), reload)} />
+                </td>
+              </tr>
             ))}
           </Table>
         )}
+      {open && <PriorityForm row={edit} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); reload(); }} />}
     </Section>
+  );
+}
+
+function PriorityForm({ row, onClose, onSaved }: { row: any | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(row?.name || "");
+  const [level, setLevel] = useState(row?.level || "Medium");
+  const [description, setDescription] = useState(row?.description || "");
+  const [disabled, setDisabled] = useState(!!row?.disabled);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!name.trim()) { setErr("Name is required."); return; }
+    setBusy(true); setErr(null);
+    const body = { name: name.trim(), level, description: description.trim() || null, disabled };
+    const r = row ? await hdCall("put", `/helpdesk/priorities/${row.id}`, body) : await hdCall("post", "/helpdesk/priorities", body);
+    setBusy(false);
+    r.ok ? onSaved() : setErr(r.error || "Save failed.");
+  };
+
+  return (
+    <Modal open onClose={() => !busy && onClose()} title={row ? "Edit priority" : "New priority"}
+      footer={<><Btn onClick={onClose} disabled={busy}>Cancel</Btn><Btn variant="primary" onClick={save} busy={busy}>Save</Btn></>}>
+      <FormError msg={err} />
+      <div className="flex flex-col gap-3.5">
+        <Field label="Name" required><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. High" autoFocus /></Field>
+        <Field label="Level" required>
+          <Select value={level} onChange={(e) => setLevel(e.target.value)}>
+            {PRIORITY_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+          </Select>
+        </Field>
+        <Field label="Description"><Textarea value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+        <Toggle checked={disabled} onChange={setDisabled} label="Disabled" />
+      </div>
+    </Modal>
   );
 }
 
@@ -775,23 +679,19 @@ const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 export function SlaSection() {
   const { data, loading, error, reload } = useHd<{ slas: any[] }>("/helpdesk/sla");
   const holidays = useHd<{ holiday_lists: any[] }>("/helpdesk/holiday-lists");
+  const priorities = useHd<{ priorities: any[] }>("/helpdesk/priorities");
   const [open, setOpen] = useState(false);
   const slas = data?.slas || [];
 
-  // Priority ids are not exposed by any catalogue endpoint; recover the label↔id
-  // map from priority rows already present on existing SLAs (best-effort).
-  const priorityMap = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const s of slas) for (const p of s.priorities || []) if (p.priority_id) m.set(p.priority_id, p.priority);
-    return [...m.entries()].map(([id, label]) => ({ id, label }));
-  }, [slas]);
+  // The /helpdesk/priorities catalogue is the source for the SLA priority pickers.
+  const priorityMap = (priorities.data?.priorities || []).map((p) => ({ id: p.id, label: p.name }));
 
   return (
     <Section title="SLA policies & business hours" description="Response/resolution targets per priority, the working days they're measured against, and holiday lists."
       action={<NewBtn label="New SLA policy" onClick={() => setOpen(true)} disabled={priorityMap.length === 0} />}>
       {error && <ErrorBanner msg={error} />}
       {priorityMap.length === 0 && (
-        <Note>Creating an SLA policy needs at least one priority to target, but the API exposes no priority-id catalogue to pick from. Tracked as a backend gap (a <code>/helpdesk/priorities</code> endpoint would close it).</Note>
+        <Note>Create at least one <b>Priority</b> first — an SLA policy sets a target for each priority to track.</Note>
       )}
 
       {loading ? <Loading what="SLA policies" />
