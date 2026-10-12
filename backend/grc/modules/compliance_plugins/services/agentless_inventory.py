@@ -1009,9 +1009,13 @@ def _parse_deep_linux(stdout: str) -> dict[str, dict]:
     disks = []
     for line in sec_map.get("storage_disks", "").splitlines():
         kv = dict(_LSBLK_KV_RE.findall(line))
-        if kv.get("NAME"):
+        _name = kv.get("NAME") or ""
+        # Skip virtual / non-storage block devices: snap loopbacks (loopN),
+        # ramdisks (ramN), optical (srN), floppy (fdN). They aren't real disks
+        # and otherwise flood "Physical Disks" with meaningless boxes.
+        if _name and not _name.lower().startswith(("loop", "ram", "sr", "fd")):
             disks.append({
-                "name": kv.get("NAME"), "model": kv.get("MODEL"),
+                "name": _name, "model": kv.get("MODEL"),
                 "serial": kv.get("SERIAL"), "size": kv.get("SIZE"),
                 "media_type": "HDD" if kv.get("ROTA") == "1" else "SSD",
                 "interface": kv.get("TRAN"),

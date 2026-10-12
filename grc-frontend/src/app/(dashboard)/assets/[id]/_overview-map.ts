@@ -145,7 +145,12 @@ function sectionBlocks(key: string, data: any): { blocks?: any[]; sectionExtra?:
   }
   if (key === 'storage' && data && typeof data === 'object' && !Array.isArray(data)) {
     const b: any[] = [];
-    if (Array.isArray(data.physical_disks) && data.physical_disks.length) b.push(objList(data.physical_disks, 'Physical Disks'));
+    // Drop virtual block devices (snap loopbacks loopN, ramN, optical srN, floppy fdN)
+    // so stored data collected before the backend filter doesn't flood the list with junk boxes.
+    const realDisks = Array.isArray(data.physical_disks)
+      ? data.physical_disks.filter((d: any) => !/^(loop|ram|sr|fd)\d/i.test(String(d?.name ?? d?.NAME ?? '')))
+      : [];
+    if (realDisks.length) b.push(objList(realDisks, 'Physical Disks'));
     if (Array.isArray(data.volumes) && data.volumes.length) b.push(objList(data.volumes, 'Volumes'));
     if (b.length) return { blocks: b };
   }
