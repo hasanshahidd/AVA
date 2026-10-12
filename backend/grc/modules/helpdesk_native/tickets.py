@@ -8,6 +8,7 @@ strategy are delegated to the `sla` / `assignment` modules (stubs for now).
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -35,9 +36,22 @@ from ...routers.auth_router import require_auth, require_tenant_permission
 from . import sla, assignment
 from .common import iso, ticket_row, ticket_detail, tenant_id, require_edit
 
+logger = logging.getLogger(__name__)
+
 RESOLVED = "Resolved"
 PAUSED = "Paused"
 CLOSED_LABEL = "Closed"
+
+
+def _notify(fn_name: str, db: Session, tid: int, ticket: "HDTicket", *args) -> None:
+    """Fire an outbound-mail hook, swallowing any failure so a mail problem can
+    never break the ticket operation. `mail` is imported lazily to avoid the
+    mail<->tickets import cycle. Local-only: a no-op without a configured account."""
+    try:
+        from . import mail
+        getattr(mail, fn_name)(db, tid, ticket, *args)
+    except Exception:  # noqa: BLE001
+        logger.warning("helpdesk.mail hook %s failed", fn_name, exc_info=True)
 
 # delete is admin-grade (Frappe `is_admin()` gate) — mapped to AVA RBAC. The
 # Administrator role and the tenant primary contact pass automatically
@@ -135,6 +149,18 @@ def _apply_status_change(db: Session, tid: int, ticket: HDTicket, new_status: HD
 
     label = new_status.label_agent
     _activity(db, tid, ticket, f"changed status to {label}")
+
+    # CSAT feedback email when the status reaches the configured feedback status
+    # (handle_email_feedback). Fires on any real status change, including the
+    # Resolved→Closed transition that is_valid_status_transition rejects, so it is
+    # checked here rather than inside the `valid` block above.
+    if old_status is None or old_status.id != new_status.id:
+        try:
+            from . import mail
+            if mail.feedback_status_matches(db, tid, new_status):
+                mail.notify_feedback(db, tid, ticket)
+        except Exception:  # noqa: BLE001 — mail must never break the status change
+            logger.warning("helpdesk.mail feedback hook failed", exc_info=True)
 
 
 # ─── reads ───────────────────────────────────────────────────────────────────
@@ -277,6 +303,8 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
     db.flush()  # assign the PK before auto-assign / return
     assignment.auto_assign(db, ticket)
     db.commit()
+    # acknowledgement email to the raiser (gated by HD Settings.send_acknowledgement_email)
+    _notify("notify_acknowledgement", db, tid, ticket)
     return {"ok": True, "name": str(ticket.id)}
 
 
@@ -300,6 +328,7 @@ def reply(db: Session, tid: int, name: str, body: dict, sender: Optional[str] = 
     if not ticket:
         return {"ok": False, "error": "not found"}
     content = body.get("content") or body.get("body") or ""
+    is_public = not body.get("internal")
     if body.get("internal"):
         db.add(HDTicketComment(
             tenant_id=tid, reference_ticket_id=ticket.id,
@@ -309,6 +338,9 @@ def reply(db: Session, tid: int, name: str, body: dict, sender: Optional[str] = 
     else:
         _public_reply(db, tid, ticket, content, sender)
     db.commit()
+    if is_public:
+        # reply-via-agent email to the customer (gated by enable_reply_email_via_agent)
+        _notify("notify_reply_via_agent", db, tid, ticket, content)
     return {"ok": True}
 
 
@@ -503,6 +535,11 @@ def bulk_reply(db: Session, tid: int, ticket_ids: list, message: str,
         except Exception as e:  # noqa: BLE001 — log + continue, like frappe.log_error
             failed.append({"name": str(t.id), "error": str(e)})
     db.commit()
+    # reply-via-agent email per successfully-replied ticket (gated by settings)
+    failed_names = {f["name"] for f in failed}
+    for t in tickets:
+        if str(t.id) not in failed_names:
+            _notify("notify_reply_via_agent", db, tid, t, message)
     return {"ok": True, "replied": len(tickets) - len(failed), "failed": failed}
 
 
@@ -629,6 +666,8 @@ def receive_customer_reply(db: Session, tid: int, name: str, content: str,
     target.last_customer_response = now
     _activity(db, tid, target, "customer replied")
     db.commit()
+    # notify the assigned agent of the customer reply (gated by enable_reply_email_to_agent)
+    _notify("notify_reply_to_agents", db, tid, target, content)
     return {"ok": True, "name": str(target.id)}
 
 

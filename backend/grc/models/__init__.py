@@ -29,6 +29,7 @@ from ._54_itsm_ticket_link_models import *  # noqa: F401,F403 - ITSM ticket link
 from ._55_ai_control_proposal_models import *  # noqa: F401,F403 - AI control proposals (P5)
 from ._56_scf_catalog_models import *  # noqa: F401,F403 - SCF canonical catalog + tenant overlay
 from ._60_helpdesk_native_models import *  # noqa: F401,F403 - AVA-native Help Desk engine models (Frappe conversion step 1)
+from ._61_helpdesk_mail_models import *  # noqa: F401,F403 - AVA-native Help Desk email account store (Frappe Email Account conversion)
 from ._pentest_scan_jobs import PentestScanJob  # noqa: F401 - AVA pentest live scan jobs (M2)
 from ._pentest_exploit_results import PentestExploitResult  # noqa: F401 - AVA pentest persisted exploit results (M2)
 from ._pentest_event_log import PentestEventLog  # noqa: F401 - AVA/GRC pentest all-stage event log

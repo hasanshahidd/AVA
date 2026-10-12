@@ -69,6 +69,28 @@ class SettingsBody(BaseModel):
     model_config = {"extra": "allow"}
 
 
+# Email-workflow fields served/updated by the dedicated /settings/email endpoints.
+# Each template column maps to the mail module's DEFAULT_TEMPLATES key, so the editor
+# can show the baked-in default when the override is blank (Frappe parity).
+_EMAIL_FLAGS = (
+    "skip_email_workflow", "instantly_send_email", "enable_email_ticket_feedback",
+    "send_acknowledgement_email", "enable_reply_email_to_agent",
+    "enable_reply_email_via_agent", "send_email_feedback_on_status_id",
+)
+_EMAIL_TEMPLATES = {
+    "acknowledgement_email_content": "acknowledgement",
+    "reply_email_to_agent_content": "reply_to_agents",
+    "reply_via_agent_email_content": "reply_via_agent",
+    "feedback_email_content": "share_feedback",
+}
+
+
+class EmailSettingsBody(BaseModel):
+    # Any subset of the email flags + template columns; filtered against the set
+    # above in update_email_settings (unknown keys ignored).
+    model_config = {"extra": "allow"}
+
+
 def _get_or_create(db: Session, tid: int) -> HDSettings:
     """Frappe `issingle` -> per-tenant singleton; create-on-first-read with the
     model's (Frappe) defaults."""
@@ -144,6 +166,35 @@ def update_settings(body: SettingsBody, db: Session = Depends(get_db), _: bool =
     data = body.model_dump()
     for k, val in data.items():
         if k in _WRITABLE:
+            setattr(s, k, val)
+    _validate(db, tid, s)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/helpdesk/settings/email")
+def get_email_settings(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    """The email-workflow subset for the Email Settings page: the flags, each
+    template's current (possibly null) content, and the baked-in default content so
+    the editor can show the fallback when the override is blank."""
+    from .mail import DEFAULT_TEMPLATES
+    s = _get_or_create(db, tenant_id(db))
+    flags = {k: getattr(s, k) for k in _EMAIL_FLAGS}
+    templates = {
+        col: {"content": getattr(s, col), "default": DEFAULT_TEMPLATES.get(kind, "")}
+        for col, kind in _EMAIL_TEMPLATES.items()
+    }
+    return {"flags": flags, "templates": templates}
+
+
+@router.post("/helpdesk/settings/email")
+def update_email_settings(body: EmailSettingsBody, db: Session = Depends(get_db),
+                          _: bool = Depends(require_edit)):
+    tid = tenant_id(db)
+    s = _get_or_create(db, tid)
+    allowed = set(_EMAIL_FLAGS) | set(_EMAIL_TEMPLATES)
+    for k, val in body.model_dump().items():
+        if k in allowed:
             setattr(s, k, val)
     _validate(db, tid, s)
     db.commit()
