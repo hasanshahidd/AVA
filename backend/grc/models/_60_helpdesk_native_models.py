@@ -594,3 +594,284 @@ class HDTicketFeedbackOption(Base):
     __table_args__ = (
         Index("uq_hd_feedback_option_label", "tenant_id", "label", unique=True),
     )
+
+
+# =============================================================================
+# Engine conversion, step 3 — tables the first pass deferred.
+# Each is a faithful 1:1 of the forked Frappe DocType JSON (same field names,
+# Link->FK/relationship, Check->Boolean, Select->String, Duration->Float, etc.),
+# added so the remaining controller logic (agent availability, customer/contact
+# CRUD, article feedback, saved-reply scope, saved views, settings, tags) can be
+# converted onto real tables instead of being stubbed.
+# =============================================================================
+
+# ----------------------------------------------------------------------------
+# PEOPLE — agent availability catalog + customer membership + contact store
+# ----------------------------------------------------------------------------
+class HDAgentStatus(Base):
+    """`HD Agent Status` — the availability catalog HD Agent.availability points at.
+    (HDAgent.availability stays a String holding this row's agent_status name, as
+    Frappe's Link stores the doc name.)"""
+    __tablename__ = "grc_hd_agent_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    agent_status = Column(String(140), nullable=True)      # unique per tenant (Frappe autoname = this)
+    status_order = Column(Integer, nullable=True)
+    category = Column(String(30), nullable=False)          # Active | Away | Unavailable, reqd
+    color = Column(String(30), nullable=True)
+    enabled = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_agent_status_name", "tenant_id", "agent_status", unique=True),
+    )
+
+
+class HDContact(Base):
+    """Native conversion of the Frappe core `Contact` surface the Help Desk uses
+    (contact.py / customer.py): the requester/customer person. Frappe's Contact
+    carries email/phone child tables; here the primary email/mobile/phone are kept
+    inline (what Help Desk reads), with the child rows dropped as layout detail."""
+    __tablename__ = "grc_hd_contact"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    first_name = Column(String(140), nullable=True)
+    last_name = Column(String(140), nullable=True)
+    email_id = Column(String(255), nullable=True)          # primary email
+    mobile_no = Column(String(60), nullable=True)
+    phone = Column(String(60), nullable=True)
+    company_name = Column(String(255), nullable=True)
+    image = Column(String(255), nullable=True)
+    user = Column(String(255), nullable=True)              # -> AVA/Frappe User login (invited contacts)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_hd_contact_tenant_email", "tenant_id", "email_id"),
+    )
+
+
+class HDCustomerMember(Base):
+    """Child of HD Customer (istable): the customer<->contact membership + manager
+    flag that HD Customer's role/permission logic depends on."""
+    __tablename__ = "grc_hd_customer_member"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("grc_hd_customer.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    contact_id = Column(Integer, ForeignKey("grc_hd_contact.id"), nullable=True)  # Frappe Link->Contact, reqd
+    is_manager = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    customer = relationship("HDCustomer", backref="contacts")
+    contact = relationship("HDContact")
+
+
+# ----------------------------------------------------------------------------
+# KNOWLEDGE BASE — per-user article like/dislike
+# ----------------------------------------------------------------------------
+class HDArticleFeedback(Base):
+    """`HD Article Feedback` — one row per (user, article): 0 none / 1 like / 2 dislike."""
+    __tablename__ = "grc_hd_article_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    article_id = Column(Integer, ForeignKey("grc_hd_article.id", ondelete="CASCADE"),
+                        nullable=True, index=True)
+    user = Column(String(255), nullable=True)              # -> User
+    feedback = Column(Integer, nullable=True, default=0)    # 0 none | 1 like | 2 dislike
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    article = relationship("HDArticle")
+
+    __table_args__ = (
+        Index("uq_hd_article_feedback_user", "article_id", "user", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
+# SAVED REPLIES — Team-scope child
+# ----------------------------------------------------------------------------
+class HDSavedReplyTeam(Base):
+    """Child of HD Saved Reply (istable): the teams a Team-scoped reply is visible to."""
+    __tablename__ = "grc_hd_saved_reply_team"
+
+    id = Column(Integer, primary_key=True, index=True)
+    saved_reply_id = Column(Integer, ForeignKey("grc_hd_saved_reply.id", ondelete="CASCADE"),
+                            nullable=False, index=True)
+    idx = Column(Integer, nullable=True)
+
+    team_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    saved_reply = relationship("HDSavedReply", backref="teams")
+    team = relationship("HDTeam")
+
+
+# ----------------------------------------------------------------------------
+# SAVED VIEWS — persisted list / kanban / group-by views
+# ----------------------------------------------------------------------------
+class HDView(Base):
+    """`HD View` — a saved list/group_by/kanban view (filters/columns/order)."""
+    __tablename__ = "grc_hd_view"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    label = Column(String(140), nullable=True)
+    icon = Column(String(140), nullable=True)
+    user = Column(String(255), nullable=True)              # -> User (owner of a personal view)
+    is_default = Column(Boolean, default=False)
+    is_customer_portal = Column(Boolean, default=False)
+    is_standard = Column(Boolean, default=False)
+    type = Column(String(20), nullable=True, default="list")  # list | group_by | kanban
+    dt = Column(String(140), nullable=True)                # target doctype/name (e.g. "HD Ticket")
+    route_name = Column(String(140), nullable=True)
+    pinned = Column(Boolean, default=False)
+    public = Column(Boolean, default=False)
+    filters = Column(Text, nullable=True)                  # Frappe Code (JSON string)
+    order_by = Column(Text, nullable=True)
+    load_default_columns = Column(Boolean, default=False)
+    columns = Column(Text, nullable=True)
+    rows = Column(Text, nullable=True)
+    group_by_field = Column(String(140), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ----------------------------------------------------------------------------
+# TAGS — native tag store + ticket join (replaces Frappe core Tag / Tag Link)
+# ----------------------------------------------------------------------------
+class HDTag(Base):
+    """Native tag master (Frappe used core `Tag` with app=helpdesk + a color)."""
+    __tablename__ = "grc_hd_tag"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    name = Column(String(140), nullable=True)
+    color = Column(String(30), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_tag_name", "tenant_id", "name", unique=True),
+    )
+
+
+class HDTicketTag(Base):
+    """Ticket<->tag join (Frappe core `Tag Link`)."""
+    __tablename__ = "grc_hd_ticket_tag"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                       nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("grc_hd_tag.id", ondelete="CASCADE"),
+                    nullable=False, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    ticket = relationship("HDTicket", backref="tags")
+    tag = relationship("HDTag")
+
+    __table_args__ = (
+        Index("uq_hd_ticket_tag", "ticket_id", "tag_id", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
+# SETTINGS — the `HD Settings` singleton, one row per tenant
+# ----------------------------------------------------------------------------
+class HDSettings(Base):
+    """`HD Settings` (Frappe issingle) -> one row per tenant. Links to converted
+    doctypes become *_id FKs; the Assignment-Rule link stays a String (not
+    converted). Email-template / search-weight fields are kept as columns for
+    faithful parity even where the outbound-mail workflow is not yet wired."""
+    __tablename__ = "grc_hd_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    # --- defaults (links to converted doctypes) ---
+    default_priority_id = Column(Integer, ForeignKey("grc_hd_ticket_priority.id"), nullable=True)
+    default_agent_status_id = Column(Integer, ForeignKey("grc_hd_agent_status.id"), nullable=True)  # reqd in Frappe
+    default_ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
+    default_ticket_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)  # reqd
+    ticket_reopen_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)   # reqd
+    update_status_to_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)
+    auto_close_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)
+    send_email_feedback_on_status_id = Column(Integer, ForeignKey("grc_hd_ticket_status.id"), nullable=True)
+    base_support_rotation = Column(String(255), nullable=True)  # -> Frappe Assignment Rule (not converted)
+
+    # --- routing / permission flags ---
+    restrict_tickets_by_agent_group = Column(Boolean, default=False)
+    do_not_restrict_tickets_without_an_agent_group = Column(Boolean, default=False)
+    assign_within_team = Column(Boolean, default=False)
+    disable_saved_replies_global_scope = Column(Boolean, default=False)
+    prefer_knowledge_base = Column(Boolean, default=False)
+    allow_anyone_to_create_tickets = Column(Boolean, default=False)
+    is_feedback_mandatory = Column(Boolean, default=True)
+    enable_comment_reactions = Column(Boolean, default=False)
+    auto_set_customer_from_contact = Column(Boolean, default=True)
+
+    # --- auto status / auto close ---
+    auto_update_status = Column(Boolean, default=False)
+    auto_close_tickets = Column(Boolean, default=False)
+    auto_close_after_days = Column(Integer, default=14)
+
+    # --- outside-hours banner ---
+    enable_outside_hours_banner = Column(Boolean, default=False)
+    outside_working_hours_message = Column(Text, nullable=True)
+
+    # --- branding / setup ---
+    brand_name = Column(String(255), nullable=True)
+    brand_logo = Column(String(255), nullable=True)
+    favicon = Column(String(255), nullable=True)
+    setup_complete = Column(Boolean, default=False)
+    initial_helpdesk_name_setup_skipped = Column(Boolean, default=False)
+    show_customer_portal_permission_notice = Column(Boolean, default=False)
+    show_ticket_field_permission_notice = Column(Boolean, default=False)
+    persona_captured = Column(Boolean, default=False)
+
+    # --- article search weights ---
+    name_weight = Column(Integer, default=1)
+    subject_weight = Column(Integer, default=6)
+    description_weight = Column(Integer, default=5)
+    headings_weight = Column(Integer, default=8)
+
+    # --- email workflow toggles + templates ---
+    skip_email_workflow = Column(Boolean, default=False)
+    instantly_send_email = Column(Boolean, default=False)
+    enable_email_ticket_feedback = Column(Boolean, default=False)
+    feedback_email_content = Column(Text, nullable=True)
+    send_acknowledgement_email = Column(Boolean, default=False)
+    acknowledgement_email_content = Column(Text, nullable=True)
+    enable_reply_email_to_agent = Column(Boolean, default=True)
+    reply_email_to_agent_content = Column(Text, nullable=True)
+    enable_reply_email_via_agent = Column(Boolean, default=True)
+    reply_via_agent_email_content = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_settings_tenant", "tenant_id", unique=True),
+    )
