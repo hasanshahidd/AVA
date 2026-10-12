@@ -53,22 +53,61 @@ const KEYS = {
 const ALL_KEYS = Object.values(KEYS);
 const get = (url: string) => async () => (await apiClient.get(url)).data;
 
+// User-settable auto-refresh cadence (ms; 0 = off / manual only), persisted per browser.
+const REFRESH_KEY = 'ava.dashboard.refreshMs';
+const REFRESH_OPTS: { label: string; ms: number }[] = [
+  { label: 'Manual', ms: 0 },
+  { label: '1 min', ms: 60_000 },
+  { label: '5 min', ms: 5 * 60_000 },
+  { label: '15 min', ms: 15 * 60_000 },
+  { label: '30 min', ms: 30 * 60_000 },
+];
+const REFRESH_DEFAULT = 5 * 60_000; // sensible default: refresh every 5 min
+function readRefreshMs(): number {
+  try {
+    const v = Number(localStorage.getItem(REFRESH_KEY));
+    if (Number.isFinite(v) && REFRESH_OPTS.some((o) => o.ms === v)) return v;
+  } catch { /* SSR / blocked storage → default */ }
+  return REFRESH_DEFAULT;
+}
+
 export default function PerformancePage() {
   const qc = useQueryClient();
-  const summary = useQuery<ExecSummary>({ queryKey: KEYS.summary, queryFn: get('/exec-dashboard/summary'), retry: 1 });
-  const trends = useQuery<Trends>({ queryKey: KEYS.trends, queryFn: get('/vuln-management/dashboard/trends?period=90d'), retry: 1 });
-  const history = useQuery<{ series?: { date: string; value: number }[] }>({ queryKey: KEYS.history, queryFn: get('/enriched-dashboard/metric-trend?metric=vuln_open&days=90'), retry: false });
-  const risk = useQuery<RiskDash>({ queryKey: KEYS.risk, queryFn: async () => (await riskPostureApi.dashboard()).data, staleTime: 5 * 60_000, retry: 1 });
+
+  // Chosen cadence drives staleTime + refetchInterval below. Lazy init reads localStorage
+  // once (client only); default applies when unset or storage is unavailable.
+  const [refreshMs, setRefreshMs] = useState<number>(REFRESH_DEFAULT);
+  useEffect(() => { setRefreshMs(readRefreshMs()); }, []);
+  const chooseRefresh = (ms: number) => {
+    setRefreshMs(ms);
+    try { localStorage.setItem(REFRESH_KEY, String(ms)); } catch { /* ignore */ }
+  };
+
+  // Shared query options for every card: navigating back uses cache (no refetch on mount or
+  // focus); data is "fresh" for the whole chosen window; auto-updates every window (off when
+  // Manual). Manual "Refresh" button and tuning-invalidations still force a refetch.
+  const shared = {
+    refetchOnMount: false as const,
+    refetchOnWindowFocus: false as const,
+    staleTime: refreshMs || Infinity,
+    refetchInterval: refreshMs || (false as const),
+  };
+
+  const summary = useQuery<ExecSummary>({ queryKey: KEYS.summary, queryFn: get('/exec-dashboard/summary'), retry: 1, ...shared });
+  const trends = useQuery<Trends>({ queryKey: KEYS.trends, queryFn: get('/vuln-management/dashboard/trends?period=90d'), retry: 1, ...shared });
+  const history = useQuery<{ series?: { date: string; value: number }[] }>({ queryKey: KEYS.history, queryFn: get('/enriched-dashboard/metric-trend?metric=vuln_open&days=90'), ...shared, retry: false });
+  const risk = useQuery<RiskDash>({ queryKey: KEYS.risk, queryFn: async () => (await riskPostureApi.dashboard()).data, retry: 1, ...shared });
   const inv = useQuery<Inventory | null>({
     queryKey: KEYS.inv,
     // Same fetcher as InventoryScorecard / InventoryRedesign (null on failure) — the key is shared.
     queryFn: async () => { try { return (await apiClient.get('/assets/inventory-overview')).data; } catch { return null; } },
+    ...shared,
   });
-  const assets = useQuery<AssetsDash>({ queryKey: KEYS.assets, queryFn: get('/assets/dashboard'), retry: 1 });
-  const cis = useQuery<CisOverview>({ queryKey: KEYS.cis, queryFn: async () => (await compliancePluginsApi.assetsOverview()).data, retry: 1 });
-  const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1 });
-  const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1 });
-  const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1 });
+  const assets = useQuery<AssetsDash>({ queryKey: KEYS.assets, queryFn: get('/assets/dashboard'), retry: 1, ...shared });
+  const cis = useQuery<CisOverview>({ queryKey: KEYS.cis, queryFn: async () => (await compliancePluginsApi.assetsOverview()).data, retry: 1, ...shared });
+  const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1, ...shared });
+  const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1, ...shared });
+  const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1, ...shared });
   const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem];
   const fetching = mine.some((q) => q.isFetching);
   // Sources that failed on their last attempt (inventory's fetcher returns null instead of throwing).
@@ -123,12 +162,21 @@ export default function PerformancePage() {
         </div>
         <div className="flex items-center gap-3 text-[11.5px] text-[#64748B]">
           <span aria-live="polite">
-            {updated ? `Live data · ${new Date(updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading live data…'}
+            {updated ? `Last updated ${new Date(updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading live data…'}
             {!fetching && failed > 0 && <span className="ml-2 inline-flex"><Warn>{plural(failed, 'source')} didn&rsquo;t respond</Warn></span>}
           </span>
+          <label className="inline-flex items-center gap-1.5 text-[#64748B]">
+            <span className="sr-only">Auto-refresh every</span>
+            <span aria-hidden>Auto-refresh</span>
+            <select value={refreshMs} onChange={(e) => chooseRefresh(Number(e.target.value))}
+              aria-label="Auto-refresh interval"
+              className="h-8 rounded-[9px] border border-[#E2E5EC] bg-white px-2 text-[12px] font-semibold text-[#334155] hover:bg-[#F6F7FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005B96]">
+              {REFRESH_OPTS.map((o) => <option key={o.ms} value={o.ms}>{o.label}</option>)}
+            </select>
+          </label>
           <button type="button" onClick={refresh} disabled={fetching}
             className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#E2E5EC] bg-white px-3 text-[12px] font-semibold text-[#334155] hover:bg-[#F6F7FB] disabled:cursor-default disabled:opacity-70">
-            <RefreshCw size={13} aria-hidden className={fetching ? 'animate-spin' : ''} style={{ color: T.base }} />{fetching ? 'Refreshing' : 'Refresh'}
+            <RefreshCw size={13} aria-hidden className={fetching ? 'animate-spin' : ''} style={{ color: T.base }} />{fetching ? 'Refreshing' : 'Refresh now'}
           </button>
         </div>
       </section>
