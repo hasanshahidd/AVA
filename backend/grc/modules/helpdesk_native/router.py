@@ -29,7 +29,7 @@ from ...models import GRCUser, get_db
 from ...routers.auth_router import require_auth
 from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
-    masters, agent_status, contacts, tags, views, settings, analytics, department,
+    masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
 )
 from .common import tenant_id, require_view, require_edit
 
@@ -221,3 +221,4 @@ helpdesk_native_router.include_router(tags.router)                          # /h
 helpdesk_native_router.include_router(views.router)                         # /helpdesk/views
 helpdesk_native_router.include_router(settings.router)                      # /helpdesk/settings + /helpdesk/config
 helpdesk_native_router.include_router(department.router)                    # /helpdesk/departments (NET-NEW)
+helpdesk_native_router.include_router(mail.router)                          # /helpdesk/email-accounts + email poll/feedback

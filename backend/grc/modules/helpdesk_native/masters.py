@@ -29,6 +29,7 @@ from ...models import (
     get_db,
     HDTicketStatus,
     HDTicketType,
+    HDTicketPriority,
     HDTicketTemplate,
     HDTicketTemplateField,
     HDTicketFeedbackOption,
@@ -290,12 +291,87 @@ def list_ticket_types(db: Session = Depends(get_db), _: bool = Depends(require_v
         .all()
     )
     return {"ticket_types": [{
+        "id": t.id,
         "name": t.name,
         "description": t.description,
         "priority_id": t.priority_id,
         "is_system": bool(t.is_system),
         "disabled": bool(t.disabled),
     } for t in rows]}
+
+
+# ─── ticket priorities (HD Ticket Priority) ─────────────────────────────────
+# Frappe's priority controller is advisory-only (a msgprint + telemetry, no
+# data guards), so this is plain tenant-scoped CRUD — exposing the `id` the SLA
+# and type pickers need (the list previously lived only on /meta, id-less).
+class PriorityBody(BaseModel):
+    name: str
+    level: Optional[str] = "Medium"       # Urgent | High | Medium | Low
+    description: Optional[str] = None
+    disabled: bool = False
+
+
+def _get_priority(db: Session, tid: int, pid: int) -> HDTicketPriority:
+    row = db.query(HDTicketPriority).filter(
+        HDTicketPriority.tenant_id == tid, HDTicketPriority.id == pid).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Priority not found")
+    return row
+
+
+@router.get("/priorities")
+def list_priorities(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    tid = tenant_id(db)
+    rows = (
+        db.query(HDTicketPriority)
+        .filter(HDTicketPriority.tenant_id == tid)
+        .order_by(HDTicketPriority.name.asc())
+        .all()
+    )
+    return {"priorities": [{
+        "id": p.id,
+        "name": p.name,
+        "level": p.level,
+        "description": p.description,
+        "disabled": bool(p.disabled),
+    } for p in rows]}
+
+
+@router.post("/priorities")
+def create_priority(body: PriorityBody, db: Session = Depends(get_db),
+                    _: bool = Depends(require_edit)):
+    tid = tenant_id(db)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Priority name is required")
+    if db.query(HDTicketPriority).filter(HDTicketPriority.tenant_id == tid,
+                                         HDTicketPriority.name == name).first():
+        raise HTTPException(status_code=400, detail="A priority with this name already exists")
+    db.add(HDTicketPriority(tenant_id=tid, name=name, level=body.level or "Medium",
+                            description=body.description, disabled=bool(body.disabled)))
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/priorities/{pid}")
+def update_priority(pid: int, body: PriorityBody, db: Session = Depends(get_db),
+                    _: bool = Depends(require_edit)):
+    tid = tenant_id(db)
+    row = _get_priority(db, tid, pid)
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(row, k, v)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/priorities/{pid}")
+def delete_priority(pid: int, db: Session = Depends(get_db),
+                    _: bool = Depends(require_edit)):
+    tid = tenant_id(db)
+    row = _get_priority(db, tid, pid)
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/ticket-types")
