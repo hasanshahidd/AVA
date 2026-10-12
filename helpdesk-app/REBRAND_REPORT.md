@@ -59,6 +59,10 @@ items. **Assets swapped:** 2 (logo component + favicon, both vector).
   names. Renaming these would break the app **and** AVA's REST proxy, which
   calls `/api/resource/HD%20Ticket`, filters on `ava_tenant`/`agent_group`,
   and reads these exact names.
+- The Frappe **module name** `"Helpdesk"` (`"module": "Helpdesk"` in every
+  DocType/report JSON, and `modules.txt`). This is a structural identifier that
+  groups the doctypes — **not** a user-facing product string — so it is left as
+  is; renaming it breaks module routing and exports.
 
 ### Deliberately NOT rebranded (not the Helpdesk product brand) — flagged for review
 - **"Frappe Mail"** (9 refs in `Settings/emailConfig.ts`, `EmailAdd.vue`,
