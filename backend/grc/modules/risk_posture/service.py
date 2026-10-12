@@ -56,6 +56,31 @@ DEFAULT_WEIGHTS = {
 WEIGHTS = dict(DEFAULT_WEIGHTS)
 
 
+def _session_cache(db) -> dict:
+    """Request-scoped memo bag living on the Session (one SQLAlchemy
+    Session == one HTTP request here).
+
+    The dashboard sweep calls `compute_asset_risk` once per asset, and
+    several of the sub-score queries are tenant-wide and identical for
+    every asset (the whole CIS plugin library, the tenant weights). Left
+    un-memoised they run N times (and the plugin-library scan runs
+    N×peers times). Caching them on the Session collapses that to one
+    query per tenant per request with zero change to the numbers.
+
+    ponytail: Session attribute, not an external cache — scope is exactly
+    one request, nothing to invalidate. Falls back to an ephemeral dict if
+    the Session rejects the attribute so callers never break.
+    """
+    c = getattr(db, "_risk_posture_cache", None)
+    if c is None:
+        c = {}
+        try:
+            db._risk_posture_cache = c
+        except Exception:  # noqa: BLE001
+            pass
+    return c
+
+
 def resolve_weights_for_tenant(db, tenant_id: int) -> dict:
     """Return the weight map this tenant should use for risk scoring.
 
@@ -64,6 +89,14 @@ def resolve_weights_for_tenant(db, tenant_id: int) -> dict:
     we honour per-tenant tuning without forcing a row for tenants that
     haven't customised anything.
     """
+    # Memoised per request: the tenant sweep calls this once per asset,
+    # but the row never changes mid-request (writes go through a separate
+    # session). One indexed lookup instead of N.
+    cache = _session_cache(db)
+    ck = ("weights", tenant_id)
+    if ck in cache:
+        return dict(cache[ck])
+
     try:
         # Lazy import to avoid circular dependency with grc.models
         from grc.models import TenantRiskWeights
@@ -73,17 +106,21 @@ def resolve_weights_for_tenant(db, tenant_id: int) -> dict:
     except Exception:
         # If the table doesn't exist yet (e.g. running against an older
         # schema during migration), silently fall back to defaults so
-        # Risk Posture keeps rendering instead of 500-ing.
+        # Risk Posture keeps rendering instead of 500-ing. Not cached — a
+        # transient error shouldn't pin defaults for the rest of the request.
         return dict(DEFAULT_WEIGHTS)
     if not row:
-        return dict(DEFAULT_WEIGHTS)
-    return {
-        "cis":  float(row.weight_cis)  / 100.0,
-        "vuln": float(row.weight_vuln) / 100.0,
-        "cia":  float(row.weight_cia)  / 100.0,
-        "ctrl": float(row.weight_ctrl) / 100.0,
-        "risk": float(row.weight_risk) / 100.0,
-    }
+        resolved = dict(DEFAULT_WEIGHTS)
+    else:
+        resolved = {
+            "cis":  float(row.weight_cis)  / 100.0,
+            "vuln": float(row.weight_vuln) / 100.0,
+            "cia":  float(row.weight_cia)  / 100.0,
+            "ctrl": float(row.weight_ctrl) / 100.0,
+            "risk": float(row.weight_risk) / 100.0,
+        }
+    cache[ck] = resolved
+    return dict(resolved)
 
 VULN_SEVERITY_POINTS = {
     "critical": 10.0,
@@ -187,28 +224,38 @@ def _cis_gap_self(db: Session, tenant_id: int, asset_id: int) -> Dict[str, Any]:
                     return True
         return False
 
-    all_plugins = (
-        db.query(CompliancePlugin.id, CompliancePlugin.os_keys, CompliancePlugin.benchmark)
-        .filter(
-            (CompliancePlugin.tenant_id.is_(None)) | (CompliancePlugin.tenant_id == tenant_id),
-            CompliancePlugin.review_status.in_(["approved", "auto_approved"]),
-            CompliancePlugin.enabled.is_(True),
-            # Match the scanner's eligibility EXACTLY (compliance_plugins scan_all):
-            # exclude TODO placeholders and unauthored auto-pass stubs so the
-            # posture denominator equals the rules the scanner actually runs.
-            # Without this the posture counted the full benchmark (incl. never-
-            # runnable rules) -> phantom "never-scanned" + stale errors, so its
-            # pass% disagreed with the CIS card.
-            ~cast(CompliancePlugin.check_definition, String).ilike("%TODO%"),
-            ~cast(CompliancePlugin.check_definition, String).ilike('%"kind": "any"%'),
-            ~cast(CompliancePlugin.check_definition, String).ilike('%"kind":"any"%'),
-            # Manual / attestation rules are never auto pass/fail — the scanner
-            # skips them, so counting them here only added stale-errored ghosts
-            # (497 rules incl. manual vs the 408 the scanner runs).
-            CompliancePlugin.runner_type != "manual",
+    # Tenant-wide and asset-independent: a full scan of the plugin library
+    # with four unindexable ILIKE-on-JSON filters. The dashboard sweep would
+    # otherwise re-run this once per asset AND once per co-located peer — the
+    # single biggest cost on the Risk Posture page. Memoise per request; the
+    # result is identical for every asset in the tenant.
+    _plugin_cache = _session_cache(db)
+    _pk = ("all_plugins", tenant_id)
+    all_plugins = _plugin_cache.get(_pk)
+    if all_plugins is None:
+        all_plugins = (
+            db.query(CompliancePlugin.id, CompliancePlugin.os_keys, CompliancePlugin.benchmark)
+            .filter(
+                (CompliancePlugin.tenant_id.is_(None)) | (CompliancePlugin.tenant_id == tenant_id),
+                CompliancePlugin.review_status.in_(["approved", "auto_approved"]),
+                CompliancePlugin.enabled.is_(True),
+                # Match the scanner's eligibility EXACTLY (compliance_plugins scan_all):
+                # exclude TODO placeholders and unauthored auto-pass stubs so the
+                # posture denominator equals the rules the scanner actually runs.
+                # Without this the posture counted the full benchmark (incl. never-
+                # runnable rules) -> phantom "never-scanned" + stale errors, so its
+                # pass% disagreed with the CIS card.
+                ~cast(CompliancePlugin.check_definition, String).ilike("%TODO%"),
+                ~cast(CompliancePlugin.check_definition, String).ilike('%"kind": "any"%'),
+                ~cast(CompliancePlugin.check_definition, String).ilike('%"kind":"any"%'),
+                # Manual / attestation rules are never auto pass/fail — the scanner
+                # skips them, so counting them here only added stale-errored ghosts
+                # (497 rules incl. manual vs the 408 the scanner runs).
+                CompliancePlugin.runner_type != "manual",
+            )
+            .all()
         )
-        .all()
-    )
+        _plugin_cache[_pk] = all_plugins
 
     # Prefer Stage-2 narrowing: if the asset has been scanned, the SPECIFIC
     # benchmark its (non-leaked) runs hit IS the applicable benchmark. That
