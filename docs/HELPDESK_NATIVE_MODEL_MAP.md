@@ -112,6 +112,25 @@ step.
 | SLA `condition` / `condition_json` | kept as `Text` | Python/portal expression strings stored verbatim; no evaluation engine in this step. |
 | HD Ticket permlevel/track_changes/states metadata | dropped | Frappe permission/workflow metadata, replaced by AVA RBAC + the activity table. |
 
+## Step 2 reconciliation (native engine — conversation model)
+
+The engine conversion (step 2) reconciled the conversation model per
+`HELPDESK_LOGIC_SPEC.md` §4 — a ticket thread is built from three **core** stores
+(Communication / Comment / Version), not the vestigial `HD Ticket Comment` /
+`HD Ticket Activity` doctypes. Changes, all in `_60`:
+
+- **+1 table `grc_hd_communication`** (`HDCommunication`) — the customer-facing
+  reply store (Sent/Received), the native equivalent of core `Communication`
+  (§4.1). This is the one net-new table (23 total now).
+- **`HDTicketComment` repurposed** as the internal-notes store (core `Comment`,
+  §4.2) — it was labelled vestigial-for-parity; now it is the live note store.
+- **`HDTicketActivity` repurposed** as the field-change / system-event log (core
+  `Version` + Info comments, §4.3) — Frappe's own doctype is an empty controller.
+- **+1 column `HDTicket.assigned_agent`** (String, email) — the flattened native
+  equivalent of Frappe core `_assign`, needed by the §A15 assign endpoint (the
+  UI exposes a single `agent`). Assignment-rule *selection* stays in the
+  assignment engine; this is just the store.
+
 ## Notes
 
 - **Frappe `name` kept where it carries data:** HD Ticket Type and HD Ticket

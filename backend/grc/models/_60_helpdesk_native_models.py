@@ -148,6 +148,11 @@ class HDTicket(Base):
     ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
     agent_group_id = Column(Integer, ForeignKey("grc_hd_team.id"), nullable=True)  # "Team"
     template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id"), nullable=True)
+    # Native equivalent of Frappe core `_assign` (JSON list), flattened to the
+    # single assignee the Help Desk UI exposes as `agent` (A15 assign endpoint).
+    # Holds the HD Agent's login email. Assignment-RULE selection (round-robin /
+    # load-balance) is the assignment agent's job; this is just the store.
+    assigned_agent = Column(String(255), nullable=True, index=True)
 
     # --- body ---
     description = Column(Text, nullable=True)
@@ -215,8 +220,10 @@ class HDTicket(Base):
 
 
 class HDTicketComment(Base):
-    """Internal agent comment on a ticket. (Frappe doctype is deprecated but
-    still the comment store; carried for parity.)"""
+    """Internal agent note on a ticket — repurposed as the native equivalent of
+    Frappe's core `Comment` (comment_type "Comment"), the real internal-note
+    store (logic spec §4.2). Frappe's own `HD Ticket Comment` doctype is
+    deprecated; here the table is the live internal-notes store."""
     __tablename__ = "grc_hd_ticket_comment"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -235,9 +242,43 @@ class HDTicketComment(Base):
     ticket = relationship("HDTicket")
 
 
+class HDCommunication(Base):
+    """Customer-facing reply thread for a ticket — the native equivalent of
+    Frappe's core `Communication` doctype (logic spec §4.1).
+
+    The forked Helpdesk builds a ticket's thread from THREE core stores, not the
+    vestigial `HD Ticket Comment`/`HD Ticket Activity` doctypes (spec §4):
+      * replies (customer email in/out)   -> this table (`sent_or_received`)
+      * internal agent notes              -> repurposed `HDTicketComment`
+      * field-change / system activity log -> repurposed `HDTicketActivity`
+    So the model set is reconciled by ADDING this one table and REPURPOSING the
+    two "vestigial" ones, rather than leaving the conversation unmodelled.
+    """
+    __tablename__ = "grc_hd_communication"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    reference_ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                                 nullable=False, index=True)
+    sent_or_received = Column(String(20), nullable=False, default="Sent")  # Sent (agent) | Received (customer)
+    sender = Column(String(255), nullable=True)            # agent/customer email
+    content = Column(Text, nullable=True)                  # HTML body
+    communication_date = Column(DateTime, nullable=True, default=datetime.utcnow)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    ticket = relationship("HDTicket")
+
+
 class HDTicketActivity(Base):
-    """Audit-timeline row for a ticket. (Frappe doctype is deprecated but still
-    the activity store; carried for parity.)"""
+    """Field-change / system-event log for a ticket — the native equivalent of
+    Frappe's `Version` + `Info`-comment activity feed (logic spec §4.3).
+
+    Frappe's own `HD Ticket Activity` doctype is an empty `pass` controller that
+    nothing writes; here the table is REPURPOSED as the real change log that the
+    ticket core appends to on status/assignment/field changes."""
     __tablename__ = "grc_hd_ticket_activity"
 
     id = Column(Integer, primary_key=True, index=True)
