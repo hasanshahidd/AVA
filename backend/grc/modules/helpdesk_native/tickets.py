@@ -8,9 +8,12 @@ strategy are delegated to the `sla` / `assignment` modules (stubs for now).
 """
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import List, Optional
 
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ...models import (
@@ -19,16 +22,29 @@ from ...models import (
     HDTicketPriority,
     HDTicketType,
     HDTeam,
+    HDAgent,
+    HDSettings,
     HDCommunication,
     HDTicketComment,
     HDTicketActivity,
     HDTicketFeedbackOption,
+    GRCUser,
+    get_db,
 )
+from ...routers.auth_router import require_auth, require_tenant_permission
 from . import sla, assignment
-from .common import iso, ticket_row, ticket_detail
+from .common import iso, ticket_row, ticket_detail, tenant_id, require_edit
 
 RESOLVED = "Resolved"
 PAUSED = "Paused"
+CLOSED_LABEL = "Closed"
+
+# delete is admin-grade (Frappe `is_admin()` gate) — mapped to AVA RBAC. The
+# Administrator role and the tenant primary contact pass automatically
+# (require_tenant_permission); any other role needs this permission granted
+# explicitly, so "only administrators can delete tickets" holds unless a tenant
+# deliberately delegates it. Convention mirrors common.require_view/require_edit.
+require_delete = require_tenant_permission("helpdesk:tickets:delete")
 
 
 # ─── lookups ───────────────────────────────────────────────────────────────
@@ -290,18 +306,26 @@ def reply(db: Session, tid: int, name: str, body: dict, sender: Optional[str] = 
         ))
         _activity(db, tid, ticket, "added an internal note")
     else:
-        now = datetime.utcnow()
-        db.add(HDCommunication(
-            tenant_id=tid, reference_ticket_id=ticket.id,
-            sent_or_received="Sent", sender=sender, content=content,
-            communication_date=now,
-        ))
-        if ticket.first_responded_on is None:
-            ticket.first_responded_on = now
-        ticket.last_agent_response = now
-        _activity(db, tid, ticket, "replied")
+        _public_reply(db, tid, ticket, content, sender)
     db.commit()
     return {"ok": True}
+
+
+def _public_reply(db: Session, tid: int, ticket: HDTicket, content: str,
+                  sender: Optional[str]) -> None:
+    """Agent's public reply write (HDCommunication, Sent) + first/last-response
+    stamping (§1.4). No commit — the caller owns the transaction, so a bulk
+    reply can fan out across many tickets in one unit of work."""
+    now = datetime.utcnow()
+    db.add(HDCommunication(
+        tenant_id=tid, reference_ticket_id=ticket.id,
+        sent_or_received="Sent", sender=sender, content=content,
+        communication_date=now,
+    ))
+    if ticket.first_responded_on is None:
+        ticket.first_responded_on = now
+    ticket.last_agent_response = now
+    _activity(db, tid, ticket, "replied")
 
 
 def update(db: Session, tid: int, name: str, payload: dict) -> dict:
@@ -362,3 +386,391 @@ def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optiona
         _activity(db, tid, ticket, f"moved to team {team}")
     db.commit()
     return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONVERTED TAILS — api/ticket.py + hd_ticket.py functions not in the core above
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── settings / status lookups (hd_ticket.py:51-64, HD Settings reads) ───────
+def _settings(db: Session, tid: int) -> Optional[HDSettings]:
+    """The tenant's HD Settings singleton row (grc_hd_settings). Settings are
+    converted in a separate module; the tails read the row directly (per task)."""
+    return db.query(HDSettings).filter(HDSettings.tenant_id == tid).first()
+
+
+def _status_by_id(db: Session, tid: int, sid: Optional[int]) -> Optional[HDTicketStatus]:
+    if not sid:
+        return None
+    return (
+        db.query(HDTicketStatus)
+        .filter(HDTicketStatus.id == sid, HDTicketStatus.tenant_id == tid)
+        .first()
+    )
+
+
+def _default_open_status_for(db: Session, tid: int, ticket: HDTicket) -> Optional[HDTicketStatus]:
+    """hd_ticket.py:51 `default_open_status` = SLA.default_ticket_status or HD
+    Settings.default_ticket_status; falls back to the label-"Open"/enabled-Open
+    heuristic (`_default_open_status`) when neither is configured."""
+    if ticket.sla and ticket.sla.default_ticket_status_id:
+        s = _status_by_id(db, tid, ticket.sla.default_ticket_status_id)
+        if s:
+            return s
+    st = _settings(db, tid)
+    if st and st.default_ticket_status_id:
+        s = _status_by_id(db, tid, st.default_ticket_status_id)
+        if s:
+            return s
+    return _default_open_status(db, tid)
+
+
+def _reopen_status(db: Session, tid: int, ticket: HDTicket) -> Optional[HDTicketStatus]:
+    """hd_ticket.py:58 `ticket_reopen_status` = SLA.ticket_reopen_status or HD
+    Settings.ticket_reopen_status."""
+    if ticket.sla and ticket.sla.ticket_reopen_status_id:
+        s = _status_by_id(db, tid, ticket.sla.ticket_reopen_status_id)
+        if s:
+            return s
+    st = _settings(db, tid)
+    if st and st.ticket_reopen_status_id:
+        return _status_by_id(db, tid, st.ticket_reopen_status_id)
+    return None
+
+
+def _has_agent_replied(db: Session, tid: int, ticket: HDTicket) -> bool:
+    """hd_ticket.py:391 `has_agent_replied` — any Sent communication exists."""
+    return (
+        db.query(HDCommunication)
+        .filter(
+            HDCommunication.tenant_id == tid,
+            HDCommunication.reference_ticket_id == ticket.id,
+            HDCommunication.sent_or_received == "Sent",
+        )
+        .first()
+        is not None
+    )
+
+
+# ─── attachments (api/ticket.py:39 link_attachments_to_tickets) ──────────────
+def link_attachments_to_tickets(db: Session, tid: int,
+                                attachments: Optional[list], ticket_ids: list) -> None:
+    """api/ticket.py:39. Frappe attaches the uploaded File rows to ticket_ids[0]
+    then copies them to the remaining tickets (one upload, many tickets).
+
+    AVA has NO native attachment/File store (no File model in the helpdesk-native
+    models, nor a generic one in the repo — see REPORT). Until one exists this is a
+    marked no-op so the reply flow is faithful end-to-end without inventing a store.
+    """
+    if not attachments or not ticket_ids:
+        return
+    # TODO(attachments): wire to AVA's attachment store once one exists. Frappe's
+    # fan-out: attach each File to ticket_ids[0], then frappe.copy_doc() per file
+    # onto ticket_ids[1:]. No store to target yet, so nothing is persisted.
+    return
+
+
+# ─── bulk reply (api/ticket.py:7 bulk_reply) ─────────────────────────────────
+def bulk_reply(db: Session, tid: int, ticket_ids: list, message: str,
+               attachments: Optional[list] = None, sender: Optional[str] = None) -> dict:
+    """api/ticket.py:7. Dedupe preserving the agent's order; resolve EVERY ticket
+    first (tenant-scoped — the native equivalent of Frappe's per-doc write
+    permission check) so one bad ticket doesn't leave the batch half done; fan out
+    attachments once; then reply to each as a public agent reply, logging and
+    continuing past a per-ticket failure (Frappe's try/except + frappe.log_error)."""
+    if not ticket_ids:
+        return {"ok": True, "replied": 0, "failed": []}
+
+    # dedupe but keep the order the agent picked (api/ticket.py:16)
+    ticket_ids = list(dict.fromkeys(ticket_ids))
+
+    # check every ticket before writing anything (api/ticket.py:20-23): a ticket
+    # not in this tenant aborts the whole batch, nothing is written
+    tickets: list = []
+    for tkid in ticket_ids:
+        t = _get_ticket(db, tid, str(tkid))
+        if not t:
+            return {"ok": False, "error": f"not found: {tkid}"}
+        tickets.append(t)
+
+    link_attachments_to_tickets(db, tid, attachments, ticket_ids)
+
+    failed: list = []
+    for t in tickets:
+        try:
+            _public_reply(db, tid, t, message, sender)
+        except Exception as e:  # noqa: BLE001 — log + continue, like frappe.log_error
+            failed.append({"name": str(t.id), "error": str(e)})
+    db.commit()
+    return {"ok": True, "replied": len(tickets) - len(failed), "failed": failed}
+
+
+# ─── assign to agent (api/ticket.py:61 assign_ticket_to_agent) ───────────────
+def assign_ticket_to_agent(db: Session, tid: int, name: str,
+                           agent: Optional[str] = None,
+                           current_user_email: Optional[str] = None) -> dict:
+    """api/ticket.py:61. agent defaults to the caller (self-assign); the assignee
+    must be an HD Agent of this tenant, else "Tickets can only be assigned to
+    agents" (api/ticket.py:72). Stamps the single-assignee store + activity."""
+    ticket = _get_ticket(db, tid, name)
+    if not ticket:
+        return {"ok": False, "error": "not found"}
+
+    agent = agent or current_user_email  # assign to self (api/ticket.py:67-69)
+    if not agent:
+        return {"ok": False, "error": "no agent"}
+
+    is_agent = (
+        db.query(HDAgent)
+        .filter(HDAgent.tenant_id == tid, HDAgent.user == agent)
+        .first()
+        is not None
+    )
+    if not is_agent:
+        return {"ok": False, "error": "Tickets can only be assigned to agents"}
+
+    ticket.assigned_agent = agent
+    _activity(db, tid, ticket, f"assigned to {agent}")
+    db.commit()
+    return {"ok": True, "name": str(ticket.id), "agent": agent}
+
+
+# ─── delete (api/ticket.py:78 delete_ticket) ─────────────────────────────────
+def delete_ticket(db: Session, tid: int, name: str) -> dict:
+    """api/ticket.py:78. Admin-only (gated at the route by `require_delete`);
+    hard delete, Frappe's force=True. Conversation rows (communication / comment /
+    activity / tags) carry ON DELETE CASCADE, so a Core delete of the ticket row
+    clears them; inbound self-references (merged_with / split_from) have no cascade
+    and are detached first so the delete cannot hit an FK violation.
+    # ponytail: relies on the declared ON DELETE CASCADE; if a target DB runs
+    # without FK enforcement (e.g. sqlite sans PRAGMA), delete children explicitly.
+    """
+    ticket = _get_ticket(db, tid, name)
+    if not ticket:
+        return {"ok": False, "error": "not found"}
+    tkid = ticket.id
+    db.query(HDTicket).filter(
+        HDTicket.tenant_id == tid, HDTicket.merged_with_id == tkid
+    ).update({"merged_with_id": None}, synchronize_session=False)
+    db.query(HDTicket).filter(
+        HDTicket.tenant_id == tid, HDTicket.ticket_split_from_id == tkid
+    ).update({"ticket_split_from_id": None}, synchronize_session=False)
+    db.query(HDTicket).filter(
+        HDTicket.id == tkid, HDTicket.tenant_id == tid
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"ok": True}
+
+
+# ─── merge chain (hd_ticket.py:1022 get_merge_target) ────────────────────────
+def get_merge_target(db: Session, tid: int, ticket: HDTicket) -> Optional[HDTicket]:
+    """hd_ticket.py:1022. Follow the merged_with chain to the final, non-merged
+    ticket. Return None if the chain dead-ends on a missing ticket or loops back on
+    itself (corrupt cycle), so a reply is never redirected onto another merged
+    ticket. Returns the target row (Frappe returns its name)."""
+    current_id = ticket.merged_with_id
+    visited = {ticket.id}
+    while current_id and current_id not in visited:
+        row = (
+            db.query(HDTicket)
+            .filter(HDTicket.id == current_id, HDTicket.tenant_id == tid)
+            .first()
+        )
+        if not row:
+            return None
+        visited.add(current_id)
+        if not row.is_merged:
+            return row
+        if not row.merged_with_id:
+            return None
+        current_id = row.merged_with_id
+    return None
+
+
+# ─── customer reply: merge-redirect + reopen (hd_ticket.py:1058 on_communication_update) ──
+def receive_customer_reply(db: Session, tid: int, name: str, content: str,
+                           sender: Optional[str] = None) -> dict:
+    """hd_ticket.py:1058 `on_communication_update`, the Received (customer) path:
+
+      * merge redirect — a reply to a merged ticket belongs to its merge target,
+        so the communication is filed against the resolved target (get_merge_target).
+      * reopen — if an agent has replied, move to the reopen status and record who
+        reopened it; otherwise the default open status. Stamp last_customer_response.
+
+    Running the status change through `_apply_status_change` recomputes the SLA
+    (set_resolution_date etc. flow from it), matching the save Frappe triggers.
+    Not-found → 200-safe error dict (contract §E)."""
+    ticket = _get_ticket(db, tid, name)
+    if not ticket:
+        return {"ok": False, "error": "not found"}
+
+    # redirect onto the merge target when this ticket is merged (hd_ticket.py:1062)
+    target = ticket
+    if ticket.is_merged and ticket.merged_with_id:
+        mt = get_merge_target(db, tid, ticket)
+        if mt:
+            target = mt
+
+    now = datetime.utcnow()
+    db.add(HDCommunication(
+        tenant_id=tid, reference_ticket_id=target.id,
+        sent_or_received="Received", sender=sender, content=content,
+        communication_date=now,
+    ))
+
+    # reopen (hd_ticket.py:1069-1078)
+    if _has_agent_replied(db, tid, target):
+        new_status = _reopen_status(db, tid, target)
+    else:
+        new_status = _default_open_status_for(db, tid, target)
+    if new_status and target.status_id != new_status.id:
+        _apply_status_change(db, tid, target, new_status)
+    target.last_customer_response = now
+    _activity(db, tid, target, "customer replied")
+    db.commit()
+    return {"ok": True, "name": str(target.id)}
+
+
+# ─── scheduled maintenance (hd_ticket.py:1469 / :1526) ───────────────────────
+def close_tickets_after_n_days(db: Session, tid: int) -> dict:
+    """hd_ticket.py:1469. Auto-close tickets sitting in the configured
+    auto_close_status with no communication for auto_close_after_days. Reads HD
+    Settings directly (auto_close_tickets / auto_close_status / auto_close_after_days)
+    per task. Closes via the normal status change (so SLA flows), logs the reason,
+    commits per ticket, and continues past a per-ticket failure (Frappe parity).
+
+    No-op unless auto_close_tickets is on and a "Closed" status exists."""
+    st = _settings(db, tid)
+    if not st or not st.auto_close_tickets:
+        return {"closed": 0}
+
+    eligible = _status_by_id(db, tid, st.auto_close_status_id)
+    if not eligible:
+        return {"closed": 0}
+    closed_status = _status_by_label(db, tid, CLOSED_LABEL)
+    if not closed_status:
+        return {"closed": 0}
+
+    days = int(st.auto_close_after_days or 0)
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # last communication per ticket; INNER JOIN excludes tickets with none
+    # (hd_ticket.py:1488 subquery parity)
+    last_comm = (
+        db.query(
+            HDCommunication.reference_ticket_id.label("tkid"),
+            func.max(HDCommunication.communication_date).label("last"),
+        )
+        .filter(HDCommunication.tenant_id == tid)
+        .group_by(HDCommunication.reference_ticket_id)
+        .subquery()
+    )
+    rows = (
+        db.query(HDTicket)
+        .join(last_comm, HDTicket.id == last_comm.c.tkid)
+        .filter(
+            HDTicket.tenant_id == tid,
+            HDTicket.status_id == eligible.id,
+            last_comm.c.last < cutoff,
+        )
+        .all()
+    )
+
+    plural = "s" if days != 1 else ""
+    closed = 0
+    for ticket in rows:
+        try:
+            _apply_status_change(db, tid, ticket, closed_status)
+            _activity(
+                db, tid, ticket,
+                f"automatically closed the ticket after {days} day{plural} of inactivity",
+            )
+            db.commit()
+            closed += 1
+        except Exception:  # noqa: BLE001 — log + continue (frappe.log_error parity)
+            db.rollback()
+            continue
+    return {"closed": closed}
+
+
+def update_sla_status_in_ticket(db: Session, tid: int) -> dict:
+    """hd_ticket.py:1526. Refresh agreement_status on every Open-category ticket
+    that has an SLA, so breaches surface as the clock runs. Mirrors Frappe's
+    agreement_status-only update (handle_agreement_status), not a full re-apply, so
+    the deadlines are left untouched. Commits per ticket, continues past failures.
+    # ponytail: the status write bumps updated_at (ORM onupdate); Frappe used
+    # update_modified=False. Cosmetic only — drop if modified-time must be frozen.
+    """
+    now = datetime.utcnow()
+    rows = (
+        db.query(HDTicket)
+        .filter(
+            HDTicket.tenant_id == tid,
+            HDTicket.status_category == "Open",
+            HDTicket.sla_id.isnot(None),
+        )
+        .all()
+    )
+    updated = 0
+    for ticket in rows:
+        policy = ticket.sla
+        if not policy:
+            continue
+        try:
+            sla._handle_agreement_status(ticket, policy, now)
+            db.commit()
+            updated += 1
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            continue
+    return {"updated": updated}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NEW ROUTES — the main session mounts `extra_router` alongside `router`.
+# (close_tickets_after_n_days / update_sla_status_in_ticket are scheduled jobs,
+#  not HTTP endpoints, so they get no route here.)
+# ═══════════════════════════════════════════════════════════════════════════
+extra_router = APIRouter(prefix="/helpdesk", tags=["Help Desk (native)"])
+
+
+class BulkReplyBody(BaseModel):
+    ticket_ids: List[str]
+    message: str
+    attachments: Optional[list] = None
+
+
+class AssignAgentBody(BaseModel):
+    agent: Optional[str] = None  # None => self-assign (caller)
+
+
+class CustomerReplyBody(BaseModel):
+    content: str = ""
+    sender: Optional[str] = None
+
+
+@extra_router.post("/tickets/bulk-reply")
+def _bulk_reply(body: BulkReplyBody, db: Session = Depends(get_db),
+                current_user: GRCUser = Depends(require_auth),
+                _: bool = Depends(require_edit)):
+    return bulk_reply(db, tenant_id(db), body.ticket_ids, body.message,
+                      body.attachments, sender=current_user.email)
+
+
+@extra_router.post("/tickets/{name}/assign-agent")
+def _assign_agent(name: str, body: AssignAgentBody, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_edit)):
+    return assign_ticket_to_agent(db, tenant_id(db), name, body.agent,
+                                  current_user_email=current_user.email)
+
+
+@extra_router.post("/tickets/{name}/customer-reply")
+def _customer_reply(name: str, body: CustomerReplyBody, db: Session = Depends(get_db),
+                    _: bool = Depends(require_edit)):
+    return receive_customer_reply(db, tenant_id(db), name, body.content, body.sender)
+
+
+@extra_router.delete("/tickets/{name}")
+def _delete_ticket(name: str, db: Session = Depends(get_db), _: bool = Depends(require_delete)):
+    return delete_ticket(db, tenant_id(db), name)
