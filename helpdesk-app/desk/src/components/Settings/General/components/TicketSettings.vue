@@ -231,7 +231,7 @@
               )
             }}
             <a
-              href="https://docs.frappe.io/helpdesk/helpdesk/customization/outside-working-hours-banner"
+              href="https://docs.ava.io/help-desk/helpdesk/customization/outside-working-hours-banner"
               target="_blank"
               class="underline font-semibold"
               >{{ __("here") }}</a

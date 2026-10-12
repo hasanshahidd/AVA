@@ -15,7 +15,7 @@
           )
         }}
         <a
-          href="https://docs.frappe.io/helpdesk/field-dependency"
+          href="https://docs.ava.io/help-desk/field-dependency"
           target="_blank"
           class="underline"
           >{{ __("here.") }}</a

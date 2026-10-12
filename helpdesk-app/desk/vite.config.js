@@ -57,11 +57,10 @@ export default defineConfig(async ({ mode }) => {
         },
         manifest: {
           display: "standalone",
-          name: "Frappe Helpdesk",
-          short_name: "Helpdesk",
+          name: "AVA Help Desk",
+          short_name: "AVA Help Desk",
           start_url: "/helpdesk",
-          description:
-            "Modern, Streamlined, Free and Open Source Customer Service Software",
+          description: "AVA Help Desk — IT service desk",
           icons: [
             {
               src: "/assets/helpdesk/desk/manifest/manifest-icon-192.maskable.png",

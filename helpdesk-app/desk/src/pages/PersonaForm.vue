@@ -161,7 +161,7 @@ const questions = [
   {
     key: "preferred_channels",
     title: __(
-      "How would you like your customers to create support tickets in Frappe Helpdesk?"
+      "How would you like your customers to create support tickets in AVA Help Desk?"
     ),
     type: "choice",
     multiple: true,
@@ -207,7 +207,7 @@ const questions = [
   },
   {
     key: "referral_source",
-    title: __("How did you hear about Frappe Helpdesk?"),
+    title: __("How did you hear about AVA Help Desk?"),
     type: "choice",
     options: [
       { label: __("GitHub"), value: "github" },
@@ -230,7 +230,7 @@ const questions = [
   },
   {
     key: "first_goal",
-    title: __("What would you like to do first in Frappe Helpdesk?"),
+    title: __("What would you like to do first in AVA Help Desk?"),
     type: "choice",
     options: [
       { label: __("Connect my support email"), value: "connect_email" },
@@ -242,5 +242,5 @@ const questions = [
   },
 ] satisfies Question[];
 
-usePageMeta(() => ({ title: __("Welcome to Frappe Helpdesk") }));
+usePageMeta(() => ({ title: __("Welcome to AVA Help Desk") }));
 </script>

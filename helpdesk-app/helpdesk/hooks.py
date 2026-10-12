@@ -1,10 +1,10 @@
 app_name = "helpdesk"
-app_title = "Helpdesk"
-app_publisher = "Frappe Technologies"
-app_description = "Customer Service Software"
+app_title = "AVA Help Desk"
+app_publisher = "CyberAssurance (AVA)"
+app_description = "AVA Help Desk — IT service desk"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
-app_email = "hello@frappe.io"
+app_email = "support@ava.io"
 app_license = "AGPLv3"
 required_apps = ["telephony"]
 require_type_annotated_api_methods = True
@@ -13,7 +13,7 @@ add_to_apps_screen = [
     {
         "name": "helpdesk",
         "logo": "/assets/helpdesk/desk/favicon.svg",
-        "title": "Helpdesk",
+        "title": "AVA Help Desk",
         "route": "/helpdesk",
         "has_permission": "helpdesk.api.permission.has_app_permission",
     }

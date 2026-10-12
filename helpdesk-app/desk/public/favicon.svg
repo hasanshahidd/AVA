@@ -1,4 +1,17 @@
-<svg width="118" height="118" viewBox="0 0 118 118" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M93.9278 0H23.1013C10.3428 0 0 10.3428 0 23.1013V93.9278C0 106.686 10.3428 117.029 23.1013 117.029H93.9278C106.686 117.029 117.029 106.686 117.029 93.9278V23.1013C117.029 10.3428 106.686 0 93.9278 0Z" fill="#7D42FB"/>
-<path d="M95.9759 50.8753V27.8265L21 27.8265V38.3271H85.5278V48.3027C81.3275 49.5103 78.2824 53.3955 78.2824 57.9632C78.2824 62.531 81.3275 66.3637 85.5278 67.5713V77.5468H31.5006V50.1403H21V88.0474H96.0284V64.9986L89.7805 60.5359V55.3906L96.0284 50.9278L95.9759 50.8753Z" fill="#EDF7FF"/>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="orb" cx="0.36" cy="0.30" r="0.9">
+      <stop offset="0" stop-color="#B3CDE0"/>
+      <stop offset="0.42" stop-color="#3279A3"/>
+      <stop offset="1" stop-color="#011F4B"/>
+    </radialGradient>
+  </defs>
+  <!-- orbiting radar ring (perspective) behind the sphere -->
+  <ellipse cx="32" cy="32" rx="30" ry="11" fill="none" stroke="#6497B1" stroke-width="2.6" opacity="0.55" transform="rotate(-22 32 32)"/>
+  <!-- 3D sphere = the internet-facing attack surface -->
+  <circle cx="32" cy="32" r="17" fill="url(#orb)"/>
+  <!-- specular highlight for depth -->
+  <ellipse cx="25.5" cy="25" rx="5.5" ry="3.6" fill="#ffffff" opacity="0.5"/>
+  <!-- detected exposure on the orbit -->
+  <circle cx="57" cy="25" r="2.9" fill="#6497B1"/>
 </svg>

@@ -1,6 +1,6 @@
 <template>
   <SettingsLayoutBase
-    :description="__('Sync customers between Helpdesk and ERPNext.')"
+    :description="__('Sync customers between AVA Help Desk and ERPNext.')"
   >
     <template #title>
       <div class="flex items-center gap-2">
@@ -36,7 +36,7 @@
                 {{ __("Enable ERPNext Integration") }}
               </span>
               <span class="text-p-sm text-ink-gray-6">
-                {{ __("Sync customers between Helpdesk and ERPNext.") }}
+                {{ __("Sync customers between AVA Help Desk and ERPNext.") }}
               </span>
             </div>
           </div>
@@ -84,7 +84,7 @@
             <span class="text-p-sm text-ink-gray-6">
               {{
                 __(
-                  "New and updated customers sync automatically between Helpdesk and ERPNext."
+                  "New and updated customers sync automatically between AVA Help Desk and ERPNext."
                 )
               }}
             </span>

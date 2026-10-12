@@ -569,7 +569,7 @@ onMounted(() => {
 watch(ticket, (ticket) => ticket.markSeen.reload(), { immediate: true });
 
 onUnmounted(() => {
-  document.title = "Helpdesk";
+  document.title = "AVA Help Desk";
 });
 </script>
 <style scoped>

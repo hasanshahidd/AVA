@@ -413,7 +413,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopViewing(props.ticketId);
-  document.title = "Helpdesk";
+  document.title = "AVA Help Desk";
   $socket.off("helpdesk:ticket-update");
 });
 </script>

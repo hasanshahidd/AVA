@@ -48,9 +48,9 @@
     v-model="showHelpModal"
     v-model:articles="articles"
     appName="helpdesk"
-    title="Frappe Helpdesk"
+    title="AVA Help Desk"
     :logo="logo"
-    docsLink="https://docs.frappe.io/helpdesk"
+    docsLink="https://docs.ava.io/help-desk"
     :afterSkip="(step: string) => capture('onboarding_step_skipped_' + step)"
     :afterSkipAll="() => capture('onboarding_steps_skipped')"
     :afterReset="(step: string) => capture('onboarding_step_reset_' + step)"
@@ -64,12 +64,11 @@
 
 <script setup lang="ts">
 import HDLogo from "@/assets/logos/HDLogo.vue";
-import { FrappeCloudIcon, InviteCustomer } from "@/components/icons";
+import { InviteCustomer } from "@/components/icons";
 import CustomerPortalPermissionBanner from "@/components/banners/CustomerPortalPermissionBanner.vue";
 import TicketFieldPermissionBanner from "@/components/banners/TicketFieldPermissionBanner.vue";
 import ShortcutsModal from "@/components/modals/ShortcutsModal.vue";
 import SettingsModal from "@/components/Settings/SettingsModal.vue";
-import { confirmLoginToFrappeCloud } from "@/composables/fc";
 import { useApps } from "@/composables/useApps";
 import { useBanners } from "@/composables/useBanners";
 import { useScreenSize } from "@/composables/screen";
@@ -162,20 +161,9 @@ const agentPortalDropdown = computed(() => [
     },
   },
   {
-    icon: "lucide-life-buoy",
-    label: __("Support"),
-    onClick: () => window.open("https://t.me/frappedesk"),
-  },
-  {
     icon: "lucide-book-open",
     label: __("Docs"),
-    onClick: () => window.open("https://docs.frappe.io/helpdesk"),
-  },
-  {
-    label: __("Login to Frappe Cloud"),
-    icon: FrappeCloudIcon,
-    onClick: () => confirmLoginToFrappeCloud(),
-    condition: () => !isMobileView.value && window.is_fc_site,
+    onClick: () => window.open("https://docs.ava.io/help-desk"),
   },
   {
     label: __("Shortcuts"),
@@ -331,7 +319,7 @@ const steps = [
       currentStep.value = {
         title: __("Create & invite a contact"),
         buttonLabel: __("Create"),
-        videoURL: "/assets/helpdesk/desk/videos/createInviteContact.mp4",
+        videoURL: "",
         onClick: async () => {
           showIntermediateModal.value = false;
           router.push({ name: "ContactList" });
@@ -423,7 +411,7 @@ const articles = ref([
     ],
   },
   {
-    title: __("Frappe Helpdesk Mobile"),
+    title: __("AVA Help Desk Mobile"),
     opened: false,
     subArticles: [
       { name: "pwa-installation", title: __("Mobile App Installation") },

@@ -13,7 +13,7 @@
           )
         }}
         <a
-          href="https://docs.frappe.io/helpdesk/service-level-agreement"
+          href="https://docs.ava.io/help-desk/service-level-agreement"
           target="_blank"
           class="underline"
           >{{ __("here.") }}
