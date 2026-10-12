@@ -21,6 +21,7 @@ from ....schemas import (
     VulnerabilityDashboard, OverdueVulnerabilityResponse, AssetExposureResponse
 )
 from ....routers.auth_router import require_auth, get_user_tenants, get_user_primary_tenant
+from .._adhoc_filter import exclude_adhoc
 
 router = APIRouter(prefix="/dashboard", tags=["Vulnerability Dashboard"])
 
@@ -67,8 +68,9 @@ def get_dashboard(
             contextual_priority={"urgent": 0, "moderate": 0, "low": 0},
         )
     
-    query = db.query(Vulnerability).filter(Vulnerability.tenant_id.in_(user_tenants))
-    
+    query = db.query(Vulnerability).filter(
+        Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db))
+
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
         query = query.filter(Vulnerability.tenant_id == tenant_id)
@@ -234,7 +236,7 @@ def get_dashboard(
         VulnerabilityAssetLink.asset_id,
         func.count(VulnerabilityAssetLink.vulnerability_id).label("vuln_count")
     ).join(Vulnerability).filter(
-        Vulnerability.tenant_id.in_(user_tenants)
+        Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db)
     ).group_by(VulnerabilityAssetLink.asset_id).order_by(
         func.count(VulnerabilityAssetLink.vulnerability_id).desc()
     ).limit(5).all()
@@ -250,7 +252,7 @@ def get_dashboard(
             })
     
     recent_vulns = db.query(Vulnerability).filter(
-        Vulnerability.tenant_id.in_(user_tenants)
+        Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db)
     ).order_by(Vulnerability.updated_at.desc()).limit(5).all()
     
     recent_activities = [
@@ -309,6 +311,7 @@ def get_overdue_vulnerabilities(
         joinedload(Vulnerability.assignee)
     ).filter(
         Vulnerability.tenant_id.in_(user_tenants),
+        exclude_adhoc(db),
         Vulnerability.due_date < now,
         Vulnerability.status.notin_(RESOLVED_STATUSES)
     )
@@ -365,6 +368,7 @@ def get_asset_exposure(
         Vulnerability
     ).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.notin_(_EXPOSURE_EXCLUDED)
     ).distinct().all()
     
@@ -378,6 +382,7 @@ def get_asset_exposure(
             Vulnerability
         ).filter(
             VulnerabilityAssetLink.asset_id == asset_id,
+            exclude_adhoc(db),
             Vulnerability.status.notin_(_EXPOSURE_EXCLUDED)
         ).all()
         
@@ -424,9 +429,9 @@ def get_department_metrics(
     ).all()
     
     all_vulns = db.query(Vulnerability).filter(
-        Vulnerability.tenant_id.in_(filter_tenants)
+        Vulnerability.tenant_id.in_(filter_tenants), exclude_adhoc(db)
     ).all()
-    
+
     assigned_vuln_ids = set()
     dept_vuln_map = {}
     
@@ -525,10 +530,11 @@ def get_sla_trends(
     
     query = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.in_(RESOLVED_STATUSES),
         Vulnerability.resolved_at >= start_date
     )
-    
+
     if department_id:
         dept_vuln_ids = db.query(GRCVulnerabilityDepartmentAssignment.vulnerability_id).filter(
             GRCVulnerabilityDepartmentAssignment.department_id == department_id
@@ -611,6 +617,7 @@ def get_workflow_metrics(
     
     vulns_with_state = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.current_state_id.isnot(None)
     ).all()
     
@@ -699,6 +706,7 @@ def get_aging_analysis(
     
     open_vulns = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.notin_(RESOLVED_STATUSES)
     ).all()
 
@@ -767,13 +775,13 @@ def get_control_coverage(
         filter_tenants = user_tenants
     
     total_vulns = db.query(func.count(Vulnerability.id)).filter(
-        Vulnerability.tenant_id.in_(filter_tenants)
+        Vulnerability.tenant_id.in_(filter_tenants), exclude_adhoc(db)
     ).scalar() or 0
-    
+
     vulns_with_links = db.query(func.count(func.distinct(VulnerabilityControlLink.vulnerability_id))).join(
         Vulnerability
     ).filter(
-        Vulnerability.tenant_id.in_(filter_tenants)
+        Vulnerability.tenant_id.in_(filter_tenants), exclude_adhoc(db)
     ).scalar() or 0
     
     coverage_rate = round((vulns_with_links / total_vulns) * 100, 1) if total_vulns > 0 else 0.0
@@ -885,6 +893,7 @@ def get_sla_compliance_trends(
     
     resolved_vulns = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.in_(RESOLVED_STATUSES),
         Vulnerability.resolved_at >= start_date
     ).all()
@@ -951,6 +960,7 @@ def get_department_workload(
     
     all_open_vulns = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.notin_(RESOLVED_STATUSES)
     ).all()
 
@@ -1008,6 +1018,7 @@ def get_aging_by_department(
     
     open_vulns = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.status.notin_(RESOLVED_STATUSES)
     ).all()
 
@@ -1288,6 +1299,7 @@ def get_dashboard_trends(
     # side so a report for "Jan 1–Mar 31" doesn't pick up April activity.
     discovered_rows = db.query(Vulnerability.created_at, Vulnerability.discovered_at).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         or_(
             and_(
                 Vulnerability.discovered_at != None,
@@ -1305,6 +1317,7 @@ def get_dashboard_trends(
     # Resolved (resolved_at within window).
     resolved_rows = db.query(Vulnerability.resolved_at).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.resolved_at != None,
         Vulnerability.resolved_at >= start,
         Vulnerability.resolved_at <= end_dt,
@@ -1316,6 +1329,7 @@ def get_dashboard_trends(
         Vulnerability.id == GRCVulnWorkflowHistory.vulnerability_id,
     ).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         GRCVulnWorkflowHistory.performed_at != None,
         GRCVulnWorkflowHistory.performed_at >= start,
         GRCVulnWorkflowHistory.performed_at <= end_dt,
@@ -1349,6 +1363,7 @@ def get_dashboard_trends(
     # both discovered and resolved during the window.
     mttr_rows = db.query(Vulnerability.discovered_at, Vulnerability.resolved_at).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
+        exclude_adhoc(db),
         Vulnerability.resolved_at != None,
         Vulnerability.resolved_at >= start,
         Vulnerability.resolved_at <= end_dt,
@@ -2164,6 +2179,7 @@ def get_threat_intel_dashboard(
 
     base_query = db.query(Vulnerability).filter(
         Vulnerability.tenant_id.in_(user_tenants),
+        exclude_adhoc(db),
         ~Vulnerability.status.in_(RESOLVED_STATUSES),
     )
     if tenant_id:
@@ -2354,6 +2370,7 @@ def get_asset_risk_heatmap(
         db.query(Vulnerability)
         .filter(
             Vulnerability.tenant_id.in_(filter_tenants),
+            exclude_adhoc(db),
             ~Vulnerability.status.in_(RESOLVED_STATUSES),
         )
     )

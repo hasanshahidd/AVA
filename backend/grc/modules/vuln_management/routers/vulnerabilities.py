@@ -17,6 +17,7 @@ from ....schemas import (
     VulnerabilityAssign, VulnerabilityStatusChange, MessageResponse
 )
 from ....routers.auth_router import require_auth, get_user_tenants, get_user_primary_tenant, require_tenant_permission
+from .._adhoc_filter import exclude_adhoc
 
 router = APIRouter(tags=["Vulnerabilities"])
 
@@ -319,7 +320,7 @@ def list_vulnerabilities(
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.normalized_control),
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.internal_control),
         joinedload(Vulnerability.control_links).joinedload(VulnerabilityControlLink.parsed_framework_control),
-    ).filter(Vulnerability.tenant_id.in_(user_tenants))
+    ).filter(Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db))
 
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
@@ -453,7 +454,7 @@ def list_vulnerability_domains(
         Vulnerability.plugin_family,
         Vulnerability.severity,
         func.count(Vulnerability.id),
-    ).filter(Vulnerability.tenant_id.in_(user_tenants))
+    ).filter(Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db))
 
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
