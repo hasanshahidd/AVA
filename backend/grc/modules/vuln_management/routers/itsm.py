@@ -38,17 +38,37 @@ def _conn_or_404(db, connection_id, tenants) -> IntegrationConnection:
     return conn
 
 
+# The Help Desk engine is now the NATIVE in-app engine (grc_hd_*), not an
+# external connector. We keep a hidden per-tenant "ticketing" IntegrationConnection
+# row purely as the anchor for VulnTicketLink (connection_id is NOT NULL); this
+# marker's integration_type tells push_finding to create a native ticket.
+NATIVE_HELPDESK_TYPE = "native_helpdesk"
+
+
 def _helpdesk_conn(db, tenants) -> IntegrationConnection:
-    """Resolve the tenant's Help Desk ticketing connection SERVER-SIDE so the
-    client never has to name it — the engine (Frappe) stays invisible. There is
-    exactly one ticketing connection per tenant (the hidden engine)."""
+    """Resolve the tenant's Help Desk ticketing anchor SERVER-SIDE (the engine
+    stays invisible to the client). Post-migration the engine is internal, so if
+    no ticketing connection exists we auto-create the hidden native marker instead
+    of failing — "Create Help Desk ticket" must always work."""
     conn = db.query(IntegrationConnection).filter(
         IntegrationConnection.tenant_id.in_(tenants),
         IntegrationConnection.category == "ticketing",
         IntegrationConnection.is_active == True,  # noqa: E712
     ).order_by(IntegrationConnection.id.asc()).first()
-    if not conn:
-        raise HTTPException(status_code=409, detail="Help Desk is not set up for this workspace")
+    if conn:
+        return conn
+    tid = tenants[0] if tenants else None
+    conn = IntegrationConnection(
+        tenant_id=tid,
+        integration_type=NATIVE_HELPDESK_TYPE,
+        connection_name="Help Desk",
+        console_url="internal://helpdesk-native",
+        category="ticketing",
+        is_active=True,
+        status="connected",
+    )
+    db.add(conn)
+    db.flush()
     return conn
 
 
