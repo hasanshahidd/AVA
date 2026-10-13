@@ -61,7 +61,23 @@ def _ticket_request(vuln):
     )
 
 
-def _ensure_remediation_plan(db: Session, vuln, connection, *, user_id: Optional[int] = None) -> bool:
+def _remediation_plan(db, vuln):
+    """Real remediation plan for a finding (title/summary/fix_artifact/rationale)
+    via the SAME generator the vuln Remediation tab uses — so the steps in the plan
+    + ticket MATCH what the user saw pre-mobilisation. Uses heuristic_plan:
+    deterministic + instant + data-grounded (no LLM latency in the ticket-create
+    hot path). Never raises."""
+    try:
+        from ..modules.vuln_management.remediation.plan_generator import heuristic_plan
+        from ..modules.vuln_management.routers.remediation_plans import _context, _primary_asset
+        return heuristic_plan(_context(vuln, _primary_asset(vuln, db)))
+    except Exception:  # noqa: BLE001 — generation must never block the push/plan
+        logger.exception("remediation plan generation failed for vuln %s", getattr(vuln, "id", None))
+        return None
+
+
+def _ensure_remediation_plan(db: Session, vuln, connection, *, user_id: Optional[int] = None,
+                             plan: Optional[Dict[str, Any]] = None) -> bool:
     """Pushing to ITSM IS mobilisation, and the `mobilized` cycle counter reads
     `VulnRemediationPlan` — so a ticketed finding MUST carry a plan or its
     mobilisation is invisible to the counter. Create a minimal one if none
@@ -99,19 +115,27 @@ def _ensure_remediation_plan(db: Session, vuln, connection, *, user_id: Optional
             logger.exception("department-assignment lookup failed for vuln_id=%s", vuln.id)
 
     now = datetime.utcnow()
-    # Customer-facing text: NEVER name the ticket engine (invisible-engine rule) —
-    # no connection_name/provider, no "ITSM". It's just the Help Desk.
+    # Real, data-grounded remediation steps (same generator as the Remediation
+    # tab) — not a generic "see the ticket" back-ref. Falls back to the generic
+    # text only if generation somehow yields nothing.
+    plan = plan or _remediation_plan(db, vuln) or {}
+    fix_type = plan.get("fix_type") or "patch"
+    title = plan.get("title") or f"Remediate {vuln.vuln_id}"
+    summary = plan.get("summary") or (
+        "Created when a Help Desk ticket was opened for this finding; this plan "
+        "makes the mobilisation visible to reporting.")
+    fix_artifact = plan.get("fix_artifact") or \
+        "See the linked Help Desk ticket for remediation steps and status."
+    rationale = plan.get("rationale") or "Finding mobilised to the Help Desk for remediation."
+    # Customer-facing text: NEVER name the ticket engine (invisible-engine rule).
     approver = "Help Desk ticket"
     db.add(VulnRemediationPlan(
         tenant_id=vuln.tenant_id, vulnerability_id=vuln.id,
-        fix_type="patch",
-        title=f"Remediate {vuln.vuln_id} via the Help Desk",
-        summary=("Created when a Help Desk ticket was opened for this finding. "
-                 "Remediation is tracked in the linked ticket; this plan makes the "
-                 "mobilisation visible to reporting. System-attributed — not a human "
-                 "approval."),
-        fix_artifact="See the linked Help Desk ticket for remediation steps and status.",
-        rationale="Finding mobilised to the Help Desk for remediation.",
+        fix_type=fix_type,
+        title=title,
+        summary=summary,
+        fix_artifact=fix_artifact,
+        rationale=rationale,
         source="itsm",
         # Auto-approve only with an owner; otherwise leave it for the gate.
         status="approved" if has_owner else "recommended",
@@ -149,18 +173,34 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
     if link.id is None:
         db.add(link)
 
+    _plan_out = None  # remediation plan generated inline on the native path, reused by _ensure
     try:
         if getattr(connection, "integration_type", None) == "native_helpdesk":
             # Native in-app Help Desk engine — create a real grc_hd_ticket, no
             # external connector. The ticket shows up directly in the Help Desk,
             # pre-filled: priority from the finding's severity, routed to a
-            # department (-> its team -> auto-assigned); status defaults to Open.
+            # department (-> its team -> auto-assigned); status defaults to Open;
+            # and the body carries the real remediation steps.
             from ..modules.helpdesk_native import tickets as hd_tickets
             from ..modules.helpdesk_native import department as hd_dept
-            from ..models import HDTicketPriority, HDDepartment
+            from ..models import HDTicketPriority, HDDepartment, VulnRemediationPlan
+            # Remediation steps for the ticket body: reuse an already-saved real
+            # plan's steps if present, else generate once (reused for the plan).
+            _ep = db.query(VulnRemediationPlan).filter(
+                VulnRemediationPlan.tenant_id == vuln.tenant_id,
+                VulnRemediationPlan.vulnerability_id == vuln.id).first()
+            _ep_art = (_ep.fix_artifact or "") if _ep else ""
+            if _ep_art.strip() and "see the linked help desk" not in _ep_art.lower():
+                _steps = _ep_art
+            else:
+                _plan_out = _remediation_plan(db, vuln) or {}
+                _steps = _plan_out.get("fix_artifact") or ""
+            _desc = (vuln.description or "")
+            if _steps:
+                _desc = (_desc + "\n\n---\n**Suggested remediation steps**\n\n" + _steps).strip()
             payload = {
                 "subject": (vuln.title or f"Vulnerability {vuln.vuln_id}")[:255],
-                "description": vuln.description or "",
+                "description": _desc,
             }
             _sev = {"critical": "Urgent", "high": "High", "medium": "Medium",
                     "low": "Low", "info": "Low", "informational": "Low"}
@@ -194,7 +234,7 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
         link.plan_advanced_at = None
         link.push_error = None
         link.updated_at = datetime.utcnow()
-        plan_created = _ensure_remediation_plan(db, vuln, connection, user_id=user_id)
+        plan_created = _ensure_remediation_plan(db, vuln, connection, user_id=user_id, plan=_plan_out)
         db.flush()
         _audit(db, vuln.tenant_id, connection.id, user_id, "itsm.ticket_pushed",
                link.id, {"vulnerability_id": vuln.id, "external_ticket_id": ext_id,
