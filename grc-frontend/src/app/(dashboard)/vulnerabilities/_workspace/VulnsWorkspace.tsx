@@ -15,7 +15,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket } from 'lucide-react';
-import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
+import { shortenVulnTitle, deBrandDomain, PriorityBeforeAfter, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
 
@@ -382,7 +382,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
-                      <thead><tr>{['ID', 'Title', 'Linked asset', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · Ctx', 'Status', 'SLA / Due', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                      <thead><tr>{['ID', 'Title', 'Linked asset', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · before → after', 'Status', 'SLA / Due', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
                       <tbody>
                         {loading ? (
                           <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
@@ -390,7 +390,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                           <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
                         ) : rows.map((v) => {
                           const sev = normSev(v.severity); const sm = SEV[sev];
-                          const sc = ctxScore(v); const bm = BAND_META[band(sc)];
                           const exp = hasExploit(v); const due = dueLabel(v);
                           const owner = (v as any).assignee_name as string | undefined;
                           const depts = (v as any).assigned_departments as string[] | undefined;
@@ -413,7 +412,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                               <td style={{ ...td, fontFamily: MONO, color: sm.pillC }}>{v.cvss_score ?? '—'}</td>
                               <td style={{ ...td, fontFamily: MONO, color: FAINT }}>{v.epss_score != null ? `${(v.epss_score * 100).toFixed(1)}%` : '—'}</td>
                               <td style={{ ...td, color: exp ? '#C0682F' : FAINT }}>{exp ? 'Public' : 'None'}</td>
-                              <td style={{ ...td, fontFamily: MONO, color: bm.c, fontWeight: 600 }}>{sc} · {bm.label}</td>
+                              <td style={td}><PriorityBeforeAfter v={v} /></td>
                               <td style={td}><span style={{ ...pill('#B23A3A', '#fff'), border: '1px solid #F3D3DA', textTransform: 'capitalize' }}>{(v.status || 'open').replace(/_/g, ' ')}</span></td>
                               <td style={td}>{due ? <b style={{ fontWeight: 600, color: due.c }}>{due.t}</b> : <span style={{ color: FAINT }}>—</span>}</td>
                               <td style={td}>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { apiClient, assetsApi } from '@/lib/api';
 import type { ITAsset } from '@/types';
+import ReportBuilderCard from './ReportBuilderCard';
 
 const ACCENT = 'var(--color-base)';
 
@@ -188,7 +189,7 @@ function SbpReportCard() {
 }
 
 // Report registry — add another component here to add a second report card.
-const REPORTS: React.ComponentType[] = [SbpReportCard];
+const REPORTS: React.ComponentType[] = [ReportBuilderCard, SbpReportCard];
 
 export default function ReportsPage() {
   return (

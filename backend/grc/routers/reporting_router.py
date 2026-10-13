@@ -539,6 +539,67 @@ def _serialize(spec: DatasetSpec, obj: Any) -> Dict[str, Any]:
     return out
 
 
+def _report_columns(spec: DatasetSpec) -> List[str]:
+    """Export column order: the projected fields, each user-FK id shown as its
+    resolved display-name key (owner_id -> owner_name)."""
+    return [spec.user_fields.get(f, f) for f in spec.fields]
+
+
+def _col_label(key: str) -> str:
+    """snake_case column key -> human header (matches /aggregate's labelling)."""
+    return key.replace("_", " ").title()
+
+
+def _apply_sort(q, model: Any, spec: DatasetSpec, sorts: List[SortSpec]):
+    """ORDER BY over whitelisted columns (else the dataset default), with the PK
+    appended as a stable pagination tiebreaker. Shared by /query and /export."""
+    order_clauses = []
+    for s in sorts:
+        if s.key not in spec.sortable:
+            continue
+        col = _col(model, s.key)
+        if col is None:
+            continue
+        order_clauses.append(col.desc() if str(s.dir).lower() == "desc" else col.asc())
+    if not order_clauses:
+        dcol = _col(model, spec.default_order[0])
+        if dcol is not None:
+            order_clauses.append(dcol.desc() if spec.default_order[1] == "desc" else dcol.asc())
+    if not any(s.key == "id" for s in sorts):
+        pk = _col(model, "id")
+        if pk is not None:
+            order_clauses.append(pk.asc())
+    return q.order_by(*order_clauses) if order_clauses else q
+
+
+def _resolve_user_fields(spec: DatasetSpec, serialized: List[Dict[str, Any]], db: Session) -> None:
+    """Batch-resolve each user-FK id column to a display name, in place. Shared by
+    /query and /export."""
+    if not (spec.user_fields and serialized):
+        return
+    user_id_set: set = set()
+    for fk_col in spec.user_fields:
+        for row in serialized:
+            uid = row.get(fk_col)
+            if uid is not None:
+                try:
+                    user_id_set.add(int(uid))
+                except (TypeError, ValueError):
+                    pass
+    if not user_id_set:
+        return
+    users = db.query(GRCUser).filter(GRCUser.id.in_(list(user_id_set))).all()
+    user_map: Dict[int, str] = {u.id: (u.display_name or u.username or str(u.id)) for u in users}
+    for row in serialized:
+        for fk_col, name_col in spec.user_fields.items():
+            uid = row.get(fk_col)
+            if uid is not None:
+                try:
+                    row[name_col] = user_map.get(int(uid))
+                except (TypeError, ValueError):
+                    pass
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 @router.get("/datasets")
 def list_server_datasets(user=Depends(require_auth)) -> Dict[str, Any]:
@@ -547,6 +608,8 @@ def list_server_datasets(user=Depends(require_auth)) -> Dict[str, Any]:
         "datasets": [
             {
                 "key": key,
+                "fields": spec.fields,
+                "user_fields": spec.user_fields,
                 "sortable": spec.sortable,
                 "filterable": spec.filterable,
                 "search": spec.search,
@@ -583,28 +646,8 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
 
     total = q.count()
 
-    # Sorting — only over whitelisted columns; fall back to the dataset default.
-    order_clauses = []
-    for s in body.sorts:
-        if s.key not in spec.sortable:
-            continue
-        col = _col(model, s.key)
-        if col is None:
-            continue
-        order_clauses.append(col.desc() if str(s.dir).lower() == "desc" else col.asc())
-    if not order_clauses:
-        dcol = _col(model, spec.default_order[0])
-        if dcol is not None:
-            order_clauses.append(dcol.desc() if spec.default_order[1] == "desc" else dcol.asc())
-    # Stable tiebreaker: without a unique final sort key, ORDER BY on a non-unique
-    # column lets Postgres return rows in any order for ties, so pagination can
-    # duplicate or skip rows across pages. Append the PK unless already sorting by it.
-    if not any(s.key == "id" for s in body.sorts):
-        pk = _col(model, "id")
-        if pk is not None:
-            order_clauses.append(pk.asc())
-    if order_clauses:
-        q = q.order_by(*order_clauses)
+    # Sorting — whitelisted columns, dataset default, PK tiebreaker (see _apply_sort).
+    q = _apply_sort(q, model, spec, body.sorts)
 
     skip = max(0, body.skip)
     limit = max(1, min(body.limit, MAX_LIMIT))
@@ -613,30 +656,7 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
     serialized = [_serialize(spec, r) for r in rows]
 
     # Resolve user FKs to display names in one batch query per dataset.
-    if spec.user_fields and serialized:
-        user_id_set: set = set()
-        for fk_col in spec.user_fields:
-            for row in serialized:
-                uid = row.get(fk_col)
-                if uid is not None:
-                    try:
-                        user_id_set.add(int(uid))
-                    except (TypeError, ValueError):
-                        pass
-        if user_id_set:
-            users = db.query(GRCUser).filter(GRCUser.id.in_(list(user_id_set))).all()
-            user_map: Dict[int, str] = {
-                u.id: (u.display_name or u.username or str(u.id))
-                for u in users
-            }
-            for row in serialized:
-                for fk_col, name_col in spec.user_fields.items():
-                    uid = row.get(fk_col)
-                    if uid is not None:
-                        try:
-                            row[name_col] = user_map.get(int(uid))
-                        except (TypeError, ValueError):
-                            pass
+    _resolve_user_fields(spec, serialized, db)
 
     result: Dict[str, Any] = {
         "rows": serialized,
@@ -647,6 +667,52 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
     if skipped_filters:
         result["warnings"] = {"skipped_filters": skipped_filters}
     return result
+
+
+MAX_EXPORT_ROWS = 10000
+
+
+class ExportBody(QueryBody):
+    """A /query request plus the chosen output columns and file format."""
+    columns: List[str] = Field(default_factory=list)
+    format: str = "csv"
+
+
+@router.post("/export")
+def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends(require_auth)):
+    """Stream one registered dataset to CSV/XLSX through the SAME filter/sort engine
+    as /query. Columns default to the full projection (user FKs shown as names).
+    Reuses search_router._report_export so there is one file-building path."""
+    spec = SERVER_DATASETS.get(body.dataset)
+    if spec is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset '{body.dataset}' is not available for export.",
+        )
+    if not _user_can(user, db, spec.permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You do not have permission to report on '{body.dataset}'.",
+        )
+
+    model = spec.model
+    q = db.query(model)
+    q, _ = _apply_query_filters(q, model, spec, body.filters, body.logic, body.search)
+    q = _apply_sort(q, model, spec, body.sorts)
+    # ponytail: hard row cap so one export can't OOM the worker; raise if a tenant
+    # legitimately needs a bigger single file.
+    rows = q.limit(MAX_EXPORT_ROWS).all()
+
+    serialized = [_serialize(spec, r) for r in rows]
+    _resolve_user_fields(spec, serialized, db)
+
+    valid = set(spec.fields) | set(spec.user_fields.values())
+    chosen = [c for c in body.columns if c in valid] or _report_columns(spec)
+    headers = [_col_label(c) for c in chosen]
+    out_rows = [[row.get(c) for c in chosen] for row in serialized]
+
+    from .search_router import _report_export  # lazy import: no load-time coupling
+    return _report_export(body.dataset, headers, out_rows, body.format)
 
 
 @router.post("/aggregate")

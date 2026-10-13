@@ -3365,6 +3365,38 @@ export const reportsApi = {
     }),
 };
 
+// ── Parameter-driven reporting engine — server-side dataset catalog + export.
+//    Backend: grc/routers/reporting_router.py (/reporting/*). Powers the
+//    Custom Report Builder card on /reports.
+export type ReportFilterType = 'text' | 'number' | 'date' | 'badge';
+
+export interface ReportDatasetMeta {
+  key: string;
+  fields: string[];
+  user_fields: Record<string, string>; // raw FK column -> resolved display-name column
+  sortable: string[];
+  filterable: Record<string, ReportFilterType>;
+  search: string[];
+}
+
+export interface ReportFilter {
+  col: string;
+  op: string;
+  value?: string | number | null;
+}
+
+export const reportingApi = {
+  datasets: () => apiClient.get<{ datasets: ReportDatasetMeta[] }>('/reporting/datasets'),
+  exportReport: (body: {
+    dataset: string;
+    columns: string[];
+    filters?: ReportFilter[];
+    logic?: 'AND' | 'OR';
+    search?: string;
+    format: 'csv' | 'xlsx';
+  }) => apiClient.post('/reporting/export', body, { responseType: 'blob' }),
+};
+
 export const enrichedDashboardApi = {
   getExecutiveRiskVelocity: (days?: number) => apiClient.get('/enriched-dashboard/executive/risk-velocity', { params: days ? { days } : {} }),
   getExecutiveRiskAppetiteGauge: () => apiClient.get('/enriched-dashboard/executive/risk-appetite-gauge'),
