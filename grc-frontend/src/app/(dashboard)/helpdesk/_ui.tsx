@@ -49,7 +49,7 @@ const AV_COLORS = ["bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-rose-5
 export function Avatar({ name, size = 28 }: { name?: string | null; size?: number }) {
   const n = (name || "?").trim();
   const initials = n.split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
-  const color = AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
+  const color = AV_COLORS[n.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
   return (
     <span style={{ width: size, height: size, fontSize: size * 0.38 }}
       className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${color}`}>{initials}</span>
