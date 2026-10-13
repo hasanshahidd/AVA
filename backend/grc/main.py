@@ -205,6 +205,8 @@ from grc.modules.exec_dashboard.router import router as exec_dashboard_router
 app.include_router(exec_dashboard_router)
 # IT Asset Inventory Overview estate composition (read-only) — isolated module: grc/modules/estate_overview
 from grc.modules.estate_overview.router import router as estate_overview_router; app.include_router(estate_overview_router)
+# PCI-DSS 4.0.1 compliance (real requirements from SCF crosswalk + assessment) — isolated module: grc/modules/pci_compliance
+from grc.modules.pci_compliance.router import router as pci_compliance_router; app.include_router(pci_compliance_router)
 # AI Pentest assessments (isolated module: grc/modules/pentest)
 from grc.modules.pentest.router import router as pentest_router
 app.include_router(pentest_router)

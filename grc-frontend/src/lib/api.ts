@@ -2385,6 +2385,23 @@ export const advancedErmApi = {
     apiClient.get(`/advanced-erm/risks/${riskId}/score-history`, { params: { days } }),
 };
 
+// PCI-DSS 4.0.1 compliance (isolated module grc/modules/pci_compliance): real
+// requirements derived from the SCF crosswalk, coverage tracked by assessment +
+// evidence. Backend prefix /pci-compliance (nginx /api → backend /grc).
+export const pciComplianceApi = {
+  overview: () => apiClient.get('/pci-compliance/overview'),
+  requirements: (group?: string) =>
+    apiClient.get('/pci-compliance/requirements', { params: group ? { group } : {} }),
+  assess: (body: {
+    requirement_code: string;
+    status: string;
+    note?: string | null;
+    evidence?: Array<{ label?: string; url?: string }> | null;
+  }) => apiClient.post('/pci-compliance/assess', body),
+  bulk: (group: string, status: string) =>
+    apiClient.post('/pci-compliance/bulk', { group, status }),
+};
+
 export const vulnManagementApi = {
   reports: {
     getAll: () => apiClient.get('/vuln-management/reports'),

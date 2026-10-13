@@ -55,6 +55,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/asset-discovery': { title: 'IT Asset Discovery', subtitle: 'Find devices on the network, decide what to adopt, and see what changed.', section: 'Cybersecurity Assurance' },
   '/risk-posture': { title: 'Assets Risk Posture', subtitle: 'Risk = weighted blend of vulnerabilities, hardening, control gap and business impact' },
   '/pentest': { title: 'AI Pentest' },
+  '/pci-compliance': { title: 'PCI-DSS Compliance', subtitle: 'Per-requirement coverage over PCI-DSS 4.0.1, tracked by assessment and evidence', section: 'Cybersecurity Assurance' },
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },
   '/integrations/connections': { title: 'Scanner Connections', subtitle: 'Manage vulnerability scanner connections and sync schedules.' },
   '/integrations/exceptions': { title: 'Integration Exceptions', subtitle: 'Review and manage integration exceptions.' },
