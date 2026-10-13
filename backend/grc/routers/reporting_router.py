@@ -47,6 +47,7 @@ from ..models._60_helpdesk_native_models import (
     HDTicket, HDTicketStatus, HDTicketPriority, HDTicketType, HDDepartment,
 )
 from ..models._23_track_a_phase_7_cloud_connector_framework_foundation import Team
+from ..modules.pci_compliance.models import PciAssessment
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -386,6 +387,24 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
         },
         default_order=("name", "asc"),
     ),
+    "pci_assessments": DatasetSpec(
+        PciAssessment,
+        permissions=["assets:asset_inventory:*"],
+        # PCI-DSS 4.0.1 compliance assessment record (isolated module
+        # grc/modules/pci_compliance). One row per assessed requirement code; the
+        # full 351-requirement catalogue + coverage lives on the /pci-compliance
+        # page. All columns are real, so no ref_fields.
+        fields=[
+            "id", "requirement_code", "status", "note", "assessed_by", "assessed_at",
+        ],
+        search=["requirement_code", "note"],
+        sortable=["id", "requirement_code", "status", "assessed_by", "assessed_at"],
+        filterable={
+            "status": "badge", "requirement_code": "text",
+            "assessed_by": "text", "assessed_at": "date",
+        },
+        default_order=("requirement_code", "asc"),
+    ),
 }
 
 
@@ -397,6 +416,7 @@ DATASET_LABELS: Dict[str, str] = {
     "cis_results": "CIS Benchmark Results",
     "helpdesk_tickets": "Help Desk Tickets",
     "sbp_inventory": "SBP Offsite IT-Asset Inventory",
+    "pci_assessments": "PCI-DSS 4.0.1 Assessments",
 }
 
 
@@ -776,6 +796,7 @@ def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dic
 # allowlist to expose more.
 AVA_DATASET_ALLOWLIST = [
     "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
+    "pci_assessments",
 ]
 
 

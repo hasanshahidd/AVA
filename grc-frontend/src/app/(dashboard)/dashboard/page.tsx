@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, AlertTriangle, ArrowRight, Boxes, Bug, ClipboardCheck, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRight, Boxes, Bug, ClipboardCheck, Globe, Landmark, RefreshCw, ShieldAlert } from 'lucide-react';
 import apiClient, { compliancePluginsApi, discoveryApi, riskPostureApi } from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import {
@@ -49,6 +49,7 @@ const KEYS = {
   easm: ['exec-dashboard.easm'],
   devices: ['disc-discovered-devices', 'all'],
   ctem: ['exec-dashboard.ctem'],
+  pci: ['pci-overview'],
 };
 const ALL_KEYS = Object.values(KEYS);
 const get = (url: string) => async () => (await apiClient.get(url)).data;
@@ -108,7 +109,8 @@ export default function PerformancePage() {
   const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1, ...shared });
   const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1, ...shared });
   const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1, ...shared });
-  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem];
+  const pci = useQuery<{ overall: { coverage_pct: number; assessed_pct: number; met: number; applicable: number; total: number } }>({ queryKey: KEYS.pci, queryFn: get('/pci-compliance/overview'), retry: 1, ...shared });
+  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem, pci];
   const fetching = mine.some((q) => q.isFetching);
   // Sources that failed on their last attempt (inventory's fetcher returns null instead of throwing).
   const failed = mine.filter((q) => q.isError).length + (inv.isSuccess && inv.data === null ? 1 : 0);
@@ -188,7 +190,7 @@ export default function PerformancePage() {
       </div>
 
       {/* ── KPI strip ── */}
-      <nav aria-label="Key indicators" className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+      <nav aria-label="Key indicators" className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
         <Kpi icon={<Boxes size={15} />} label="Assets under management" href="/assets" loading={inv.isLoading && assets.isLoading} busy={busyOf(inv, assets)}
           value={nfmt(assetsN)}
           sub={I?.attention_queue ? (I.attention_queue.assets_without_owner ? <Warn>{nfmt(I.attention_queue.assets_without_owner)} without an owner</Warn> : 'every asset has an owner') : 'in the IT asset inventory'} />
@@ -210,6 +212,13 @@ export default function PerformancePage() {
           value={cis.data?.totals?.scanned ? `${Math.round(cis.data.totals.avg_pass_rate)}%` : '—'}
           sub={cis.data?.totals
             ? (cis.data.totals.scanned ? `pass rate · ${nfmt(cis.data.totals.scanned)} of ${nfmt(cis.data.totals.assets)} assets scanned` : <Cta>No CIS scan yet · Run a CIS scan</Cta>)
+            : 'unavailable'} />
+        <Kpi icon={<Landmark size={15} />} label="PCI-DSS coverage" href="/pci-compliance" loading={pci.isLoading} busy={busyOf(pci)}
+          value={pci.data ? `${pci.data.overall.coverage_pct}%` : '—'}
+          sub={pci.data
+            ? (pci.data.overall.assessed_pct
+                ? `${nfmt(pci.data.overall.met)} of ${nfmt(pci.data.overall.applicable)} requirements met`
+                : <Cta>Not assessed yet · Start</Cta>)
             : 'unavailable'} />
       </nav>
 
