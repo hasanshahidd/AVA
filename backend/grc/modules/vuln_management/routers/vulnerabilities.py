@@ -757,6 +757,17 @@ def get_vulnerability(
     if not vuln:
         raise HTTPException(status_code=404, detail="Vulnerability not found")
 
+    # SELF-HEAL: a CVE finding whose run was never (re-)classified has CVSS/EPSS/KEV/CWE still NULL
+    # (enrich only ran inside classify_run). Run the SAME enrichment once on first open so the Analysis
+    # "Before" CVSS vector, score and CWE populate here — every existing un-enriched finding heals when
+    # viewed, no script. Gated on nvd_last_synced_at IS NULL (never re-fetched after) and best-effort
+    # (never 500s the page); the response below is built from the now-enriched row.
+    try:
+        from grc.modules.vuln_management.enrichment import ensure_cve_enriched
+        ensure_cve_enriched(db, vuln)
+    except Exception:
+        db.rollback()
+
     # Keep the stored contextual score honest on every view: recompute it from the
     # finding's current signals + linked asset (no external feeds) so the saved
     # value can never drift stale from the evidence the page shows — the "stored
