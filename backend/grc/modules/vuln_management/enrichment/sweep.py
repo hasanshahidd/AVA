@@ -1,11 +1,12 @@
-"""Automatic background CVE enrichment for the vulnerability REGISTER.
+"""MANUAL, one-time CVE enrichment backlog fill for the vulnerability REGISTER.
 
-Until now a register finding only got its CVSS/EPSS/KEV/CWE filled when a user
-clicked "Find exploitable" (classify_run) or opened the finding (the lazy
-`ensure_cve_enriched` read-path fallback). This module makes it happen on its
-own: a scheduled oneshot (systemd timer, see `deploy/systemd/`) drains every
-un-enriched register CVE across every tenant, so the register is complete when
-viewed — no clicking, no opening.
+New findings are enriched automatically now — a scan enriches its own asset at
+completion (pentest `_run_scan_job` / `classify_run`), and opening a finding
+lazy-enriches it (`ensure_cve_enriched` read-path fallback). This module is NOT
+scheduled and there is NO timer: it is a one-shot ops CLI for draining a
+HISTORICAL backlog on demand — e.g. after importing old findings, or a first
+pass over a register that predates per-scan enrichment. Run it by hand, once;
+it exits cheaply when nothing is un-enriched.
 
 It is DELIBERATELY thin. It owns nothing new:
   * scope       -> the shared `exclude_adhoc` register filter (never ad-hoc),

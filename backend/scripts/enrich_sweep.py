@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""Systemd/CLI entrypoint for the automatic CVE enrichment sweep.
+"""CLI entrypoint for the MANUAL, one-time CVE enrichment backlog fill.
+
+Not scheduled and not a timer — new findings enrich themselves at scan
+completion and on first open. Run this by hand only to drain a historical
+backlog of un-enriched register CVEs (e.g. after an import).
+
 
 Loads .env and fixes sys.path BEFORE importing grc. This matters: a plain
 `python -m grc.modules.vuln_management.enrichment.sweep` imports the PARENT
