@@ -1,9 +1,11 @@
-"""The Vulnerability dashboard excludes ad-hoc pentest-target findings.
+"""The Vulnerability register is MANAGED-INVENTORY findings only.
 
-Locks the shared `exclude_adhoc` filter: a finding on a managed-inventory asset
-(or with no asset link) is kept; a finding whose asset is tagged
-status='adhoc' OR last_seen_source='pentest-adhoc' is dropped. Those two tags
-are exactly what the pentest engine stamps on its transient external targets.
+Locks the shared `exclude_adhoc` filter: a finding is KEPT only if it is linked
+to a managed inventory asset. A finding with NO asset link is dropped, and a
+finding linked ONLY to an ad-hoc pentest target (asset tagged status='adhoc' OR
+last_seen_source='pentest-adhoc' — exactly what the pentest engine stamps on its
+transient external targets) is dropped. A finding linked to a managed asset is
+kept even when it is ALSO linked to an ad-hoc target.
 """
 import pytest
 from sqlalchemy import create_engine
@@ -41,19 +43,25 @@ def _seed(db):
         Vulnerability(id=10, tenant_id=TENANT, vuln_id="V-10", title="managed", severity="high", status="open"),
         Vulnerability(id=20, tenant_id=TENANT, vuln_id="V-20", title="adhoc-status", severity="high", status="open"),
         Vulnerability(id=30, tenant_id=TENANT, vuln_id="V-30", title="adhoc-source", severity="high", status="open"),
-        # No asset link at all → must be kept (manual/imported finding).
+        # No asset link at all → NOT part of the register (inventory-linked only).
         Vulnerability(id=40, tenant_id=TENANT, vuln_id="V-40", title="unlinked", severity="low", status="open"),
+        # Linked to BOTH a managed asset and an ad-hoc target → kept (has a managed link).
+        Vulnerability(id=50, tenant_id=TENANT, vuln_id="V-50", title="managed+adhoc", severity="high", status="open"),
     ])
     db.add_all([
         VulnerabilityAssetLink(vulnerability_id=10, asset_id=1),
         VulnerabilityAssetLink(vulnerability_id=20, asset_id=2),
         VulnerabilityAssetLink(vulnerability_id=30, asset_id=3),
+        VulnerabilityAssetLink(vulnerability_id=50, asset_id=1),
+        VulnerabilityAssetLink(vulnerability_id=50, asset_id=2),
     ])
     db.commit()
 
 
-def test_excludes_adhoc_keeps_managed_and_unlinked(db):
+def test_register_is_managed_inventory_only(db):
+    # Kept: 10 (managed), 50 (managed + ad-hoc). Dropped: 20/30 (ad-hoc only),
+    # 40 (no link at all).
     kept = {
         v.id for v in db.query(Vulnerability).filter(exclude_adhoc(db)).all()
     }
-    assert kept == {10, 40}, kept
+    assert kept == {10, 50}, kept

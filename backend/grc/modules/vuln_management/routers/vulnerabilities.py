@@ -18,6 +18,7 @@ from ....schemas import (
 )
 from ....routers.auth_router import require_auth, get_user_tenants, get_user_primary_tenant, require_tenant_permission
 from .._adhoc_filter import exclude_adhoc
+from ...pentest.verdict import exploit_verdict
 
 router = APIRouter(tags=["Vulnerabilities"])
 
@@ -172,6 +173,13 @@ def _build_vulnerability_response(v: Vulnerability, solution_count=None) -> Vuln
         # so cheap to expose on every row; the frontend ORs them for "exploit exists".
         exploitdb_count=getattr(v, "exploitdb_count", None),
         exploitdb_verified_count=getattr(v, "exploitdb_verified_count", None),
+        # Pentest-AI exploitability verdict — the SOURCE the detail page's Exploit
+        # Test / Analysis tabs read (never the CVSS heuristic). exploit_verdict is
+        # the one canonical collapse of exploit_status, shared with the pentest
+        # "Attack path" modal so the two surfaces can never disagree.
+        exploit_status=getattr(v, "exploit_status", None),
+        exploit_class=getattr(v, "exploit_class", None),
+        exploit_verdict=exploit_verdict(getattr(v, "exploit_status", None)),
         # Populated only by the detail endpoint (a query); None on list rows.
         solution_count=solution_count,
         # Phase 6 — vendor patch intelligence.
