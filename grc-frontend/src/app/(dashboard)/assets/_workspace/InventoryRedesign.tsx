@@ -55,7 +55,7 @@ const CRIT: Record<string, { bg: string; fg: string }> = {
 const CRIT_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 const td: React.CSSProperties = { padding: '11px 12px', borderBottom: '1px solid #F0F3F5', color: '#3A4653' };
-const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', borderBottom: '1px solid #E8ECEE', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: '#8A95A1', fontWeight: 600, position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1, whiteSpace: 'nowrap' };
+const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', borderBottom: '1px solid #E8ECEE', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: '#0F1F2B', fontWeight: 700, position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1, whiteSpace: 'nowrap' };
 
 // ── EASM subdomain roll-up ──────────────────────────────────────────────────
 // registrableDomain (apex) is the full Public Suffix List, imported from @/lib/domains.

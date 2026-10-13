@@ -67,10 +67,17 @@ type Estate = {
   capacity?: { hosts: number; vcpu: number; ram_gb: number; disk_gb: number; valuation_sum: number; valuation_n: number; purchase_sum: number; purchase_n: number };
   software?: { hosts_reporting: number; products: number; installs: number; top: SwRow[]; more: number; external: { sites: number; products: number; top: SwRow[]; more: number } };
 };
+type FleetBand = 'excellent' | 'good' | 'fair' | 'poor';
+type FleetCis = {
+  avg: number | null; grade: string | null; scanned: number; unscanned: number;
+  bands: Record<FleetBand, number>;
+  worst: { id: number; name: string; score: number; band: FleetBand; criticality?: string | null }[];
+};
 type InvOverview = {
   no_data?: boolean;
   performance?: { score: number | null; grade: string | null };
   attention_queue?: { assets_unassessed: number; open_critical_high_vulns: number };
+  fleet_cis?: FleetCis;
 };
 type Devices = { devices?: { in_inventory?: boolean }[] };
 type Q<X> = { data?: X | null; isLoading: boolean; isError: boolean; isFetching?: boolean };
@@ -171,6 +178,9 @@ export default function InventoryOverview() {
             </button>
           </div>
         } />
+
+      {/* ── Fleet compliance score — the per-asset CIS score rolled up estate-wide (headline) ── */}
+      <FleetScoreCard inv={invQ} className="xl:col-span-12" />
 
       {/* ── SME-approved core: External | Internal (two distinct cards), then the matrix & the gaps list ── */}
       <SidePanel kind="external" q={estateQ} className="xl:col-span-6"
@@ -311,6 +321,110 @@ function EstateHeader({ estate, inv, devices, stamp, className }: { estate: Q<Es
   );
 }
 const Dot = ({ c }: { c: string }) => <i aria-hidden className="ml-2.5 mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle first:ml-0" style={{ background: c }} />;
+
+/* ---------- 1b) Fleet compliance score — the per-asset CIS score, rolled up estate-wide ----------
+   The inventory's own complaint fix: every asset carries a CIS score (shown inside its detail),
+   but the top level never summarised them. This card rolls that per-asset score up to a fleet
+   average + grade, a band distribution (incl. assets with no scan), and a worst-first leaderboard
+   that links straight into the assets needing work. All from /assets/inventory-overview.fleet_cis. */
+const BAND: Record<FleetBand, { label: string; c: string }> = {
+  excellent: { label: 'Excellent', c: T.success },
+  good: { label: 'Good', c: '#65A30D' },
+  fair: { label: 'Fair', c: SEV.medium.c },
+  poor: { label: 'Poor', c: SEV.critical.c },
+};
+/** Small average-score ring, coloured by grade band — the same visual language as the
+    per-asset score donut, so the rollup reads as "the same score, summarised". */
+function ScoreRing({ score, grade }: { score: number | null; grade: string | null }) {
+  const size = 92, sw = 9, r = (size - sw) / 2, circ = 2 * Math.PI * r;
+  const col = grade && BAND[grade as FleetBand] ? BAND[grade as FleetBand].c : GREY;
+  const filled = score == null ? 0 : (Math.max(0, Math.min(100, score)) / 100) * circ;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={sw} stroke="#EEF1F5" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={sw} stroke={col}
+          strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[23px] font-bold tabular-nums" style={{ color: col }}>{score == null ? '—' : Math.round(score)}</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-[#94A3B8]">/ 100</span>
+      </div>
+    </div>
+  );
+}
+function FleetScoreCard({ inv, className }: { inv: Q<InvOverview>; className: string }) {
+  const f = inv.data?.fleet_cis;
+  const total = f ? f.scanned + f.unscanned : 0;
+  let inner: ReactNode;
+  if (inv.isLoading) inner = <Loading rows={4} />;
+  else if (!f) inner = <Unavailable what="Fleet compliance score" />;
+  else if (!f.scanned) inner = (
+    <Empty icon={<ShieldCheck size={16} />} title="No asset scores yet"
+      body="Run a CIS benchmark scan from the CIS tab — the fleet average, score distribution and the lowest-scoring assets appear here."
+      href="/assets?tab=cis" cta="Open CIS Benchmark" />
+  );
+  else {
+    const tone = GRADE_TONE[f.grade ?? ''] ?? SEV.info;
+    const parts: Part[] = [
+      { key: 'excellent', label: 'Excellent ≥85', n: f.bands.excellent, c: BAND.excellent.c },
+      { key: 'good', label: 'Good 70–84', n: f.bands.good, c: BAND.good.c },
+      { key: 'fair', label: 'Fair 50–69', n: f.bands.fair, c: BAND.fair.c },
+      { key: 'poor', label: 'Poor <50', n: f.bands.poor, c: BAND.poor.c },
+      { key: 'unscanned', label: 'Not scanned', n: f.unscanned, c: GREY },
+    ];
+    inner = (
+      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-12">
+        {/* Average */}
+        <div className="flex items-center gap-4 lg:col-span-3">
+          <ScoreRing score={f.avg} grade={f.grade} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-semibold text-[#0F172A]">Fleet average</span>
+              <Pill tone={tone}>{tone.label}</Pill>
+            </div>
+            <p className="m-0 mt-1 text-[11.5px] leading-[1.5] text-[#64748B]">
+              CIS benchmark score across <b className="text-[#334155]">{nfmt(f.scanned)}</b> scanned {f.scanned === 1 ? 'asset' : 'assets'}
+              {f.unscanned > 0 ? <> · <b className="text-[#334155]">{nfmt(f.unscanned)}</b> not scanned yet</> : null}
+            </p>
+          </div>
+        </div>
+        {/* Distribution */}
+        <div className="flex flex-col justify-center lg:col-span-5 lg:border-l lg:border-[#EEF1F5] lg:pl-6">
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <Eyebrow>Score distribution</Eyebrow><span className="text-[11px] text-[#64748B]">{nfmt(total)} assets</span>
+          </div>
+          <StackBar parts={parts} label="Assets by score band" height={12} />
+          <div className="mt-2.5"><PartLegend parts={parts} total={total} cols={3} /></div>
+        </div>
+        {/* Worst-first */}
+        <div className="flex min-w-0 flex-col lg:col-span-4 lg:border-l lg:border-[#EEF1F5] lg:pl-6">
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <Eyebrow>Lowest-scoring assets</Eyebrow><MoreLink href={REG}>Register</MoreLink>
+          </div>
+          <ul className="m-0 flex flex-1 list-none flex-col p-0">
+            {f.worst.map((w) => (
+              <li key={w.id} className="border-b border-[#F1F3F7] last:border-0">
+                <Link href={`/assets/${w.id}`} className="group flex min-h-[29px] items-center gap-2.5 text-[12.5px] hover:text-[#005B96]">
+                  <span aria-hidden className="h-[8px] w-[8px] shrink-0 rounded-full" style={{ background: BAND[w.band].c }} />
+                  <span className="min-w-0 flex-1 truncate text-[#334155]" title={`${w.name}${w.criticality ? ` · ${w.criticality}` : ''}`}>{w.name}</span>
+                  <b className="shrink-0 tabular-nums" style={{ color: BAND[w.band].c }}>{Math.round(w.score)}</b>
+                  <ChevronRight size={13} aria-hidden className="shrink-0 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <Box title="Asset compliance scores" icon={<ShieldCheck size={15} />} accent={T.base} busy={busy(inv)} className={className}
+      sub="Each asset's CIS benchmark score, rolled up across the fleet — average, distribution, and the assets that need work first">
+      {inner}
+    </Box>
+  );
+}
 
 /* ---------- 2) External | Internal panels (the SME droplet structure + drill-down depth) ----------
    Two distinct cards, each owning its own aggregations: a by-type / by-infrastructure list and a

@@ -82,7 +82,7 @@ export interface VulnsWorkspaceProps {
 
 type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unassigned' | `sev-${SevKey}` | `dom-${string}`;
 
-const th: React.CSSProperties = { textAlign: 'left', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', color: FAINT, fontWeight: 600, padding: '10px 12px', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1 };
+const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', color: INK, fontWeight: 700, padding: '10px 12px', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1 };
 const td: React.CSSProperties = { padding: '11px 12px', borderBottom: `1px solid ${BORDER2}`, verticalAlign: 'middle', whiteSpace: 'nowrap', fontSize: 12.5 };
 const cap: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, padding: '2px 6px 6px' };
 const railBtn = (active: boolean): React.CSSProperties => ({ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 10px', border: 0, borderRadius: 10, background: active ? ACSOFT : 'none', color: active ? '#0A5A4B' : SEC, fontSize: 12.5, fontWeight: active ? 600 : 500, textAlign: 'left', width: '100%', cursor: 'pointer' });

@@ -305,6 +305,40 @@ def score_inventory(db, tids, now=None):
             "1 - (errored checks / all checks run)", inverse=True),
     ]
 
+    # ---------- Fleet CIS score rollup ----------
+    # Each asset's own CIS score (passed / definitive checks) — the SAME number the
+    # asset-detail score donut shows — rolled up across the fleet so the top-level
+    # inventory dashboard answers "how do our assets score" without opening each one.
+    # Reuses per_asset_latest (already in memory above); no extra query.
+    def _band(s):
+        return "excellent" if s >= 85 else "good" if s >= 70 else "fair" if s >= 50 else "poor"
+    _name_by_id = {a.id: (getattr(a, "name", None) or getattr(a, "host_name", None)
+                          or getattr(a, "ip_address", None) or f"Asset {a.id}") for a in assets}
+    _crit_by_id = {a.id: getattr(a, "criticality", None) for a in assets}
+    per_asset_cis_scores = []  # [(asset_id, score 0-100)] for assets with >=1 definitive check
+    for _aid, _pm in per_asset_latest.items():
+        _p = sum(1 for _s in _pm.values() if _s == "passed")
+        _f = sum(1 for _s in _pm.values() if _s == "failed")
+        _den = _p + _f
+        if _den:
+            per_asset_cis_scores.append((_aid, round(_p / _den * 100, 1)))
+    _scanned = len(per_asset_cis_scores)
+    _avg = round(sum(s for _, s in per_asset_cis_scores) / _scanned, 1) if _scanned else None
+    _bands = {"excellent": 0, "good": 0, "fair": 0, "poor": 0}
+    for _, s in per_asset_cis_scores:
+        _bands[_band(s)] += 1
+    _worst = sorted(per_asset_cis_scores, key=lambda x: x[1])[:8]
+    fleet_cis = {
+        "avg": _avg,
+        "grade": (None if _avg is None else _band(_avg)),
+        "scanned": _scanned,
+        "unscanned": max(0, N - _scanned),
+        "bands": _bands,
+        "worst": [{"id": _aid, "name": _name_by_id.get(_aid, f"Asset {_aid}"),
+                   "score": s, "band": _band(s), "criticality": _crit_by_id.get(_aid)}
+                  for _aid, s in _worst],
+    }
+
     sections = {
         "hygiene": {"key": "hygiene", "label": "Inventory Hygiene", "weight": 0.18, "score": _sec(hygiene), "metrics": hygiene},
         "criticality": {"key": "criticality", "label": "Criticality Coverage", "weight": 0.15, "score": _sec(crit), "metrics": crit},
@@ -349,6 +383,7 @@ def score_inventory(db, tids, now=None):
         "no_data": N == 0,
         "counts": {"assets": N, "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns)},
         "performance": {"score": perf, "grade": grade, "components": comps},
+        "fleet_cis": fleet_cis,
         "sections": sections,
         "attention_queue": {
             "assets_without_owner": sum(1 for a in assets if not has_owner(a)),
