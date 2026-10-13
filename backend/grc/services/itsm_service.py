@@ -150,8 +150,18 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
         db.add(link)
 
     try:
-        adapter = _build_adapter(connection)
-        ext_id = adapter.create_ticket(_ticket_request(vuln))
+        if getattr(connection, "integration_type", None) == "native_helpdesk":
+            # Native in-app Help Desk engine — create a real grc_hd_ticket, no
+            # external connector. The ticket shows up directly in the Help Desk.
+            from ..modules.helpdesk_native import tickets as hd_tickets
+            res = hd_tickets.create_ticket(db, vuln.tenant_id, {
+                "subject": (vuln.title or f"Vulnerability {vuln.vuln_id}")[:255],
+                "description": vuln.description or "",
+            }, raised_by=None)
+            ext_id = str(res.get("name") or res.get("id") or "")
+        else:
+            adapter = _build_adapter(connection)
+            ext_id = adapter.create_ticket(_ticket_request(vuln))
         link.external_ticket_id = ext_id
         link.pushed_by_user_id = user_id
         link.pushed_at = datetime.utcnow()
