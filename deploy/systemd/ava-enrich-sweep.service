@@ -13,7 +13,7 @@ Type=oneshot
 WorkingDirectory=/root/AVA/backend
 Environment=PYTHONPATH=/root/AVA/backend
 EnvironmentFile=/root/AVA/backend/.env
-ExecStart=/root/AVA/backend/venv/bin/python -m grc.modules.vuln_management.enrichment.sweep
+ExecStart=/root/AVA/backend/venv/bin/python /root/AVA/backend/scripts/enrich_sweep.py
 # Keep it light on the 2GB box shared with ava-backend/ava-worker.
 Nice=10
 IOSchedulingClass=idle
