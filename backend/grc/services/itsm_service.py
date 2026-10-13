@@ -152,12 +152,36 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
     try:
         if getattr(connection, "integration_type", None) == "native_helpdesk":
             # Native in-app Help Desk engine — create a real grc_hd_ticket, no
-            # external connector. The ticket shows up directly in the Help Desk.
+            # external connector. The ticket shows up directly in the Help Desk,
+            # pre-filled: priority from the finding's severity, routed to a
+            # department (-> its team -> auto-assigned); status defaults to Open.
             from ..modules.helpdesk_native import tickets as hd_tickets
-            res = hd_tickets.create_ticket(db, vuln.tenant_id, {
+            from ..modules.helpdesk_native import department as hd_dept
+            from ..models import HDTicketPriority, HDDepartment
+            payload = {
                 "subject": (vuln.title or f"Vulnerability {vuln.vuln_id}")[:255],
                 "description": vuln.description or "",
-            }, raised_by=None)
+            }
+            _sev = {"critical": "Urgent", "high": "High", "medium": "Medium",
+                    "low": "Low", "info": "Low", "informational": "Low"}
+            _pn = _sev.get((getattr(vuln, "severity", "") or "").lower(), "Medium")
+            _p = (db.query(HDTicketPriority).filter(
+                      HDTicketPriority.tenant_id == vuln.tenant_id,
+                      HDTicketPriority.name == _pn).first()
+                  or db.query(HDTicketPriority).filter(
+                      HDTicketPriority.tenant_id == vuln.tenant_id,
+                      HDTicketPriority.name == "Medium").first())
+            if _p:
+                payload["priority_id"] = _p.id
+            _dep = db.query(HDDepartment).filter(
+                HDDepartment.tenant_id == vuln.tenant_id,
+                HDDepartment.enabled.is_(True)).order_by(HDDepartment.id.asc()).first()
+            if _dep:
+                payload["department_id"] = _dep.id
+                _team = hd_dept.resolve_department_team(db, vuln.tenant_id, _dep.id)
+                if _team:
+                    payload["agent_group_id"] = _team
+            res = hd_tickets.create_ticket(db, vuln.tenant_id, payload, raised_by=None)
             ext_id = str(res.get("name") or res.get("id") or "")
         else:
             adapter = _build_adapter(connection)
