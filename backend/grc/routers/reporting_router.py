@@ -40,6 +40,13 @@ from ..models import (
     MetricSnapshot, MetricTarget, Permission, ReportDefinition, Risk, Role,
     RolePermission, Tenant, UserRole, Vendor, Vulnerability, get_db,
 )
+# Cyber datasets (Report Builder slice 2) — imported from their submodules
+# directly so the registry does not depend on models/__init__ re-exporting them.
+from ..models._37_artifact_catalog_tenant_artifacts import CompliancePlugin, CompliancePluginRun
+from ..models._60_helpdesk_native_models import (
+    HDTicket, HDTicketStatus, HDTicketPriority, HDTicketType, HDDepartment,
+)
+from ..models._23_track_a_phase_7_cloud_connector_framework_foundation import Team
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -63,6 +70,7 @@ class DatasetSpec:
         filterable: Dict[str, str],
         default_order: tuple,
         user_fields: Optional[Dict[str, str]] = None,
+        ref_fields: Optional[Dict[str, tuple]] = None,
     ) -> None:
         self.model = model
         self.permissions = permissions    # any-of module perms that grant this dataset (same as the frontend)
@@ -74,6 +82,10 @@ class DatasetSpec:
         # Maps a raw integer FK column (already in `fields`) to the resolved
         # display-name key that the frontend expects (e.g. owner_id -> owner_name).
         self.user_fields: Dict[str, str] = user_fields or {}
+        # out_key -> (fk_col, TargetModel, target_attr): resolve a non-user FK id
+        # to a readable value from another model (asset name, plugin title, HD
+        # status, …). Generalises user_fields (GRCUser-only, single-output).
+        self.ref_fields: Dict[str, tuple] = ref_fields or {}
 
 
 # Registry — key MUST match the frontend dataset key so the grid can address it.
@@ -285,7 +297,111 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
         default_order=("created_at", "desc"),
         user_fields={"owner_id": "owner_name"},
     ),
+    # ── Ava cyber datasets (Report Builder slice 2) ────────────────────────────
+    "cis_results": DatasetSpec(
+        CompliancePluginRun,
+        permissions=["compliance:scan:*"],
+        # asset_name / rule_title / benchmark / severity are resolved from the
+        # linked ITAsset + CompliancePlugin (ref_fields) — the run row stores only
+        # the FK ids + execution result, not those display values.
+        fields=[
+            "id", "asset_name", "benchmark", "rule_title", "severity", "status",
+            "result_summary", "triggered_by", "duration_ms", "started_at", "completed_at",
+        ],
+        search=["result_summary"],
+        sortable=[
+            "id", "status", "triggered_by", "duration_ms", "started_at", "completed_at",
+        ],
+        filterable={
+            "status": "badge", "triggered_by": "badge", "duration_ms": "number",
+            "started_at": "date", "completed_at": "date", "result_summary": "text",
+        },
+        default_order=("started_at", "desc"),
+        ref_fields={
+            "asset_name": ("asset_id", ITAsset, "name"),
+            "rule_title": ("plugin_id", CompliancePlugin, "title"),
+            "benchmark": ("plugin_id", CompliancePlugin, "benchmark"),
+            "severity": ("plugin_id", CompliancePlugin, "severity"),
+        },
+    ),
+    "helpdesk_tickets": DatasetSpec(
+        HDTicket,
+        permissions=["helpdesk:tickets:*"],
+        # status_name / priority / ticket_type / department / agent_group are
+        # resolved from the HD lookup tables + the owning Team (ref_fields);
+        # status_category / agreement_status / assigned_agent are real columns.
+        fields=[
+            "id", "subject", "status_category", "status_name", "priority",
+            "ticket_type", "department", "agent_group", "assigned_agent",
+            "agreement_status", "opening_date", "response_by", "resolution_by",
+            "resolution_date", "resolution_time", "feedback_rating",
+        ],
+        search=["subject"],
+        sortable=[
+            "id", "subject", "status_category", "agreement_status", "assigned_agent",
+            "opening_date", "response_by", "resolution_by", "resolution_date",
+            "resolution_time", "feedback_rating",
+        ],
+        filterable={
+            "status_category": "badge", "agreement_status": "badge",
+            "assigned_agent": "text", "subject": "text", "opening_date": "date",
+            "response_by": "date", "resolution_by": "date", "resolution_date": "date",
+            "resolution_time": "number", "feedback_rating": "number",
+        },
+        default_order=("opening_date", "desc"),
+        ref_fields={
+            "status_name": ("status_id", HDTicketStatus, "label_agent"),
+            "priority": ("priority_id", HDTicketPriority, "level"),
+            "ticket_type": ("ticket_type_id", HDTicketType, "name"),
+            "department": ("department_id", HDDepartment, "name"),
+            "agent_group": ("agent_group_id", Team, "name"),
+        },
+    ),
+    "sbp_inventory": DatasetSpec(
+        ITAsset,
+        permissions=["assets:asset_inventory:*"],
+        # Approach (ii): the SBP offsite return is 52 DERIVED per-asset fields
+        # (build_row in modules/sbp_inventory, incl. external vendor feeds) — too
+        # divergent/slow for the generic SQL engine. This dataset exposes the asset
+        # identity / OS / classification columns that feed the return; the
+        # authoritative 52-column .xlsx stays at GET /sbp-inventory/export.xlsx
+        # (the SBP card on this page).
+        fields=[
+            "id", "name", "host_name", "ip_address", "asset_type", "criticality",
+            "data_classification", "internet_facing", "network_segment", "environment",
+            "os_family", "os_version", "business_function", "location", "status",
+            "owner_name", "created_at",
+        ],
+        search=["name", "host_name", "ip_address", "os_version"],
+        sortable=[
+            "id", "name", "host_name", "ip_address", "asset_type", "criticality",
+            "data_classification", "os_family", "os_version", "environment", "status",
+            "created_at",
+        ],
+        filterable={
+            "asset_type": "badge", "criticality": "badge", "data_classification": "badge",
+            "internet_facing": "badge", "environment": "badge", "os_family": "badge",
+            "status": "badge", "name": "text", "host_name": "text", "ip_address": "text",
+            "network_segment": "text", "business_function": "text", "created_at": "date",
+        },
+        default_order=("name", "asc"),
+    ),
 }
+
+
+# Human labels for the dataset keys — used for the PDF report header and as a
+# fallback label. (The FE keeps its own copy for the dropdown.)
+DATASET_LABELS: Dict[str, str] = {
+    "assets": "Assets",
+    "vulnerabilities": "Vulnerabilities",
+    "cis_results": "CIS Benchmark Results",
+    "helpdesk_tickets": "Help Desk Tickets",
+    "sbp_inventory": "SBP Offsite IT-Asset Inventory",
+}
+
+
+def _dataset_label(key: str) -> str:
+    return DATASET_LABELS.get(key, key.replace("_", " ").title())
 
 
 # ── Per-dataset authorization ──────────────────────────────────────────────
@@ -600,10 +716,76 @@ def _resolve_user_fields(spec: DatasetSpec, serialized: List[Dict[str, Any]], db
                     pass
 
 
+def _tenant_scope(q, model: Any, user: Any, db: Session):
+    """Scope a dataset query to the caller's tenant(s).
+
+    Ava is per-tenant-DB, but the rest of the app still filters by the
+    `tenant_id` column (get_user_tenants returns the self-tenant id), so a bare
+    `db.query(model)` can miss the tenant's rows and return nothing. Match that
+    pattern: filter by tenant_id when the model carries it; leave join/lookup
+    models that have no tenant_id untouched.
+    """
+    if hasattr(model, "tenant_id"):
+        q = q.filter(model.tenant_id.in_(get_user_tenants(user, db)))
+    return q
+
+
+def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dict[str, Any]], db: Session) -> None:
+    """Resolve each ref_fields out_key from its target model, in place.
+
+    Reads the raw FK id off the ORM row (so the FK need not be a projected
+    field) and writes the looked-up attribute into the matching serialized dict.
+    One batched query per (fk_col, target model). Generalises user-name
+    resolution to any related model (asset name, plugin title, HD status, …).
+    """
+    if not spec.ref_fields or not rows:
+        return
+    from collections import defaultdict
+    groups: Dict[tuple, List[tuple]] = defaultdict(list)  # (fk_col, model) -> [(out_key, attr)]
+    for out_key, (fk_col, model, attr) in spec.ref_fields.items():
+        groups[(fk_col, model)].append((out_key, attr))
+    for (fk_col, model), outs in groups.items():
+        ids: set = set()
+        for obj in rows:
+            v = getattr(obj, fk_col, None)
+            if v is not None:
+                try:
+                    ids.add(int(v))
+                except (TypeError, ValueError):
+                    pass
+        objmap: Dict[int, Any] = {}
+        if ids:
+            for o in db.query(model).filter(model.id.in_(list(ids))).all():
+                objmap[o.id] = o
+        for obj, row in zip(rows, serialized):
+            v = getattr(obj, fk_col, None)
+            tgt = None
+            if v is not None:
+                try:
+                    tgt = objmap.get(int(v))
+                except (TypeError, ValueError):
+                    tgt = None
+            for out_key, attr in outs:
+                row[out_key] = getattr(tgt, attr, None) if tgt is not None else None
+
+
+# Ava is a cyber-only product: only these datasets surface in the builder's
+# dropdown. GRC-inherited specs (risks, evidence, issues, tasks, vendors,
+# gov_documents, internal_controls) stay registered in SERVER_DATASETS — other
+# callers rely on them — but are filtered out of /reporting/datasets. Edit this
+# allowlist to expose more.
+AVA_DATASET_ALLOWLIST = [
+    "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
+]
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 @router.get("/datasets")
 def list_server_datasets(user=Depends(require_auth)) -> Dict[str, Any]:
-    """Capability discovery — which datasets support server mode and how."""
+    """Capability discovery — which datasets support server mode and how.
+
+    Filtered to AVA_DATASET_ALLOWLIST so GRC-only datasets never reach the UI.
+    """
     return {
         "datasets": [
             {
@@ -615,6 +797,7 @@ def list_server_datasets(user=Depends(require_auth)) -> Dict[str, Any]:
                 "search": spec.search,
             }
             for key, spec in SERVER_DATASETS.items()
+            if key in AVA_DATASET_ALLOWLIST
         ]
     }
 
@@ -639,6 +822,7 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
 
     model = spec.model
     q = db.query(model)
+    q = _tenant_scope(q, model, user, db)
 
     q, skipped_filters = _apply_query_filters(
         q, model, spec, body.filters, body.logic, body.search,
@@ -657,6 +841,7 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
 
     # Resolve user FKs to display names in one batch query per dataset.
     _resolve_user_fields(spec, serialized, db)
+    _resolve_ref_fields(spec, rows, serialized, db)
 
     result: Dict[str, Any] = {
         "rows": serialized,
@@ -678,6 +863,90 @@ class ExportBody(QueryBody):
     format: str = "csv"
 
 
+def _pdf_response(filename_stem: str, dataset_label: str, tenant_name: Optional[str],
+                  headers: List[str], rows: List[List[Any]]):
+    """Clean, unbranded PDF: a text header (title + dataset + generated + tenant),
+    then the selected columns/rows as a paginated table (landscape when wide)."""
+    try:
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF export is unavailable: the reportlab library is not installed on the server.",
+        )
+    import html as _html
+    import io as _io
+
+    wide = len(headers) > 5
+    page = landscape(letter) if wide else letter
+    margin = 0.5 * inch
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=page, leftMargin=margin, rightMargin=margin,
+                            topMargin=margin, bottomMargin=margin, title=dataset_label)
+    styles = getSampleStyleSheet()
+    DARK = colors.HexColor("#0f172a")
+    MUTED = colors.HexColor("#64748b")
+    BORDER = colors.HexColor("#e2e8f0")
+    ROW_ALT = colors.HexColor("#f8fafc")
+
+    title_style = ParagraphStyle("RBTitle", parent=styles["Title"], fontSize=18, leading=22,
+                                 textColor=DARK, alignment=0, spaceAfter=2)
+    sub_style = ParagraphStyle("RBSub", parent=styles["Heading2"], fontSize=12, leading=15,
+                               textColor=DARK, fontName="Helvetica", spaceAfter=2)
+    meta_style = ParagraphStyle("RBMeta", parent=styles["BodyText"], fontSize=9,
+                                textColor=MUTED, spaceAfter=12)
+    cell_style = ParagraphStyle("RBCell", parent=styles["BodyText"], fontSize=7, leading=9, textColor=DARK)
+    head_style = ParagraphStyle("RBHead", parent=cell_style, fontName="Helvetica-Bold", textColor=colors.white)
+
+    MAX_PDF_ROWS = 2000
+    shown = rows[:MAX_PDF_ROWS]
+
+    def esc(v: Any) -> str:
+        return _html.escape("" if v is None else str(v))
+
+    story: List[Any] = [
+        Paragraph("Custom Report", title_style),
+        Paragraph(esc(dataset_label), sub_style),
+    ]
+    gen = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    meta = (f"Generated: {esc(gen)} &nbsp;&middot;&nbsp; Tenant: {esc(tenant_name or '—')}"
+            f" &nbsp;&middot;&nbsp; {len(rows)} row(s)")
+    if len(rows) > MAX_PDF_ROWS:
+        meta += f" &nbsp;&middot;&nbsp; showing first {MAX_PDF_ROWS} (use CSV/XLSX for the full set)"
+    story.append(Paragraph(meta, meta_style))
+
+    data = [[Paragraph(esc(h), head_style) for h in headers]]
+    for r in shown:
+        data.append([Paragraph(esc(c), cell_style) for c in r])
+
+    ncols = max(1, len(headers))
+    avail = page[0] - 2 * margin
+    table = Table(data, colWidths=[avail / ncols] * ncols, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("GRID", (0, 0), (-1, -1), 0.4, BORDER),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ROW_ALT]),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.append(table)
+    doc.build(story)
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename_stem}.pdf"'},
+    )
+
+
 @router.post("/export")
 def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends(require_auth)):
     """Stream one registered dataset to CSV/XLSX through the SAME filter/sort engine
@@ -697,6 +966,7 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
 
     model = spec.model
     q = db.query(model)
+    q = _tenant_scope(q, model, user, db)
     q, _ = _apply_query_filters(q, model, spec, body.filters, body.logic, body.search)
     q = _apply_sort(q, model, spec, body.sorts)
     # ponytail: hard row cap so one export can't OOM the worker; raise if a tenant
@@ -705,14 +975,22 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
 
     serialized = [_serialize(spec, r) for r in rows]
     _resolve_user_fields(spec, serialized, db)
+    _resolve_ref_fields(spec, rows, serialized, db)
 
     valid = set(spec.fields) | set(spec.user_fields.values())
     chosen = [c for c in body.columns if c in valid] or _report_columns(spec)
     headers = [_col_label(c) for c in chosen]
     out_rows = [[row.get(c) for c in chosen] for row in serialized]
 
+    fmt = (body.format or "csv").lower()
+    if fmt == "pdf":
+        tenant = db.query(Tenant).first()
+        tenant_name = (getattr(tenant, "name", None) or getattr(tenant, "display_name", None)
+                       or getattr(tenant, "slug", None))
+        return _pdf_response(body.dataset, _dataset_label(body.dataset), tenant_name, headers, out_rows)
+
     from .search_router import _report_export  # lazy import: no load-time coupling
-    return _report_export(body.dataset, headers, out_rows, body.format)
+    return _report_export(body.dataset, headers, out_rows, fmt)
 
 
 @router.post("/aggregate")
@@ -808,6 +1086,7 @@ def aggregate_dataset(body: AggregateBody, db: Session = Depends(get_db), user=D
         )
 
     q = db.query(*select_exprs).select_from(model)
+    q = _tenant_scope(q, model, user, db)
     q, skipped_filters = _apply_query_filters(
         q, model, spec, body.filters, body.logic, body.search,
     )
@@ -846,6 +1125,7 @@ def aggregate_dataset(body: AggregateBody, db: Session = Depends(get_db), user=D
             col = _col(model, field) if field else None
             g_exprs.append(_agg_sql(mm["fn"], col).label(mm["alias"]))
         gq = db.query(*g_exprs).select_from(model)
+        gq = _tenant_scope(gq, model, user, db)
         gq, _ = _apply_query_filters(gq, model, spec, body.filters, body.logic, body.search)
         g_row = gq.one()
         g_map = g_row._mapping if hasattr(g_row, "_mapping") else None

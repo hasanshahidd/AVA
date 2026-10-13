@@ -3393,7 +3393,7 @@ export const reportingApi = {
     filters?: ReportFilter[];
     logic?: 'AND' | 'OR';
     search?: string;
-    format: 'csv' | 'xlsx';
+    format: 'csv' | 'xlsx' | 'pdf';
   }) => apiClient.post('/reporting/export', body, { responseType: 'blob' }),
 };
 

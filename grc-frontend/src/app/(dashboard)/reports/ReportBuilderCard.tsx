@@ -24,6 +24,9 @@ const DATASET_LABELS: Record<string, string> = {
   tasks: 'Tasks',
   vendors: 'Vendors',
   gov_documents: 'Governance Documents',
+  cis_results: 'CIS Benchmark Results',
+  helpdesk_tickets: 'Help Desk Tickets',
+  sbp_inventory: 'SBP Offsite IT-Asset Inventory',
 };
 
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -74,7 +77,7 @@ export default function ReportBuilderCard() {
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<DraftFilter[]>([]);
   const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
-  const [format, setFormat] = useState<'csv' | 'xlsx'>('csv');
+  const [format, setFormat] = useState<'csv' | 'xlsx' | 'pdf'>('csv');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -318,7 +321,7 @@ export default function ReportBuilderCard() {
           {/* Footer: format + generate */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
             <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-border)]">
-              {(['csv', 'xlsx'] as const).map((fmt) => (
+              {(['csv', 'xlsx', 'pdf'] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => setFormat(fmt)}

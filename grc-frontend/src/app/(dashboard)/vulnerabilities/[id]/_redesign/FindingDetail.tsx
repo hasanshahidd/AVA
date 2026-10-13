@@ -147,6 +147,17 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
     queryKey: ['vuln-departments', vulnId],
     queryFn: async () => (await vulnManagementApi.departments.getVulnerabilityDepartments(vulnId)).data as any[],
   });
+  // Assign-owner control — the redesign dropped it; without an owner the plan can't
+  // be Approved. Reuses the tenant-users list + the existing assign mutation.
+  const { data: tenantUsers } = useQuery({
+    queryKey: ['vuln-tenant-users'],
+    queryFn: async () => (await assetsApi.getTenantUsers()).data as any[],
+  });
+  const [assignPick, setAssignPick] = useState('');
+  const assignMut = useMutation({
+    mutationFn: (userId: number) => vulnManagementApi.vulnerabilities.assign(vulnId, userId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['vulnerability', vulnId] }); setAssignPick(''); },
+  });
 
   const statusMut = useMutation({
     mutationFn: (status: string) => vulnManagementApi.vulnerabilities.changeStatus(vulnId, status),
@@ -230,6 +241,21 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
             {(deptAssignments?.length ?? 0) > 0
               ? deptAssignments!.map((d: any, i: number) => <Row key={d.id ?? d.department_id ?? i} k={d.department_name || d.name || 'Department'} v={d.priority || d.sla_override_days ? `${d.priority || ''}${d.sla_override_days ? ` · ${d.sla_override_days}d` : ''}`.trim() || 'assigned' : 'assigned'} />)
               : !(v.assigned_to && v.assignee_name) && <div style={{ fontSize: 11.5, color: MUTED }}>No one assigned — assign this finding to route remediation.</div>}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <select value={assignPick} onChange={(e) => setAssignPick(e.target.value)}
+                style={{ minWidth: 0, flex: 1, border: '1px solid #DDE3E8', borderRadius: 8, padding: '6px 8px', fontSize: 12.5, color: INK, background: '#fff' }}>
+                <option value="">{v.assigned_to ? 'Reassign to…' : 'Assign to member…'}</option>
+                {(tenantUsers ?? []).map((u: any) => (
+                  <option key={u.id} value={u.id}>{u.display_name || u.username || u.email}</option>
+                ))}
+              </select>
+              <button disabled={!assignPick || assignMut.isPending}
+                onClick={() => assignPick && assignMut.mutate(Number(assignPick))}
+                style={{ flex: 'none', border: 0, borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, color: '#06342B', background: AC, cursor: assignPick ? 'pointer' : 'default', opacity: assignPick && !assignMut.isPending ? 1 : 0.5 }}>
+                {assignMut.isPending ? '…' : 'Assign'}
+              </button>
+            </div>
+            {assignMut.isError && <div style={{ fontSize: 11, color: '#C2453F', marginTop: 6 }}>Could not assign — check your permissions.</div>}
           </RailCard>
           <RailCard title="Identity">
             <Row k="CWE" v={v.cwe_id || '—'} mono />
