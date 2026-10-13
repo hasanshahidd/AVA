@@ -40,7 +40,7 @@ from .routers.admin_router import router as admin_router
 # Kept: vuln_management, chatbot, workflow_engine, integrations, risk_posture,
 # onboarding, asset_discovery, compliance_plugins (+ shared platform/models).
 from .modules.vuln_management import vuln_management_router
-from .modules.helpdesk import helpdesk_router
+from .modules.helpdesk_native.router import helpdesk_native_router as helpdesk_router
 from .modules.chatbot import (
     chatbot_router,
     start_complychat_embedding_worker,
