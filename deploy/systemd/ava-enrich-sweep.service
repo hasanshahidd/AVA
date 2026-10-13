@@ -1,0 +1,20 @@
+[Unit]
+# Automatic background CVE enrichment for the vulnerability register.
+# Drains every un-enriched register CVE (CVSS/EPSS/KEV/CWE) across every tenant
+# via the SAME enrichment path the UI uses. Oneshot, fired by the paired timer.
+# Register-scoped (never ad-hoc), idempotent (nvd_last_synced_at IS NULL),
+# single-instance (its own flock), best-effort (never raises out).
+Description=AVA register CVE enrichment sweep (oneshot)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/AVA/backend
+Environment=PYTHONPATH=/root/AVA/backend
+EnvironmentFile=/root/AVA/backend/.env
+ExecStart=/root/AVA/backend/venv/bin/python -m grc.modules.vuln_management.enrichment.sweep
+# Keep it light on the 2GB box shared with ava-backend/ava-worker.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=400M
