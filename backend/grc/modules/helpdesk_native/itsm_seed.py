@@ -25,6 +25,8 @@ from ...models import (
     HDTicketStatus,
     HDTicketTemplate,
     HDTicketType,
+    Role,
+    RolePermission,
     get_db,
 )
 from . import sla
@@ -392,6 +394,34 @@ _SERVICE_DAYS = [{"workday": d, "start_time": "09:00:00", "end_time": "17:00:00"
 _TYPE_TO_PROCESS = {"Change": "change", "Problem": "problem",
                     "Service Request": "service_request"}
 
+# Preset HD roles (spec §Agent1.5). perm strings are the matrix contract. The
+# Requester role is scoped to raise/track-own/KB (NO agent tickets:* perms, so
+# it never reaches the agent console); the Agent role is the full console.
+_HD_ROLES = {
+    "Help Desk Requester": {
+        "description": "Raise and track your own Help Desk requests, and browse the knowledge base.",
+        "permissions": [
+            "helpdesk:requests:create",
+            "helpdesk:requests:view_own",
+            "helpdesk:kb:view",
+        ],
+    },
+    "Help Desk Agent": {
+        "description": "Work the Help Desk agent queue: tickets, ITIL processes, KB authoring, settings.",
+        "permissions": [
+            "helpdesk:tickets:view",
+            "helpdesk:tickets:edit",
+            "helpdesk:tickets:assign",
+            "helpdesk:processes:view",
+            "helpdesk:processes:manage",
+            "helpdesk:kb:view",
+            "helpdesk:kb:author",
+            "helpdesk:requests:view_own",
+            "helpdesk:settings:view",
+        ],
+    },
+}
+
 
 # ─── steps ────────────────────────────────────────────────────────────────────
 def _alter_add_columns(db: Session, table: str, cols: list) -> int:
@@ -567,6 +597,41 @@ def recompute_all_slas(db: Session, tid: int) -> dict:
     return {"recomputed": count}
 
 
+def seed_hd_roles(db: Session, tid: int) -> list:
+    """§Agent1.5 — create the two per-tenant preset HD roles (idempotent).
+
+    Mirrors admin_router.create_role: a tenant-scoped Role plus RolePermission
+    rows. Crucially it routes every permission through
+    admin_router._get_or_create_permission so the `helpdesk:*` rows are INSERTED
+    into grc_permissions on-demand — that is what makes them grantable in the
+    Admin > Roles matrix on an already-existing tenant (e.g. ava). Re-running
+    only adds roles/links that are missing, never duplicates. Admin +
+    primary-contact bypass is untouched (they don't need these roles)."""
+    from ...routers.admin_router import _get_or_create_permission  # lazy: avoid import cycle
+
+    out: list = []
+    for name, spec in _HD_ROLES.items():
+        role = (db.query(Role)
+                .filter(Role.tenant_id == tid, Role.name == name)
+                .first())
+        if not role:
+            role = Role(tenant_id=tid, name=name,
+                        description=spec["description"], is_system_role=False)
+            db.add(role)
+            db.flush()  # need role.id for the RolePermission rows
+        linked = {rp.permission_id for rp in
+                  db.query(RolePermission).filter(RolePermission.role_id == role.id).all()}
+        for perm_name in spec["permissions"]:
+            perm = _get_or_create_permission(db, perm_name)
+            if perm and perm.id not in linked:
+                db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+                linked.add(perm.id)
+        db.commit()
+        out.append({"id": role.id, "name": role.name,
+                    "permissions": spec["permissions"]})
+    return out
+
+
 def seed_itsm(db: Session, tid: int) -> dict:
     """§3 — idempotent ITSM seed. Order matters: columns exist before backfill,
     priorities exist before the SLAs reference them, and the SLA backfill runs
@@ -580,6 +645,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
     templates_created = seed_request_templates(db, tid)
     backfill = backfill_process(db, tid)
     sla_backfill = recompute_all_slas(db, tid)
+    hd_roles = seed_hd_roles(db, tid)
     return {
         "ok": True,
         "columns_processed": columns,
@@ -593,6 +659,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
         "templates_created": templates_created,
         "backfilled": backfill["updated"],
         "slas_recomputed": sla_backfill["recomputed"],
+        "hd_roles": [r["name"] for r in hd_roles],
     }
 
 
@@ -655,5 +722,19 @@ if __name__ == "__main__":
     assert len(all_titles) >= 100, len(all_titles)
     assert len(all_titles) == len(set(all_titles)), "duplicate template_name"
 
+    # §Agent1.5 preset roles: every granted perm must be a real string in the
+    # PERMISSION_MATRIX helpdesk module (catches a typo that would seed a role
+    # with a dead/ungrantable permission).
+    from ...permissions import get_all_permissions
+    _hd_perms = {p["name"] for p in get_all_permissions()
+                 if p["module"] == "helpdesk"}
+    assert _hd_perms, "helpdesk module missing from PERMISSION_MATRIX"
+    for _role, _spec in _HD_ROLES.items():
+        for _p in _spec["permissions"]:
+            assert _p in _hd_perms, (_role, _p)
+    assert _HD_ROLES["Help Desk Requester"]["permissions"] == [
+        "helpdesk:requests:create", "helpdesk:requests:view_own", "helpdesk:kb:view"]
+
     print(f"itsm_seed self-check ok — {len(SERVICE_CATALOG)} categories, "
-          f"{len(all_titles)} templates {per_dept}")
+          f"{len(all_titles)} templates {per_dept}; "
+          f"HD roles {list(_HD_ROLES)} perms ok ({len(_hd_perms)} in matrix)")

@@ -282,17 +282,17 @@ def _apply_status_change(db: Session, tid: int, ticket: HDTicket, new_status: HD
 # ─── reads ───────────────────────────────────────────────────────────────────
 def list_tickets(db: Session, tid: int, status: Optional[str] = None,
                  q: Optional[str] = None, process: Optional[str] = None,
-                 **filters) -> dict:
+                 raised_by: Optional[str] = None, **filters) -> dict:
     """§A3 / §2. FE calls with no params (filters/sorts/groups client-side over
     the full list); `status`/`q`/`process` honoured if passed. Each row carries
     `process` + all extension fields so the per-process pages can render.
-    `status`/`q` stay positional for the existing all-process list caller."""
-    rows = (
-        db.query(HDTicket)
-        .filter(HDTicket.tenant_id == tid)
-        .order_by(HDTicket.updated_at.desc())
-        .all()
-    )
+    `status`/`q` stay positional for the existing all-process list caller.
+    `raised_by` filters to one requester's own tickets at the SQL layer — the
+    requester portal passes it so a user can never see another user's tickets."""
+    query = db.query(HDTicket).filter(HDTicket.tenant_id == tid)
+    if raised_by:
+        query = query.filter(func.lower(HDTicket.raised_by) == raised_by.lower())
+    rows = query.order_by(HDTicket.updated_at.desc()).all()
     out = [{**ticket_row(t), **_process_fields(t)} for t in rows]
     if process:
         out = [r for r in out if (r.get("process") or "incident") == process]
