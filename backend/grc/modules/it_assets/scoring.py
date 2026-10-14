@@ -381,7 +381,7 @@ def score_inventory(db, tids, now=None):
         # True when there is no inventory to score at all — the UI should show
         # "No assets yet", never a number.
         "no_data": N == 0,
-        "counts": {"assets": N, "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns)},
+        "counts": {"assets": N, "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns), "cde_scoped": len(cde)},
         "performance": {"score": perf, "grade": grade, "components": comps},
         "fleet_cis": fleet_cis,
         "sections": sections,

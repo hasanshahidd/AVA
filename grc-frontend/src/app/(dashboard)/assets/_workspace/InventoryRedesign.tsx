@@ -218,7 +218,7 @@ export default function InventoryRedesign(p: Props) {
         <div className="rib-tot">
           <div><div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>Total assets</div><div style={{ margin: '3px 0' }}><b className="num" style={{ fontSize: 17, fontWeight: 600 }}>{c.total}</b></div><div style={{ fontSize: 10.5, color: 'var(--faint)' }}>{c.internal} internal · {c.external} external</div></div>
           <div><div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>Critical</div><div style={{ margin: '3px 0' }}><b className="num" style={{ fontSize: 17, fontWeight: 600, color: '#A32B2B' }}>{c.critical}</b></div><div style={{ fontSize: 10.5, color: 'var(--faint)' }}>highest tier</div></div>
-          <div><div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>CDE / PCI</div><div style={{ margin: '3px 0' }}><b className="num" style={{ fontSize: 17, fontWeight: 600, color: '#28578F' }}>{c.cde}</b></div><div style={{ fontSize: 10.5, color: 'var(--faint)' }}>cardholder env</div></div>
+          <div><div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>PCI scope</div><div style={{ margin: '3px 0' }}><b className="num" style={{ fontSize: 17, fontWeight: 600, color: '#28578F' }}>{c.cde}</b></div><div style={{ fontSize: 10.5, color: 'var(--faint)' }}>marked PCI</div></div>
         </div>
         <div className="rib-att">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} style={{ color: '#8A5A0C' }} /><span style={{ fontSize: 12, color: '#7A4E0A', fontWeight: 500 }}>Needs attention</span><b className="num" style={{ marginLeft: 'auto', fontSize: 15, color: '#8A5A0C' }}>{attnTotal}</b></div>
@@ -241,7 +241,7 @@ export default function InventoryRedesign(p: Props) {
           {railBtn('unowned', 'Unowned', c.unowned, '#8A5A0C')}
           {railBtn('stale', 'Stale > 30d', c.stale, '#8A95A1')}
           {railBtn('internet', 'Internet-facing', c.internet, '#28578F')}
-          {railBtn('cde', 'CDE / PCI', c.cde, '#014A81')}
+          {railBtn('cde', 'PCI scope', c.cde, '#014A81')}
           <div className="railcap" style={{ paddingTop: 14 }}>By origin</div>
           {railBtn('internal', 'Internal', c.internal)}
           {railBtn('external', 'External', c.external)}
@@ -283,6 +283,8 @@ export default function InventoryRedesign(p: Props) {
                   <b style={{ marginRight: 6 }}>{selIds.length} selected</b>
                   {p.onBulkConnect && <button className="bulkb" onClick={() => p.onBulkConnect!(rows.filter((r) => sel.has(r.id) && canConnect(r)).map((r) => r.id))}>Connect</button>}
                   {p.onBulkUpdate && p.canEdit && (['critical', 'high', 'medium', 'low'] as const).map((k) => <button key={k} className="bulkb" onClick={() => p.onBulkUpdate!(selIds, { criticality: k })}>Set {k[0].toUpperCase() + k.slice(1)}</button>)}
+                  {p.onBulkUpdate && p.canEdit && <button className="bulkb" onClick={() => p.onBulkUpdate!(selIds, { cde_environment: true })}>Mark PCI</button>}
+                  {p.onBulkUpdate && p.canEdit && <button className="bulkb" onClick={() => p.onBulkUpdate!(selIds, { cde_environment: false })}>Remove PCI</button>}
                   {p.onBulkDelete && p.canDelete && <button className="bulkb danger" onClick={() => { if (confirm(`Delete ${selIds.length} asset(s)? This can't be undone.`)) p.onBulkDelete!(selIds); }}>Delete</button>}
                   <span style={{ flex: 1 }} /><button className="bulkb" onClick={() => setSel(new Set())}>Deselect all</button>
                 </div>
@@ -295,14 +297,14 @@ export default function InventoryRedesign(p: Props) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 860 }}>
                   <thead><tr>
                     <th style={{ ...th, width: 38 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#014A81', width: 15, height: 15 }} /></th>
-                    {['Asset', 'Type', 'Owner', 'Criticality', 'CIA', 'Last scan', 'Value', 'Status'].map((h) => <th key={h} style={th}>{h}</th>)}
+                    {['Asset', 'Type', 'Owner', 'Criticality', 'CIA', 'Last scan', 'Value', 'Status', 'PCI'].map((h) => <th key={h} style={th}>{h}</th>)}
                     <th style={{ ...th, width: 36 }}></th>
                   </tr></thead>
                   <tbody>
                     {p.loading ? (
-                      <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
+                      <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
                     ) : rows.length === 0 ? (
-                      <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
+                      <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
                     ) : orderedRows.map((a) => {
                       const tl = TILE[typeKey(a)] || { bg: '#E4E9ED', fg: '#78838F' };
                       const ck = CRIT[critOf(a)];
@@ -330,7 +332,7 @@ export default function InventoryRedesign(p: Props) {
                                     : <span title="Collected with credentials (deep)" style={{ background: '#E7F0F8', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Managed / Credentialed</span>}
                                   {nSubs > 0 ? <span style={{ background: '#E4EDF6', color: '#3A5A80', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>{nSubs} sub{nSubs > 1 ? 's' : ''}</span> : null}
                                   {a.internet_facing ? <span style={{ background: '#DBE8FA', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Internet-facing</span> : null}
-                                  {a.cde_environment ? <span style={{ background: '#F7D8D8', color: '#A32B2B', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>CDE</span> : null}
+                                  {a.cde_environment ? <span title="In PCI scope" style={{ background: '#F7D8D8', color: '#A32B2B', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>PCI</span> : null}
                                   {(a.open_findings ?? 0) > 0 ? <span style={{ background: '#F2D3C6', color: '#6B2412', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>{a.open_findings} vuln{(a.open_findings ?? 0) > 1 ? 's' : ''}</span> : null}
                                 </span>
                                 {a.environment ? <span style={{ display: 'block', fontSize: 10.5, color: '#78838F', textTransform: 'capitalize' }}>{a.environment}</span> : null}
@@ -344,6 +346,16 @@ export default function InventoryRedesign(p: Props) {
                           <td style={td}>{lastScan(a)}</td>
                           <td style={td}>{val(a)}</td>
                           <td style={td}>{st && stMap[st] ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#3A4653' }}><i style={{ width: 7, height: 7, borderRadius: '50%', background: stMap[st].c }} />{stMap[st].l}</span> : <span style={{ color: '#B4BDC6' }}>—</span>}</td>
+                          <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                            {p.onBulkUpdate && p.canEdit ? (
+                              <input type="checkbox" checked={!!a.cde_environment}
+                                onChange={() => p.onBulkUpdate!([a.id], { cde_environment: !a.cde_environment })}
+                                title={a.cde_environment ? 'In PCI scope — click to remove' : 'Mark this asset in PCI scope'}
+                                style={{ accentColor: '#A32B2B', width: 15, height: 15, cursor: 'pointer' }} />
+                            ) : (
+                              <span title={a.cde_environment ? 'In PCI scope' : 'Not in PCI scope'} style={{ color: a.cde_environment ? '#A32B2B' : '#C4CCD3' }}>{a.cde_environment ? '✓' : '—'}</span>
+                            )}
+                          </td>
                           <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             <RowActionsMenu actions={[
                               { key: 'view', label: 'View', icon: Eye, onClick: () => p.onView(a) },

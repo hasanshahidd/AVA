@@ -114,7 +114,6 @@ const navigation: NavEntry[] = [
     items: [
       { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'AI Pentest',                href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
-      { name: 'PCI-DSS Compliance',        href: '/pci-compliance',                icon: Landmark,      requiredPermissions: ['assets:asset_inventory:*'] },
     ],
   },
   {

@@ -49,7 +49,6 @@ const KEYS = {
   easm: ['exec-dashboard.easm'],
   devices: ['disc-discovered-devices', 'all'],
   ctem: ['exec-dashboard.ctem'],
-  pci: ['pci-overview'],
 };
 const ALL_KEYS = Object.values(KEYS);
 const get = (url: string) => async () => (await apiClient.get(url)).data;
@@ -109,8 +108,7 @@ export default function PerformancePage() {
   const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1, ...shared });
   const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1, ...shared });
   const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1, ...shared });
-  const pci = useQuery<{ overall: { coverage_pct: number; assessed_pct: number; met: number; applicable: number; total: number } }>({ queryKey: KEYS.pci, queryFn: get('/pci-compliance/overview'), retry: 1, ...shared });
-  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem, pci];
+  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem];
   const fetching = mine.some((q) => q.isFetching);
   // Sources that failed on their last attempt (inventory's fetcher returns null instead of throwing).
   const failed = mine.filter((q) => q.isError).length + (inv.isSuccess && inv.data === null ? 1 : 0);
@@ -213,13 +211,9 @@ export default function PerformancePage() {
           sub={cis.data?.totals
             ? (cis.data.totals.scanned ? `pass rate · ${nfmt(cis.data.totals.scanned)} of ${nfmt(cis.data.totals.assets)} assets scanned` : <Cta>No CIS scan yet · Run a CIS scan</Cta>)
             : 'unavailable'} />
-        <Kpi icon={<Landmark size={15} />} label="PCI-DSS coverage" href="/pci-compliance" loading={pci.isLoading} busy={busyOf(pci)}
-          value={pci.data ? `${pci.data.overall.coverage_pct}%` : '—'}
-          sub={pci.data
-            ? (pci.data.overall.assessed_pct
-                ? `${nfmt(pci.data.overall.met)} of ${nfmt(pci.data.overall.applicable)} requirements met`
-                : <Cta>Not assessed yet · Start</Cta>)
-            : 'unavailable'} />
+        <Kpi icon={<Landmark size={15} />} label="PCI-scoped assets" href="/assets?tab=inventory&pci=1" loading={inv.isLoading} busy={busyOf(inv)}
+          value={I ? nfmt((I.counts as any)?.cde_scoped ?? 0) : '—'}
+          sub={I ? (assetsN ? `marked PCI of ${nfmt(assetsN)} assets` : 'no assets yet') : 'unavailable'} />
       </nav>
 
       {/* ── Module lenses ──
