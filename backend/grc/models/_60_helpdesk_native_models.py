@@ -120,11 +120,25 @@ class HDTicketTemplate(Base):
     about = Column(Text, nullable=True)                    # Frappe Code(HTML)
     description_template = Column(Text, nullable=True)
 
+    # AVA net-new: department-wise predefined request library (pre-fills New-Ticket).
+    # create_all can't add these to existing tenant DBs, so itsm_seed ALTERs them in.
+    department_id = Column(Integer, ForeignKey("grc_hd_department.id"), nullable=True)
+    process = Column(String(20), server_default="incident")  # incident|problem|change|service_request|question
+    default_subject = Column(String(255), nullable=True)
+    default_description = Column(Text, nullable=True)
+    default_category = Column(String(100), nullable=True)
+    default_subcategory = Column(String(100), nullable=True)
+    default_impact = Column(String(10), nullable=True)     # low | medium | high
+    default_urgency = Column(String(10), nullable=True)    # low | medium | high
+    icon = Column(String(40), nullable=True)               # lucide icon name for the card
+    enabled = Column(Boolean, server_default=text("true"))
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     fields = relationship("HDTicketTemplateField", back_populates="template",
                           cascade="all, delete-orphan", order_by="HDTicketTemplateField.idx")
+    department = relationship("HDDepartment", foreign_keys=[department_id])
 
     __table_args__ = (
         Index("uq_hd_ticket_template_name", "tenant_id", "template_name", unique=True),

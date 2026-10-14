@@ -30,7 +30,7 @@ from ...routers.auth_router import require_auth
 from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
-    incident, problem, change, service_request, itsm_seed,
+    incident, problem, change, service_request, itsm_seed, request_templates,
 )
 from .common import tenant_id, require_view, require_edit
 
@@ -228,3 +228,4 @@ helpdesk_native_router.include_router(problem.router)                       # /h
 helpdesk_native_router.include_router(change.router)                        # /helpdesk/changes + approval workflow
 helpdesk_native_router.include_router(service_request.router)               # /helpdesk/service-requests + service-catalog
 helpdesk_native_router.include_router(itsm_seed.router)                     # /helpdesk/itsm/seed (per-tenant ITSM seeder)
+helpdesk_native_router.include_router(request_templates.router)             # /helpdesk/request-templates + /helpdesk/sla-preview

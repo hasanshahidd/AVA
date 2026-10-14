@@ -18,10 +18,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ...models import (
+    HDDepartment,
     HDServiceLevelAgreement,
     HDTicket,
     HDTicketPriority,
     HDTicketStatus,
+    HDTicketTemplate,
     HDTicketType,
     get_db,
 )
@@ -53,6 +55,91 @@ _ALTER_COLUMNS = [
     ("request_category", "VARCHAR(100)"),
     ("request_subcategory", "VARCHAR(100)"),
 ]
+
+# §A1 — same mechanism for grc_hd_ticket_template (create_all can't add the new
+# request-library columns to an existing table). Plain columns; the department_id
+# FK constraint is omitted (SQLAlchemy's relationship works off the column, and
+# the live grc_hd_ticket ALTERs add no FK either). ponytail: add the FK in a real
+# migration only if referential enforcement is ever needed here.
+_TEMPLATE_ALTER_COLUMNS = [
+    ("department_id", "INTEGER"),
+    ("process", "VARCHAR(20) DEFAULT 'incident'"),
+    ("default_subject", "VARCHAR(255)"),
+    ("default_description", "TEXT"),
+    ("default_category", "VARCHAR(100)"),
+    ("default_subcategory", "VARCHAR(100)"),
+    ("default_impact", "VARCHAR(10)"),
+    ("default_urgency", "VARCHAR(10)"),
+    ("icon", "VARCHAR(40)"),
+    ("enabled", "BOOLEAN DEFAULT true"),
+]
+
+# §A2 — the 5 standard departments the request library is organized by.
+_DEPARTMENTS = ["IT", "Sales", "Finance", "HR", "Facilities"]
+
+# §A2 — the predefined request/problem library, by department. Each entry:
+# (title, process, default_category, default_impact, default_urgency, icon, description).
+# title == template_name == default_subject; description == default_description.
+_REQUEST_TEMPLATES = {
+    "IT": [
+        ("My PC is slow", "incident", None, "medium", "medium", "gauge",
+         "My computer has become slow or unresponsive."),
+        ("Password reset / can't log in", "service_request", "Access/Account", None, None, "key-round",
+         "I need my password reset or I'm unable to log in."),
+        ("Email not working", "incident", None, None, None, "mail",
+         "I'm having trouble sending or receiving email."),
+        ("VPN won't connect", "incident", None, None, None, "shield",
+         "I can't connect to the VPN."),
+        ("Request a new laptop", "service_request", "Hardware", None, None, "laptop",
+         "I'd like to request a new laptop."),
+        ("Install software", "service_request", "Software", None, None, "download",
+         "Please install software on my machine."),
+        ("Printer not working", "incident", None, None, None, "printer",
+         "The printer isn't working."),
+        ("Request system access", "service_request", "Access/Account", None, None, "user-plus",
+         "I need access to a system or application."),
+    ],
+    "Sales": [
+        ("CRM is down / slow", "incident", None, "high", "high", "trending-down",
+         "The CRM is down or running slowly."),
+        ("Can't access CRM", "incident", "Access/Account", None, None, "lock",
+         "I'm unable to access the CRM."),
+        ("New rep needs CRM access", "service_request", None, None, None, "user-plus",
+         "A new sales rep needs CRM access."),
+        ("Laptop issue", "incident", None, None, None, "laptop",
+         "I'm having a problem with my laptop."),
+    ],
+    "Finance": [
+        ("Expense reimbursement", "service_request", "Expense", None, None, "receipt",
+         "I'd like to submit an expense for reimbursement."),
+        ("Procurement request", "service_request", "Procurement", None, None, "shopping-cart",
+         "I need to request a purchase."),
+        ("Accounting software error", "incident", None, None, None, "calculator",
+         "The accounting software is showing an error."),
+        ("Invoice / payment issue", "incident", None, None, None, "file-text",
+         "There's a problem with an invoice or payment."),
+    ],
+    "HR": [
+        ("New employee onboarding", "service_request", "Onboarding", None, None, "user-plus",
+         "Please onboard a new employee."),
+        ("Payroll issue", "incident", "Payroll", None, None, "banknote",
+         "There's an issue with my payroll."),
+        ("Leave-system access", "service_request", None, None, None, "calendar",
+         "I need access to the leave system."),
+        ("Update personal info", "service_request", None, None, None, "user-cog",
+         "I'd like to update my personal information."),
+    ],
+    "Facilities": [
+        ("Office AC / heating issue", "incident", None, None, None, "thermometer",
+         "The office AC or heating isn't working properly."),
+        ("Broken equipment", "incident", "Equipment", None, None, "wrench",
+         "A piece of office equipment is broken."),
+        ("Desk / office move", "service_request", "Office", None, None, "move",
+         "I need to request a desk or office move."),
+        ("Meeting room booking issue", "service_request", None, None, None, "calendar-clock",
+         "There's a problem with a meeting room booking."),
+    ],
+}
 
 # §3.2 priorities (name == level) and §3.3 statuses (label, category).
 _PRIORITIES = ["Urgent", "High", "Medium", "Low"]
@@ -97,19 +184,69 @@ _TYPE_TO_PROCESS = {"Change": "change", "Problem": "problem",
 
 
 # ─── steps ────────────────────────────────────────────────────────────────────
-def _add_columns(db: Session) -> int:
-    """§3.1 — ALTER-add each extension column; IF NOT EXISTS makes it a no-op when
-    present, and per-column try/except keeps one failure from aborting the rest."""
+def _alter_add_columns(db: Session, table: str, cols: list) -> int:
+    """ALTER-add each column; IF NOT EXISTS makes it a no-op when present, and
+    per-column try/except keeps one failure from aborting the rest."""
     added = 0
-    for name, ddl in _ALTER_COLUMNS:
+    for name, ddl in cols:
         try:
-            db.execute(text(f"ALTER TABLE grc_hd_ticket ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {ddl}"))
             db.commit()
             added += 1
         except Exception:  # noqa: BLE001 — a pre-existing/variant column is non-fatal
             db.rollback()
-            logger.warning("itsm_seed: ALTER for column %s skipped", name, exc_info=True)
+            logger.warning("itsm_seed: ALTER for %s.%s skipped", table, name, exc_info=True)
     return added
+
+
+def _add_columns(db: Session) -> int:
+    """§3.1 + §A1 — migrate the HDTicket extension columns AND the new
+    HDTicketTemplate request-library columns onto existing tenant tables."""
+    return (_alter_add_columns(db, "grc_hd_ticket", _ALTER_COLUMNS)
+            + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS))
+
+
+def _ensure_departments(db: Session, tid: int) -> dict:
+    """§A2 — ensure the 5 standard departments exist (enabled); return {name: id}."""
+    out: dict = {}
+    for name in _DEPARTMENTS:
+        d = (db.query(HDDepartment)
+             .filter(HDDepartment.tenant_id == tid, HDDepartment.name == name)
+             .first())
+        if not d:
+            d = HDDepartment(tenant_id=tid, name=name, enabled=True)
+            db.add(d)
+            db.flush()
+        out[name] = d.id
+    db.commit()
+    return out
+
+
+def seed_request_templates(db: Session, tid: int) -> int:
+    """§A2 — seed the department-wise request library. Idempotent: skip a template
+    whose template_name + department already exists. Returns the count created."""
+    dept_ids = {d.name: d.id for d in
+                db.query(HDDepartment).filter(HDDepartment.tenant_id == tid).all()}
+    created = 0
+    for dept_name, entries in _REQUEST_TEMPLATES.items():
+        did = dept_ids.get(dept_name)
+        for title, process, category, impact, urgency, icon, desc in entries:
+            exists = (db.query(HDTicketTemplate)
+                      .filter(HDTicketTemplate.tenant_id == tid,
+                              HDTicketTemplate.template_name == title,
+                              HDTicketTemplate.department_id == did)
+                      .first())
+            if exists:
+                continue
+            db.add(HDTicketTemplate(
+                tenant_id=tid, template_name=title, department_id=did,
+                process=process, default_subject=title, default_description=desc,
+                default_category=category, default_impact=impact,
+                default_urgency=urgency, icon=icon, enabled=True,
+            ))
+            created += 1
+    db.commit()
+    return created
 
 
 def _ensure_priorities(db: Session, tid: int) -> dict:
@@ -207,6 +344,8 @@ def seed_itsm(db: Session, tid: int) -> dict:
     _ensure_statuses(db, tid)
     _ensure_ticket_types(db, tid, pri_ids.get("Medium"))
     slas_created = _ensure_slas(db, tid, pri_ids)
+    depts = _ensure_departments(db, tid)
+    templates_created = seed_request_templates(db, tid)
     backfill = backfill_process(db, tid)
     return {
         "ok": True,
@@ -217,6 +356,8 @@ def seed_itsm(db: Session, tid: int) -> dict:
         "service_catalog": list(SERVICE_CATALOG),
         "slas": [d[0] for d in _SLA_DEFS],
         "slas_created": slas_created,
+        "departments": list(depts),
+        "templates_created": templates_created,
         "backfilled": backfill["updated"],
     }
 
@@ -252,5 +393,20 @@ if __name__ == "__main__":
         assert set(targets) == set(_PRIORITIES), name
         for level, (resp, reso) in targets.items():
             assert resp > 0 and reso >= resp, (name, level)
+
+    # §A2 request library: 5 depts, 24 templates, valid process/impact/urgency,
+    # unique template_names (template_name is unique per tenant).
+    assert set(_REQUEST_TEMPLATES) == set(_DEPARTMENTS), _REQUEST_TEMPLATES.keys()
+    _procs = {"incident", "problem", "change", "service_request", "question"}
+    _levels = {None, "low", "medium", "high"}
+    all_titles = []
+    for entries in _REQUEST_TEMPLATES.values():
+        for title, process, category, impact, urgency, icon, desc in entries:
+            assert process in _procs, process
+            assert impact in _levels and urgency in _levels, (title, impact, urgency)
+            assert title and icon and desc, title
+            all_titles.append(title)
+    assert len(all_titles) == 24, len(all_titles)
+    assert len(all_titles) == len(set(all_titles)), "duplicate template_name"
 
     print("itsm_seed self-check ok")

@@ -441,6 +441,13 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
     db.add(ticket)
     db.flush()  # assign the PK before auto-assign / return
     assignment.auto_assign(db, ticket)
+    # §A4: compute the SLA now so a brand-new ticket shows response_by/resolution_by/
+    # agreement_status immediately (not only on the first status change). Guarded —
+    # a ticket must still be created when no SLA policy matches.
+    try:
+        sla.recompute(db, ticket, prev_status_category=None)
+    except Exception:  # noqa: BLE001 — SLA failure must never block ticket creation
+        logger.warning("helpdesk: SLA recompute on create failed", exc_info=True)
     db.commit()
     # acknowledgement email to the raiser (gated by HD Settings.send_acknowledgement_email)
     _notify("notify_acknowledgement", db, tid, ticket)

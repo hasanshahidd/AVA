@@ -11,10 +11,45 @@
  * UX feedback (same §4 matrix, client-side).
  */
 import { useMemo, useState } from "react";
+import {
+  Monitor, KeyRound, Mail, Wifi, Laptop, Download, Package, Printer, Lock,
+  Server, UserPlus, Receipt, ShoppingCart, Calculator, FileText, Calendar,
+  User, Thermometer, Wrench, Truck, DoorOpen, Sparkles, type LucideIcon,
+} from "lucide-react";
 import { Chip, PRIORITY_CHIP, useHd } from "./_ui";
 import { Modal, Field, Input, Textarea, Select, Btn, FormError, hdCall } from "./_admin";
 
 type Dept = { id: number; name: string; enabled: boolean };
+
+type Tpl = {
+  id: number;
+  template_name: string;
+  department_id: number | null;
+  department?: string | null;
+  process: Process;
+  default_subject?: string | null;
+  default_description?: string | null;
+  default_category?: string | null;
+  default_subcategory?: string | null;
+  default_impact?: string | null;
+  default_urgency?: string | null;
+  icon?: string | null;
+};
+
+// Resolve a template's lucide icon name (kebab or Pascal) to a component; any
+// unknown name falls back to a generic card icon. Keyed by alnum-lowercased name.
+const ICONS: Record<string, LucideIcon> = {
+  monitor: Monitor, keyround: KeyRound, key: KeyRound, mail: Mail, wifi: Wifi,
+  laptop: Laptop, download: Download, package: Package, printer: Printer,
+  lock: Lock, shieldcheck: Lock, server: Server, userplus: UserPlus,
+  receipt: Receipt, shoppingcart: ShoppingCart, cart: ShoppingCart,
+  calculator: Calculator, filetext: FileText, file: FileText,
+  calendar: Calendar, calendarclock: Calendar, user: User,
+  thermometer: Thermometer, wrench: Wrench, truck: Truck, move: Truck,
+  dooropen: DoorOpen,
+};
+const iconFor = (name?: string | null): LucideIcon =>
+  ICONS[(name || "").toLowerCase().replace(/[^a-z0-9]/g, "")] || Sparkles;
 
 const PROCESSES = [
   { value: "incident", label: "Incident" },
@@ -77,6 +112,8 @@ export function NewTicketDialog({
   const [implPlan, setImplPlan] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
+  const [hideTemplates, setHideTemplates] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -95,6 +132,30 @@ export function NewTicketDialog({
 
   const derived = derivePriority(impact, urgency);
 
+  // §A3 template library — refetches when process/department change (useHd keys on path).
+  const tplPath =
+    `/helpdesk/request-templates?process=${encodeURIComponent(process)}` +
+    (departmentId ? `&department_id=${encodeURIComponent(departmentId)}` : "");
+  const tpls = useHd<{ templates: Tpl[] }>(tplPath);
+  const templates = tpls.data?.templates || [];
+
+  // §A5 real SLA target for the chosen process + derived priority (fallback Medium).
+  const slaPrev = useHd<{ policy?: string | null; response?: string | null; resolution?: string | null }>(
+    `/helpdesk/sla-preview?process=${encodeURIComponent(process)}&priority=${encodeURIComponent(derived || "Medium")}`,
+  );
+  const slaResp = slaPrev.data?.response;
+  const slaRes = slaPrev.data?.resolution;
+
+  const applyTemplate = (t: Tpl) => {
+    if (t.process && t.process !== process) setProcess(t.process);
+    setSubject(t.default_subject || t.template_name || "");
+    setDescription(t.default_description || "");
+    setCategory(t.default_category || "");
+    setSubcategory(t.default_subcategory || "");
+    setImpact(t.default_impact || "");
+    setUrgency(t.default_urgency || "");
+  };
+
   const reset = () => {
     setProcess("incident");
     setDepartmentId(""); setSubject(""); setDescription(""); setContact("");
@@ -103,6 +164,7 @@ export function NewTicketDialog({
     setRootCause("");
     setChangeType("normal"); setChangeRisk("medium");
     setPlannedStart(""); setPlannedEnd(""); setImplPlan(""); setBackoutPlan("");
+    setHideTemplates(false);
     setErr(null);
   };
 
@@ -188,7 +250,9 @@ export function NewTicketDialog({
             ))}
           </div>
           <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#94A3B8]">
-            SLA: <span className="font-medium text-[#64748B]">{SLA_LABEL[process]}</span>
+            SLA: <span className="font-medium text-[#64748B]">
+              {slaResp && slaRes ? `respond ${slaResp} · resolve ${slaRes}` : SLA_LABEL[process]}
+            </span>
           </span>
         </div>
 
@@ -205,6 +269,42 @@ export function NewTicketDialog({
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary of the request" autoFocus />
           </Field>
         </div>
+
+        {/* Common requests — click a card to pre-fill the form (§B1). */}
+        {!hideTemplates && templates.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[11.5px] font-semibold text-[#475569]">
+                Common requests{departmentId ? "" : " (all departments)"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setHideTemplates(true)}
+                className="text-[11px] font-semibold text-[#005B96] hover:underline"
+              >
+                Start from scratch
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {templates.map((t) => {
+                const Icon = iconFor(t.icon);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className="flex items-center gap-2 rounded-[10px] border border-[#E2E5EC] bg-white px-3 py-2.5 text-left transition hover:border-[#005B96] hover:bg-[#F6F7FB]"
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#005B96]/10 text-[#005B96]">
+                      <Icon size={16} strokeWidth={1.9} />
+                    </span>
+                    <span className="text-[12.5px] font-medium text-[#334155]">{t.default_subject || t.template_name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Incident */}
         {process === "incident" && (
