@@ -391,9 +391,6 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'identity',         label: 'Identity Providers',    icon: Shield },
   { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
   { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },
-  // Standalone route — token usage + usage monitoring merged into one entry.
-  { id: 'ai-usage',         label: 'AI Usage',              icon: BarChart3, href: '/admin/ai-usage' },
-  { id: 'audit',            label: 'Audit Logs',            icon: ScrollText },
 ];
 
 function AdministrationPopover({

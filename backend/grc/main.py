@@ -1,3 +1,4 @@
+import asyncio
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,7 +138,13 @@ async def audit_log_middleware(request: Request, call_next):
         async def receive():
             nonlocal received
             if received:
-                return {"type": "http.request", "body": b"", "more_body": False}
+                # Body already replayed. A StreamingResponse (e.g. the report
+                # export CSV/XLSX/PDF) polls receive() for client disconnects
+                # while streaming; returning a replayed http.request here crashes
+                # it with "Unexpected message received: http.request". Block so the
+                # poll waits quietly — the server cancels it when the response
+                # completes (or the client really disconnects).
+                await asyncio.Event().wait()
             received = True
             return {"type": "http.request", "body": body, "more_body": False}
 

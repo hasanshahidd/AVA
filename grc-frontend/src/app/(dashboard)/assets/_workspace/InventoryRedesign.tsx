@@ -255,9 +255,6 @@ export default function InventoryRedesign(p: Props) {
           {railBtn('stale', 'Stale > 30d', c.stale, '#8A95A1')}
           {railBtn('internet', 'Internet-facing', c.internet, '#28578F')}
           {railBtn('cde', 'PCI scope', c.cde, '#014A81')}
-          <div className="railcap" style={{ paddingTop: 14 }}>By origin</div>
-          {railBtn('internal', 'Internal', c.internal)}
-          {railBtn('external', 'External', c.external)}
           <div className="railcap" style={{ paddingTop: 14 }}>By type</div>
           {[['application', 'Applications', '#28578F'], ['infrastructure', 'Infrastructure', '#014A81'], ['data', 'Data', '#8A5A0C'], ['cloud', 'Cloud', '#5A45B5'], ['thirdparty', 'Third-party', '#DB7B45']].map(([id, label, sw]) => (
             <button key={id} className={'rbtn' + (view === id ? ' on' : '')} onClick={() => { setView(id); setTab('reg'); }}>
