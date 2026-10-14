@@ -18,7 +18,7 @@ import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-key
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import { RowActionsMenu } from './RowActionsMenu';
 import type { ITAsset } from '@/types';
-import { Search, Download, Plus, AlertTriangle, Eye, Pencil, Trash2, Plug } from 'lucide-react';
+import { Search, Download, Plus, AlertTriangle, Eye, Pencil, Trash2, Plug, X } from 'lucide-react';
 import '../inventory-redesign.css';
 
 interface Props {
@@ -43,6 +43,12 @@ const isStale = (a: ITAsset) => (a.last_seen_at ? (Date.now() - new Date(a.last_
 const critOf = (a: ITAsset) => (a.criticality || '').toLowerCase();
 const typeKey = (a: ITAsset) => (a.asset_type || '').toLowerCase().replace(/[ _-]/g, '');
 const canConnect = (a: ITAsset) => !!a.host_name && a.discovery_state !== 'unmanaged';
+// 3-mode inventory bucket (pentest discovery contract): EASM (domain/website from
+// EASM), Uncredential (credential-free network sweep), Credential (full depth —
+// credentialed scan OR manual/import; scan_mode null folds into Credential).
+const modeOf = (a: ITAsset): 'easm' | 'credential' | 'uncredential' =>
+  a.scan_mode === 'easm' ? 'easm' : a.scan_mode === 'uncredential' ? 'uncredential' : 'credential';
+const MODE_LABEL: Record<'easm' | 'credential' | 'uncredential', string> = { easm: 'EASM', credential: 'Credential', uncredential: 'Uncredential' };
 
 const TILE: Record<string, { bg: string; fg: string }> = {
   application: { bg: '#DBE8FA', fg: '#28578F' }, infrastructure: { bg: '#CFF2E7', fg: '#014A81' },
@@ -67,17 +73,19 @@ export default function InventoryRedesign(p: Props) {
   // ?view=external|internal|unowned|stale… and ?scan_depth=surface|credentialed — deep links land pre-filtered.
   const sp = useSearchParams();
   const initialView = sp?.get('view');
-  const initialDepth = sp?.get('scan_depth');
+  const initialMode = sp?.get('scan_mode');
   const [view, setView] = useState(initialView || 'all');
   const [tab, setTab] = useState<'reg' | 'ins'>('reg');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('crit');
-  // Two-flow filter — Surface (agentless) vs Credentialed assets. Client-side
-  // on the already-fetched list; scan_depth is derived server-side, never null.
-  const [scanDepth, setScanDepth] = useState<'all' | 'surface' | 'credentialed'>(
-    initialDepth === 'surface' || initialDepth === 'credentialed' ? initialDepth : 'all');
+  // 3-mode toggle — EASM / Credential / Uncredential (scan_mode from the discovery
+  // backend; null folds into Credential via modeOf). Default Credential (the
+  // full-depth bucket, incl. manual/import).
+  const [mode, setMode] = useState<'easm' | 'credential' | 'uncredential'>(
+    initialMode === 'easm' || initialMode === 'uncredential' ? initialMode : 'credential');
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
+  const [popup, setPopup] = useState<ITAsset | null>(null);
 
   const ov = useQuery({
     queryKey: [...SCORECARD_QUERY_KEYS.assets],
@@ -99,6 +107,9 @@ export default function InventoryRedesign(p: Props) {
       needcia: assets.filter((a) => !hasCia(a)).length,
       stale: assets.filter(isStale).length,
       scanned: assets.filter((a) => a.last_seen_at).length,
+      easmN: assets.filter((a) => modeOf(a) === 'easm').length,
+      credN: assets.filter((a) => modeOf(a) === 'credential').length,
+      uncredN: assets.filter((a) => modeOf(a) === 'uncredential').length,
       byType: (k: string) => assets.filter((a) => typeKey(a) === k).length,
       mix: { critical: assets.filter((a) => critOf(a) === 'critical').length, high: assets.filter((a) => critOf(a) === 'high').length, medium: assets.filter((a) => critOf(a) === 'medium').length, low: assets.filter((a) => critOf(a) === 'low').length },
     };
@@ -122,14 +133,14 @@ export default function InventoryRedesign(p: Props) {
     const r = assets.filter((a) =>
       match(a) &&
       (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
-      (scanDepth === 'all' || (a.scan_depth ?? 'credentialed') === scanDepth));
+      modeOf(a) === mode);
     const s = [...r];
     if (sort === 'crit') s.sort((a, b) => (CRIT_ORDER[critOf(b)] || 0) - (CRIT_ORDER[critOf(a)] || 0));
     else if (sort === 'scan') s.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
     else if (sort === 'value') s.sort((a, b) => (b.valuation || b.purchase_cost || 0) - (a.valuation || a.purchase_cost || 0));
     else if (sort === 'name') s.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return s;
-  }, [assets, view, q, sort, scanDepth]);
+  }, [assets, view, q, sort, mode]);
 
   // Nest external subdomains under their apex. Apex rows get a ▸ toggle + "N subs"
   // badge; children are inserted right after the apex only when it's expanded.
@@ -268,11 +279,14 @@ export default function InventoryRedesign(p: Props) {
               <input className="search" placeholder="Search this view…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <select className="sel" value={sort} onChange={(e) => setSort(e.target.value)}><option value="crit">Sort: Criticality</option><option value="scan">Sort: Recently scanned</option><option value="value">Sort: Value</option><option value="name">Sort: Name</option></select>
-            {/* Two-flow scan-depth filter — same segment pattern as Register/Insights. */}
-            <div className="segwrap" title="Filter by how the asset was collected">
-              <button className={'seg' + (scanDepth === 'surface' ? ' on' : '')} onClick={() => setScanDepth('surface')}>Surface</button>
-              <button className={'seg' + (scanDepth === 'credentialed' ? ' on' : '')} onClick={() => setScanDepth('credentialed')}>Credentialed</button>
-              <button className={'seg' + (scanDepth === 'all' ? ' on' : '')} onClick={() => setScanDepth('all')}>All</button>
+            {/* 3-mode toggle — discovery source / scan mode. EASM (external), Credential
+                (full depth, incl. manual), Uncredential (credential-free sweep). */}
+            <div className="segwrap" title="Discovery source — EASM (external), Credential (full depth), Uncredential (credential-free sweep)">
+              {(['easm', 'credential', 'uncredential'] as const).map((m) => (
+                <button key={m} className={'seg' + (mode === m ? ' on' : '')} onClick={() => { setMode(m); setSel(new Set()); }}>
+                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'easm' ? c.easmN : m === 'credential' ? c.credN : c.uncredN}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -294,6 +308,9 @@ export default function InventoryRedesign(p: Props) {
                 <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}><b className="num" style={{ color: 'var(--sec)' }}>{rows.length}</b> shown · {c.total} total</span>
               </div>
               <div style={{ overflow: 'auto', maxHeight: '58vh' }}>
+                {mode === 'uncredential' ? (
+                  <UncredentialView rows={rows} onOpen={setPopup} />
+                ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 860 }}>
                   <thead><tr>
                     <th style={{ ...th, width: 38 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#014A81', width: 15, height: 15 }} /></th>
@@ -369,8 +386,9 @@ export default function InventoryRedesign(p: Props) {
                     })}
                   </tbody>
                 </table>
+                )}
               </div>
-              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>Empty cells are honest — <b style={{ color: '#55606D' }}>Unassigned</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn't set.</div>
+              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>{mode === 'uncredential' ? 'Credential-free sweep view — click a device for the captured detail; Apply credentials to pull full richness.' : <>Empty cells are honest — <b style={{ color: '#55606D' }}>Unassigned</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn&rsquo;t set.</>}</div>
             </div>
           ) : (
             <div className="fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -388,6 +406,102 @@ export default function InventoryRedesign(p: Props) {
               <InventoryScorecard />
             </div>
           )}
+        </div>
+      </div>
+      {popup && <UncredPopup asset={popup} onClose={() => setPopup(null)} onConnect={p.onConnect} />}
+    </div>
+  );
+}
+
+// ── Uncredential mode — swept hosts grouped by the CIDR they were discovered on.
+// Credential-free: we show only what the sweep captured; clicking a device opens
+// the detail pop-up. Promotion to full richness happens via the Connect Wizard.
+function UncredentialView({ rows, onOpen }: { rows: ITAsset[]; onOpen: (a: ITAsset) => void }) {
+  const groups = useMemo(() => {
+    const m = new Map<string, ITAsset[]>();
+    for (const a of rows) { const k = a.network_segment || 'Unknown subnet'; const arr = m.get(k) ?? []; arr.push(a); m.set(k, arr); }
+    return Array.from(m.entries()).sort((x, y) => x[0].localeCompare(y[0], undefined, { numeric: true }));
+  }, [rows]);
+  const [closed, setClosed] = useState<Set<string>>(() => new Set());
+  if (rows.length === 0) {
+    return <div style={{ padding: 28, textAlign: 'center', color: '#78838F', fontSize: 12.5 }}>No uncredentialed assets yet. Run a network sweep from Asset Discovery — discovered hosts land here automatically, no credentials needed.</div>;
+  }
+  return (
+    <div>
+      {groups.map(([cidr, devs]) => {
+        const isClosed = closed.has(cidr);
+        return (
+          <div key={cidr} style={{ borderBottom: '1px solid #F0F3F5' }}>
+            <button type="button"
+              onClick={() => setClosed((s) => { const n = new Set(s); if (n.has(cidr)) n.delete(cidr); else n.add(cidr); return n; })}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', border: 'none', background: '#F7F9FA', padding: '9px 16px', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ color: '#78838F', fontSize: 12, display: 'inline-block', transform: isClosed ? 'none' : 'rotate(90deg)', transition: 'transform .12s' }}>&#9656;</span>
+              <span className="mono" style={{ fontWeight: 700, color: '#0F1F2B', fontSize: 12.5 }}>{cidr}</span>
+              <span style={{ fontSize: 11, color: '#78838F' }}>swept subnet</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#78838F' }}><b className="num" style={{ color: '#005B96' }}>{devs.length}</b> device{devs.length > 1 ? 's' : ''}</span>
+            </button>
+            {!isClosed && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <tbody>
+                  {devs.map((a) => (
+                    <tr key={a.id} className="rrow" style={{ cursor: 'pointer' }} onClick={() => onOpen(a)}>
+                      <td style={{ ...td, paddingLeft: 42 }}>
+                        <span style={{ fontWeight: 600, color: '#0F1F2B' }}>{a.host_name || a.name || a.ip_address || 'Unknown host'}</span>
+                        {a.device_type ? <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 600, color: '#55606D', background: '#EEF1F3', borderRadius: 999, padding: '1px 7px', textTransform: 'capitalize' }}>{a.device_type}</span> : null}
+                      </td>
+                      <td style={{ ...td, width: 150 }}><span className="mono" style={{ color: '#3A4653' }}>{a.ip_address || '—'}</span></td>
+                      <td style={td}>
+                        {a.open_ports && a.open_ports.length ? (
+                          <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                            {a.open_ports.slice(0, 8).map((pt) => <span key={pt} className="mono" style={{ fontSize: 10, color: '#28578F', background: '#E7F0F8', borderRadius: 4, padding: '1px 5px' }}>{pt}</span>)}
+                            {a.open_ports.length > 8 ? <span style={{ fontSize: 10, color: '#78838F' }}>+{a.open_ports.length - 8}</span> : null}
+                          </span>
+                        ) : <span style={{ color: '#B4BDC6' }}>no open ports</span>}
+                      </td>
+                      <td style={{ ...td, width: 86, textAlign: 'right', color: '#78838F', fontSize: 11 }}>details &rarr;</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Detail pop-up for an uncredential (sweep) device — only the fields the sweep
+// captured. "Apply credentials" routes to the Connect Wizard (contract: credit
+// via Connect, NOT the old promote-from-unclaimed flow).
+function UncredPopup({ asset, onClose, onConnect }: { asset: ITAsset; onClose: () => void; onConnect: (a: ITAsset) => void }) {
+  const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid #F0F3F5', fontSize: 12.5 }}>
+      <span style={{ color: '#78838F' }}>{k}</span><span style={{ color: '#0F1F2B', fontWeight: 500, textAlign: 'right', maxWidth: '62%' }}>{v}</span>
+    </div>
+  );
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,31,43,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 14, boxShadow: '0 18px 50px rgba(16,24,40,.22)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid #EEF1F3' }}>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontSize: 14, color: '#0F1F2B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.host_name || asset.name || asset.ip_address || 'Swept device'}</h3>
+            <span style={{ fontSize: 11, color: '#78838F' }}>What the credential-free sweep captured</span>
+          </div>
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#78838F', flex: 'none' }}><X size={18} /></button>
+        </div>
+        <div style={{ padding: '6px 18px 14px' }}>
+          <Row k="IP address" v={<span className="mono">{asset.ip_address || '—'}</span>} />
+          <Row k="Hostname" v={asset.host_name || '—'} />
+          <Row k="Device type" v={<span style={{ textTransform: 'capitalize' }}>{asset.device_type || asset.platform_kind || '—'}</span>} />
+          <Row k="Subnet (CIDR)" v={<span className="mono">{asset.network_segment || '—'}</span>} />
+          <Row k="Open ports" v={asset.open_ports && asset.open_ports.length ? <span className="mono">{asset.open_ports.join(', ')}</span> : 'none detected'} />
+          <Row k="Scan mode" v="Uncredential (sweep)" />
+          <Row k="Depth" v={asset.scan_depth === 'credentialed' ? 'Credentialed' : 'Surface / agentless'} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '12px 18px', borderTop: '1px solid #EEF1F3', background: '#FAFBFC', borderRadius: '0 0 14px 14px' }}>
+          <button onClick={onClose} style={{ border: '1px solid #D7DDE2', background: '#fff', borderRadius: 9, padding: '7px 13px', fontSize: 12.5, fontWeight: 600, color: '#3A4653', cursor: 'pointer' }}>Close</button>
+          {canConnect(asset) && <button onClick={() => { onConnect(asset); onClose(); }} style={{ border: 'none', background: '#005B96', color: '#fff', borderRadius: 9, padding: '7px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Plug size={14} />Apply credentials</button>}
         </div>
       </div>
     </div>

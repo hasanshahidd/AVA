@@ -451,6 +451,10 @@ export interface ITAsset {
   // Surface facts — stamped from the credential-free discovery sweep.
   open_ports?: number[] | null;
   device_type?: string | null;
+  // 3-mode inventory bucket (discovery contract): easm | credential | uncredential;
+  // null = manual/import (folds into the Credential bucket in the UI).
+  scan_mode?: 'easm' | 'credential' | 'uncredential' | null;
+  platform_kind?: string | null;
   platform_properties?: Record<string, any> | null;
 }
 
