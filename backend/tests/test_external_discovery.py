@@ -103,17 +103,23 @@ def test_external_no_match_becomes_internet_facing_asset(monkeypatch):
     assert marked.get("asset") is fake_asset  # exposure flag + criticality re-rate invoked
 
 
-def test_internal_no_match_still_waits_for_a_login(monkeypatch):
+def test_internal_no_match_auto_adopts_as_uncredential(monkeypatch):
+    """Owner feature: an unmatched internal sweep host is taken into inventory
+    DIRECTLY (credential-free) as an uncredential asset, not parked for a login.
+    The external carve-out and this internal adopt both route through manual_adopt;
+    the result distinguishes them (external=True vs uncredential=True)."""
     from grc.modules.asset_discovery.services import resolver
     monkeypatch.setattr(resolver, "_candidates", lambda db, tid, obs: ("", []))
     monkeypatch.setattr(resolver, "_prior_ignored", lambda db, tid, obs: False)
-    # If the carve-out mis-fired for an internal sweep hit, this would be called.
-    monkeypatch.setattr(resolver, "manual_adopt",
-                        lambda db, obs: pytest.fail("internal obs must NOT be auto-adopted"))
+    fake_asset = types.SimpleNamespace(id=42)
+    monkeypatch.setattr(resolver, "manual_adopt", lambda db, obs: fake_asset)
 
     result = resolver.resolve_observation(object(), _obs(source="cidr", raw={}))
 
-    assert result["action"] == "unclaimed"
+    assert result["action"] == "created"
+    assert result["asset_id"] == 42
+    assert result.get("uncredential") is True
+    assert result.get("external") is None  # internal adopt, not the EASM path
 
 
 def test_mark_internet_facing_writes_both_exposure_columns():

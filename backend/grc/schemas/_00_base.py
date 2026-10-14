@@ -1076,6 +1076,10 @@ class ITAssetResponse(BaseModel):
     scan_depth: Optional[str] = None
     open_ports: Optional[List[int]] = None
     device_type: Optional[str] = None
+    # Discovery category — THE authoritative contract field. Exactly one of
+    # easm | credential | uncredential (or None for manual/imported assets).
+    # Derived in assets_router._scan_mode from origin_source + discovery_state.
+    scan_mode: Optional[str] = None
     # Transient: the AI-Pentest fleet lane this asset routes to (external | internal-host |
     # internal-ad | cloud | code | container), computed via pentest._classify_asset so the
     # hub's 6-lane card and the launcher's lane filter agree by construction.
@@ -1247,6 +1251,8 @@ class AssetDetailResponse(BaseModel):
     scan_depth: Optional[str] = None
     open_ports: Optional[List[int]] = None
     device_type: Optional[str] = None
+    # Discovery category: easm | credential | uncredential (see ITAssetResponse).
+    scan_mode: Optional[str] = None
 
     class Config:
         from_attributes = True

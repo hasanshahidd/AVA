@@ -323,6 +323,13 @@ def _create_from(db: Session, tenant_id: int, obs: DiscoveryObservation) -> ITAs
     )
     _apply_classification(asset, cls, fill_only=False)
     _apply_surface(asset, raw)  # keep the sweep's open-ports/banners for the surface view
+    # Store the CIDR/scope this host was swept from so the Uncredential inventory
+    # view can group by it. network_segment is the authoritative CIDR field; the
+    # sweep writes scope into obs.raw['scope'] (executor). EASM (domain) obs carry
+    # no scope, so this is skipped for them.
+    scope = raw.get("scope")
+    if scope and not getattr(asset, "network_segment", None):
+        asset.network_segment = str(scope)[:100]
     db.add(asset)
     db.flush()  # assign id for the external-identity link + later same-run matches
     ext = raw.get("external_id")
@@ -442,28 +449,32 @@ def resolve_observation(db: Session, obs: DiscoveryObservation) -> Dict[str, Any
             f"external attack surface — evidence-only asset #{asset.id} (internet-facing)")
         return {"action": "created", "asset_id": asset.id, "external": True}
 
-    # No match, nothing ignored. Discovery NEVER writes inventory on its own — a
-    # swept device is evidence, not an asset. Everything unmatched lands in the
-    # Connect queue as 'unclaimed'; it earns an inventory row only when a human
-    # promotes it from Connect (save a credential, select the device, run the
-    # login → deep-collect), or by an explicit merge into an asset already
-    # tracked. Even a positively-identified non-host device (printer / switch /
-    # DNS) waits here rather than auto-creating an empty shell — this pipeline
-    # was rebuilt to stop producing those. The identification is preserved on the
-    # observation (raw + note) so Connect can show "what we think this is".
+    # No match, nothing ignored. A swept host is taken into inventory DIRECTLY as
+    # an uncredential (evidence-only, surface) asset — no credential required. The
+    # owner's model: finding a device on the managed network IS owning it; the
+    # login later just ADDS depth (uncredential → credential), it isn't the gate
+    # for the device to exist. This replaces the old 'unclaimed'/Waiting-to-connect
+    # park. Idempotent: a re-sweep of the same host matches the row created here
+    # (hostname/MAC/IP tiers above) and merges instead of duplicating.
+    #
+    # Category: _create_from stamps origin_source='network_sweep'; manual_adopt
+    # sets discovery_state='unmanaged' (surface). That pair derives scan_mode
+    # ='uncredential' in the API (see assets_router._scan_mode). A later
+    # credentialed collect flips discovery_state='managed' → scan_mode='credential'.
+    asset = manual_adopt(db, obs)
     cls = _classification(obs)
     dt = cls.get("device_type")
     identified = bool(dt and dt not in ("host", "unknown", None)
                       and (cls.get("confidence") or 0) >= 0.7)
-    obs.resolution = "unclaimed"
-    obs.resolved_asset_id = None
     obs.resolution_note = (
         f"identified as {dt} via {', '.join(cls.get('evidence') or [])} — "
-        f"promote from Connect to add to inventory"
+        f"added to inventory (uncredential); connect a credential to deep-scan"
         if identified else
-        "found on the network — needs a login before it enters inventory"
+        "found on the network — added to inventory (uncredential); "
+        "connect a credential to deep-scan"
     )
-    return {"action": "unclaimed", "identified": identified}
+    return {"action": "created", "asset_id": asset.id, "uncredential": True,
+            "identified": identified}
 
 
 # ── Operator-driven resolution (the Inbox actions) ──────────────────────────
@@ -540,11 +551,11 @@ def resolve_run(db: Session, run_id: int) -> Dict[str, int]:
         db.flush()  # so same-run duplicates of a host see the row we just created
 
     run = db.get(DiscoveryRun, run_id)
-    # assets_new counts rows that actually entered inventory. A network sweep
-    # creates none (its unmatched hosts wait for a login), so a CIDR run holds
-    # this at 0 until credentials promote the devices. An external (EASM) run
-    # DOES increment it — an outside-in find is adopted as an evidence-only asset
-    # right here, because there's no login to wait for.
+    # assets_new counts rows that actually entered inventory. Both a network sweep
+    # (CIDR) and an external (EASM) run now increment it: an unmatched swept host
+    # is taken into inventory directly as an uncredential asset — no login to wait
+    # for — exactly as an outside-in EASM find is. A credential later adds depth,
+    # it is not the gate for the asset to exist.
     run.assets_new = (run.assets_new or 0) + created
     run.assets_updated = (run.assets_updated or 0) + updated
     db.commit()

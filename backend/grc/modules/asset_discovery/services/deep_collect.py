@@ -625,6 +625,10 @@ def promote_observation_typed(db: Session, obs: DiscoveryObservation,
         asset.platform_properties = merged
         asset.last_seen_at = datetime.utcnow()
         asset.last_seen_source = "agentless"
+        # Credentialed typed connect — same upgrade flip as collect_host: managed
+        # ⇒ scan_mode='credential' (uncredential→credential when re-connecting an
+        # already-swept db/cloud device).
+        asset.discovery_state = "managed"
     except Exception:
         if created:
             db.delete(asset)
@@ -866,6 +870,13 @@ def collect_host(db: Session, asset: ITAsset, profile: CredentialProfile,
 
     asset.last_seen_at = datetime.utcnow()
     asset.last_seen_source = "agentless"
+    # Authoritative "we logged in" flip: a successful authenticated collect upgrades
+    # the asset to managed (credentialed). This is the single sink every host
+    # credentialed path routes through (promote_observation AND deep_collect_run
+    # re-scans), so it is the one place the uncredential→credential upgrade is
+    # guaranteed. scan_mode (assets_router._scan_mode) and scan_depth both derive
+    # from discovery_state=='managed', so both flip together.
+    asset.discovery_state = "managed"
     db.add(asset)
     db.flush()
 

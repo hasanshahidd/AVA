@@ -305,6 +305,34 @@ def _surface_fields(asset):
     return depth, (ports if isinstance(ports, list) else None), (surface.get("device_type") or dc.get("device_type"))
 
 
+# ── Discovery category model — THE frontend contract ─────────────────────────
+# scan_mode is the AUTHORITATIVE way an asset's discovery mode is exactly one of
+#   easm | credential | uncredential   (or None for non-discovery assets:
+#   manually-created / imported rows that never came from discovery).
+# It is DERIVED (not a stored column) from two existing, already-maintained
+# fields, so there is no migration or backfill:
+#   • origin_source   — how the asset was BORN (stamped once, never mutated):
+#                       'easm' (outside-in) | 'network_sweep' | 'connect' | ...
+#   • discovery_state — 'managed' once a credentialed collect succeeds
+#                       (deep_collect.collect_host / promote_observation*),
+#                       'unmanaged'/'discovered' for an uncredential surface row.
+# Precedence (first hit wins):
+#   1. origin_source == 'easm'            → 'easm'        (never logged into)
+#   2. discovery_state == 'managed'       → 'credential'  (we authenticated)
+#   3. origin_source == 'network_sweep'   → 'uncredential'(surface sweep row)
+#   4. otherwise                          → None          (manual/import/…)
+# The list filter (?scan_mode=) in list_assets translates these back to column
+# predicates — keep the two in sync.
+def _scan_mode(asset):
+    if (getattr(asset, "origin_source", None) or "") == "easm":
+        return "easm"
+    if getattr(asset, "discovery_state", None) == "managed":
+        return "credential"
+    if (getattr(asset, "origin_source", None) or "") == "network_sweep":
+        return "uncredential"
+    return None
+
+
 # AI-Pentest fleet lane per asset — reuse the engine's OWN classifier so the launcher's
 # lane filter matches the /pentest/fleet hub card by construction. target_type -> fleet key.
 _FLEET_LANE_BY_TARGET = {
@@ -338,6 +366,7 @@ def list_assets(
     lifecycle_state: Optional[str] = None,
     data_classification: Optional[str] = None,
     internet_facing: Optional[bool] = None,
+    scan_mode: Optional[str] = Query(None, description="Discovery category filter: easm | credential | uncredential (see _scan_mode)."),
     stale_only: bool = Query(False, description="When true, return assets where last_seen_at is older than `stale_days` (default 30)."),
     stale_days: int = Query(30, ge=1, le=365),
     skip: int = 0,
@@ -380,6 +409,22 @@ def list_assets(
         query = query.filter(ITAsset.data_classification == data_classification)
     if internet_facing is not None:
         query = query.filter(ITAsset.internet_facing == internet_facing)
+    if scan_mode:
+        # Column predicates that mirror _scan_mode's derivation (keep in sync).
+        if scan_mode == "easm":
+            query = query.filter(func.coalesce(ITAsset.origin_source, "") == "easm")
+        elif scan_mode == "credential":
+            # 'managed' = credentialed, but an EASM asset is never logged into, so
+            # exclude easm-born rows to match _scan_mode's easm-first precedence.
+            query = query.filter(
+                ITAsset.discovery_state == "managed",
+                func.coalesce(ITAsset.origin_source, "") != "easm",
+            )
+        elif scan_mode == "uncredential":
+            query = query.filter(
+                func.coalesce(ITAsset.origin_source, "") == "network_sweep",
+                func.coalesce(ITAsset.discovery_state, "") != "managed",
+            )
     if stale_only:
         from datetime import timedelta
         cutoff = datetime.utcnow() - timedelta(days=stale_days)
@@ -394,6 +439,7 @@ def list_assets(
     # so the response_model picks them up without new columns on ITAsset.
     for a in assets:
         a.scan_depth, a.open_ports, a.device_type = _surface_fields(a)
+        a.scan_mode = _scan_mode(a)
         a.fleet_lane = _fleet_lane(a)
     return assets
 
@@ -1463,7 +1509,8 @@ def get_asset(
             "gaps": latest.gaps,
             "assessor_id": latest.assessor_id
         }
-    
+
+    _d_scan_depth, _d_open_ports, _d_device_type = _surface_fields(asset)
     return {
         "id": asset.id,
         "tenant_id": asset.tenant_id,
@@ -1509,6 +1556,11 @@ def get_asset(
         "last_seen_at": asset.last_seen_at.isoformat() if asset.last_seen_at else None,
         "last_seen_source": asset.last_seen_source,
         "origin_source": asset.origin_source,
+        "scan_mode": _scan_mode(asset),
+        # Surface evidence for the uncredential detail popup (IP/hostname/ports/type).
+        "scan_depth": _d_scan_depth,
+        "open_ports": _d_open_ports,
+        "device_type": _d_device_type,
         "dns_aliases": asset.dns_aliases,
         "linked_controls": [link.normalized_control_id for link in asset.control_links],
         "linked_risks": [link.risk_id for link in asset.risk_links],
@@ -2228,6 +2280,7 @@ def get_asset_detail(
         scan_depth=_scan_depth,
         open_ports=_open_ports,
         device_type=_device_type,
+        scan_mode=_scan_mode(asset),
     )
 
 
