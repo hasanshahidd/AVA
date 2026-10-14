@@ -170,82 +170,10 @@ apiClient.interceptors.response.use(
   }
 );
 
-export const frameworksApi = {
-  getAll: () => apiClient.get<Framework[]>('/frameworks'),
-  getAvailable: () => apiClient.get('/frameworks/available'),
-  getById: (id: string) => apiClient.get<Framework>(`/frameworks/${id}`),
-  create: (data: Partial<Framework>) => apiClient.post<Framework>('/frameworks', data),
-  update: (id: string, data: Partial<Framework>) => apiClient.put<Framework>(`/frameworks/${id}`, data),
-  delete: (id: string) => apiClient.delete(`/frameworks/${id}`),
-};
-
 export const controlsApi = {
+  // Sole remaining caller: vulnerabilities/nca/[id]/page.tsx. NOTE: the backend
+  // /controls router was removed (45fe209) so this call 404s -- flagged for follow-up.
   getAll: () => apiClient.get<Control[]>('/controls'),
-  getById: (id: string) => apiClient.get<Control>(`/controls/${id}`),
-  create: (data: Partial<Control>) => apiClient.post<Control>('/controls', data),
-  update: (id: string, data: Partial<Control>) => apiClient.put<Control>(`/controls/${id}`, data),
-  delete: (id: string) => apiClient.delete(`/controls/${id}`),
-  getNormalized: () => apiClient.get<NormalizedControl[]>('/controls/normalized'),
-  getMappings: () => apiClient.get<ControlMapping[]>('/controls/mappings'),
-  getAIRecommendations: (data: { control_id: number; control_title: string; control_description?: string; framework_name?: string }) =>
-    apiClient.post<{
-      control_id: number;
-      test_procedures: Array<{
-        procedure_type: string;
-        description: string;
-        frequency: string;
-        sample_size: string;
-      }>;
-      evidence_requirements: Array<{
-        evidence_type: string;
-        title: string;
-        description: string;
-        mandatory: boolean;
-      }>;
-      key_risks_addressed: string[];
-      audit_focus_areas: string[];
-      addressed_risks: Array<{
-        id: number; title: string; category: string | null; status: string | null;
-        inherent_score: number | null; residual_score: number | null; mitigation_effectiveness: string | null;
-      }>;
-      risks_if_not_implemented: Array<{
-        title: string; description?: string; category?: string; severity?: string;
-        likelihood?: number; impact?: number; rationale?: string;
-      }>;
-      }>('/controls/ai-recommendations', data),
-  promoteControlRisk: (data: {
-    control_id: number; framework_name?: string; title: string; description?: string;
-    register_type?: string; category?: string; risk_sub_category?: string;
-    inherent_likelihood?: number; inherent_impact?: number;
-    residual_likelihood?: number; residual_impact?: number;
-    owner_id?: number; business_owner_id?: number;
-    treatment_plan?: string; root_cause?: string; recommendations?: string; due_date?: string;
-  }) => apiClient.post('/controls/ai-recommendations/promote-risk', data),
-  getFrameworkControlsSummary: () => apiClient.get('/controls/framework-controls/summary'),
-  getFrameworkControlsStatusSummary: (frameworkId?: number) =>
-    apiClient.get('/controls/framework-controls/status-summary', {
-      params: frameworkId ? { framework_id: frameworkId } : undefined,
-    }),
-  getFrameworkControls: (params?: {
-    framework_id?: number;
-    domain?: string;
-    search?: string;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-    skip?: number;
-    limit?: number;
-  }) => apiClient.get('/controls/framework-controls', { params }),
-  getFrameworkControlEvidence: (frameworkControlId: number) =>
-    apiClient.get(`/controls/framework-control/${frameworkControlId}/evidence`),
-  linkFrameworkControlEvidence: (frameworkControlId: number, data: { evidence_id: number }) =>
-    apiClient.post(`/controls/framework-control/${frameworkControlId}/evidence`, data),
-  unlinkFrameworkControlEvidence: (frameworkControlId: number, linkId: number) =>
-    apiClient.delete(`/controls/framework-control/${frameworkControlId}/evidence/${linkId}`),
-  // Standalone per-control owner + implementation stage (no journey required).
-  updateFrameworkControlOwnership: (
-    frameworkControlId: number,
-    data: { status?: string; assigned_user_ids?: number[] },
-  ) => apiClient.patch(`/controls/framework-control/${frameworkControlId}/ownership`, data),
 };
 
 export const evidenceApi = {
@@ -4094,11 +4022,6 @@ export const integrationsApi = {
     apiClient.get('/integrations/sla/breaches'),
   sendSLANotifications: () =>
     apiClient.post('/integrations/sla/send-notifications'),
-
-  autoMapControls: (vulnId: number, params?: Record<string, unknown>) =>
-    apiClient.post(`/integrations/control-mapping/auto-map/${vulnId}`, {}, { params }),
-  batchMapControls: (params?: Record<string, unknown>) =>
-    apiClient.post('/integrations/control-mapping/batch-map', {}, { params }),
 
   analyticsOverview: (params?: Record<string, unknown>) =>
     apiClient.get('/integrations/analytics/overview', { params }),

@@ -16,17 +16,6 @@ PERMISSION_MATRIX = [
         ]
     },
     {
-        "module": "bcm",
-        "display_name": "Business Continuity Management",
-        "submodules": [
-            {"name": "plans", "display_name": "BCM Plans", "actions": ["view", "create", "edit", "delete", "approve"]},
-            {"name": "bia", "display_name": "Business Impact Analysis", "actions": ["view", "create", "edit", "delete"]},
-            {"name": "drills", "display_name": "Drills & Tests", "actions": ["view", "create", "edit", "delete"]},
-            {"name": "findings", "display_name": "Drill Findings", "actions": ["view", "create", "edit", "delete"]},
-            {"name": "dashboard", "display_name": "BCM Dashboard", "actions": ["view"]},
-        ]
-    },
-    {
         "module": "risks",
         "display_name": "Risk Management",
         "submodules": [
@@ -155,73 +144,6 @@ PERMISSION_MATRIX = [
         ]
     },
     {
-        "module": "evidence",
-        "display_name": "Evidence Management",
-        "submodules": [
-            {
-                "name": "evidence_library",
-                "display_name": "Evidence Library",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "evidence_upload",
-                "display_name": "Evidence Upload",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "audit_packages",
-                "display_name": "Audit Packages",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "evidence_requirements",
-                "display_name": "Evidence Requirements",
-                "actions": ["view", "create", "edit", "delete"]
-            }
-        ]
-    },
-    {
-        "module": "governance",
-        "display_name": "Governance",
-        "submodules": [
-            {
-                "name": "policies",
-                "display_name": "Policies & Documents",
-                "actions": ["view", "create", "edit", "delete", "approve", "publish"]
-            },
-            {
-                "name": "policy_exceptions",
-                "display_name": "Policy Exceptions",
-                "actions": ["view", "create", "edit", "delete", "approve"]
-            },
-            {
-                "name": "committees",
-                "display_name": "Committees",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "meetings",
-                "display_name": "Meetings",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "attestations",
-                "display_name": "Attestations",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "workflows",
-                "display_name": "Workflows",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "regulatory_changes",
-                "display_name": "Regulatory Changes",
-                "actions": ["view", "create", "edit", "delete"]
-            }
-        ]
-    },
-    {
         "module": "vulnerabilities",
         "display_name": "Vulnerability Management",
         "submodules": [
@@ -289,27 +211,6 @@ PERMISSION_MATRIX = [
                 "name": "criticality_assessments",
                 "display_name": "Criticality Assessments",
                 "actions": ["view", "create", "edit", "delete", "approve_ciso"]
-            }
-        ]
-    },
-    {
-        "module": "frameworks",
-        "display_name": "Framework Management",
-        "submodules": [
-            {
-                "name": "framework_library",
-                "display_name": "Framework Library",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "framework_upload",
-                "display_name": "Framework Upload",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "framework_mapping",
-                "display_name": "Framework Mapping",
-                "actions": ["view", "create", "edit"]
             }
         ]
     },
@@ -434,116 +335,6 @@ PERMISSION_MATRIX = [
                 "name": "analytics",
                 "display_name": "Integration Analytics",
                 "actions": ["view"]
-            }
-        ]
-    },
-    {
-        "module": "is_projects",
-        "display_name": "IS Projects",
-        "submodules": [
-            {
-                "name": "projects",
-                "display_name": "Projects",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "dashboard",
-                "display_name": "Portfolio Dashboard",
-                "actions": ["view"]
-            }
-        ]
-    },
-    {
-        "module": "critical_tasks",
-        "display_name": "Critical Tasks",
-        "submodules": [
-            {
-                "name": "tasks",
-                "display_name": "Task Board",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "reports",
-                "display_name": "Task Reports",
-                "actions": ["view"]
-            },
-            {
-                "name": "templates",
-                "display_name": "Task Templates",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "approvals",
-                "display_name": "Task Approvals",
-                "actions": ["view", "approve", "reject"]
-            },
-            {
-                "name": "ai",
-                "display_name": "Task AI",
-                "actions": ["view", "create"]
-            }
-        ]
-    },
-    {
-        # Issue Management — gates set on every endpoint in
-        # backend/grc/modules/issue_management/routers/* (CRUD on Issues,
-        # CAPA actions, comments, links, dashboard, matrices, automation
-        # flags, and the activity / audit-log feed at /issues/{id}/activity).
-        # Admin role and primary-contact bypass remain intact; non-admin
-        # custom roles need at least the `view` action to use the module.
-        "module": "issue_management",
-        "display_name": "Issue Management",
-        "submodules": [
-            {
-                "name": "issues",
-                "display_name": "Issues, CAPA, Links & Audit Log",
-                "actions": ["view", "create", "edit", "delete"]
-            }
-        ]
-    },
-    {
-        "module": "vendor_risk",
-        "display_name": "Vendor / Third-Party Risk (TPRA)",
-        "submodules": [
-            {
-                "name": "vendors",
-                "display_name": "Vendors",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "assessments",
-                "display_name": "TPRA Assessments",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "lifecycle",
-                "display_name": "Lifecycle (advance / send-back / skip)",
-                "actions": ["view", "advance", "send_back", "skip"]
-            },
-            {
-                "name": "findings",
-                "display_name": "Findings & Remediation",
-                "actions": ["view", "create", "edit", "delete", "accept_risk"]
-            },
-            {
-                "name": "contracts",
-                "display_name": "Contracts & Control Obligations",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "approvals",
-                "display_name": "Approval Decisions",
-                "actions": ["view", "approve"]
-            },
-            {
-                "name": "monitoring",
-                "display_name": "Continuous Monitoring",
-                "actions": ["view", "create", "edit", "delete"]
-            },
-            {
-                "name": "templates",
-                "display_name": "Questionnaire Templates",
-                "actions": ["view", "create", "edit", "delete"]
             }
         ]
     },
