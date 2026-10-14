@@ -46,9 +46,11 @@ from ..models._37_artifact_catalog_tenant_artifacts import CompliancePlugin, Com
 from ..models._60_helpdesk_native_models import (
     HDTicket, HDTicketStatus, HDTicketPriority, HDTicketType, HDDepartment,
 )
-from ..models._23_track_a_phase_7_cloud_connector_framework_foundation import Team
+from ..models._23_track_a_phase_7_cloud_connector_framework_foundation import Team, SoftwareIdentifier
 from ..models._47_asset_discovery_models import DiscoveryObservation
 from ..models._pentest_exploit_results import PentestExploitResult
+from ..models._pentest_scan_jobs import PentestScanJob
+from ..models._52_ctem_scope_models import CtemScope
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -516,6 +518,57 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
             "asset_name": ("asset_id", ITAsset, "name"),
         },
     ),
+    "software_inventory": DatasetSpec(
+        SoftwareIdentifier,
+        permissions=["assets:asset_inventory:*"],
+        # Installed software identifiers (grc_software_identifiers) — CPE/PURL
+        # inventory per asset, populated by the CPE matcher + scanner adapters.
+        # `asset_name` resolves asset_id to the canonical asset name.
+        fields=["id", "asset_name", "vendor", "product", "version",
+                "identifier_type", "identifier", "source", "created_at"],
+        search=["vendor", "product", "identifier"],
+        sortable=["id", "vendor", "product", "version", "identifier_type",
+                  "source", "created_at"],
+        filterable={"identifier_type": "badge", "source": "badge",
+                    "vendor": "text", "product": "text", "version": "text",
+                    "identifier": "text", "created_at": "date"},
+        default_order=("created_at", "desc"),
+        ref_fields={"asset_name": ("asset_id", ITAsset, "name")},
+    ),
+    "pentest_scans": DatasetSpec(
+        PentestScanJob,
+        permissions=["pentest:workspace:view"],
+        # Live AI-Pentest scan jobs (grc_pentest_scan_jobs) — one row per scan run.
+        # `asset_name` resolves asset_id (plain int, no FK; None for ad-hoc targets).
+        fields=["id", "target", "asset_name", "lane", "find_mcp", "find_tool",
+                "credentialed", "status", "progress", "stage", "findings_count",
+                "created_at", "started_at", "finished_at", "error"],
+        search=["target", "find_tool", "stage"],
+        sortable=["id", "target", "lane", "status", "findings_count", "progress",
+                  "created_at", "started_at", "finished_at"],
+        filterable={"status": "badge", "lane": "badge", "credentialed": "badge",
+                    "find_mcp": "badge", "find_tool": "badge", "target": "text",
+                    "stage": "text", "findings_count": "number", "created_at": "date"},
+        default_order=("created_at", "desc"),
+        ref_fields={"asset_name": ("asset_id", ITAsset, "name")},
+    ),
+    "ctem_scopes": DatasetSpec(
+        CtemScope,
+        permissions=["pentest:workspace:view"],
+        # CTEM exposure scopes (grc_ctem_scopes) — named, business-owned slices
+        # of the attack surface. `business_owner_id` is projected and resolved to
+        # `owner_name` via user_fields (the raw FK must be in `fields` for the
+        # resolver to see it — same convention as every other user_fields dataset).
+        # membership_rule (JSON) is deliberately omitted — not a report cell.
+        fields=["id", "name", "description", "cadence", "is_active",
+                "created_at", "updated_at", "business_owner_id"],
+        search=["name", "description"],
+        sortable=["id", "name", "cadence", "is_active", "created_at", "updated_at"],
+        filterable={"is_active": "badge", "cadence": "badge", "name": "text",
+                    "description": "text", "created_at": "date", "updated_at": "date"},
+        default_order=("created_at", "desc"),
+        user_fields={"business_owner_id": "owner_name"},
+    ),
 }
 
 
@@ -529,6 +582,9 @@ DATASET_LABELS: Dict[str, str] = {
     "sbp_inventory": "SBP Offsite IT-Asset Inventory",
     "discovery": "Discovered Devices",
     "pentest_findings": "Pentest Findings",
+    "software_inventory": "Software Inventory",
+    "pentest_scans": "Pentest Scans",
+    "ctem_scopes": "CTEM Scopes",
 }
 
 
@@ -908,7 +964,7 @@ def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dic
 # allowlist to expose more.
 AVA_DATASET_ALLOWLIST = [
     "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
-    "discovery", "pentest_findings",
+    "discovery", "pentest_findings", "software_inventory", "pentest_scans", "ctem_scopes",
 ]
 
 
