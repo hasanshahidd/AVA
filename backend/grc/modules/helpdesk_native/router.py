@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import GRCUser, get_db
+from ...models import GRCUser, Team, get_db
 from ...routers.auth_router import require_auth
 from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
@@ -73,6 +73,8 @@ class TicketCreate(BaseModel):
     customer_id: Optional[int] = None
     contact: Optional[str] = None
     department_id: Optional[int] = None    # AVA net-new: multi-department intake
+    assigned_agent: Optional[str] = None   # §1c explicit assignee at create (agent email)
+    team: Optional[str] = None             # explicit Team (by name) picked in the form
 
 
 class SavedReplyBody(BaseModel):
@@ -113,6 +115,12 @@ def create_ticket(body: TicketCreate, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
     tid = tenant_id(db)
     data = body.model_dump()
+    # An explicitly-picked Team (by name) wins over department routing.
+    _team = data.pop("team", None)
+    if _team and not data.get("agent_group_id"):
+        t = db.query(Team).filter(Team.tenant_id == tid, Team.name == _team).first()
+        if t:
+            data["agent_group_id"] = t.id
     # NET-NEW department routing: a chosen department stamps the ticket's Team, then
     # the existing assignment + SLA pipeline runs unchanged. An explicit agent_group wins.
     if data.get("department_id") and not data.get("agent_group_id"):

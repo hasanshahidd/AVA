@@ -1,25 +1,43 @@
 "use client";
 
 /**
- * Help Desk — rich, process-aware New-Ticket form (ITSM §7).
+ * Help Desk — rich, process-aware New-Ticket form (ITSM §7, catalog v2).
  *
  * Step 1 picks the Process (Incident / Service Request / Problem / Change) +
  * Department; then process-specific fields render. Submits a single
- * POST /helpdesk/tickets with `process` + the collected extension fields
- * (exact key names from spec §1/§2). The backend re-derives priority from the
- * impact/urgency matrix authoritatively — the live Priority chip here is just
- * UX feedback (same §4 matrix, client-side).
+ * POST /helpdesk/tickets with `process` + the collected extension fields.
+ * The backend re-derives priority from the impact/urgency matrix
+ * authoritatively — the live Priority chip here is just UX feedback.
+ *
+ * Template picker (catalog v2): the full library (100+) is fetched ONCE,
+ * unfiltered, and grouped/filtered entirely client-side — by DEPARTMENT when no
+ * department is chosen, by CATEGORY within the chosen department otherwise.
+ *
+ * Desync fix: the catalog fetch is NO LONGER keyed on `process`/`departmentId`.
+ * Previously the request path embedded those mutable form values, so changing
+ * Department (or a card click calling setProcess) refetched and reordered the
+ * candidate cards under the user — and useHd keeps stale data mid-reload — so a
+ * later click applied a *different* row with the same name (subject from one
+ * row, description/impact from another). Now template values are written to form
+ * state ONLY inside applyTemplate (the card onClick); changing the department
+ * filter just changes which cards are visible and never mutates the form.
  */
 import { useMemo, useState } from "react";
 import {
   Monitor, KeyRound, Mail, Wifi, Laptop, Download, Package, Printer, Lock,
   Server, UserPlus, Receipt, ShoppingCart, Calculator, FileText, Calendar,
-  User, Thermometer, Wrench, Truck, DoorOpen, Sparkles, type LucideIcon,
+  User, Thermometer, Wrench, Truck, DoorOpen, Sparkles, Shield, ShieldAlert,
+  Bug, AlertTriangle, GitBranch, Rocket, Settings, Users, Building2, CreditCard,
+  Phone, Globe, HardDrive, Cloud, Database, Smartphone, FileCheck, Megaphone,
+  Headphones, Briefcase, GraduationCap, Network, RefreshCw, Trash2, Plus,
+  type LucideIcon,
 } from "lucide-react";
 import { Chip, PRIORITY_CHIP, useHd } from "./_ui";
 import { Modal, Field, Input, Textarea, Select, Btn, FormError, hdCall } from "./_admin";
 
 type Dept = { id: number; name: string; enabled: boolean };
+type Agent = { email?: string | null; name?: string | null; agent_name?: string | null };
+type Team = { id: number; name: string; team_name?: string | null; disabled?: boolean };
 
 type Tpl = {
   id: number;
@@ -41,12 +59,18 @@ type Tpl = {
 const ICONS: Record<string, LucideIcon> = {
   monitor: Monitor, keyround: KeyRound, key: KeyRound, mail: Mail, wifi: Wifi,
   laptop: Laptop, download: Download, package: Package, printer: Printer,
-  lock: Lock, shieldcheck: Lock, server: Server, userplus: UserPlus,
-  receipt: Receipt, shoppingcart: ShoppingCart, cart: ShoppingCart,
-  calculator: Calculator, filetext: FileText, file: FileText,
-  calendar: Calendar, calendarclock: Calendar, user: User,
-  thermometer: Thermometer, wrench: Wrench, truck: Truck, move: Truck,
-  dooropen: DoorOpen,
+  lock: Lock, shieldcheck: Shield, shield: Shield, shieldalert: ShieldAlert,
+  server: Server, userplus: UserPlus, receipt: Receipt,
+  shoppingcart: ShoppingCart, cart: ShoppingCart, calculator: Calculator,
+  filetext: FileText, file: FileText, filecheck: FileCheck, calendar: Calendar,
+  calendarclock: Calendar, user: User, users: Users, thermometer: Thermometer,
+  wrench: Wrench, truck: Truck, move: Truck, dooropen: DoorOpen, bug: Bug,
+  alerttriangle: AlertTriangle, gitbranch: GitBranch, rocket: Rocket,
+  settings: Settings, building: Building2, building2: Building2,
+  creditcard: CreditCard, phone: Phone, globe: Globe, harddrive: HardDrive,
+  cloud: Cloud, database: Database, smartphone: Smartphone, megaphone: Megaphone,
+  headphones: Headphones, briefcase: Briefcase, graduationcap: GraduationCap,
+  network: Network, refreshcw: RefreshCw, trash2: Trash2, trash: Trash2, plus: Plus,
 };
 const iconFor = (name?: string | null): LucideIcon =>
   ICONS[(name || "").toLowerCase().replace(/[^a-z0-9]/g, "")] || Sparkles;
@@ -59,11 +83,12 @@ const PROCESSES = [
 ] as const;
 type Process = (typeof PROCESSES)[number]["value"];
 
-const SLA_LABEL: Record<Process, string> = {
-  incident: "Incident SLA",
-  service_request: "Service Request SLA",
-  problem: "Problem SLA",
-  change: "Change SLA",
+// Colour-coded process badge (card + "Creating:" line). Distinct hue per ITIL process.
+const PROCESS_BADGE: Record<Process, { label: string; cls: string }> = {
+  incident: { label: "Incident", cls: "bg-rose-100 text-rose-700" },
+  service_request: { label: "Service Request", cls: "bg-sky-100 text-sky-700" },
+  problem: { label: "Problem", cls: "bg-amber-100 text-amber-700" },
+  change: { label: "Change", cls: "bg-violet-100 text-violet-700" },
 };
 
 // §4 priority matrix (impact row × urgency column). Backend is authoritative.
@@ -77,6 +102,8 @@ const derivePriority = (impact: string, urgency: string): string | null =>
 
 const LEVELS = ["low", "medium", "high"];
 
+type Section = { header: string; items: Tpl[] };
+
 export function NewTicketDialog({
   open,
   onClose,
@@ -89,12 +116,21 @@ export function NewTicketDialog({
   const depts = useHd<{ departments: Dept[] }>("/helpdesk/departments");
   // Shape: a map of category → [subcategories] (§3.5). Tolerate a {catalog:…} wrapper or absence.
   const sc = useHd<any>("/helpdesk/service-catalog");
+  // Full template library — fetched ONCE, unfiltered. Grouping/filtering is client-side
+  // so changing the department filter never refetches or reorders under the user (desync fix).
+  const tpls = useHd<{ templates: Tpl[] }>("/helpdesk/request-templates");
+  const agentsRes = useHd<{ agents: Agent[] }>("/helpdesk/agents");
+  const teamsRes = useHd<{ teams: Team[] }>("/helpdesk/teams");
 
   const [process, setProcess] = useState<Process>("incident");
   const [departmentId, setDepartmentId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
+
+  // assignment (optional — unassigned routes by department)
+  const [assignee, setAssignee] = useState("");
+  const [team, setTeam] = useState("");
 
   // shared (incident + service_request)
   const [impact, setImpact] = useState("");
@@ -118,6 +154,8 @@ export function NewTicketDialog({
   const [err, setErr] = useState<string | null>(null);
 
   const deptList = (depts.data?.departments || []).filter((d) => d.enabled);
+  const agentList = agentsRes.data?.agents || [];
+  const teamList = (teamsRes.data?.teams || []).filter((t) => !t.disabled);
 
   const catalog: Record<string, string[]> = useMemo(() => {
     const raw = sc.data;
@@ -132,20 +170,37 @@ export function NewTicketDialog({
 
   const derived = derivePriority(impact, urgency);
 
-  // §A3 template library — refetches when process/department change (useHd keys on path).
-  const tplPath =
-    `/helpdesk/request-templates?process=${encodeURIComponent(process)}` +
-    (departmentId ? `&department_id=${encodeURIComponent(departmentId)}` : "");
-  const tpls = useHd<{ templates: Tpl[] }>(tplPath);
-  const templates = tpls.data?.templates || [];
-
   // §A5 real SLA target for the chosen process + derived priority (fallback Medium).
+  // Keyed on process/priority only — display-only, never writes form state.
   const slaPrev = useHd<{ policy?: string | null; response?: string | null; resolution?: string | null }>(
     `/helpdesk/sla-preview?process=${encodeURIComponent(process)}&priority=${encodeURIComponent(derived || "Medium")}`,
   );
   const slaResp = slaPrev.data?.response;
   const slaRes = slaPrev.data?.resolution;
 
+  // Group/filter the full library client-side (§2a). No department → section per
+  // department; department chosen → that department's cards, sub-grouped by category.
+  const sections: Section[] = useMemo(() => {
+    const all = tpls.data?.templates || [];
+    const push = (m: Map<string, Tpl[]>, k: string, t: Tpl) => {
+      const arr = m.get(k) || [];
+      arr.push(t);
+      m.set(k, arr);
+    };
+    const m = new Map<string, Tpl[]>();
+    if (departmentId) {
+      const did = Number(departmentId);
+      for (const t of all) if (t.department_id === did) push(m, t.default_category || "General", t);
+    } else {
+      for (const t of all) push(m, t.department || "Other", t);
+    }
+    return Array.from(m.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([header, items]) => ({ header, items }));
+  }, [tpls.data, departmentId]);
+  const templateCount = sections.reduce((n, s) => n + s.items.length, 0);
+
+  // §2c atomic full autofill — the ONLY place template values touch form state.
   const applyTemplate = (t: Tpl) => {
     if (t.process && t.process !== process) setProcess(t.process);
     setSubject(t.default_subject || t.template_name || "");
@@ -159,6 +214,7 @@ export function NewTicketDialog({
   const reset = () => {
     setProcess("incident");
     setDepartmentId(""); setSubject(""); setDescription(""); setContact("");
+    setAssignee(""); setTeam("");
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
     setRootCause("");
@@ -181,6 +237,8 @@ export function NewTicketDialog({
       department_id: departmentId ? Number(departmentId) : null,
     };
     if (contact.trim()) payload.contact = contact.trim();
+    if (assignee) payload.assigned_agent = assignee; // explicit assignee (wins over auto-assign)
+    if (team) payload.team = team;
 
     if (process === "incident" || process === "service_request") {
       if (impact) payload.impact = impact;
@@ -211,6 +269,8 @@ export function NewTicketDialog({
     reset();
     onCreated();
   };
+
+  const activeBadge = PROCESS_BADGE[process];
 
   return (
     <Modal
@@ -249,17 +309,40 @@ export function NewTicketDialog({
               </button>
             ))}
           </div>
-          <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#94A3B8]">
-            SLA: <span className="font-medium text-[#64748B]">
-              {slaResp && slaRes ? `respond ${slaResp} · resolve ${slaRes}` : SLA_LABEL[process]}
+          <span className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-[#64748B]">
+            Creating:
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeBadge.cls}`}>
+              {activeBadge.label}
             </span>
           </span>
         </div>
 
+        {/* §2d prominent SLA callout — updates live with process × derived priority. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[10px] border border-[#005B96]/20 bg-[#005B96]/[0.06] px-3.5 py-2.5">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-[#005B96]">SLA</span>
+          {slaResp || slaRes ? (
+            <>
+              <span className="text-[12.5px] text-[#334155]">
+                First response <span className="font-semibold text-[#0F172A]">{slaResp || "—"}</span>
+              </span>
+              <span className="text-[12.5px] text-[#334155]">
+                Resolution <span className="font-semibold text-[#0F172A]">{slaRes || "—"}</span>
+              </span>
+            </>
+          ) : (
+            <span className="text-[12.5px] text-[#64748B]">
+              {slaPrev.loading ? "Loading target…" : "No SLA policy configured for this process."}
+            </span>
+          )}
+          <span className="ml-auto text-[11px] text-[#94A3B8]">
+            {activeBadge.label} · {derived || "Medium"} priority
+          </span>
+        </div>
+
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <Field label="Department" hint={deptList.length ? undefined : "No departments yet — create one in Settings → Departments."}>
+          <Field label="Department" hint={deptList.length ? "Filters the templates below." : "No departments yet — create one in Settings → Departments."}>
             <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              <option value="">— Select —</option>
+              <option value="">— All departments —</option>
               {deptList.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
@@ -270,12 +353,13 @@ export function NewTicketDialog({
           </Field>
         </div>
 
-        {/* Common requests — click a card to pre-fill the form (§B1). */}
-        {!hideTemplates && templates.length > 0 && (
+        {/* §2a/2b/2c template picker — grouped, scrollable, process-badged; click = full autofill. */}
+        {!hideTemplates ? (
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[11.5px] font-semibold text-[#475569]">
-                Common requests{departmentId ? "" : " (all departments)"}
+                Common requests{departmentId ? "" : " — by department"}
+                {templateCount > 0 && <span className="ml-1 font-normal text-[#94A3B8]">({templateCount})</span>}
               </span>
               <button
                 type="button"
@@ -285,25 +369,55 @@ export function NewTicketDialog({
                 Start from scratch
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {templates.map((t) => {
-                const Icon = iconFor(t.icon);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => applyTemplate(t)}
-                    className="flex items-center gap-2 rounded-[10px] border border-[#E2E5EC] bg-white px-3 py-2.5 text-left transition hover:border-[#005B96] hover:bg-[#F6F7FB]"
-                  >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#005B96]/10 text-[#005B96]">
-                      <Icon size={16} strokeWidth={1.9} />
-                    </span>
-                    <span className="text-[12.5px] font-medium text-[#334155]">{t.default_subject || t.template_name}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {templateCount === 0 ? (
+              <div className="rounded-[10px] border border-dashed border-[#E2E5EC] bg-[#F9FAFB] px-3 py-4 text-center text-[12px] text-[#94A3B8]">
+                {tpls.loading ? "Loading templates…" : departmentId ? "No templates for this department yet." : "No templates configured yet."}
+              </div>
+            ) : (
+              <div className="max-h-[320px] space-y-3 overflow-y-auto rounded-[10px] border border-[#EEF1F5] bg-[#F9FAFB] p-2.5">
+                {sections.map((sec) => (
+                  <div key={sec.header}>
+                    <div className="sticky top-0 z-[1] mb-1.5 bg-[#F9FAFB] px-0.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">
+                      {sec.header}
+                      <span className="ml-1 font-normal normal-case text-[#A3AEBE]">({sec.items.length})</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {sec.items.map((t) => {
+                        const Icon = iconFor(t.icon);
+                        const badge = PROCESS_BADGE[t.process] || PROCESS_BADGE.incident;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => applyTemplate(t)}
+                            className="flex items-start gap-2 rounded-[10px] border border-[#E2E5EC] bg-white px-3 py-2.5 text-left transition hover:border-[#005B96] hover:bg-[#F6F7FB]"
+                          >
+                            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#005B96]/10 text-[#005B96]">
+                              <Icon size={16} strokeWidth={1.9} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[12.5px] font-medium text-[#334155]">{t.default_subject || t.template_name}</span>
+                              <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setHideTemplates(false)}
+            className="self-start text-[11px] font-semibold text-[#005B96] hover:underline"
+          >
+            Browse common requests
+          </button>
         )}
 
         {/* Incident */}
@@ -410,6 +524,28 @@ export function NewTicketDialog({
         <Field label="Description">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's going on? Steps, context, impact…" />
         </Field>
+
+        {/* §2e assignment — optional; unassigned routes by department. */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <Field label="Assignee" hint="Optional — leave blank to auto-route by department.">
+            <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+              <option value="">Unassigned (route by department)</option>
+              {agentList.map((a) => (
+                <option key={a.email || a.name || ""} value={a.email || a.name || ""}>
+                  {a.agent_name || a.name || a.email}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Team" hint="Optional — overrides the department's default team.">
+            <Select value={team} onChange={(e) => setTeam(e.target.value)} disabled={!teamList.length}>
+              <option value="">{teamList.length ? "— Select —" : "No teams configured"}</option>
+              {teamList.map((tm) => (
+                <option key={tm.id} value={tm.name}>{tm.team_name || tm.name}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
 
         <Field label="Contact email" hint="Who raised this, if not an internal user.">
           <Input type="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="person@company.com" />
