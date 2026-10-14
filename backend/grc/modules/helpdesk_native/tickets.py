@@ -435,12 +435,17 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
         department_id=payload.get("department_id"),  # AVA net-new intake department
         customer_id=payload.get("customer_id"),
         contact=payload.get("contact"),
+        assigned_agent=payload.get("assigned_agent"),  # §1c explicit assignee at create
         process=process,
         **ext,
     )
     db.add(ticket)
     db.flush()  # assign the PK before auto-assign / return
-    assignment.auto_assign(db, ticket)
+    # §1c: an explicit assignee wins — auto_assign is the only caller, so guarding
+    # the call here keeps it from overwriting a provided assigned_agent. Team
+    # routing (agent_group_id) is kept either way; unassigned tickets still route.
+    if not ticket.assigned_agent:
+        assignment.auto_assign(db, ticket)
     # §A4: compute the SLA now so a brand-new ticket shows response_by/resolution_by/
     # agreement_status immediately (not only on the first status change). Guarded —
     # a ticket must still be created when no SLA policy matches.
