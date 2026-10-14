@@ -54,6 +54,9 @@ export default function AssetsPage() {
     setActiveView(v);
     router.replace(v === 'overview' ? '/assets' : `/assets?tab=${v}`, { scroll: false });
   };
+  // CIS Benchmark sub-view — its Dashboard/Hierarchy toggle renders on the main
+  // tab row (right-aligned), so CisBenchmark is a controlled switch on this.
+  const [cisView, setCisView] = useState<'dashboard' | 'hierarchy'>('dashboard');
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('assets:asset_inventory:create');
   const canEdit = hasPermission('assets:asset_inventory:edit');
@@ -108,6 +111,17 @@ export default function AssetsPage() {
   const bulkUpdateMutation = useMutation({
     mutationFn: ({ ids, patch }: { ids: number[]; patch: Record<string, unknown> }) =>
       assetsApi.bulkUpdate(ids, patch),
+    // Optimistic: reflect the change (e.g. the PCI checkbox) instantly, then
+    // reconcile on success. A controlled checkbox with no optimistic update looks
+    // unclickable — it only flips once the refetch lands ~1s later.
+    onMutate: async ({ ids, patch }) => {
+      await queryClient.cancelQueries({ queryKey: ['assets'] });
+      const prev = queryClient.getQueryData(['assets']);
+      queryClient.setQueryData(['assets'], (old: any) =>
+        Array.isArray(old) ? old.map((a: any) => (ids.includes(a.id) ? { ...a, ...patch } : a)) : old);
+      return { prev };
+    },
+    onError: (_e, _vars, ctx: any) => { if (ctx?.prev !== undefined) queryClient.setQueryData(['assets'], ctx.prev); },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['asset-facets'] });
@@ -348,17 +362,25 @@ export default function AssetsPage() {
             {canCreate && <button type="button" className="btn btn-pri" onClick={() => setIsModalOpen(true)}><Plus size={15} />Add asset</button>}
           </div>
         </div>
-        <div className="segwrap" style={{ marginTop: 9 }}>
-          <button type="button" className={activeView === 'overview' ? 'seg on' : 'seg'} onClick={() => switchView('overview')}>Overview</button>
-          <button type="button" className={activeView === 'inventory' ? 'seg on' : 'seg'} onClick={() => switchView('inventory')}>Inventory</button>
-          <button type="button" className={activeView === 'cis' ? 'seg on' : 'seg'} onClick={() => switchView('cis')}>CIS Benchmark</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
+          <div className="segwrap">
+            <button type="button" className={activeView === 'overview' ? 'seg on' : 'seg'} onClick={() => switchView('overview')}>Overview</button>
+            <button type="button" className={activeView === 'inventory' ? 'seg on' : 'seg'} onClick={() => switchView('inventory')}>Inventory</button>
+            <button type="button" className={activeView === 'cis' ? 'seg on' : 'seg'} onClick={() => switchView('cis')}>CIS Benchmark</button>
+          </div>
+          {activeView === 'cis' && (
+            <div className="segwrap">
+              <button type="button" className={cisView === 'dashboard' ? 'seg on' : 'seg'} onClick={() => setCisView('dashboard')}>Dashboard</button>
+              <button type="button" className={cisView === 'hierarchy' ? 'seg on' : 'seg'} onClick={() => setCisView('hierarchy')}>Benchmark Hierarchy</button>
+            </div>
+          )}
         </div>
       </div>
 
       {activeView === 'overview' ? (
         <InventoryOverview />
       ) : activeView === 'cis' ? (
-        <CisBenchmark />
+        <CisBenchmark view={cisView} />
       ) : (
       <InventoryRedesign
         hideHead

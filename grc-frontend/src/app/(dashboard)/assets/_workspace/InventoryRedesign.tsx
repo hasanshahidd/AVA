@@ -48,7 +48,7 @@ const canConnect = (a: ITAsset) => !!a.host_name && a.discovery_state !== 'unman
 // credentialed scan OR manual/import; scan_mode null folds into Credential).
 const modeOf = (a: ITAsset): 'easm' | 'credential' | 'uncredential' =>
   a.scan_mode === 'easm' ? 'easm' : a.scan_mode === 'uncredential' ? 'uncredential' : 'credential';
-const MODE_LABEL: Record<'easm' | 'credential' | 'uncredential', string> = { easm: 'EASM', credential: 'Credential', uncredential: 'Uncredential' };
+const MODE_LABEL: Record<'all' | 'easm' | 'credential' | 'uncredential' | 'pci', string> = { all: 'All', easm: 'EASM', credential: 'Credential', uncredential: 'Uncredential', pci: 'PCI' };
 
 const TILE: Record<string, { bg: string; fg: string }> = {
   application: { bg: '#DBE8FA', fg: '#28578F' }, infrastructure: { bg: '#CFF2E7', fg: '#014A81' },
@@ -81,8 +81,10 @@ export default function InventoryRedesign(p: Props) {
   // 3-mode toggle — EASM / Credential / Uncredential (scan_mode from the discovery
   // backend; null folds into Credential via modeOf). Default Credential (the
   // full-depth bucket, incl. manual/import).
-  const [mode, setMode] = useState<'easm' | 'credential' | 'uncredential'>(
-    initialMode === 'easm' || initialMode === 'uncredential' ? initialMode : 'credential');
+  const [mode, setMode] = useState<'all' | 'easm' | 'credential' | 'uncredential' | 'pci'>(() => {
+    const m = initialMode || '';
+    return m === 'easm' || m === 'credential' || m === 'uncredential' || m === 'pci' ? m : 'all';
+  });
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
   const [popup, setPopup] = useState<ITAsset | null>(null);
@@ -133,7 +135,7 @@ export default function InventoryRedesign(p: Props) {
     const r = assets.filter((a) =>
       match(a) &&
       (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
-      modeOf(a) === mode);
+      (mode === 'all' ? true : mode === 'pci' ? !!a.cde_environment : modeOf(a) === mode));
     const s = [...r];
     if (sort === 'crit') s.sort((a, b) => (CRIT_ORDER[critOf(b)] || 0) - (CRIT_ORDER[critOf(a)] || 0));
     else if (sort === 'scan') s.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
@@ -279,12 +281,12 @@ export default function InventoryRedesign(p: Props) {
               <input className="search" placeholder="Search this view…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <select className="sel" value={sort} onChange={(e) => setSort(e.target.value)}><option value="crit">Sort: Criticality</option><option value="scan">Sort: Recently scanned</option><option value="value">Sort: Value</option><option value="name">Sort: Name</option></select>
-            {/* 3-mode toggle — discovery source / scan mode. EASM (external), Credential
-                (full depth, incl. manual), Uncredential (credential-free sweep). */}
-            <div className="segwrap" title="Discovery source — EASM (external), Credential (full depth), Uncredential (credential-free sweep)">
-              {(['easm', 'credential', 'uncredential'] as const).map((m) => (
+            {/* 5-tab view — All, EASM (external), Credential (full depth incl. manual),
+                Uncredential (credential-free sweep, grouped by CIDR), PCI (in-scope). */}
+            <div className="segwrap" title="View — All · EASM (external) · Credential (full depth) · Uncredential (credential-free sweep) · PCI (in scope)">
+              {(['all', 'easm', 'credential', 'uncredential', 'pci'] as const).map((m) => (
                 <button key={m} className={'seg' + (mode === m ? ' on' : '')} onClick={() => { setMode(m); setSel(new Set()); }}>
-                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'easm' ? c.easmN : m === 'credential' ? c.credN : c.uncredN}</span>
+                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'all' ? c.total : m === 'easm' ? c.easmN : m === 'credential' ? c.credN : m === 'uncredential' ? c.uncredN : c.cde}</span>
                 </button>
               ))}
             </div>
