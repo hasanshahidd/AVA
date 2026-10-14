@@ -123,19 +123,27 @@ const navigation: NavEntry[] = [
     // Teams live in Administration (grc_teams); Home is dropped (Dashboard only).
     name: 'Help Desk',
     icon: LifeBuoy,
+    // Role-aware (OR gate — hasPermission uses `.some`): agent-console items need
+    // helpdesk:tickets:view; the three requester items need only the end-user
+    // perms, so a requester-only user sees JUST those three, an agent the console.
     items: [
-      { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard },
-      { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket },
-      { name: 'Incidents',        href: '/helpdesk/incidents',  icon: AlertCircle },
-      { name: 'Problems',         href: '/helpdesk/problems',   icon: Bug },
-      { name: 'Changes',          href: '/helpdesk/changes',    icon: GitPullRequest },
-      { name: 'Service Requests', href: '/helpdesk/service-requests', icon: ClipboardList },
-      { name: 'Agents',           href: '/helpdesk/agents',     icon: Users },
-      { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2 },
-      { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact },
-      { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen },
-      { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText },
-      { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings },
+      // ── requester (end-user) view ──
+      { name: 'Report an issue',  href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:requests:create'] },
+      { name: 'My Requests',      href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:requests:view_own'] },
+      { name: 'Help / Knowledge Base', href: '/helpdesk/kb',            icon: BookOpen,          requiredPermissions: ['helpdesk:requests:view_own'] },
+      // ── agent console ──
+      { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard, requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket,          requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Incidents',        href: '/helpdesk/incidents',  icon: AlertCircle,     requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Problems',         href: '/helpdesk/problems',   icon: Bug,             requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Changes',          href: '/helpdesk/changes',    icon: GitPullRequest,  requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Service Requests', href: '/helpdesk/service-requests', icon: ClipboardList, requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Agents',           href: '/helpdesk/agents',     icon: Users,           requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2,       requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact,         requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen,        requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText, requiredPermissions: ['helpdesk:tickets:view'] },
+      { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings,        requiredPermissions: ['helpdesk:tickets:view'] },
     ],
   },
   // Reports — its own top-level module.

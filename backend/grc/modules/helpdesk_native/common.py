@@ -14,17 +14,28 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from ...models import Tenant
-from ...routers.auth_router import require_tenant_permission
+from ...models import GRCUser, Tenant
+from ...routers.auth_router import require_auth, require_tenant_permission
 
 # RBAC — mirror the app's "<area>:<resource>:<action>" permission convention.
 # Administrator and the tenant primary-contact pass automatically (see
-# require_tenant_permission); other roles need these granted. Not seeded yet —
-# the router is not mounted, cutover is a later step.
-require_view = require_tenant_permission("helpdesk:tickets:view")
-require_edit = require_tenant_permission("helpdesk:tickets:edit")
+# require_tenant_permission); other roles need these granted.
+require_view = require_tenant_permission("helpdesk:tickets:view")   # agent queue
+require_edit = require_tenant_permission("helpdesk:tickets:edit")   # agent write
+
+# End-user (requester) gates — a requester-only role has these but NOT tickets:*,
+# so the agent console stays closed to them while the portal opens.
+require_requester = require_tenant_permission("helpdesk:requests:view_own")
+require_request_create = require_tenant_permission("helpdesk:requests:create")
+
+
+def current_user_email(user: GRCUser = Depends(require_auth)) -> str:
+    """The signed-in user's email — the key the requester portal isolates own
+    tickets on. Reuses require_auth (so auth/idle checks all still run)."""
+    return user.email
 
 
 def tenant_id(db: Session) -> Optional[int]:

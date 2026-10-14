@@ -546,6 +546,29 @@ PERMISSION_MATRIX = [
                 "actions": ["view", "create", "edit", "delete"]
             }
         ]
+    },
+    {
+        # Help Desk (AVA-native ITSM). Agent gates (helpdesk:tickets:view/edit)
+        # are already enforced across the HD routers via common.require_view /
+        # require_edit; this block makes the module grantable in the Admin > Roles
+        # matrix and adds the end-user `requests` scope (raise + track-own + KB)
+        # so a tenant can give employees a requester-only view, not the full
+        # agent console. Administrator + primary-contact bypass as everywhere.
+        # Preset roles seeded per-tenant by helpdesk_native.itsm_seed.seed_hd_roles.
+        "module": "helpdesk",
+        "display_name": "Help Desk",
+        "submodules": [
+            {"name": "requests", "display_name": "My Requests (end user)",
+             "actions": ["create", "view_own"]},
+            {"name": "tickets", "display_name": "Tickets (agent queue)",
+             "actions": ["view", "create", "edit", "delete", "assign"]},
+            {"name": "processes", "display_name": "Incidents / Problems / Changes / Service Requests",
+             "actions": ["view", "manage"]},
+            {"name": "kb", "display_name": "Knowledge Base",
+             "actions": ["view", "author"]},
+            {"name": "settings", "display_name": "Help Desk Settings & SLA",
+             "actions": ["view", "manage"]},
+        ]
     }
 ]
 
