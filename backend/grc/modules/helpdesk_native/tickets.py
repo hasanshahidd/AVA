@@ -8,11 +8,12 @@ strategy are delegated to the `sla` / `assignment` modules (stubs for now).
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -41,6 +42,121 @@ logger = logging.getLogger(__name__)
 RESOLVED = "Resolved"
 PAUSED = "Paused"
 CLOSED_LABEL = "Closed"
+
+# ─── ITSM process + priority matrix (spec §0, §1, §4) ────────────────────────
+PROCESSES = {"incident", "problem", "change", "service_request", "question"}
+
+# ITIL 4-level matrix: PRIORITY_MATRIX[impact][urgency] -> priority name (§4).
+PRIORITY_MATRIX = {
+    "high":   {"high": "Urgent", "medium": "High",   "low": "Medium"},
+    "medium": {"high": "High",   "medium": "Medium", "low": "Low"},
+    "low":    {"high": "Medium", "medium": "Low",    "low": "Low"},
+}
+
+# extension columns create/update accept (process handled separately — set-once).
+_EXT_DATETIME = ("planned_start", "planned_end", "approved_at")
+_EXT_FIELDS = (
+    "impact", "urgency",
+    "change_type", "change_risk", "planned_start", "planned_end",
+    "implementation_plan", "backout_plan",
+    "approval_state", "approved_by", "approved_at",
+    "root_cause", "workaround", "known_error", "problem_resolution",
+    "linked_incident_ids",
+    "request_category", "request_subcategory",
+)
+
+
+def priority_name_from_matrix(impact: Optional[str], urgency: Optional[str]) -> Optional[str]:
+    """Pure §4 lookup — priority *name* for an (impact, urgency) pair, or None."""
+    return PRIORITY_MATRIX.get((impact or "").strip().lower(), {}).get(
+        (urgency or "").strip().lower())
+
+
+def priority_from_matrix(db: Session, tid: int, impact: Optional[str],
+                         urgency: Optional[str]) -> Optional[int]:
+    """§4. Resolve the matrix priority name to a tenant HDTicketPriority.id.
+    Missing cell or no such priority → None."""
+    name = priority_name_from_matrix(impact, urgency)
+    if not name:
+        return None
+    p = (
+        db.query(HDTicketPriority)
+        .filter(HDTicketPriority.tenant_id == tid, HDTicketPriority.name == name)
+        .first()
+    )
+    return p.id if p else None
+
+
+def _as_bool(v) -> bool:
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
+
+
+def _as_dt(v) -> Optional[datetime]:
+    if v in (None, ""):
+        return None
+    if isinstance(v, datetime):
+        return v
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _extension_kwargs(payload: dict) -> dict:
+    """Pull + coerce the §1 extension fields present in `payload` (store what's
+    sent — no per-process gating, spec §2)."""
+    out: dict = {}
+    for f in _EXT_FIELDS:
+        if f not in payload:
+            continue
+        v = payload[f]
+        if f == "known_error":
+            out[f] = _as_bool(v)
+        elif f == "linked_incident_ids":
+            out[f] = json.dumps(v) if isinstance(v, (list, tuple)) else v
+        elif f in _EXT_DATETIME:
+            out[f] = _as_dt(v)
+        else:
+            out[f] = v
+    return out
+
+
+def _parse_linked_ids(v) -> list:
+    if not v:
+        return []
+    try:
+        d = json.loads(v)
+        return d if isinstance(d, list) else []
+    except (ValueError, TypeError):
+        return []
+
+
+def _process_fields(ticket: "HDTicket") -> dict:
+    """process + all extension fields, serialized (dates → iso, ids → list) so
+    every ticket shape carries them (FE picks the ones the process needs, §2)."""
+    return {
+        "process": ticket.process or "incident",
+        "impact": ticket.impact,
+        "urgency": ticket.urgency,
+        "change_type": ticket.change_type,
+        "change_risk": ticket.change_risk,
+        "planned_start": iso(ticket.planned_start),
+        "planned_end": iso(ticket.planned_end),
+        "implementation_plan": ticket.implementation_plan,
+        "backout_plan": ticket.backout_plan,
+        "approval_state": ticket.approval_state,
+        "approved_by": ticket.approved_by,
+        "approved_at": iso(ticket.approved_at),
+        "root_cause": ticket.root_cause,
+        "workaround": ticket.workaround,
+        "known_error": bool(ticket.known_error),
+        "problem_resolution": ticket.problem_resolution,
+        "linked_incident_ids": _parse_linked_ids(ticket.linked_incident_ids),
+        "request_category": ticket.request_category,
+        "request_subcategory": ticket.request_subcategory,
+    }
 
 
 def _notify(fn_name: str, db: Session, tid: int, ticket: "HDTicket", *args) -> None:
@@ -165,16 +281,21 @@ def _apply_status_change(db: Session, tid: int, ticket: HDTicket, new_status: HD
 
 # ─── reads ───────────────────────────────────────────────────────────────────
 def list_tickets(db: Session, tid: int, status: Optional[str] = None,
-                 q: Optional[str] = None) -> dict:
-    """§A3. FE calls with no params (filters/sorts/groups client-side over the
-    full list); `status`/`q` honoured if passed."""
+                 q: Optional[str] = None, process: Optional[str] = None,
+                 **filters) -> dict:
+    """§A3 / §2. FE calls with no params (filters/sorts/groups client-side over
+    the full list); `status`/`q`/`process` honoured if passed. Each row carries
+    `process` + all extension fields so the per-process pages can render.
+    `status`/`q` stay positional for the existing all-process list caller."""
     rows = (
         db.query(HDTicket)
         .filter(HDTicket.tenant_id == tid)
         .order_by(HDTicket.updated_at.desc())
         .all()
     )
-    out = [ticket_row(t) for t in rows]
+    out = [{**ticket_row(t), **_process_fields(t)} for t in rows]
+    if process:
+        out = [r for r in out if (r.get("process") or "incident") == process]
     if status:
         out = [r for r in out if (r.get("status") or "") == status]
     if q:
@@ -235,7 +356,8 @@ def get_detail(db: Session, tid: int, name: str) -> dict:
     if not ticket:
         return {"ticket": None, "conversation": []}
     return {
-        "ticket": ticket_detail(ticket, sla.compute_sla_block(db, ticket)),
+        "ticket": {**ticket_detail(ticket, sla.compute_sla_block(db, ticket)),
+                   **_process_fields(ticket)},
         "conversation": _conversation(db, tid, ticket),
     }
 
@@ -273,8 +395,14 @@ def meta(db: Session, tid: int) -> dict:
 
 # ─── writes ────────────────────────────────────────────────────────────────
 def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str] = None) -> dict:
-    """§0/§5 create. Defaults status to the open status when unset; priority/type
-    taken from payload. Auto-assign is delegated to the assignment engine."""
+    """§0/§5/§2 create. Defaults status to the open status when unset; priority is
+    taken from payload or derived from the impact/urgency matrix. `process`
+    defaults to 'incident' and is set once. Auto-assign is delegated to the
+    assignment engine."""
+    process = (payload.get("process") or "").strip().lower() or "incident"
+    if process not in PROCESSES:
+        raise HTTPException(status_code=400, detail=f"unknown process '{process}'")
+
     status_id = payload.get("status_id")
     if not status_id:
         s = _default_open_status(db, tid)
@@ -285,6 +413,15 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
             HDTicketStatus.id == status_id, HDTicketStatus.tenant_id == tid).first()
         status_cat = s.category if s else None
 
+    # §2: derive priority from the matrix when not given but impact+urgency are.
+    priority_id = payload.get("priority_id")
+    if not priority_id and payload.get("impact") and payload.get("urgency"):
+        priority_id = priority_from_matrix(db, tid, payload.get("impact"), payload.get("urgency"))
+
+    ext = _extension_kwargs(payload)
+    if process == "change" and not ext.get("approval_state"):
+        ext["approval_state"] = "draft"  # §2: change tickets start in draft
+
     ticket = HDTicket(
         tenant_id=tid,
         subject=payload.get("subject") or "(no subject)",
@@ -292,12 +429,14 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
         raised_by=payload.get("raised_by") or raised_by,
         status_id=status_id,
         status_category=status_cat,
-        priority_id=payload.get("priority_id"),
+        priority_id=priority_id,
         ticket_type_id=payload.get("ticket_type_id"),
         agent_group_id=payload.get("agent_group_id"),
         department_id=payload.get("department_id"),  # AVA net-new intake department
         customer_id=payload.get("customer_id"),
         contact=payload.get("contact"),
+        process=process,
+        **ext,
     )
     db.add(ticket)
     db.flush()  # assign the PK before auto-assign / return
@@ -399,6 +538,21 @@ def update(db: Session, tid: int, name: str, payload: dict) -> dict:
 
     db.commit()
     return {"ok": True}
+
+
+def update_ticket(db: Session, tid: int, id, payload: dict) -> dict:
+    """§2. Set the §1 process-extension fields a process detail panel / action
+    edits (impact/urgency, change, problem, service-request fields + the change
+    approval_state/approved_by/approved_at). `process` is set-once at create and
+    is never changed here. Label-based priority/type/status edits go through
+    `update()`."""
+    ticket = _get_ticket(db, tid, str(id))
+    if not ticket:
+        return {"ok": False, "error": "not found"}
+    for k, v in _extension_kwargs(payload).items():
+        setattr(ticket, k, v)
+    db.commit()
+    return {"ok": True, "name": str(ticket.id)}
 
 
 def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optional[str]) -> dict:
