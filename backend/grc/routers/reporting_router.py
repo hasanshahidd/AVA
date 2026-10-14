@@ -47,6 +47,8 @@ from ..models._60_helpdesk_native_models import (
     HDTicket, HDTicketStatus, HDTicketPriority, HDTicketType, HDDepartment,
 )
 from ..models._23_track_a_phase_7_cloud_connector_framework_foundation import Team
+from ..models._47_asset_discovery_models import DiscoveryObservation
+from ..models._pentest_exploit_results import PentestExploitResult
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -146,19 +148,83 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
     "assets": DatasetSpec(
         ITAsset,
         permissions=["assets:asset_inventory:*"],
+        # Full ITAM-parity projection — identity, ownership, CIA/criticality,
+        # exposure & business-impact (the live risk-posture inputs), lifecycle,
+        # OS, hardware, procurement and discovery provenance. JSON blobs
+        # (known_ips, pci_dss, security_posture, detected_software_json, …) and
+        # long free-text (description, *_notes, *_reason) are intentionally left
+        # out — they don't serialize to a report cell. owner_name is the
+        # denormalized display column, so no owner-FK resolution is needed. NB:
+        # there is NO stored `open_findings` column (it's computed live by the
+        # inventory API), so it cannot be a report field.
         fields=[
-            "id", "name", "asset_type", "criticality", "owner_name", "host_name",
-            "ip_address", "location", "internet_facing", "status", "created_at",
+            # Identity
+            "id", "name", "host_name", "fqdn", "ip_address", "primary_mac",
+            "asset_type", "asset_role", "platform_kind",
+            # Ownership
+            "owner_name", "custodian", "owning_team", "department",
+            "assigned_user", "business_function",
+            # Classification & criticality
+            "criticality", "criticality_score", "confidentiality_rating",
+            "integrity_rating", "availability_rating", "data_classification",
+            "regulated_data_type", "valuation",
+            # Exposure & business impact (risk-posture inputs)
+            "internet_facing", "op_dep_business_impact", "network_segment",
+            "environment", "cde_environment",
+            # Lifecycle & status
+            "status", "lifecycle_state", "discovery_state", "origin_source",
+            "decommissioned_at",
+            # Operating system
+            "os_family", "os_version", "os_edition",
+            # Hardware
+            "manufacturer", "model", "serial_number", "cpu_cores", "memory_gb",
+            "storage_gb",
+            # Procurement
+            "vendor", "purchase_cost", "purchase_date", "warranty_expiry", "eol_date",
+            # Location & tracking
+            "location", "last_seen_source", "first_seen_at", "last_seen_at", "created_at",
         ],
-        search=["name", "owner_name", "host_name", "ip_address", "location"],
+        search=[
+            "name", "host_name", "fqdn", "ip_address", "primary_mac",
+            "owner_name", "serial_number", "location", "os_version",
+        ],
         sortable=[
-            "id", "name", "asset_type", "criticality", "owner_name", "host_name",
-            "ip_address", "location", "internet_facing", "status", "created_at",
+            "id", "name", "host_name", "ip_address", "asset_type", "asset_role",
+            "platform_kind", "owner_name", "department", "business_function",
+            "criticality", "criticality_score", "confidentiality_rating",
+            "integrity_rating", "availability_rating", "data_classification",
+            "regulated_data_type", "valuation", "internet_facing",
+            "op_dep_business_impact", "environment", "status", "lifecycle_state",
+            "discovery_state", "origin_source", "decommissioned_at", "os_family",
+            "manufacturer", "model", "cpu_cores", "memory_gb", "storage_gb",
+            "vendor", "purchase_cost", "purchase_date", "warranty_expiry",
+            "eol_date", "location", "first_seen_at", "last_seen_at", "created_at",
         ],
         filterable={
-            "asset_type": "badge", "criticality": "badge", "owner_name": "text",
-            "location": "text", "internet_facing": "badge", "status": "badge",
-            "created_at": "date", "name": "text",
+            # badges (enums + booleans)
+            "asset_type": "badge", "asset_role": "badge", "platform_kind": "badge",
+            "criticality": "badge", "data_classification": "badge",
+            "regulated_data_type": "badge", "internet_facing": "badge",
+            "cde_environment": "badge", "op_dep_business_impact": "badge",
+            "environment": "badge", "status": "badge", "lifecycle_state": "badge",
+            "discovery_state": "badge", "origin_source": "badge", "os_family": "badge",
+            # numbers
+            "criticality_score": "number", "confidentiality_rating": "number",
+            "integrity_rating": "number", "availability_rating": "number",
+            "valuation": "number", "cpu_cores": "number", "memory_gb": "number",
+            "storage_gb": "number", "purchase_cost": "number",
+            # dates
+            "purchase_date": "date", "warranty_expiry": "date", "eol_date": "date",
+            "decommissioned_at": "date", "first_seen_at": "date",
+            "last_seen_at": "date", "created_at": "date",
+            # text
+            "name": "text", "host_name": "text", "fqdn": "text", "ip_address": "text",
+            "primary_mac": "text", "owner_name": "text", "custodian": "text",
+            "owning_team": "text", "department": "text", "assigned_user": "text",
+            "business_function": "text", "network_segment": "text",
+            "os_version": "text", "os_edition": "text", "manufacturer": "text",
+            "model": "text", "serial_number": "text", "vendor": "text",
+            "location": "text", "last_seen_source": "text",
         },
         default_order=("id", "desc"),
     ),
@@ -386,6 +452,70 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
         },
         default_order=("name", "asc"),
     ),
+    "discovery": DatasetSpec(
+        DiscoveryObservation,
+        permissions=["compliance:discover:*"],
+        # Discovered-device evidence (grc_discovery_observations) — the pre-asset
+        # inbox the identity resolver drains. host/ip/fqdn/mac are the identity
+        # hints a scan wrote; `source` is the scan kind (cidr / active_directory);
+        # `resolution` is the lifecycle (pending → unclaimed → created/merged/
+        # review/ignored); `resolved_asset` resolves resolved_asset_id to the
+        # canonical asset name once the resolver links it. Open ports / OS guess
+        # live in the `raw` JSON evidence blob (not a column), so they cannot be
+        # projected as report cells.
+        fields=[
+            "id", "host_name", "ip_address", "fqdn", "mac_address", "source",
+            "resolution", "resolved_asset", "resolution_note", "observed_at",
+            "created_at",
+        ],
+        search=["host_name", "ip_address", "fqdn", "mac_address"],
+        sortable=[
+            "id", "host_name", "ip_address", "fqdn", "mac_address", "source",
+            "resolution", "observed_at", "created_at",
+        ],
+        filterable={
+            "source": "badge", "resolution": "badge", "host_name": "text",
+            "ip_address": "text", "fqdn": "text", "mac_address": "text",
+            "resolution_note": "text", "observed_at": "date", "created_at": "date",
+        },
+        default_order=("observed_at", "desc"),
+        ref_fields={
+            "resolved_asset": ("resolved_asset_id", ITAsset, "name"),
+        },
+    ),
+    "pentest_findings": DatasetSpec(
+        PentestExploitResult,
+        permissions=["pentest:workspace:view"],
+        # Persisted AI-Pentest exploit results (grc_pentest_exploit_results) — one
+        # row per exploit attempt against a finding on an asset. `asset_name`
+        # resolves asset_id to the canonical asset name (asset_id is a plain int,
+        # no FK — the lookup is simply None for ad-hoc targets). `status` is the
+        # operational outcome (executed / error / needs-creds / …); `exploit_status`
+        # is the prover's honest verdict (exploitable / not-exploitable / …).
+        # Large evidence/log/screenshot/kill_chain/narrative blobs are omitted —
+        # they are not report cells.
+        fields=[
+            "id", "target", "asset_name", "title", "severity", "cve_id", "tool",
+            "technique", "status", "exploit_status", "exploit_class", "confirmed",
+            "access_proven", "cve_specific", "outcome", "created_at",
+        ],
+        search=["target", "title", "cve_id", "technique"],
+        sortable=[
+            "id", "target", "severity", "cve_id", "tool", "status",
+            "exploit_status", "exploit_class", "confirmed", "access_proven",
+            "cve_specific", "created_at",
+        ],
+        filterable={
+            "severity": "badge", "status": "badge", "exploit_status": "badge",
+            "exploit_class": "badge", "confirmed": "badge", "access_proven": "badge",
+            "cve_specific": "badge", "tool": "badge", "cve_id": "text",
+            "target": "text", "title": "text", "created_at": "date",
+        },
+        default_order=("created_at", "desc"),
+        ref_fields={
+            "asset_name": ("asset_id", ITAsset, "name"),
+        },
+    ),
 }
 
 
@@ -397,6 +527,8 @@ DATASET_LABELS: Dict[str, str] = {
     "cis_results": "CIS Benchmark Results",
     "helpdesk_tickets": "Help Desk Tickets",
     "sbp_inventory": "SBP Offsite IT-Asset Inventory",
+    "discovery": "Discovered Devices",
+    "pentest_findings": "Pentest Findings",
 }
 
 
@@ -776,6 +908,7 @@ def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dic
 # allowlist to expose more.
 AVA_DATASET_ALLOWLIST = [
     "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
+    "discovery", "pentest_findings",
 ]
 
 

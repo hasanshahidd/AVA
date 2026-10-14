@@ -27,6 +27,8 @@ const DATASET_LABELS: Record<string, string> = {
   cis_results: 'CIS Benchmark Results',
   helpdesk_tickets: 'Help Desk Tickets',
   sbp_inventory: 'SBP Offsite IT-Asset Inventory',
+  discovery: 'Discovered Devices',
+  pentest_findings: 'Pentest Findings',
 };
 
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

@@ -1,40 +1,49 @@
 'use client';
 
 /**
- * CIS Benchmark — compliance dashboard (executive / analyst view).
+ * CIS Benchmark — executive compliance dashboard.
  *
  * The second of the two CIS pages in the IT-asset area (the first is the
  * CisHierarchy rule browser). That page browses the rule *library*; this one
- * scores actual hardening across the whole asset estate.
+ * answers, for a CISO at a glance:
+ *     1. How hardened is the estate against its CIS benchmarks, right now?
+ *     2. Can I trust that number — how much of the estate is actually scanned?
+ *     3. Where does the weakness concentrate (OS families, benchmarks)?
+ *     4. What do we fix first (most-failed controls, worst assets)?
+ *
+ * Layout mirrors that C-level order, top to bottom:
+ *     [executive summary band]  — one confident sentence over live numbers
+ *     [posture · coverage · estate-by-hardening]   ← answer + trust
+ *     [pass rate by OS family · by benchmark]       ← where it concentrates
+ *     [remediation priorities · worst assets]       ← what to do next
  *
  * Visual language follows the Performance exec dashboard (dashboard/_components):
- * white cards on a light canvas, brand accent #005B96, coverage ring, 100%
- * stacked bars, honest per-card empty states — charts are inline SVG/CSS
- * (recharts is mocked in this repo, so it is never used here). The card, bar,
- * legend, figure and empty-state primitives are reused from that dashboard's
- * kit so the two surfaces stay pixel-consistent.
+ * white cards on a light canvas, brand accent #005B96, a compliance pass-rate ring,
+ * 100% stacked bars, honest per-card empty states. Charts are inline SVG/CSS
+ * (recharts is mocked in this repo). The card / bar / legend / figure / pill /
+ * empty-state primitives and the T / SEV tokens are imported read-only from that
+ * dashboard's kit so the two surfaces stay pixel-consistent. We render lists as
+ * div rows (not <table>) because this panel lives under the warm `.asset-suite`
+ * theme, whose `table` rules carry `!important` and would recolour a table here.
  *
- * Every figure is read live; nothing is fabricated. Data sources:
+ * Every figure is read live; nothing is fabricated, sampled or trended (no CIS
+ * time-series exists, so the page states posture confidently but claims no
+ * direction). Data sources:
  *   GET /compliance-plugins/assets-overview       (compliancePluginsApi.assetsOverview)
  *       → per-asset passed/failed/errored, OS family, matched benchmark, last scan.
- *         Backs: compliance score, scan coverage, pass-rate by OS family & by
- *         benchmark, and the assets-needing-attention leaderboard.
  *   GET /compliance-plugins/per-asset-coverage?asset_id=N  (perAssetCoverage), fanned
- *       out over the assets that have >=1 failing check → rule-level failures with
- *       severity. Backs: remediation-by-severity and top-failing-controls.
- *
- * A panel with no backing data shows an empty state, never a zero dressed up as a
- * score (mirrors _cis-overview and the Performance dashboard honesty rules).
+ *       out over the assets with >=1 failing check → rule-level failures with severity.
+ * A panel with no backing data shows an empty state, never a zero dressed up as a score.
  */
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { ClipboardCheck, ServerCog, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, ServerCog, ShieldCheck } from 'lucide-react';
 import { compliancePluginsApi } from '@/lib/api';
 import {
-  T, SEV, SEV_ORDER, type Sev, type Tone, FONT,
-  Card, Empty, Loading, Unavailable, Figure, Pill,
+  T, SEV, SEV_ORDER, type Sev, type Tone, FONT, CARD_SHADOW,
+  Card, Empty, Loading, Unavailable, Figure, Pill, Eyebrow,
   nfmt, pctOf, plural,
 } from '../../dashboard/_components/kit';
 import { StackBar, PartLegend, BarList, type Part, type BarRow } from '../../dashboard/_components/charts';
@@ -67,6 +76,13 @@ function rateTone(r: number | null): Tone {
   if (r >= 55) return { ...SEV.medium, label: `${r}%` };
   return { ...SEV.critical, label: `${r}%` };
 }
+/** Confident one-word hardening band for a pass rate (same 85 / 55 cut-offs as the colours). */
+function bandTone(r: number | null): Tone {
+  if (r == null) return { ...SEV.info, label: 'Unmeasured' };
+  if (r >= 85) return { label: 'Strong', c: T.success, ink: T.success, bg: '#E7F5EE' };
+  if (r >= 55) return { ...SEV.medium, label: 'Moderate' };
+  return { ...SEV.critical, label: 'Weak' };
+}
 const normSev = (s?: string | null): Sev => {
   const k = (s || '').toLowerCase();
   return (SEV_ORDER as string[]).includes(k) ? (k as Sev) : 'info';
@@ -91,9 +107,9 @@ function prettyBenchmark(raw?: string | null): string {
   return s.length > 46 ? s.slice(0, 46) + '…' : s;
 }
 
-/* ---------- pass-rate ring (compliance reads green-high, so it is its own
-   mark — the kit Gauge is a risk gauge whose zones are green-low/red-high) ---------- */
-function Ring({ pct, size = 108 }: { pct: number | null; size?: number }) {
+/* ---------- pass-rate ring (compliance reads green-high, so it is its own mark —
+   the kit Gauge is a risk gauge whose zones are green-low/red-high) ---------- */
+function Ring({ pct, size = 112 }: { pct: number | null; size?: number }) {
   const C = 2 * Math.PI * 52;
   const off = pct == null ? C : C * (1 - Math.min(100, Math.max(0, pct)) / 100);
   return (
@@ -108,7 +124,7 @@ function Ring({ pct, size = 108 }: { pct: number | null; size?: number }) {
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', lineHeight: 1 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: Math.round(size * 0.26), fontWeight: 700, color: pct == null ? T.faint : T.text }}>{pct == null ? 'N/S' : `${pct}%`}</div>
+          <div style={{ fontSize: Math.round(size * 0.27), fontWeight: 700, color: pct == null ? T.faint : T.text }}>{pct == null ? 'N/S' : `${pct}%`}</div>
           <div style={{ fontSize: 10.5, color: T.muted, marginTop: 2 }}>{pct == null ? 'not scanned' : 'checks passing'}</div>
         </div>
       </div>
@@ -116,63 +132,95 @@ function Ring({ pct, size = 108 }: { pct: number | null; size?: number }) {
   );
 }
 
-/* ---------- tables ---------- */
-const thCell: React.CSSProperties = { padding: '7px 10px', fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: T.muted, background: T.subtle, borderBottom: `1px solid ${T.border}`, whiteSpace: 'nowrap', textAlign: 'left' };
-const tdCell: React.CSSProperties = { padding: '8px 10px', fontSize: 12, color: T.text, borderBottom: '1px solid #F1F3F7', verticalAlign: 'middle' };
+/* ---------- confident executive sentence (plain template over live numbers) ----------
+   States posture, concentration, remediation size and coverage honesty. Claims NO
+   direction (no CIS time-series exists). `critHigh` is null until the coverage fan-out
+   that carries severity has settled; that clause simply waits for it. */
+const B = ({ children }: { children: ReactNode }) => <b style={{ fontWeight: 600, color: T.text }}>{children}</b>;
+function postureSentence(p: {
+  passRate: number | null; scannedAssets: number; failed: number; critHigh: number | null;
+  total: number; withBenchmark: number; unscanned: number;
+  worstLabel: string | null; worstRate: number | null;
+}): ReactNode {
+  // Pre-scan: nothing evaluated yet (handled before the dashboard body, but the band
+  // still renders, so keep an honest line here too).
+  if (p.scannedAssets === 0) {
+    return (
+      <>No CIS scan has run yet — <B>{nfmt(p.total)}</B> {p.total === 1 ? 'asset is' : 'assets are'} in inventory
+        {p.withBenchmark ? <>, <B>{nfmt(p.withBenchmark)}</B> matched to a benchmark and ready to scan</> : null}.
+        {' '}Hardening is <B>unmeasured</B>, not passing.</>
+    );
+  }
+  const lead = p.passRate == null
+    ? <>CIS checks have run but none could be evaluated yet across <B>{plural(p.scannedAssets, 'scanned asset')}</B></>
+    : <>The estate is <B>{p.passRate >= 85 ? 'strongly hardened' : p.passRate >= 55 ? 'moderately hardened' : 'weakly hardened'}</B> — <B>{p.passRate}%</B> of evaluated CIS checks pass across <B>{plural(p.scannedAssets, 'scanned asset')}</B></>;
+  const concentration = p.worstLabel && p.worstRate != null
+    ? <> Hardening is weakest on <B>{p.worstLabel}</B> (<B>{p.worstRate}%</B>).</> : <>.</>;
+  const remediation = p.failed > 0
+    ? <> <B>{nfmt(p.failed)}</B> {p.failed === 1 ? 'check is' : 'checks are'} failing{p.critHigh != null && p.critHigh > 0 ? <>, <B>{nfmt(p.critHigh)}</B> critical or high</> : null}.</>
+    : <> No evaluated check is failing.</>;
+  const coverage = p.unscanned > 0
+    ? <> <B>{nfmt(p.unscanned)}</B> of <B>{nfmt(p.total)}</B> assets are not yet scanned — their hardening is <B>unmeasured</B>.</>
+    : <> Every asset in inventory has been scanned.</>;
+  return <>{lead}{concentration}{remediation}{coverage}</>;
+}
 
+/* ---------- remediation: most-failed controls (biggest-win fixes first) ---------- */
 type FailRule = { rule_id: string; title: string; severity: Sev; benchmark: string; assets: number };
 
-function TopFailTable({ rows }: { rows: FailRule[] }) {
+function TopFailList({ rows }: { rows: FailRule[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.assets));
   return (
-    <div style={{ overflowX: 'auto', margin: '-2px -4px -6px' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 440 }}>
-        <thead><tr>
-          <th scope="col" style={thCell}>Control</th>
-          <th scope="col" style={thCell}>Severity</th>
-          <th scope="col" style={{ ...thCell, textAlign: 'right' }}>Assets failing</th>
-        </tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={`${r.rule_id}·${r.benchmark}·${i}`}>
-              <td style={tdCell}>
-                <span style={{ display: 'block', fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420 }} title={r.title}>
-                  <span style={{ fontFamily: 'ui-monospace,Consolas,monospace', color: T.muted, marginRight: 6 }}>{r.rule_id}</span>{r.title}
-                </span>
-                <span style={{ display: 'block', fontSize: 10.5, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420 }} title={r.benchmark}>{prettyBenchmark(r.benchmark)}</span>
-              </td>
-              <td style={tdCell}><Pill tone={SEV[r.severity]} /></td>
-              <td style={{ ...tdCell, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{nfmt(r.assets)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ol className="m-0 flex list-none flex-col p-0">
+      {rows.map((r, i) => (
+        <li key={`${r.rule_id}·${r.benchmark}·${i}`}
+          className="flex items-center gap-3 border-b border-[#F1F3F7] py-[9px] last:border-0">
+          <span aria-hidden className="w-[16px] shrink-0 text-right text-[11px] font-semibold tabular-nums text-[#94A3B8]">{i + 1}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1.5">
+              <span className="shrink-0 font-mono text-[10.5px] text-[#64748B]" style={{ fontFamily: 'ui-monospace,Consolas,monospace' }}>{r.rule_id}</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#0F172A]" title={r.title}>{r.title}</span>
+            </div>
+            <div className="mt-[5px] flex items-center gap-2">
+              {/* reach bar: how many assets this one control would fix — the biggest-win signal */}
+              <span aria-hidden className="relative block h-[5px] flex-1 overflow-hidden rounded-full bg-[#EEF1F5]">
+                <i className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${(r.assets / max) * 100}%`, minWidth: 4, background: SEV[r.severity].c }} />
+              </span>
+              <span className="shrink-0 truncate text-[10.5px] text-[#94A3B8]" style={{ maxWidth: 150 }} title={r.benchmark}>{prettyBenchmark(r.benchmark)}</span>
+            </div>
+          </div>
+          <Pill tone={SEV[r.severity]} />
+          <span className="w-[58px] shrink-0 text-right leading-[1.1]">
+            <b className="text-[13px] font-semibold tabular-nums text-[#0F172A]">{nfmt(r.assets)}</b>
+            <span className="block text-[10px] text-[#94A3B8]">{r.assets === 1 ? 'asset' : 'assets'}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
-function WorstTable({ rows }: { rows: { a: FlatAsset; r: number | null }[] }) {
+/* ---------- worst assets to act on first (each links to its asset, client-nav) ---------- */
+function WorstList({ rows }: { rows: { a: FlatAsset; r: number | null }[] }) {
   return (
-    <div style={{ overflowX: 'auto', margin: '-2px -4px -6px' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
-        <thead><tr>
-          <th scope="col" style={thCell}>Asset</th>
-          <th scope="col" style={{ ...thCell, textAlign: 'right' }}>Failed</th>
-          <th scope="col" style={{ ...thCell, textAlign: 'right' }}>Pass rate</th>
-        </tr></thead>
-        <tbody>
-          {rows.map(({ a, r }) => (
-            <tr key={a.id}>
-              <td style={tdCell}>
-                <Link href={`/assets/${a.id}`} style={{ display: 'block', fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }} title={a.name}>{a.name}</Link>
-                <span style={{ fontSize: 10.5, color: T.faint }}>{a._groupLabel || a.os_family || '—'}{a.host_name ? ` · ${a.host_name}` : ''}</span>
-              </td>
-              <td style={{ ...tdCell, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: (a.failed || 0) > 0 ? SEV.critical.ink : T.muted }}>{nfmt(a.failed || 0)}</td>
-              <td style={{ ...tdCell, textAlign: 'right' }}><Pill tone={rateTone(r)} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="-mx-1.5 m-0 flex list-none flex-col p-0">
+      {rows.map(({ a, r }) => (
+        <li key={a.id}>
+          <Link href={`/assets/${a.id}`}
+            className="flex items-center gap-3 rounded-[9px] border-b border-[#F1F3F7] px-1.5 py-[9px] last:border-0 hover:bg-[#F6F7FB]">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12px] font-semibold text-[#0F172A]" title={a.name}>{a.name}</span>
+              <span className="block truncate text-[10.5px] text-[#94A3B8]">{a._groupLabel || a.os_family || '—'}{a.host_name ? ` · ${a.host_name}` : ''}</span>
+            </span>
+            <span className="shrink-0 text-right leading-[1.1]">
+              <b className="text-[12.5px] font-semibold tabular-nums" style={{ color: (a.failed || 0) > 0 ? SEV.critical.ink : T.muted }}>{nfmt(a.failed || 0)}</b>
+              <span className="block text-[10px] text-[#94A3B8]">failing</span>
+            </span>
+            <span className="w-[52px] shrink-0 text-right"><Pill tone={rateTone(r)} /></span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -193,11 +241,14 @@ export default function CisDashboard() {
   // Estate roll-up (checks = rule instances summed across assets).
   const roll = useMemo(() => {
     let passed = 0, failed = 0, errored = 0, scannedAssets = 0, withBenchmark = 0, lastScan = 0;
+    let strong = 0, moderate = 0, weak = 0;
     for (const a of allAssets) {
       passed += a.passed || 0; failed += a.failed || 0; errored += a.errored || 0;
       if ((a.scanned_rules || 0) > 0) scannedAssets += 1;
       if (a.matched_benchmark) withBenchmark += 1;
       lastScan = Math.max(lastScan, toMs(a.last_scan_at));
+      const r = rate(a.passed || 0, a.failed || 0);
+      if (r != null) { if (r >= 85) strong += 1; else if (r >= 55) moderate += 1; else weak += 1; }
     }
     const total = allAssets.length;
     return {
@@ -206,6 +257,7 @@ export default function CisDashboard() {
       awaiting: Math.max(0, withBenchmark - scannedAssets),
       unmapped: Math.max(0, total - withBenchmark),
       passRate: rate(passed, failed),
+      strong, moderate, weak, scored: strong + moderate + weak,
     };
   }, [allAssets]);
 
@@ -242,8 +294,9 @@ export default function CisDashboard() {
         byRule.set(r.plugin_id, cur);
       }
     }
-    const top = Array.from(byRule.values()).sort((a, b) => b.assets - a.assets || a.rule_id.localeCompare(b.rule_id)).slice(0, 12);
-    return { loading, haveData: settled.length > 0, total, bySev, top };
+    const top = Array.from(byRule.values()).sort((a, b) => b.assets - a.assets || a.rule_id.localeCompare(b.rule_id)).slice(0, 10);
+    const critHigh = (bySev.critical || 0) + (bySev.high || 0);
+    return { loading, haveData: settled.length > 0, total, bySev, top, critHigh };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [covFp]);
 
@@ -277,6 +330,9 @@ export default function CisDashboard() {
     .sort((x, y) => (x.r as number) - (y.r as number))
     .slice(0, 8), [allAssets]);
 
+  // Weakest MEASURED family, for the executive sentence.
+  const worstFamily = useMemo(() => familyRows.find((r) => r.n != null) ?? null, [familyRows]);
+
   const checkParts: Part[] = [
     { key: 'passed', label: 'Passed', n: roll.passed, c: T.success },
     { key: 'failed', label: 'Failed', n: roll.failed, c: SEV.critical.c },
@@ -287,32 +343,46 @@ export default function CisDashboard() {
     { key: 'awaiting', label: 'Awaiting scan', n: roll.awaiting, c: SEV.medium.c },
     { key: 'unmapped', label: 'No benchmark mapped', n: roll.unmapped, c: '#CBD5E1' },
   ];
+  const hardeningParts: Part[] = [
+    { key: 'strong', label: 'Strong · ≥85%', n: roll.strong, c: T.success },
+    { key: 'moderate', label: 'Moderate · 55–84%', n: roll.moderate, c: SEV.medium.c },
+    { key: 'weak', label: 'Weak · <55%', n: roll.weak, c: SEV.critical.c },
+  ];
   const sevParts: Part[] = SEV_ORDER.map((s) => ({ key: s, label: SEV[s].label, n: fail.bySev[s] || 0, c: SEV[s].c })).filter((p) => p.n > 0);
 
   const scanned = roll.scannedAssets > 0;
-  const grid = 'grid grid-cols-1 gap-3 xl:grid-cols-12';
+  const band = bandTone(roll.passRate);
+  const unmeasured = roll.awaiting + roll.unmapped;
+  const grid = 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12';
+
+  /* --- executive summary band (header + confident sentence + coverage stat) --- */
+  const summaryBand = (
+    <section aria-label="CIS executive summary"
+      className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] border border-[#E2E5EC] bg-white px-4 py-3 ${CARD_SHADOW}`}
+      style={{ borderLeft: `3px solid ${T.base}` }}>
+      <h2 className="sr-only">CIS benchmark compliance</h2>
+      <div className="min-w-0 flex-1 basis-[280px]">
+        <Eyebrow>Executive summary · CIS hardening</Eyebrow>
+        <p className="m-0 mt-0.5 text-[13.5px] leading-[1.5] text-[#0F172A]" aria-live="polite">
+          {postureSentence({
+            passRate: roll.passRate, scannedAssets: roll.scannedAssets, failed: roll.failed,
+            critHigh: fail.haveData ? fail.critHigh : null,
+            total: roll.total, withBenchmark: roll.withBenchmark, unscanned: roll.total - roll.scannedAssets,
+            worstLabel: typeof worstFamily?.label === 'string' ? worstFamily.label : null,
+            worstRate: worstFamily?.n ?? null,
+          })}
+        </p>
+      </div>
+      <div className="text-[11.5px] leading-[1.6] text-[#64748B]" style={{ textAlign: 'right' }}>
+        <b className="text-[#0F172A]">{nfmt(roll.scannedAssets)}</b> of {nfmt(roll.total)} assets scanned<br />
+        {roll.lastScan ? `last scan ${fmtAgo(roll.lastScan)}` : 'no scans yet'}
+        {overviewQ.data?.totals?.total_rules ? <> · {nfmt(overviewQ.data.totals.total_rules)} rules in library</> : null}
+      </div>
+    </section>
+  );
 
   return (
-    <div style={{ background: '#F4F6F7', padding: '20px 22px', minHeight: 'calc(100vh - 46px)', fontFamily: FONT }}>
-      {/* header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h2 style={{ fontSize: 17, letterSpacing: '-.02em', margin: 0, color: T.text }}>CIS Benchmark compliance</h2>
-          <p style={{ fontSize: 12, color: T.muted, marginTop: 3, maxWidth: 640 }}>
-            How hardened the estate is against its matched CIS benchmarks — pass rate, scan coverage, the controls that fail most, and the assets that need attention. Every figure is read from live scan results.
-          </p>
-        </div>
-        <div style={{ fontSize: 11.5, color: T.muted, textAlign: 'right' }}>
-          {overviewQ.isLoading ? 'Loading…' : (
-            <>
-              <b style={{ color: T.text }}>{nfmt(roll.scannedAssets)}</b> of {nfmt(roll.total)} assets scanned<br />
-              {roll.lastScan ? `last scan ${fmtAgo(roll.lastScan)}` : 'no scans yet'}
-              {overviewQ.data?.totals?.total_rules ? ` · ${nfmt(overviewQ.data.totals.total_rules)} rules in library` : ''}
-            </>
-          )}
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-3" style={{ background: '#EDF0F5', padding: '18px 20px', minHeight: 'calc(100vh - 46px)', fontFamily: FONT, color: T.text }}>
       {overviewQ.isLoading ? (
         <Loading rows={6} note="Loading CIS scan results across the estate…" />
       ) : overviewQ.isError ? (
@@ -320,59 +390,80 @@ export default function CisDashboard() {
       ) : roll.total === 0 ? (
         <Empty icon={<ServerCog size={18} />} title="No assets in inventory yet" body="Discover or import assets, connect a scanner, then run a CIS benchmark scan to see hardening across the estate." href="/asset-discovery" cta="Bring assets in" />
       ) : !scanned ? (
-        // Mapped-but-unscanned: one honest CTA plus the coverage breakdown, not five empty panels.
-        <div className={grid}>
-          <Card title="Scan coverage" sub="Assets ready vs scanned" className="xl:col-span-5">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
-              <Figure label="Matched & ready" value={nfmt(roll.withBenchmark)} sub={`of ${nfmt(roll.total)} assets`} />
-              <Figure label="No benchmark yet" value={nfmt(roll.unmapped)} sub="need an OS profile" />
-            </div>
-            <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={covParts} label="Scan coverage" /></div>
-            <div style={{ marginTop: 10 }}><PartLegend parts={covParts} total={roll.total} /></div>
-          </Card>
-          <div className="xl:col-span-7">
-            <Empty icon={<ClipboardCheck size={18} />} title="No CIS scan has run yet"
-              body={<>{nfmt(roll.total)} assets in inventory{roll.withBenchmark ? <>, {nfmt(roll.withBenchmark)} already matched to a benchmark and ready to scan</> : null}. Hardening is <b>unmeasured</b>, not passing — run a scan to populate this dashboard.</>}
-              href="/admin/agents" cta="Connect a scanner" />
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {/* Row A — score · coverage · remediation */}
+        // Mapped-but-unscanned: the summary band + the coverage breakdown + one honest CTA.
+        <>
+          {summaryBand}
           <div className={grid}>
-            <Card title="Overall CIS compliance" sub="Passed ÷ (passed + failed)" href="/assets?tab=cis" cta="Details" busy={overviewQ.isFetching} className="xl:col-span-4">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-                <Ring pct={roll.passRate} />
-                <div style={{ flex: 1, minWidth: 130 }}>
-                  <StackBar parts={checkParts} label="Checks passed, failed, errored" />
-                  <div style={{ marginTop: 10 }}><PartLegend parts={checkParts} total={roll.checks} /></div>
-                </div>
-              </div>
-            </Card>
-
-            <Card title="Scan coverage" sub="Assets scanned vs awaiting" href="/assets?tab=cis" cta="Details" className="xl:col-span-4">
+            <Card title="Scan coverage" sub="Assets ready vs scanned" className="xl:col-span-5">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
-                <Figure label="Scanned" value={`${nfmt(roll.scannedAssets)} / ${nfmt(roll.total)}`} sub={`${pctOf(roll.scannedAssets, roll.total)}% of the estate`} />
-                <Figure label="Checks run" value={nfmt(roll.checks)} sub={`${nfmt(roll.errored)} couldn't evaluate`} />
+                <Figure label="Matched & ready" value={nfmt(roll.withBenchmark)} sub={`of ${nfmt(roll.total)} assets`} />
+                <Figure label="No benchmark yet" value={nfmt(roll.unmapped)} sub="need an OS profile" />
               </div>
               <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={covParts} label="Scan coverage" /></div>
               <div style={{ marginTop: 10 }}><PartLegend parts={covParts} total={roll.total} /></div>
             </Card>
+            <div className="xl:col-span-7">
+              <Empty icon={<ClipboardCheck size={18} />} title="No CIS scan has run yet"
+                body={<>{nfmt(roll.total)} assets in inventory{roll.withBenchmark ? <>, {nfmt(roll.withBenchmark)} already matched to a benchmark and ready to scan</> : null}. Hardening is <b className="font-semibold">unmeasured</b>, not passing — run a scan to populate this dashboard.</>}
+                href="/admin/agents" cta="Connect a scanner" />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {summaryBand}
 
-            <Card title="Remediation by severity" sub="Failed checks across scanned assets" href="/vulnerabilities" cta="Plan work" className="xl:col-span-4">
-              {fail.loading && !fail.haveData ? <Loading rows={3} note="Reading per-asset rule results…" />
-                : fail.total === 0 ? <Empty compact icon={<ShieldCheck size={16} />} title="No failing checks" body="Every evaluated check on every scanned asset passed." />
-                  : (
-                    <div className="flex flex-1 flex-col">
-                      <Figure label="Failing checks" value={nfmt(fail.total)} sub={`across ${plural(failingIds.length, 'asset')}`} />
-                      <div style={{ marginTop: 'auto', paddingTop: 12 }}><StackBar parts={sevParts} label="Failed checks by severity" /></div>
-                      <div style={{ marginTop: 10 }}><PartLegend parts={sevParts} total={fail.total} cols={2} /></div>
-                    </div>
-                  )}
+          {/* ── Answer + trust: posture · coverage honesty · estate by hardening ── */}
+          <div className={grid}>
+            <Card title="Overall CIS compliance" sub="Passed ÷ (passed + failed)" busy={overviewQ.isFetching} className="xl:col-span-4">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <Ring pct={roll.passRate} />
+                <div style={{ flex: 1, minWidth: 128 }}>
+                  <Pill tone={band}>{band.label} hardening</Pill>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', marginTop: 12 }}>
+                    <Figure label="Failing checks" value={nfmt(roll.failed)} sub={roll.failed > 0 ? 'need remediation' : 'all passing'} />
+                    <Figure label="Critical & high"
+                      value={fail.haveData ? nfmt(fail.critHigh) : (fail.loading ? '…' : '—')}
+                      sub="highest severity" />
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: 14 }}><StackBar parts={checkParts} label="Checks passed, failed, errored" /></div>
+              <div style={{ marginTop: 10 }}><PartLegend parts={checkParts} total={roll.checks} cols={3} /></div>
+            </Card>
+
+            <Card title="Scan coverage" sub="You can't claim compliance on unscanned assets" className="xl:col-span-4">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
+                <Figure label="Scanned" value={`${nfmt(roll.scannedAssets)} / ${nfmt(roll.total)}`} sub={`${pctOf(roll.scannedAssets, roll.total)}% of the estate`} />
+                <Figure label="Unmeasured" value={nfmt(unmeasured)} sub="awaiting scan or unmapped" />
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={covParts} label="Scan coverage" /></div>
+              <div style={{ marginTop: 10 }}><PartLegend parts={covParts} total={roll.total} /></div>
+              {unmeasured > 0 && (
+                <p className="m-0 mt-3 flex items-start gap-1.5 rounded-[10px] bg-[#F6F7FB] px-3 py-2 text-[11px] leading-[1.5] text-[#475569]">
+                  <AlertTriangle size={13} aria-hidden className="mt-[1px] shrink-0" style={{ color: T.warning }} />
+                  <span><b className="font-semibold">{nfmt(unmeasured)}</b> {unmeasured === 1 ? 'asset is' : 'assets are'} unmeasured — not compliant, just unseen.</span>
+                </p>
+              )}
+            </Card>
+
+            <Card title="Estate by hardening" sub="Scanned assets grouped by pass rate" className="md:col-span-2 xl:col-span-4">
+              {roll.scored === 0 ? (
+                <Empty compact title="No asset scored yet" body="An asset is scored once it has evaluated (passed or failed) checks." />
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
+                    <Figure label="Well hardened" value={nfmt(roll.strong)} sub={`${pctOf(roll.strong, roll.scored)}% of ${plural(roll.scored, 'scored asset')}`} />
+                    <Figure label="Weak (<55%)" value={nfmt(roll.weak)} sub={roll.weak > 0 ? 'act first' : 'none'} />
+                  </div>
+                  <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={hardeningParts} label="Scanned assets by hardening band" /></div>
+                  <div style={{ marginTop: 10 }}><PartLegend parts={hardeningParts} total={roll.scored} /></div>
+                </>
+              )}
             </Card>
           </div>
 
-          {/* Row B — pass rate by OS family · by benchmark */}
+          {/* ── Where it concentrates: pass rate by OS family · by benchmark ── */}
           <div className={grid}>
             <Card title="Pass rate by OS family" sub="Weakest hardening first" className="xl:col-span-6">
               {familyRows.some((r) => r.n != null)
@@ -386,19 +477,33 @@ export default function CisDashboard() {
             </Card>
           </div>
 
-          {/* Row C — top failing controls · assets needing attention */}
+          {/* ── What to do next: remediation priorities · worst assets ── */}
           <div className={grid}>
-            <Card title="Top failing controls" sub="CIS rules failing on the most assets" className="xl:col-span-7">
-              {fail.loading && !fail.haveData ? <Loading rows={5} note="Reading per-asset rule results…" />
-                : fail.top.length === 0 ? <Empty compact icon={<ShieldCheck size={16} />} title="No failing controls" body="No evaluated CIS rule is currently failing on any scanned asset." />
-                  : <TopFailTable rows={fail.top} />}
+            <Card title="Remediation priorities" sub="Fix the controls failing on the most assets" className="xl:col-span-7">
+              {fail.loading && !fail.haveData ? <Loading rows={6} note="Reading per-asset rule results…" />
+                : fail.total === 0 ? <Empty compact icon={<ShieldCheck size={16} />} title="No failing checks" body="Every evaluated check on every scanned asset passed." />
+                  : (
+                    <div className="flex flex-1 flex-col">
+                      {/* severity split of all failing checks — the shape of the backlog */}
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <Eyebrow>Failing checks by severity</Eyebrow>
+                        <span className="text-[11.5px] text-[#64748B]">{plural(fail.total, 'failing check')} · {plural(failingIds.length, 'asset')}</span>
+                      </div>
+                      <StackBar parts={sevParts} label="Failing checks by severity" />
+                      <div className="mt-2.5"><PartLegend parts={sevParts} total={fail.total} cols={3} /></div>
+                      <div className="mt-3 border-t border-[#F1F3F7] pt-2">
+                        <Eyebrow className="mb-0.5">Fix these first — ranked by assets affected</Eyebrow>
+                        <TopFailList rows={fail.top} />
+                      </div>
+                    </div>
+                  )}
             </Card>
-            <Card title="Assets needing attention" sub="Lowest pass rate first" href="/assets?tab=cis" cta="All assets" className="xl:col-span-5">
+            <Card title="Worst assets to act on first" sub="Lowest pass rate · each opens the asset" className="xl:col-span-5">
               {worst.length === 0 ? <Empty compact title="No scored assets yet" body="Pass rates appear once an asset has evaluated checks." />
-                : <WorstTable rows={worst} />}
+                : <WorstList rows={worst} />}
             </Card>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
