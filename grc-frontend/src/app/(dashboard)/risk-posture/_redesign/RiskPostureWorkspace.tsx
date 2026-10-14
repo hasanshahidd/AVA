@@ -19,7 +19,7 @@
  * flex-fill cards, and the zoom:0.8 density lever. Layout is a STRICT 2-per-row
  * grid under one thin hero strip; the shell <main> owns the page scroll.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search as SearchIcon, RefreshCw, SlidersHorizontal, Activity, ShieldAlert, Target, Layers } from 'lucide-react';
@@ -97,8 +97,15 @@ export default function RiskPostureWorkspace() {
   const toast = useToast();
   const [term, setTerm] = useState('');
   const [weightsOpen, setWeightsOpen] = useState(false);
+  // Auto-refresh cadence in minutes (0 = Off). Default 5; remembered per viewer.
+  // Loaded in an effect (not the initializer) to avoid an SSR hydration mismatch.
+  const [refreshMin, setRefreshMin] = useState<number>(5);
+  useEffect(() => {
+    try { const v = Number(localStorage.getItem('rp.refreshMin')); if (Number.isFinite(v) && v >= 0 && v <= 10) setRefreshMin(v); } catch {}
+  }, []);
+  const setRefresh = (m: number) => { setRefreshMin(m); try { localStorage.setItem('rp.refreshMin', String(m)); } catch {} };
 
-  const q = useQuery<Dashboard>({ queryKey: ['risk-posture.dashboard'], queryFn: async () => (await riskPostureApi.dashboard()).data, refetchInterval: 30000 });
+  const q = useQuery<Dashboard>({ queryKey: ['risk-posture.dashboard'], queryFn: async () => (await riskPostureApi.dashboard()).data, refetchInterval: refreshMin ? refreshMin * 60000 : false });
 
   const assets = useMemo(() => q.data?.assets ?? [], [q.data]);
   const summary = q.data?.summary;
@@ -214,7 +221,16 @@ export default function RiskPostureWorkspace() {
           </p>
         </div>
         <div className="flex items-center gap-3 text-[11.5px] text-[#64748B]">
-          <span>Scored <b className="tabular-nums text-[#0F172A]">{nfmt(summary.scored_count)}</b> of {nfmt(total)} · live · refreshes 30s</span>
+          <span>Scored <b className="tabular-nums text-[#0F172A]">{nfmt(summary.scored_count)}</b> of {nfmt(total)} · live</span>
+          <label className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#E2E5EC] bg-white pl-2.5 pr-1.5 text-[12px] font-semibold text-[#334155]" title="How often the dashboard recalculates risk on its own">
+            <RefreshCw size={12} aria-hidden className={q.isFetching ? 'animate-spin' : ''} style={{ color: T.base }} />
+            <span className="text-[#64748B]">Auto-refresh</span>
+            <select value={refreshMin} onChange={(e) => setRefresh(Number(e.target.value))} aria-label="Auto-refresh interval"
+              className="cursor-pointer border-0 bg-transparent pr-1 text-[12px] font-semibold text-[#0F172A] outline-none">
+              <option value={0}>Off</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((m) => <option key={m} value={m}>{m} min</option>)}
+            </select>
+          </label>
           <button type="button" onClick={tuneWeights}
             className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[#E2E5EC] bg-white px-3 text-[12px] font-semibold text-[#334155] hover:bg-[#F6F7FB]">
             <SlidersHorizontal size={13} aria-hidden style={{ color: T.base }} />Tune weights

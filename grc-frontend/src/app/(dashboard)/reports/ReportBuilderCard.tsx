@@ -32,6 +32,7 @@ const DATASET_LABELS: Record<string, string> = {
   software_inventory: 'Software Inventory',
   pentest_scans: 'Pentest Scans',
   ctem_scopes: 'CTEM Scopes',
+  risk_posture: 'Risk Posture',
 };
 
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

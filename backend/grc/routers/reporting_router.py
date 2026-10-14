@@ -51,6 +51,7 @@ from ..models._47_asset_discovery_models import DiscoveryObservation
 from ..models._pentest_exploit_results import PentestExploitResult
 from ..models._pentest_scan_jobs import PentestScanJob
 from ..models._52_ctem_scope_models import CtemScope
+from ..models._asset_risk_snapshot import AssetRiskSnapshot
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -569,6 +570,28 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
         default_order=("created_at", "desc"),
         user_fields={"business_owner_id": "owner_name"},
     ),
+    "risk_posture": DatasetSpec(
+        AssetRiskSnapshot,
+        permissions=["assets:asset_inventory:*"],
+        # Persisted daily risk-posture snapshots (grc_asset_risk_snapshots) — one
+        # row per asset per day. `score` is the composite 0-100 (higher = worse);
+        # `band` is the severity label; dim_* are each dimension's contribution to
+        # the score (CIS gap / vuln burden / CIA / control coverage / linked risk);
+        # `data_quality` is the % of weight covered by measured dimensions.
+        # snapshot_date is the day; a Risk Posture report refreshes the current
+        # day's rows first (see _refresh_risk_snapshots) so a download is current,
+        # and the dated rows form a daily history.
+        fields=["id", "asset_name", "score", "band", "data_quality",
+                "dim_cis", "dim_vuln", "dim_cia", "dim_ctrl", "dim_risk",
+                "known_dimensions", "snapshot_date", "computed_at"],
+        search=["asset_name", "band"],
+        sortable=["id", "asset_name", "score", "band", "data_quality",
+                  "snapshot_date", "computed_at"],
+        filterable={"band": "badge", "asset_name": "text", "score": "number",
+                    "data_quality": "number", "snapshot_date": "date",
+                    "computed_at": "date"},
+        default_order=("snapshot_date", "desc"),
+    ),
 }
 
 
@@ -585,6 +608,7 @@ DATASET_LABELS: Dict[str, str] = {
     "software_inventory": "Software Inventory",
     "pentest_scans": "Pentest Scans",
     "ctem_scopes": "CTEM Scopes",
+    "risk_posture": "Risk Posture",
 }
 
 
@@ -965,6 +989,7 @@ def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dic
 AVA_DATASET_ALLOWLIST = [
     "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
     "discovery", "pentest_findings", "software_inventory", "pentest_scans", "ctem_scopes",
+    "risk_posture",
 ]
 
 
@@ -1008,6 +1033,12 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"You do not have permission to report on '{body.dataset}'.",
         )
+
+    # Risk Posture is computed live; refresh its daily snapshot right now so this
+    # read (preview or download) reflects current risk. Write-on-change, so a
+    # no-op write when nothing moved. Must run before we read the snapshot table.
+    if body.dataset == "risk_posture":
+        _refresh_risk_snapshots(db, user)
 
     model = spec.model
     q = db.query(model)
@@ -1171,6 +1202,25 @@ def _html_response(filename_stem: str, dataset_label: str, tenant_name: Optional
     return HTMLResponse(content=doc, headers={"Content-Disposition": f'attachment; filename="{filename_stem}.html"'})
 
 
+def _refresh_risk_snapshots(db: Session, user) -> None:
+    """Recompute + persist the current risk snapshot for the caller's tenant(s)
+    right before a Risk Posture report is read, so a downloaded report reflects
+    risk current to THIS moment — not just the last time someone opened the
+    dashboard. The snapshot writer (risk_posture.service) is write-on-change +
+    deduped per day, so this is a no-op write when nothing changed. Non-fatal:
+    a refresh failure must not block the export (the report just reads whatever
+    snapshot is already there)."""
+    try:
+        from ..modules.risk_posture.service import compute_tenant_posture
+        for tid in (get_user_tenants(user, db) or []):
+            compute_tenant_posture(db, tid)  # side effect: persists the snapshot
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 @router.post("/export")
 def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends(require_auth)):
     """Stream one registered dataset to CSV/XLSX through the SAME filter/sort engine
@@ -1187,6 +1237,12 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"You do not have permission to report on '{body.dataset}'.",
         )
+
+    # Risk Posture is computed live; refresh its daily snapshot right now so this
+    # read (preview or download) reflects current risk. Write-on-change, so a
+    # no-op write when nothing moved. Must run before we read the snapshot table.
+    if body.dataset == "risk_posture":
+        _refresh_risk_snapshots(db, user)
 
     model = spec.model
     q = db.query(model)

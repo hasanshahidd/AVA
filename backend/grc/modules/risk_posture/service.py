@@ -1225,6 +1225,73 @@ def compute_asset_risk(
     }
 
 
+def _persist_risk_snapshots(db: Session, tenant_id: int, rows: List[Dict[str, Any]]) -> None:
+    """Persist today's risk snapshot for each asset in `rows`.
+
+    ONE row per asset per day (UNIQUE tenant+asset+day). Within a day the row is
+    updated in place; a new day appends a fresh row. Writes ONLY when the row is
+    new or the score/band actually changed — so repeated dashboard polls where
+    nothing moved issue a single SELECT and no writes (the old per-poll write
+    amplification is NOT reintroduced). Commits only if something changed.
+
+    Called from compute_tenant_posture, wrapped so a snapshot failure can never
+    break the dashboard read.
+    """
+    from datetime import date, datetime as _dt
+    from grc.models import AssetRiskSnapshot
+
+    if not rows:
+        return
+    today = date.today()
+    asset_ids = [r["id"] for r in rows if r.get("id") is not None]
+    if not asset_ids:
+        return
+
+    existing = {
+        s.asset_id: s
+        for s in db.query(AssetRiskSnapshot).filter(
+            AssetRiskSnapshot.tenant_id == tenant_id,
+            AssetRiskSnapshot.snapshot_date == today,
+            AssetRiskSnapshot.asset_id.in_(asset_ids),
+        ).all()
+    }
+
+    now = _dt.utcnow()
+    dirty = False
+    for r in rows:
+        aid = r.get("id")
+        if aid is None:
+            continue
+        contrib = r.get("contributions") or {}
+        band = r.get("band") or {}
+        band_label = (band.get("label") if isinstance(band, dict) else str(band)) or None
+        score = r.get("score")
+
+        snap = existing.get(aid)
+        if snap is not None and snap.score == score and snap.band == band_label:
+            continue  # unchanged today → leave it untouched, no write
+        if snap is None:
+            snap = AssetRiskSnapshot(tenant_id=tenant_id, asset_id=aid, snapshot_date=today)
+            db.add(snap)
+
+        snap.asset_name = r.get("name")
+        snap.score = score
+        snap.band = band_label
+        snap.data_quality = r.get("data_quality")
+        snap.known_dimensions = ",".join(r.get("known_dimensions") or [])
+        snap.dim_cis = contrib.get("cis")
+        snap.dim_vuln = contrib.get("vuln")
+        snap.dim_cia = contrib.get("cia")
+        snap.dim_ctrl = contrib.get("ctrl")
+        snap.dim_risk = contrib.get("risk")
+        snap.snapshot_kind = "auto"
+        snap.computed_at = now
+        dirty = True
+
+    if dirty:
+        db.commit()
+
+
 def compute_tenant_posture(
     db: Session, tenant_id: int,
     owner_id: Optional[int] = None,
@@ -1293,6 +1360,18 @@ def compute_tenant_posture(
     def sort_key(row: Dict[str, Any]):
         return (row["score"] is None, -(row["score"] or 0))
     rows.sort(key=sort_key)
+
+    # Persist today's per-asset risk snapshot (owner-requested; grc_asset_risk_snapshots).
+    # Deduped to one row per asset per day, write-on-change, so routine dashboard
+    # polls stay read-only. Isolated + non-fatal: a snapshot failure must never
+    # break the dashboard read, so swallow + rollback just the snapshot attempt.
+    try:
+        _persist_risk_snapshots(db, tenant_id, rows)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     scored_rows = [r for r in rows if r["score"] is not None]
     if scored_rows:
