@@ -203,6 +203,34 @@ class HDTicket(Base):
     feedback_id = Column(Integer, ForeignKey("grc_hd_ticket_feedback_option.id"), nullable=True)
     feedback_extra = Column(Text, nullable=True)
 
+    # --- ITIL process discriminator + per-process extension fields (ITSM) ---
+    # process is set at create and never auto-changes (spec §0). create_all can't
+    # add these to existing tenant DBs, so itsm_seed.seed_itsm ALTERs them in.
+    process = Column(String(20), nullable=False, server_default="incident")  # incident|problem|change|service_request|question
+    # shared priority-matrix inputs (incident + service_request)
+    impact = Column(String(10), nullable=True)             # low | medium | high
+    urgency = Column(String(10), nullable=True)            # low | medium | high
+    # change
+    change_type = Column(String(20), nullable=True)        # standard | normal | emergency
+    change_risk = Column(String(10), nullable=True)        # low | medium | high
+    planned_start = Column(DateTime, nullable=True)
+    planned_end = Column(DateTime, nullable=True)
+    implementation_plan = Column(Text, nullable=True)
+    backout_plan = Column(Text, nullable=True)
+    approval_state = Column(String(20), nullable=True)     # draft|pending_approval|approved|rejected|scheduled|in_progress|review|closed|cancelled
+    approved_by = Column(String(255), nullable=True)       # agent email
+    approved_at = Column(DateTime, nullable=True)
+    # problem
+    root_cause = Column(Text, nullable=True)
+    workaround = Column(Text, nullable=True)
+    known_error = Column(Boolean, server_default=text("false"))
+    problem_resolution = Column(Text, nullable=True)
+    # ponytail: JSON list of incident ids; add a link table only if reverse-lookup/perf ever matters.
+    linked_incident_ids = Column(Text, nullable=True)      # JSON array of HDTicket ids, e.g. "[12,15]"
+    # service request
+    request_category = Column(String(100), nullable=True)
+    request_subcategory = Column(String(100), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

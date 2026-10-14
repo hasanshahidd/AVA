@@ -165,6 +165,7 @@ def _ctx(ticket) -> dict:
         customer=ticket.customer.customer_name if ticket.customer else None,
         contact=ticket.contact,
         raised_by=ticket.raised_by,
+        process=ticket.process,  # ITSM: per-process SLAs key on doc.process
     )}
 
 
