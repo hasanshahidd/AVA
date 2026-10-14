@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { GitPullRequest, Inbox, Search } from "lucide-react";
-import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, Table, timeAgo, useHd } from "../_ui";
+import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
 import { ApprovalBadge, ChangeActions } from "./_actions";
 
 const fmt = (v?: string | null) => {
@@ -61,7 +61,7 @@ export default function HelpDeskChanges() {
           hint={q ? "Try a different term." : "Raise a change request from the New-ticket flow."}
         />
       ) : (
-        <Table head={["#", "Subject", "Approval", "Type", "Planned window", "Priority", "Created", ""]}>
+        <Table head={["#", "Subject", "Approval", "Type", "Planned window", "Priority", "SLA", "Created", ""]}>
           {filtered.map((t) => (
             <tr key={t.name} className="hover:bg-[#F9FAFC]">
               <td className="px-4 py-2.5 font-mono text-[11px] text-[#94A3B8]">
@@ -76,6 +76,7 @@ export default function HelpDeskChanges() {
               <td className="px-4 py-2.5 text-[12.5px] capitalize text-[#475569]">{t.change_type || "—"}</td>
               <td className="px-4 py-2.5"><PlannedWindow start={t.planned_start} end={t.planned_end} /></td>
               <td className="px-4 py-2.5"><Chip value={t.priority} map={PRIORITY_CHIP} /></td>
+              <td className="px-4 py-2.5"><SlaBadge due={t.response_by} done={/resolved|closed/i.test(t.status || "")} /></td>
               <td className="px-4 py-2.5 text-[11.5px] text-[#94A3B8]">{timeAgo(t.created)}</td>
               <td className="px-4 py-2.5 text-right"><ChangeActions change={t} onChanged={reload} /></td>
             </tr>

@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Bug, Inbox, Search } from "lucide-react";
-import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, Table, timeAgo, useHd } from "../_ui";
+import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
 import { Btn } from "../_admin";
 import { ProblemPanel, linkedIds } from "./_panel";
 
@@ -52,7 +52,7 @@ export default function HelpDeskProblems() {
           hint={q ? "Try a different term." : "Raise a problem to investigate recurring incidents."}
         />
       ) : (
-        <Table head={["#", "Subject", "Status", "Priority", "Known error", "Incidents", "Root cause", "Created", ""]}>
+        <Table head={["#", "Subject", "Status", "Priority", "Known error", "Incidents", "Root cause", "SLA", "Created", ""]}>
           {filtered.map((t) => {
             const ids = linkedIds(t.linked_incident_ids);
             return (
@@ -78,6 +78,7 @@ export default function HelpDeskProblems() {
                     ? <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Recorded</span>
                     : <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Pending</span>}
                 </td>
+                <td className="px-4 py-2.5"><SlaBadge due={t.response_by} done={/resolved|closed/i.test(t.status || "")} /></td>
                 <td className="px-4 py-2.5 text-[11.5px] text-[#94A3B8]">{timeAgo(t.created)}</td>
                 <td className="px-4 py-2.5 text-right">
                   <Btn variant="ghost" onClick={() => setActive(t)}>Manage</Btn>

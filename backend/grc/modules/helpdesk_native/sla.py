@@ -445,6 +445,50 @@ def config(db: Session, tid: int) -> dict:
     return {"sla": sla_block, "auto_assignment": auto_assignment, "managed": True}
 
 
+def sla_preview(db: Session, tid: int, process: Optional[str] = None,
+                priority: str = "Medium") -> dict:
+    """§A5 — the SLA that WOULD apply to a new ticket of this `process`, for the
+    given `priority` (default Medium). Matches the per-process SLA by evaluating
+    each enabled SLA's `condition` against a doc carrying only `process` (so the
+    seeded `doc.process == '<x>'` policies match), falling back to the default
+    SLA. 200-safe: nulls when nothing matches or the priority has no target row."""
+    priority = priority or "Medium"
+    slas = (
+        db.query(HDServiceLevelAgreement)
+        .filter(HDServiceLevelAgreement.tenant_id == tid,
+                HDServiceLevelAgreement.enabled == True)  # noqa: E712
+        .all()
+    )
+    context = {"doc": _Doc(process=process)}
+    chosen = default = None
+    for s in slas:
+        if s.default_sla and default is None:
+            default = s
+        if not s.condition:
+            continue
+        try:
+            if eval(s.condition, {"__builtins__": {}}, context):  # noqa: S307
+                chosen = s
+                break
+        except Exception:  # noqa: BLE001
+            continue
+    chosen = chosen or default
+    if not chosen:
+        return {"policy": None, "response": None, "resolution": None}
+    prow = next((p for p in chosen.priorities
+                 if ((p.priority.name or p.priority.level) if p.priority else None) == priority),
+                None)
+    if not prow:
+        prow = next((p for p in chosen.priorities if p.default_priority), None)
+    if not prow:
+        return {"policy": chosen.service_level, "response": None, "resolution": None}
+    return {
+        "policy": chosen.service_level,
+        "response": _fmt_duration(prow.response_time),
+        "resolution": _fmt_duration(prow.resolution_time),
+    }
+
+
 # =============================================================================
 # CONFIG WRITE-SIDE — native port of the Frappe doctype controllers' validate /
 # before_save / on_update logic (CODE CONVERSION, not a redesign). Sources:

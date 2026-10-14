@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertCircle, Inbox, Search } from "lucide-react";
-import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, Table, timeAgo, useHd } from "../_ui";
+import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
 
 export default function HelpDeskIncidents() {
   const { data, loading, error } = useHd<{ tickets: any[] }>("/helpdesk/incidents");
@@ -51,7 +51,7 @@ export default function HelpDeskIncidents() {
           hint={q ? "Try a different term." : "Incidents raised in the New-ticket flow show up here."}
         />
       ) : (
-        <Table head={["#", "Subject", "Status", "Priority", "Impact", "Urgency", "Team", "Assignee", "Created"]}>
+        <Table head={["#", "Subject", "Status", "Priority", "Impact", "Urgency", "Team", "Assignee", "SLA", "Created"]}>
           {filtered.map((t) => (
             <tr key={t.name} className="hover:bg-[#F9FAFC]">
               <td className="px-4 py-2.5 font-mono text-[11px] text-[#94A3B8]">
@@ -68,6 +68,7 @@ export default function HelpDeskIncidents() {
               <td className="px-4 py-2.5"><Chip value={t.urgency} map={PRIORITY_CHIP} /></td>
               <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.team || "—"}</td>
               <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.agent || <span className="text-[#CBD5E1]">Unassigned</span>}</td>
+              <td className="px-4 py-2.5"><SlaBadge due={t.response_by} done={/resolved|closed/i.test(t.status || "")} /></td>
               <td className="px-4 py-2.5 text-[11.5px] text-[#94A3B8]">{timeAgo(t.created)}</td>
             </tr>
           ))}
