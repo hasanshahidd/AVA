@@ -65,6 +65,9 @@ interface NavItem {
   requiredModules?: string[];
   /** Path prefix for active-highlighting when it differs from href. */
   activeMatch?: string;
+  /** Visible only to requester-only users: hidden for admins and for anyone who
+   *  holds the agent-console permission (helpdesk:tickets:view). */
+  requesterOnly?: boolean;
 }
 
 interface NavGroup {
@@ -128,9 +131,9 @@ const navigation: NavEntry[] = [
     // perms, so a requester-only user sees JUST those three, an agent the console.
     items: [
       // ── requester (end-user) view ──
-      { name: 'Report an issue',  href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:requests:create'] },
-      { name: 'My Requests',      href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:requests:view_own'] },
-      { name: 'Help / Knowledge Base', href: '/helpdesk/kb',            icon: BookOpen,          requiredPermissions: ['helpdesk:requests:view_own'] },
+      { name: 'Report an issue',  href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:requests:create'], requesterOnly: true },
+      { name: 'My Requests',      href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:requests:view_own'], requesterOnly: true },
+      { name: 'Help / Knowledge Base', href: '/helpdesk/portal/kb',     icon: BookOpen,          requiredPermissions: ['helpdesk:requests:view_own'], requesterOnly: true },
       // ── agent console ──
       { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard, requiredPermissions: ['helpdesk:tickets:view'] },
       { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket,          requiredPermissions: ['helpdesk:tickets:view'] },
@@ -596,6 +599,14 @@ export default function Sidebar() {
 
   const canAccessItem = (item: NavItem & { requiredModules?: string[]; adminOnly?: boolean }) => {
     if (item.adminOnly && !isAdmin) return false;
+    if (item.requesterOnly) {
+      // Requester-portal items: never for admins, never for agents (anyone who can
+      // use the console). Otherwise only if the user truly holds the item's own
+      // perms — deliberately NO admin shortcut here.
+      if (isAdmin) return false;
+      if (matchesPermission('helpdesk:tickets:view')) return false;
+      return (item.requiredPermissions ?? []).some((perm) => matchesPermission(perm));
+    }
     if (!hasModuleAccess(item.requiredModules)) return false;
     return hasPermission(item.requiredPermissions);
   };

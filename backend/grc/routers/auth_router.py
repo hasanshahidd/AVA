@@ -637,10 +637,10 @@ def get_me(
     if is_admin:
         permissions = ["*:*:*"]
         allowed_modules = [
-            "dashboard", "risks", "erm", "controls", "compliance", "evidence",
-            "governance", "vulnerabilities", "assets", "frameworks", "reports",
-            "admin", "integrations", "workflow_engine", "is_projects",
-            "critical_tasks", "bcm",
+            "dashboard", "risks", "erm", "controls", "compliance",
+            "vulnerabilities", "assets", "reports",
+            "admin", "integrations", "workflow_engine",
+            "pentest", "helpdesk",
         ]
     else:
         perms = []
