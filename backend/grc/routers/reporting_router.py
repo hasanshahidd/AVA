@@ -1080,6 +1080,41 @@ def _pdf_response(filename_stem: str, dataset_label: str, tenant_name: Optional[
     )
 
 
+def _html_response(filename_stem: str, dataset_label: str, tenant_name: Optional[str],
+                   headers: List[str], rows: List[List[Any]]):
+    """Clean, unbranded standalone HTML report: a title + meta header, then the
+    selected columns/rows as a styled table. Downloads as .html (self-contained,
+    openable in any browser)."""
+    import html as _html
+    from datetime import datetime as _dt
+    esc = lambda v: _html.escape("" if v is None else str(v))
+    gen = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    thead = "".join(f"<th>{esc(h)}</th>" for h in headers)
+    body_rows = "".join("<tr>" + "".join(f"<td>{esc(c)}</td>" for c in r) + "</tr>" for r in rows)
+    if not body_rows:
+        body_rows = f'<tr><td colspan="{max(1, len(headers))}" class="empty">No rows match the selected filters.</td></tr>'
+    doc = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        f"<title>{esc(dataset_label)} report</title><style>"
+        ":root{color-scheme:light}"
+        "body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;margin:28px}"
+        "h1{font-size:20px;margin:0 0 4px}"
+        ".meta{color:#64748b;font-size:12.5px;margin-bottom:18px}"
+        "table{border-collapse:collapse;width:100%;font-size:12.5px}"
+        "th,td{border:1px solid #e2e8f0;padding:6px 9px;text-align:left;vertical-align:top}"
+        "thead th{background:#0f172a;color:#fff;position:sticky;top:0;font-weight:600}"
+        "tbody tr:nth-child(even){background:#f8fafc}"
+        "td.empty{text-align:center;color:#64748b;padding:22px}"
+        "</style></head><body>"
+        f"<h1>{esc(dataset_label)}</h1>"
+        f'<div class="meta">Generated: {esc(gen)} &middot; Tenant: {esc(tenant_name or "—")} &middot; {len(rows)} row(s)</div>'
+        f"<table><thead><tr>{thead}</tr></thead><tbody>{body_rows}</tbody></table>"
+        "</body></html>"
+    )
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=doc, headers={"Content-Disposition": f'attachment; filename="{filename_stem}.html"'})
+
+
 @router.post("/export")
 def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends(require_auth)):
     """Stream one registered dataset to CSV/XLSX through the SAME filter/sort engine
@@ -1116,11 +1151,13 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
     out_rows = [[row.get(c) for c in chosen] for row in serialized]
 
     fmt = (body.format or "csv").lower()
-    if fmt == "pdf":
+    if fmt in ("pdf", "html"):
         tenant = db.query(Tenant).first()
         tenant_name = (getattr(tenant, "name", None) or getattr(tenant, "display_name", None)
                        or getattr(tenant, "slug", None))
-        return _pdf_response(body.dataset, _dataset_label(body.dataset), tenant_name, headers, out_rows)
+        if fmt == "pdf":
+            return _pdf_response(body.dataset, _dataset_label(body.dataset), tenant_name, headers, out_rows)
+        return _html_response(body.dataset, _dataset_label(body.dataset), tenant_name, headers, out_rows)
 
     from .search_router import _report_export  # lazy import: no load-time coupling
     return _report_export(body.dataset, headers, out_rows, fmt)

@@ -79,7 +79,7 @@ export default function ReportBuilderCard() {
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<DraftFilter[]>([]);
   const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
-  const [format, setFormat] = useState<'csv' | 'xlsx' | 'pdf'>('csv');
+  const [format, setFormat] = useState<'csv' | 'xlsx' | 'pdf' | 'html'>('csv');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -323,7 +323,7 @@ export default function ReportBuilderCard() {
           {/* Footer: format + generate */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
             <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-border)]">
-              {(['csv', 'xlsx', 'pdf'] as const).map((fmt) => (
+              {(['csv', 'xlsx', 'pdf', 'html'] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => setFormat(fmt)}
