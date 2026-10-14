@@ -118,12 +118,12 @@ const navigation: NavEntry[] = [
     ],
   },
   {
-    // Help Desk — AVA-native service desk; findings become remediation tickets.
-    // Backed by an isolated Frappe engine over REST (tenant-scoped proxy).
+    // Help Desk — AVA-native ITIL-lite service desk, one FastAPI engine
+    // (modules/helpdesk_native). Findings become remediation Incidents.
+    // Teams live in Administration (grc_teams); Home is dropped (Dashboard only).
     name: 'Help Desk',
     icon: LifeBuoy,
     items: [
-      { name: 'Home',             href: '/helpdesk/home',       icon: Home },
       { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard },
       { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket },
       { name: 'Incidents',        href: '/helpdesk/incidents',  icon: AlertCircle },
@@ -131,7 +131,6 @@ const navigation: NavEntry[] = [
       { name: 'Changes',          href: '/helpdesk/changes',    icon: GitPullRequest },
       { name: 'Service Requests', href: '/helpdesk/service-requests', icon: ClipboardList },
       { name: 'Agents',           href: '/helpdesk/agents',     icon: Users },
-      { name: 'Teams',            href: '/helpdesk/teams',      icon: UsersRound },
       { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2 },
       { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact },
       { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen },
