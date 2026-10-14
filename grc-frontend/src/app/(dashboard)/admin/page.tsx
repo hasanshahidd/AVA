@@ -7,15 +7,16 @@ import OrganizationProfilePage from './organization/page';
 import UsersManagementPage from './users/page';
 import RolesManagementPage from './roles/page';
 import TeamsAdminPage from './teams/page';
+import DepartmentsAdminPage from './departments/page';
 import AuditLogsPage from './audit-logs/page';
 import PasswordPolicyPage from './password-policy/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
 import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'identity' | 'password-policy' | 'integrations' | 'audit';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'identity' | 'password-policy' | 'integrations' | 'audit';
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
-  'company','users','roles','teams','identity','password-policy',
+  'company','users','roles','teams','departments','identity','password-policy',
   'integrations','audit',
 ]);
 
@@ -37,6 +38,8 @@ export default function AdminPage() {
     { id: 'roles', label: 'Role Management', icon: ShieldCheck },
     // Org teams — used as owning_team dropdown on assets + future ownership chains.
     { id: 'teams', label: 'Teams', icon: UsersRound },
+    // Help-Desk service-desk departments, surfaced in Admin (also visible in HD).
+    { id: 'departments', label: 'Departments', icon: Building2 },
     { id: 'identity', label: 'Identity Providers', icon: KeyRound },
     // Password & session policy — controls complexity, lockout, and idle timeout.
     { id: 'password-policy', label: 'Password Policy', icon: Lock },
@@ -79,6 +82,7 @@ export default function AdminPage() {
         {activeTab === 'users' && <UsersManagementPage />}
         {activeTab === 'roles' && <RolesManagementPage />}
         {activeTab === 'teams' && <TeamsAdminPage />}
+        {activeTab === 'departments' && <DepartmentsAdminPage />}
         {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'password-policy' && <PasswordPolicyPage />}
         {activeTab === 'integrations' && <IntegrationsConnectionsPage />}

@@ -383,6 +383,7 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'users',            label: 'User Management',       icon: Users },
   { id: 'roles',            label: 'Role Management',       icon: ShieldCheck },
   { id: 'teams',            label: 'Teams',                 icon: Users },
+  { id: 'departments',      label: 'Departments',           icon: Building2 },
   { id: 'identity',         label: 'Identity Providers',    icon: Shield },
   { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
   { id: 'integrations',     label: 'Vulnerability Scanners', icon: Server },

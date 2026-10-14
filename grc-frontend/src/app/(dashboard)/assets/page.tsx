@@ -31,7 +31,7 @@ import {
 // CIS Benchmark now lives as a tab inside IT Asset Inventory (merged from the
 // former standalone /compliance-overview page). Render just the overview body —
 // not the default export's own Overview/Rules tab strip, which the design drops.
-import { OverviewTabContent as CisBenchmarkView } from '../compliance-overview/_cis-overview';
+import CisBenchmark from './_cis/CisBenchmark';
 // Design-handoff theme (warm cream + IBM Plex), scoped under .asset-suite.
 import './_suite/asset-suite.css';
 import { InventoryStats } from './_suite/InventoryStats';
@@ -358,7 +358,7 @@ export default function AssetsPage() {
       {activeView === 'overview' ? (
         <InventoryOverview />
       ) : activeView === 'cis' ? (
-        <CisBenchmarkView />
+        <CisBenchmark />
       ) : (
       <InventoryRedesign
         hideHead
