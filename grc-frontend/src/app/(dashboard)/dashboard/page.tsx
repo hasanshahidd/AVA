@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, AlertTriangle, ArrowRight, Boxes, Bug, ClipboardCheck, Globe, Landmark, RefreshCw, ShieldAlert } from 'lucide-react';
-import apiClient, { compliancePluginsApi, discoveryApi, riskPostureApi } from '@/lib/api';
+import apiClient, { compliancePluginsApi, discoveryApi, riskPostureApi, type LicenseSummary } from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import {
   BAND, BAND_ORDER, CARD_SHADOW, Card, Empty, Eyebrow, FONT, Figure, Key, Loading, Pill, Skel, T, Unavailable,
@@ -25,7 +25,7 @@ import {
 } from './_components/kit';
 import { FlowChart, Gauge, NEW_C, PartLegend, RES_C, Sparkline, StackBar, type Part, type Week } from './_components/charts';
 import {
-  AttackSurface, CisCompliance, CtemProgramme, InventoryHealth, PenTest, RiskDrivers, TopAssets, VulnExposure, busyOf, isExternalAsset,
+  AttackSurface, CisCompliance, CtemProgramme, InventoryHealth, LicenseCompliance, PenTest, RiskDrivers, TopAssets, VulnExposure, busyOf, isExternalAsset,
   type AssetsDash, type CisOverview, type Ctem, type Devices, type Easm, type ExecSummary, type Inventory, type Qs, type RiskDash,
 } from './_components/lenses';
 
@@ -49,6 +49,7 @@ const KEYS = {
   easm: ['exec-dashboard.easm'],
   devices: ['disc-discovered-devices', 'all'],
   ctem: ['exec-dashboard.ctem'],
+  licenses: ['licenses', 'summary'], // same key as the Licenses register's KPI strip
 };
 const ALL_KEYS = Object.values(KEYS);
 const get = (url: string) => async () => (await apiClient.get(url)).data;
@@ -108,7 +109,8 @@ export default function PerformancePage() {
   const easm = useQuery<Easm>({ queryKey: KEYS.easm, queryFn: async () => (await discoveryApi.easmScorecard()).data, retry: 1, ...shared });
   const devices = useQuery<Devices>({ queryKey: KEYS.devices, queryFn: async () => (await discoveryApi.discoveredDevices()).data, retry: 1, ...shared });
   const ctem = useQuery<Ctem>({ queryKey: KEYS.ctem, queryFn: get('/erm/ctem/scopes/portfolio'), retry: 1, ...shared });
-  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem];
+  const licenses = useQuery<LicenseSummary>({ queryKey: KEYS.licenses, queryFn: get('/licenses/summary'), retry: 1, ...shared });
+  const mine = [summary, trends, history, risk, inv, assets, cis, easm, devices, ctem, licenses];
   const fetching = mine.some((q) => q.isFetching);
   // Sources that failed on their last attempt (inventory's fetcher returns null instead of throwing).
   const failed = mine.filter((q) => q.isError).length + (inv.isSuccess && inv.data === null ? 1 : 0);
@@ -219,7 +221,8 @@ export default function PerformancePage() {
       {/* ── Module lenses ──
          Every 12-col row sums to 12 (no empty cell): row 1 = the four vuln tiles (their own
          full-width sub-grid); row 2 = Most-exposed (8) + Attack-surface (4); row 3 = the three
-         mid cards (4·3); row 4 = CIS (6) + CTEM (6). Rows STRETCH (equal heights, common
+         mid cards (4·3); row 4 = CIS (6) + CTEM (6); row 5 = Software licenses (12, its
+         own four-part band). Rows STRETCH (equal heights, common
          baseline, no hole beside a short card) and each Card body is a flex column its content
          fills — lists spread, tables grow, empty / loading / error states centre in the full
          height — so there is no white card bottom either, in any state. */}
@@ -232,6 +235,7 @@ export default function PerformancePage() {
         <PenTest q={summary} />
         <CisCompliance q={cis} />
         <CtemProgramme q={ctem} />
+        <LicenseCompliance q={licenses} />
       </div>
     </div>
   );

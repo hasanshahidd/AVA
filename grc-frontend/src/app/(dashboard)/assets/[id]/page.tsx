@@ -32,7 +32,7 @@ import {
   // ITAM tab-bar parity — Software / Relationships / Discovery / Lifecycle /
   // Assignments / Activity.
   Package, Radar, GitBranch, Users, Activity as ActivityIcon,
-  MessageSquare, Clock,
+  MessageSquare, Clock, KeyRound,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -48,6 +48,7 @@ import { ActivityPanel } from './_components/AssetWorkTabs';
 // Redesigned tab panels (Overview design language). Each is a drop-in that
 // absorbs the former inline tab renderer with the same prop contract.
 import SoftwarePanel from './_tabs/SoftwarePanel';
+import LicensesPanel from './_tabs/LicensesPanel';
 import RelationshipsPanel from './_tabs/RelationshipsPanel';
 import LifecyclePanel from './_tabs/LifecyclePanel';
 import NotesPanel from './_tabs/NotesPanel';
@@ -101,7 +102,9 @@ type TabType = 'overview' | 'details' | 'compliance' | 'controls' | 'evidence' |
   | 'software' | 'relationships' | 'discovery' | 'lifecycle' | 'assignments' | 'activity'
   // Notes / Alerts / History — the last reference tabs, now backed by real
   // endpoints (Notes + History) and a derived feed (Alerts).
-  | 'alerts' | 'notes' | 'history' | 'sbp';
+  | 'alerts' | 'notes' | 'history' | 'sbp'
+  // Software license status per installed product (reads /licenses/asset/{id}).
+  | 'licenses';
 
 interface LinkedControl {
   id: number;
@@ -353,7 +356,7 @@ export default function AssetDetailPage() {
     'overview', 'details', 'compliance', 'controls', 'evidence', 'risks',
     'vulnerabilities', 'criticality', 'trajectory', 'mapping-recommendations',
     'software', 'relationships', 'discovery', 'lifecycle', 'assignments',
-    'activity', 'alerts', 'notes', 'history', 'sbp',
+    'activity', 'alerts', 'notes', 'history', 'sbp', 'licenses',
   ]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -745,6 +748,9 @@ export default function AssetDetailPage() {
     // No Software tab for hosts we can only see from outside — the inventory
     // it would show cannot exist without a login.
     ...(showsSoftware ? [{ id: 'software' as TabType, label: 'Software', icon: Package }] : []),
+    // License status is derived from that same installed-software inventory, so it
+    // is hidden for exactly the hosts the Software tab is hidden for.
+    ...(showsSoftware ? [{ id: 'licenses' as TabType, label: 'Licenses', icon: KeyRound }] : []),
     { id: 'relationships', label: 'Relationships', icon: Network },
     // A domain / outside-only asset has no procurement lifecycle (planned→disposed)
     // and no host CIS benchmark — hide both, the same way Software is hidden.
@@ -864,6 +870,7 @@ export default function AssetDetailPage() {
                 hostIp={asset.ip_address || undefined}
               />
             )}
+            {activeTab === 'licenses' && <LicensesPanel assetId={assetId} />}
             {activeTab === 'relationships' && (
               <RelationshipsPanel asset={asset} assetId={assetId} ipPeers={ipPeers} canEdit={canEdit} />
             )}

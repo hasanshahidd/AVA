@@ -52,6 +52,10 @@ SENSITIVE_KEYS = {
     "api_key",
     "authorization",
     "cookie",
+    # software-license volume keys (modules/license_management): stored encrypted,
+    # so the request body must not carry them into the audit trail in plaintext
+    "product_key",
+    "license_key",
 }
 
 

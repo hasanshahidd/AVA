@@ -5,11 +5,12 @@
 // ticks columns, adds typed filters, chooses CSV/XLSX, and Generate streams the
 // file back (mirrors the SBP card's blob-download pattern). This slice wires only
 // the datasets already registered server-side; it builds no new engine.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Table2, Download, Loader2, AlertCircle, Plus, X } from 'lucide-react';
 import { MultiSelectDropdown } from '@/components/ui';
 import { reportingApi, type ReportDatasetMeta, type ReportFilter, type ReportFilterType } from '@/lib/api';
+import type { BuilderLoadRequest, BuilderSnapshot } from '@/lib/reportingExtrasApi';
 
 const ACCENT = 'var(--color-base)';
 
@@ -71,7 +72,18 @@ type DraftFilter = { id: number; col: string; op: string; value: string };
 const selectCls =
   'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-sm text-[var(--color-text)] focus:border-[var(--color-base)] focus:outline-none';
 
-export default function ReportBuilderCard() {
+// Optional hooks the Reports page uses to connect saved / scheduled reports to the builder.
+// All three are optional, so the card behaves exactly as before when rendered bare.
+export interface ReportBuilderCardProps {
+  /** Adopt this definition (dataset, columns, filters, logic, format) — e.g. "Open in builder" on a saved report. */
+  load?: BuilderLoadRequest | null;
+  /** Called with the builder's current definition whenever it changes (null until the catalog loads). */
+  onSnapshot?: (snapshot: BuilderSnapshot | null) => void;
+  /** Extra footer controls (Save / Schedule), rendered next to "Generate report". */
+  footerExtras?: React.ReactNode;
+}
+
+export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: ReportBuilderCardProps = {}) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['reporting-datasets'],
     queryFn: async () => (await reportingApi.datasets()).data.datasets,
@@ -107,13 +119,73 @@ export default function ReportBuilderCard() {
     }
   }, [datasets, dataset]);
 
-  // Reset columns (all ticked) + filters whenever the dataset changes.
+  // A definition waiting for its dataset to become active (see the load effect below).
+  const pendingLoad = useRef<BuilderSnapshot | null>(null);
+
+  // Adopt a definition for `m`: keep only columns/filters that still exist in the catalog.
+  const applySnapshot = useCallback((s: BuilderSnapshot, m: ReportDatasetMeta) => {
+    const allCols = m.fields.map((f) => m.user_fields[f] ?? f);
+    const valid = new Set(allCols);
+    const cols = s.columns.filter((c) => valid.has(c));
+    setSelectedCols(cols.length ? cols : allCols);
+    setFilters(
+      s.filters
+        .filter((f) => f.col in m.filterable)
+        .map((f, i) => ({ id: Date.now() + i, col: f.col, op: f.op, value: f.value == null ? '' : String(f.value) })),
+    );
+    setLogic(s.logic === 'OR' ? 'OR' : 'AND');
+    setFormat(s.format);
+    setErr(null);
+  }, []);
+
+  // Reset columns (all ticked) + filters whenever the dataset changes — unless a load
+  // request is waiting for exactly this dataset, in which case that definition wins.
   useEffect(() => {
     if (!meta) return;
+    const pending = pendingLoad.current;
+    pendingLoad.current = null;
+    if (pending && pending.dataset === meta.key) {
+      applySnapshot(pending, meta);
+      return;
+    }
     setSelectedCols(meta.fields.map((f) => meta.user_fields[f] ?? f));
     setFilters([]);
     setErr(null);
-  }, [meta]);
+  }, [meta, applySnapshot]);
+
+  // External "load this definition" request (nonce changes on every request).
+  useEffect(() => {
+    if (!load) return;
+    if (meta && meta.key === load.snapshot.dataset) {
+      applySnapshot(load.snapshot, meta);
+    } else {
+      pendingLoad.current = load.snapshot;
+      setDataset(load.snapshot.dataset);
+    }
+    // Only a new request should re-run this, not every catalog / state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load?.nonce]);
+
+  // The filters the backend will actually receive (blank values are dropped, numbers coerced).
+  const filterPayload = useMemo<ReportFilter[]>(
+    () =>
+      filters
+        .filter((f) => f.col && f.value.trim() !== '')
+        .map((f) => ({
+          col: f.col,
+          op: f.op,
+          value: meta?.filterable[f.col] === 'number' ? Number(f.value) : f.value,
+        })),
+    [filters, meta],
+  );
+
+  // Tell the page what is configured right now (powers Save / Schedule).
+  useEffect(() => {
+    if (!onSnapshot) return;
+    onSnapshot(meta ? { dataset, columns: selectedCols, filters: filterPayload, logic, format } : null);
+    // onSnapshot is a state setter on the page; the definition inputs are the real dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta, dataset, selectedCols, filterPayload, logic, format]);
 
   const addFilter = () => {
     if (!meta || !filterCols.length) return;
@@ -140,17 +212,10 @@ export default function ReportBuilderCard() {
     setBusy(true);
     setErr(null);
     try {
-      const payload: ReportFilter[] = filters
-        .filter((f) => f.col && f.value.trim() !== '')
-        .map((f) => ({
-          col: f.col,
-          op: f.op,
-          value: meta.filterable[f.col] === 'number' ? Number(f.value) : f.value,
-        }));
       const res = await reportingApi.exportReport({
         dataset,
         columns: selectedCols,
-        filters: payload,
+        filters: filterPayload,
         logic,
         format,
       });
@@ -343,12 +408,13 @@ export default function ReportBuilderCard() {
               ))}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {err && (
                 <span className="inline-flex items-center gap-1 text-[13px] text-[var(--color-danger)]">
                   <AlertCircle size={14} /> {err}
                 </span>
               )}
+              {footerExtras}
               <button
                 onClick={runExport}
                 disabled={busy || !selectedCols.length}

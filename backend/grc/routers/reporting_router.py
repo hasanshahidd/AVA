@@ -52,6 +52,7 @@ from ..models._pentest_exploit_results import PentestExploitResult
 from ..models._pentest_scan_jobs import PentestScanJob
 from ..models._52_ctem_scope_models import CtemScope
 from ..models._asset_risk_snapshot import AssetRiskSnapshot
+from ..modules.license_management.models import LicenseEntitlement
 from ..services import metric_catalog, metric_snapshots
 from ..services import report_linkages
 from .auth_router import get_user_primary_tenant, get_user_tenants, require_auth
@@ -592,6 +593,30 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
                     "computed_at": "date"},
         default_order=("snapshot_date", "desc"),
     ),
+    "licenses": DatasetSpec(
+        LicenseEntitlement,
+        permissions=["assets:asset_inventory:*"],
+        # Software license entitlements (grc_license_entitlements) — what the tenant
+        # OWNS: one row per purchased licence line (publisher / product / edition,
+        # type + metric, quantity, unit cost, PO, expiry). Consumption and the
+        # effective licence position are computed live by modules/license_management
+        # (GET /licenses/positions, /licenses/summary) and are deliberately NOT report
+        # cells here. `status` is the stored lifecycle (active / expired / retired);
+        # lapsed lines are flipped to expired just before this dataset is read (see
+        # _refresh_license_status). product_key (encrypted) is never projected.
+        fields=["id", "publisher", "product", "edition", "license_type", "license_metric",
+                "total_quantity", "unit_cost", "currency", "status", "expiry_date",
+                "po_reference", "created_at"],
+        search=["publisher", "product", "edition", "po_reference"],
+        sortable=["id", "publisher", "product", "edition", "license_type", "license_metric",
+                  "total_quantity", "unit_cost", "currency", "status", "expiry_date",
+                  "po_reference", "created_at"],
+        filterable={"license_type": "badge", "license_metric": "badge", "status": "badge",
+                    "currency": "badge", "publisher": "text", "product": "text",
+                    "edition": "text", "po_reference": "text", "total_quantity": "number",
+                    "unit_cost": "number", "expiry_date": "date", "created_at": "date"},
+        default_order=("publisher", "asc"),
+    ),
 }
 
 
@@ -609,6 +634,7 @@ DATASET_LABELS: Dict[str, str] = {
     "pentest_scans": "Pentest Scans",
     "ctem_scopes": "CTEM Scopes",
     "risk_posture": "Risk Posture",
+    "licenses": "Software Licenses",
 }
 
 
@@ -989,7 +1015,7 @@ def _resolve_ref_fields(spec: DatasetSpec, rows: List[Any], serialized: List[Dic
 AVA_DATASET_ALLOWLIST = [
     "assets", "vulnerabilities", "cis_results", "helpdesk_tickets", "sbp_inventory",
     "discovery", "pentest_findings", "software_inventory", "pentest_scans", "ctem_scopes",
-    "risk_posture",
+    "risk_posture", "licenses",
 ]
 
 
@@ -1039,6 +1065,8 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
     # no-op write when nothing moved. Must run before we read the snapshot table.
     if body.dataset == "risk_posture":
         _refresh_risk_snapshots(db, user)
+    if body.dataset == "licenses":
+        _refresh_license_status(db, user)
 
     model = spec.model
     q = db.query(model)
@@ -1221,6 +1249,22 @@ def _refresh_risk_snapshots(db: Session, user) -> None:
             pass
 
 
+def _refresh_license_status(db: Session, user) -> None:
+    """Flip lapsed licence lines to status='expired' right before the Software
+    Licenses dataset is read, so a downloaded report agrees with the register
+    (expiry is otherwise only swept when someone opens the licensing pages).
+    Cheap, write-on-change, non-fatal."""
+    try:
+        from ..modules.license_management.service import sweep_expired
+        for tid in (get_user_tenants(user, db) or []):
+            sweep_expired(db, tid)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 @router.post("/export")
 def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends(require_auth)):
     """Stream one registered dataset to CSV/XLSX through the SAME filter/sort engine
@@ -1243,6 +1287,8 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
     # no-op write when nothing moved. Must run before we read the snapshot table.
     if body.dataset == "risk_posture":
         _refresh_risk_snapshots(db, user)
+    if body.dataset == "licenses":
+        _refresh_license_status(db, user)
 
     model = spec.model
     q = db.query(model)
@@ -1298,6 +1344,8 @@ def aggregate_dataset(body: AggregateBody, db: Session = Depends(get_db), user=D
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one measure is required.",
         )
+    if body.dataset == "licenses":
+        _refresh_license_status(db, user)
 
     model = spec.model
     # Allowlist: real table columns that are filterable, sortable, or projected.

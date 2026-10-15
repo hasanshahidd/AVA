@@ -4460,4 +4460,210 @@ export const onboardingApi = {
   }) => apiClient.post('/onboarding/import', data),
 };
 
+// ── Software License Management (backend: grc/modules/license_management) ────
+// Entitlements are what the tenant OWNS (entered by hand / imported from a PO sheet);
+// consumption is what credentialed scans found installed. The backend reconciles the
+// two live, so every GET here is a computed view, not stored state. Status strings are
+// typed as plain `string` on purpose: the UI maps the ones it knows and shows any
+// other value verbatim rather than guessing.
+//
+// Row status vocabulary (entitlement lines + positions):
+//   compliant | over_deployed | expiring_soon | over_licensed | not_measured |
+//   expired | pending | retired
+// Per-asset status: licensed | unlicensed | over_deployed | expiring
+export interface LicenseEntitlement {
+  id: number;
+  publisher: string;
+  product: string;
+  edition?: string | null;
+  license_type: string;
+  license_metric: string;
+  /** Quantity owned on THIS purchase line. */
+  total_quantity: number;
+  /** Computed, POOL-level (all live lines of the same product); null when this line is not live. */
+  consumed?: number | null;
+  position?: number | null;
+  status?: string | null;
+  unit_cost?: number | null;
+  currency?: string | null;
+  purchase_date?: string | null;
+  start_date?: string | null;
+  expiry_date?: string | null;
+  maintenance_expiry?: string | null;
+  po_reference?: string | null;
+  contract_reference?: string | null;
+  reseller?: string | null;
+  notes?: string | null;
+  // ── additive extras the backend also returns ──
+  software_key?: string | null;
+  /** Total owned across every live line of this product (the pool `consumed` is measured against). */
+  product_entitled?: number | null;
+  /** false when the metric (CAL, concurrent user, usage) cannot be counted from installed-software scans. */
+  measured?: boolean;
+  /** Stored lifecycle: active | expired | retired. */
+  lifecycle_status?: string | null;
+  has_product_key?: boolean;
+}
+
+/** The writable subset of an entitlement (POST body / PUT body — PUT changes only the keys sent). */
+export interface LicenseEntitlementInput {
+  publisher: string;
+  product: string;
+  edition?: string | null;
+  license_type: string;
+  license_metric: string;
+  total_quantity: number;
+  unit_cost?: number | null;
+  currency?: string | null;
+  purchase_date?: string | null;
+  start_date?: string | null;
+  expiry_date?: string | null;
+  maintenance_expiry?: string | null;
+  po_reference?: string | null;
+  contract_reference?: string | null;
+  reseller?: string | null;
+  notes?: string | null;
+  /** Optional exact-match key(s) to scanned software: comma-separated, trailing * = prefix. Omit to leave unchanged. */
+  software_key?: string | null;
+}
+
+export interface LicenseConsumingAsset {
+  asset_id: number;
+  name: string;
+  /** Units this asset consumes (cores for per-core licenses, else 1). */
+  quantity?: number | null;
+}
+
+export interface LicensePosition {
+  publisher: string;
+  product: string;
+  edition?: string | null;
+  license_metric: string;
+  entitled: number;
+  consumed: number;
+  position: number;
+  status: string;
+  unit_cost?: number | null;
+  /** 0 when there is no shortfall; null when there IS a shortfall but no unit cost is recorded to price it. */
+  exposure_cost?: number | null;
+  reclaimable_count?: number | null;
+  nearest_expiry?: string | null;
+  /** Capped server-side; `consuming_assets_total` is the true count. */
+  consuming_assets?: LicenseConsumingAsset[];
+  currency?: string | null;
+  measured?: boolean;
+  entitlement_ids?: number[];
+  consuming_assets_total?: number;
+}
+
+/** Installed software with no valid entitlement, one entry per product. */
+export interface UnlicensedSoftware {
+  software_key: string;
+  name: string;
+  publisher?: string | null;
+  /** Installations found, across assets. */
+  install_count: number;
+  assets?: Array<{ asset_id: number; name: string }>;
+  assets_total?: number;
+  /** `entitlement_expired` = it WAS covered and the entitlement lapsed. */
+  reason?: 'no_entitlement' | 'entitlement_expired' | (string & {});
+  note?: string | null;
+}
+
+export interface LicenseSummary {
+  /** compliant ÷ tracked, 0–100; null when no product is tracked yet. */
+  compliance_pct: number | null;
+  /** Products with a live entitlement whose metric scans can count. compliant + over_deployed === tracked_products. */
+  tracked_products: number;
+  compliant: number;
+  over_deployed: number;
+  /** Same count as `over_deployed` (the backend keeps both names) — never add the two together. */
+  under_licensed: number;
+  /** Installations (not products) with no valid entitlement. */
+  unlicensed_count: number;
+  /** Cumulative windows: 30 ⊂ 60 ⊂ 90. Live lines whose licence or maintenance ends inside the window. */
+  expiring_30: number;
+  expiring_60: number;
+  expiring_90: number;
+  /** Money below is in `currency` (the tenant's primary one). */
+  annual_spend: number;
+  renewal_cost_90d: number;
+  reclaimable_count: number;
+  reclaimable_savings: number;
+  // ── additive extras the backend also returns ──
+  currency?: string | null;
+  by_currency?: Record<string, Record<string, number | null>>;
+  exposure_cost?: number;
+  /** Over-deployed products whose shortfall cannot be priced (no unit cost). */
+  exposure_unpriced?: number;
+  not_measured_products?: number;
+  expired_lines?: number;
+  entitlement_lines?: number;
+  /** Coverage: how many assets actually have a software inventory behind these numbers. */
+  assets_total?: number | null;
+  assets_with_inventory?: number | null;
+  as_of?: string;
+}
+
+export interface AssetLicense {
+  detected_name: string;
+  detected_version?: string | null;
+  publisher?: string | null;
+  software_key?: string | null;
+  status: 'licensed' | 'unlicensed' | 'over_deployed' | 'expiring' | (string & {});
+  entitlement_id?: number | null;
+  entitlement_product?: string | null;
+  // ── additive extras ──
+  quantity?: number;
+  license_metric?: string | null;
+  product_status?: string | null;
+  /** Host not seen for 90+ days — a PROXY for an idle seat, not usage metering. */
+  reclaim_candidate?: boolean;
+  note?: string | null;
+}
+
+export interface AssetLicenses {
+  asset_id: number;
+  asset_name?: string;
+  licenses: AssetLicense[];
+  summary?: { licensed: number; unlicensed: number; over_deployed: number; expiring: number; total: number };
+  /** false → no software inventory has been collected for this asset yet. */
+  inventory_collected?: boolean;
+}
+
+export interface LicenseImportResult {
+  dry_run: boolean;
+  total: number;
+  created: number;
+  would_create: number | null;
+  skipped: number;
+  error_count: number;
+  errors: Array<{ row: number; error: string }>;
+  ids: number[];
+  /** Sheet header → entitlement field it was matched to. */
+  columns: Record<string, string>;
+  unmapped: string[];
+}
+
+export const licensesApi = {
+  list: () => apiClient.get<{ entitlements: LicenseEntitlement[] }>('/licenses'),
+  create: (body: LicenseEntitlementInput) => apiClient.post<{ id: number }>('/licenses', body),
+  update: (id: number, body: LicenseEntitlementInput) => apiClient.put<{ id: number }>(`/licenses/${id}`, body),
+  delete: (id: number) => apiClient.delete<{ id: number; deleted: boolean }>(`/licenses/${id}`),
+  getPositions: () =>
+    apiClient.get<{ positions: LicensePosition[]; unlicensed: UnlicensedSoftware[] }>('/licenses/positions'),
+  getSummary: () => apiClient.get<LicenseSummary>('/licenses/summary'),
+  getAssetLicenses: (assetId: number) => apiClient.get<AssetLicenses>(`/licenses/asset/${assetId}`),
+  /** CSV / XLSX of entitlements. `dryRun` validates and reports without writing. */
+  importFile: (file: File, dryRun: boolean) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post<LicenseImportResult>('/licenses/import', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params: { dry_run: dryRun },
+    });
+  },
+  importTemplate: () => apiClient.get<Blob>('/licenses/import/template', { responseType: 'blob' }),
+};
+
 export default apiClient;

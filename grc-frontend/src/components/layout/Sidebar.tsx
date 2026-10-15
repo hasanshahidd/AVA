@@ -46,6 +46,7 @@ import {
   BookOpen,
   MessageSquareText,
   Home,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -109,6 +110,7 @@ const navigation: NavEntry[] = [
     items: [
       { name: 'IT Asset Discovery',        href: '/asset-discovery',               icon: Radar,         requiredPermissions: ['assets:asset_inventory:*'] },
       { name: 'IT Asset Inventory',        href: '/assets',                        icon: Server,        requiredPermissions: ['assets:asset_inventory:*'] },
+      { name: 'Licenses',                  href: '/licenses',                      icon: KeyRound,      requiredPermissions: ['assets:asset_inventory:*'] },
       { name: 'Assets Risk Posture',       href: '/risk-posture',                  icon: Activity,      requiredPermissions: ['erm:risks:*'] },
     ],
   },

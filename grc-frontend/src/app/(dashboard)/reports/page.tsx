@@ -1,19 +1,34 @@
 'use client';
 
-// Reports — the dedicated area for downloading the product's regulatory /
-// inventory reports. Built as a small registry (REPORTS) so adding a second
-// report later is just another entry. SBP is the first (and currently only) one.
+// Reports — the dedicated area for building, saving, scheduling and downloading the
+// product's reports. Four tabs:
+//   Report builder  the custom Report Builder + the SBP regulatory return (the
+//                   original page; kept mounted so its state survives tab switches)
+//   Saved reports   saved definitions (/reporting/reports) + ready-made audit exports
+//   Scheduled       emailed reports on a schedule (/report-schedules)
+//   Trends          metric history, change and status vs target (/reporting/trends/*)
 // The page title lives in the top bar (Header PAGE_TITLES '/reports'), so the
-// body renders only the report cards — no second heading.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// body renders only the tab bar and the cards — no second heading.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Landmark, Download, ChevronDown, Search, Loader2, AlertCircle, FileSpreadsheet,
+  Table2, Bookmark, CalendarClock, Activity,
   type LucideIcon,
 } from 'lucide-react';
 import { apiClient, assetsApi } from '@/lib/api';
+import { useTabParam } from '@/lib/useTabParam';
+import type {
+  BuilderLoadRequest, BuilderSnapshot, SavedReport,
+} from '@/lib/reportingExtrasApi';
 import type { ITAsset } from '@/types';
 import ReportBuilderCard from './ReportBuilderCard';
+import BuilderActions from './BuilderActions';
+import SaveReportDialog from './SaveReportDialog';
+import SavedReportsPanel from './SavedReportsPanel';
+import ScheduledReportsPanel from './ScheduledReportsPanel';
+import ScheduleModal, { type ScheduleEditor } from './ScheduleModal';
+import TrendsPanel from './TrendsPanel';
 
 const ACCENT = 'var(--color-base)';
 
@@ -188,13 +203,118 @@ function SbpReportCard() {
   );
 }
 
-// Report registry — add another component here to add a second report card.
-const REPORTS: React.ComponentType[] = [ReportBuilderCard, SbpReportCard];
+// Extra report cards shown under the Report Builder — add another component here to add a
+// further regulatory / inventory report.
+const BUILDER_TAB_REPORTS: React.ComponentType[] = [SbpReportCard];
+
+const TAB_IDS = ['builder', 'saved', 'scheduled', 'trends'] as const;
+type TabId = (typeof TAB_IDS)[number];
+const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
+  { id: 'builder', label: 'Report builder', icon: Table2 },
+  { id: 'saved', label: 'Saved reports', icon: Bookmark },
+  { id: 'scheduled', label: 'Scheduled', icon: CalendarClock },
+  { id: 'trends', label: 'Trends', icon: Activity },
+];
 
 export default function ReportsPage() {
+  const [tab, setTab] = useTabParam<TabId>('builder', TAB_IDS);
+
+  // What the Report Builder holds right now (reported by the card) — powers Save / Schedule.
+  const [snapshot, setSnapshot] = useState<BuilderSnapshot | null>(null);
+  // A definition to push into the builder ("Open" on a saved report).
+  const [loadReq, setLoadReq] = useState<BuilderLoadRequest | null>(null);
+  // The saved report the builder was last opened from / saved as (so Save can update it).
+  const [loadedFrom, setLoadedFrom] = useState<SavedReport | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [scheduleEditor, setScheduleEditor] = useState<ScheduleEditor | null>(null);
+  const nonce = useRef(0);
+
+  const openInBuilder = useCallback(
+    (r: SavedReport) => {
+      const spec = r.spec ?? {};
+      nonce.current += 1;
+      setLoadReq({
+        nonce: nonce.current,
+        snapshot: {
+          dataset: r.dataset,
+          columns: spec.columns ?? [],
+          filters: spec.filters ?? [],
+          logic: spec.logic === 'OR' ? 'OR' : 'AND',
+          format: spec.format ?? 'csv',
+        },
+      });
+      setLoadedFrom(r);
+      setTab('builder');
+    },
+    [setTab],
+  );
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      {REPORTS.map((Card, i) => <Card key={i} />)}
+      <div role="tablist" aria-label="Reports" className="flex flex-wrap gap-1 border-b border-[var(--color-border)]">
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className="-mb-px inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors"
+              style={
+                active
+                  ? { borderColor: 'var(--color-base)', color: 'var(--color-base)' }
+                  : { borderColor: 'transparent', color: 'var(--color-muted)' }
+              }
+            >
+              <t.icon size={15} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Kept mounted (just hidden) so the builder's columns / filters survive a trip to another tab. */}
+      <div className={tab === 'builder' ? 'space-y-4' : 'hidden'}>
+        <ReportBuilderCard
+          load={loadReq}
+          onSnapshot={setSnapshot}
+          footerExtras={
+            <BuilderActions
+              snapshot={snapshot}
+              onSave={() => setSaveOpen(true)}
+              onSchedule={() => snapshot && setScheduleEditor({ mode: 'new', source: { kind: 'inline', snapshot } })}
+            />
+          }
+        />
+        {BUILDER_TAB_REPORTS.map((Card, i) => <Card key={i} />)}
+      </div>
+
+      {tab === 'saved' && (
+        <SavedReportsPanel
+          onLoad={openInBuilder}
+          onSchedule={(r) => setScheduleEditor({ mode: 'new', source: { kind: 'saved', slug: r.slug, name: r.name } })}
+          onGoBuilder={() => setTab('builder')}
+          onDeleted={(r) =>
+            setLoadedFrom((cur) => (cur && cur.slug === r.slug && cur.is_mine === r.is_mine ? null : cur))
+          }
+        />
+      )}
+      {tab === 'scheduled' && (
+        <ScheduledReportsPanel
+          onNew={() => setScheduleEditor({ mode: 'new' })}
+          onEdit={(s) => setScheduleEditor({ mode: 'edit', schedule: s })}
+        />
+      )}
+      {tab === 'trends' && <TrendsPanel />}
+
+      <SaveReportDialog
+        open={saveOpen}
+        onClose={() => setSaveOpen(false)}
+        snapshot={snapshot}
+        loadedFrom={loadedFrom}
+        onSaved={setLoadedFrom}
+      />
+      <ScheduleModal editor={scheduleEditor} onClose={() => setScheduleEditor(null)} />
     </div>
   );
 }

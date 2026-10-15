@@ -53,6 +53,8 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/auditor-portal/statutory-audit': { title: 'Statutory Audit', subtitle: 'Register and track regulator requirements and audit observations' },
   '/assets': { title: 'IT Asset Inventory', subtitle: 'Manage and track IT assets with CIA ratings and valuations.', section: 'Cybersecurity Assurance' },
   '/asset-discovery': { title: 'IT Asset Discovery', subtitle: 'Find devices on the network, decide what to adopt, and see what changed.', section: 'Cybersecurity Assurance' },
+  // No `section`: the page has no body heading of its own, so the bar carries the page name.
+  '/licenses': { title: 'Licenses', subtitle: 'Software entitlements vs what is installed — compliance, exposure and renewals.' },
   '/risk-posture': { title: 'Assets Risk Posture', subtitle: 'Risk = weighted blend of vulnerabilities, hardening, control gap and business impact' },
   '/pentest': { title: 'AI Pentest' },
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },

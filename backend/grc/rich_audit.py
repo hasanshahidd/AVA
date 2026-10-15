@@ -93,6 +93,7 @@ def current_actor_workflow_id() -> Optional[int]:
 SENSITIVE_KEYS = {
     "password", "password_hash", "token", "access_token",
     "refresh_token", "secret", "api_key", "authorization", "cookie",
+    "product_key", "license_key",   # software-license volume keys (modules/license_management)
 }
 
 SKIP_INTERNAL_KEYS = {"_sa_instance_state"}
