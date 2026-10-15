@@ -8,15 +8,18 @@
 // authenticated agent's session. EVERY such string must pass through
 // `sanitizeHtml()` before it reaches `dangerouslySetInnerHTML`.
 //
-// Runs on both server (SSR) and client via isomorphic-dompurify.
+// Browser-only `dompurify` (NOT isomorphic/jsdom — that bundles jsdom into every
+// HD page's static export and breaks `next build`). These are "use client" pages
+// that fetch ticket/reply/email content in the browser, so sanitization only has
+// to run client-side: during SSG/SSR there is no real untrusted content yet, and
+// the browser re-renders (and sanitizes) once the data arrives. On the server we
+// return "" (fail-closed) so nothing unsanitized is ever emitted.
 //
-// NOTE: `isomorphic-dompurify` is declared in grc-frontend/package.json but is
-// NOT yet installed in this checkout — the droplet must run `npm install` before
-// `npm run build`. The `@ts-ignore` below lets `tsc --noEmit` pass pre-install;
-// once the package is present the import resolves normally (an unused @ts-ignore
-// is not itself an error).
-// @ts-ignore -- resolved at build time after `npm install` (see note above)
-import DOMPurify from "isomorphic-dompurify";
+// NOTE: `dompurify` + `@types/dompurify` are declared in grc-frontend/package.json
+// but not installed in this checkout — the droplet runs `npm install` before
+// `npm run build`. The `@ts-ignore` lets `tsc --noEmit` pass pre-install.
+// @ts-ignore -- resolved at build time after `npm install`
+import DOMPurify from "dompurify";
 
 // Strict allowlist: only basic text formatting survives. Everything else
 // (scripts, iframes, objects, forms, style, event-handler attributes, data-*,
@@ -64,6 +67,10 @@ function ensureHook() {
  */
 export function sanitizeHtml(html: string): string {
   if (!html || typeof html !== "string") return "";
+  // Browser-only: DOMPurify needs a DOM. On the server (SSG/SSR) there is no real
+  // untrusted content to render yet, so fail closed — the client re-renders +
+  // sanitizes once the data loads.
+  if (typeof window === "undefined") return "";
   try {
     ensureHook();
     return DOMPurify.sanitize(html, SANITIZE_CONFIG) as string;
