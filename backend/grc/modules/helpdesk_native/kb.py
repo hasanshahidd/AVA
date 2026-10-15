@@ -42,22 +42,25 @@ from sqlalchemy.orm import Session
 from ...models import (GRCUser, HDAgent, HDArticle, HDArticleCategory,
                        HDArticleFeedback, get_db)
 from ...routers.auth_router import require_auth
-from .common import iso, require_edit, require_view, tenant_id
+from .common import iso, require_kb_author, require_kb_view, tenant_id
 
 GENERAL = "General"
 
 
-def list_articles(db: Session, tid: int) -> dict:
+def list_articles(db: Session, tid: int, published_only: bool = True) -> dict:
     """§A10. Per-article helpful/not_helpful have no native store yet (the model
     map defers HD Article Feedback), so they serialize as 0 — exactly what the
     proxy returns for an article with no feedback rows. `categories` is the
-    proxy's name→count breakdown (sorted), unread by the UI but part of the shape."""
-    rows = (
-        db.query(HDArticle)
-        .filter(HDArticle.tenant_id == tid)
-        .order_by(HDArticle.updated_at.desc())
-        .all()
-    )
+    proxy's name→count breakdown (sorted), unread by the UI but part of the shape.
+
+    SECURITY (audit M1 — KB draft leak): `published_only` defaults to True so a
+    requester/portal caller never sees Draft/Archived titles, authors or metadata.
+    The agent-console caller that manages drafts must pass published_only=False
+    explicitly (it is tickets:view/kb:view gated, so only staff reach it)."""
+    q = db.query(HDArticle).filter(HDArticle.tenant_id == tid)
+    if published_only:
+        q = q.filter(HDArticle.status == "Published")
+    rows = q.order_by(HDArticle.updated_at.desc()).all()
     cats: Counter = Counter()
     articles = []
     for a in rows:
@@ -484,81 +487,81 @@ class FeedbackBody(BaseModel):
 
 @kb_write_router.get("/articles/{name}")
 def r_get_article(name: str, db: Session = Depends(get_db),
-                  user: GRCUser = Depends(require_auth), _: bool = Depends(require_view)):
+                  user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_view)):
     return get_article(db, tenant_id(db), name, user.email)
 
 
 @kb_write_router.get("/articles/{name}/stats")
 def r_article_stats(name: str, db: Session = Depends(get_db),
-                    user: GRCUser = Depends(require_auth), _: bool = Depends(require_view)):
+                    user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_view)):
     return get_article_stats(db, tenant_id(db), name, user.email)
 
 
 @kb_write_router.post("/articles")
 def r_create_article(body: ArticleBody, db: Session = Depends(get_db),
-                     user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                     user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_author)):
     return create_article(db, tenant_id(db), user.email, body.model_dump(exclude_none=True))
 
 
 @kb_write_router.put("/articles/{name}")
 def r_update_article(name: str, body: ArticleBody, db: Session = Depends(get_db),
-                     user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                     user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_author)):
     return update_article(db, tenant_id(db), name, user.email, body.model_dump(exclude_unset=True))
 
 
 @kb_write_router.post("/articles/delete")
 def r_delete_articles(body: DeleteBody, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
+                      _: bool = Depends(require_kb_author)):
     return delete_articles(db, tenant_id(db), body.articles)
 
 
 @kb_write_router.post("/articles/{name}/feedback")
 def r_set_feedback(name: str, body: FeedbackBody, db: Session = Depends(get_db),
-                   user: GRCUser = Depends(require_auth), _: bool = Depends(require_view)):
+                   user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_view)):
     return set_feedback(db, tenant_id(db), name, user.email, body.feedback)
 
 
 @kb_write_router.post("/articles/{name}/views")
-def r_increment_views(name: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def r_increment_views(name: str, db: Session = Depends(get_db), _: bool = Depends(require_kb_view)):
     return increment_views(db, tenant_id(db), name)
 
 
 @kb_write_router.get("/kb/categories")
-def r_get_categories(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def r_get_categories(db: Session = Depends(get_db), _: bool = Depends(require_kb_view)):
     return get_categories(db, tenant_id(db))
 
 
 @kb_write_router.get("/kb/general-category")
-def r_general_category(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def r_general_category(db: Session = Depends(get_db), _: bool = Depends(require_kb_view)):
     return {"category": get_general_category(db, tenant_id(db))}
 
 
 @kb_write_router.get("/kb/categories/{category}/title")
-def r_category_title(category: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def r_category_title(category: str, db: Session = Depends(get_db), _: bool = Depends(require_kb_view)):
     return {"category_name": get_category_title(db, tenant_id(db), category)}
 
 
 @kb_write_router.get("/kb/categories/{category}/articles")
-def r_category_articles(category: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def r_category_articles(category: str, db: Session = Depends(get_db), _: bool = Depends(require_kb_view)):
     return get_category_articles(db, tenant_id(db), category)
 
 
 @kb_write_router.post("/kb/categories")
 def r_create_category(body: CategoryCreate, db: Session = Depends(get_db),
-                      user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                      user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_author)):
     return create_category(db, tenant_id(db), user.email, body.title)
 
 
 @kb_write_router.post("/kb/categories/move")
-def r_move_to_category(body: MoveBody, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def r_move_to_category(body: MoveBody, db: Session = Depends(get_db), _: bool = Depends(require_kb_author)):
     return move_to_category(db, tenant_id(db), body.category, body.articles)
 
 
 @kb_write_router.post("/kb/categories/merge")
-def r_merge_category(body: MergeBody, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def r_merge_category(body: MergeBody, db: Session = Depends(get_db), _: bool = Depends(require_kb_author)):
     return merge_category(db, tenant_id(db), body.source, body.target)
 
 
 @kb_write_router.delete("/kb/categories/{name}")
-def r_delete_category(name: str, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def r_delete_category(name: str, db: Session = Depends(get_db), _: bool = Depends(require_kb_author)):
     return delete_category(db, tenant_id(db), name)

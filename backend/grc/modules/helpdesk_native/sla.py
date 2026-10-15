@@ -14,6 +14,7 @@ returns a 200-safe shape and never raises on empty input.
 """
 from __future__ import annotations
 
+import ast
 import json
 from datetime import date, datetime, time as dtime, timedelta
 from typing import List, Optional
@@ -34,7 +35,12 @@ from ...models import (
     HDTicketPriority,
     get_db,
 )
-from .common import iso, require_edit, require_view, tenant_id
+from .common import iso, require_view, tenant_id
+try:  # Agent-1 adds this to common.py; resolves at runtime, fallback pre-merge
+    from .common import require_settings_manage
+except ImportError:  # pragma: no cover
+    from ...routers.auth_router import require_tenant_permission
+    require_settings_manage = require_tenant_permission("helpdesk:settings:manage")
 
 RESOLVED = "Resolved"
 PAUSED = "Paused"
@@ -169,6 +175,126 @@ def _ctx(ticket) -> dict:
     )}
 
 
+# ─── safe condition evaluator (B1: replaces the escapable eval sandbox) ───────
+# The SLA `condition` is a tenant-authored boolean expression over the ticket
+# fields `_ctx` exposes (`doc.<field>`). It used to run through
+# `eval(..., {"__builtins__": {}}, ctx)`, which is NOT a sandbox: attribute
+# access alone — `().__class__.__bases__[0].__subclasses__()` — walks to any
+# class (subprocess, os-importing gadgets) → RCE on the backend host. This
+# evaluator PARSES the expression and walks it against a STRICT allowlist,
+# executing it WITHOUT eval/exec. Anything outside the allowlist (calls,
+# subscripts, lambdas, comprehensions, dunder/foreign names, non-`doc`
+# attribute roots, nested attribute walks) raises ConditionError.
+_DOC_FIELDS = frozenset({
+    "subject", "status", "status_category", "priority", "ticket_type",
+    "agent_group", "customer", "contact", "raised_by", "process",
+})
+
+_CMP_OPS = {
+    ast.Eq: lambda a, b: a == b,
+    ast.NotEq: lambda a, b: a != b,
+    ast.Lt: lambda a, b: a < b,
+    ast.LtE: lambda a, b: a <= b,
+    ast.Gt: lambda a, b: a > b,
+    ast.GtE: lambda a, b: a >= b,
+    ast.In: lambda a, b: a in b,
+    ast.NotIn: lambda a, b: a not in b,
+}
+
+
+class ConditionError(ValueError):
+    """A condition used a construct outside the strict allowlist (or is invalid
+    syntax). Subclasses ValueError so the existing `except Exception` guards in
+    `_get_sla` (skip) and `_validate_condition` (-> HTTP 400) catch it."""
+
+
+def _reject(node: ast.AST):
+    raise ConditionError(f"disallowed expression element: {type(node).__name__}")
+
+
+def _doc_field(doc, attr: str):
+    """Read `doc.<attr>` for an allow-listed scalar field only. `attr` is already
+    checked against `_DOC_FIELDS` (no dunders) by the caller, so this can never
+    reach Python internals; works for a `_Doc`/dict or a plain object."""
+    if isinstance(doc, dict):
+        return doc.get(attr)
+    return getattr(doc, attr, None)
+
+
+def _eval_node(node: ast.AST, doc):
+    """Evaluate ONE allow-listed node, returning its Python value. Raises
+    ConditionError for anything not explicitly permitted."""
+    if isinstance(node, ast.BoolOp):
+        if isinstance(node.op, ast.And):
+            result = True
+            for value in node.values:
+                result = _eval_node(value, doc)
+                if not result:
+                    return result
+            return result
+        if isinstance(node.op, ast.Or):
+            result = False
+            for value in node.values:
+                result = _eval_node(value, doc)
+                if result:
+                    return result
+            return result
+        _reject(node)
+    if isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.Not):          # UnaryOp: Not ONLY
+            return not _eval_node(node.operand, doc)
+        _reject(node)                             # USub/UAdd/Invert disallowed
+    if isinstance(node, ast.Compare):
+        left = _eval_node(node.left, doc)
+        for op, comparator in zip(node.ops, node.comparators):
+            if type(op) not in _CMP_OPS:
+                _reject(op)
+            right = _eval_node(comparator, doc)
+            if not _CMP_OPS[type(op)](left, right):
+                return False
+            left = right
+        return True
+    if isinstance(node, ast.Attribute):
+        # ONLY `doc.<field>` — one level deep, root must be the `doc` Name, the
+        # field an allow-listed non-dunder scalar. Blocks `doc.__class__`,
+        # `x.y.z`, `foo.bar`, any attribute walk.
+        if not (isinstance(node.value, ast.Name) and node.value.id == "doc"):
+            _reject(node)
+        attr = node.attr
+        if attr.startswith("__") or attr not in _DOC_FIELDS:
+            _reject(node)
+        return _doc_field(doc, attr)
+    if isinstance(node, ast.Name):
+        if node.id != "doc":                      # no foreign names (os, cycler…)
+            _reject(node)
+        return doc
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, (ast.List, ast.Tuple)):   # literal containers (for `in`)
+        values = []
+        for elt in node.elts:
+            if not isinstance(elt, ast.Constant):
+                _reject(elt)
+            values.append(elt.value)
+        return values if isinstance(node, ast.List) else tuple(values)
+    _reject(node)   # Call, Subscript, Lambda, comprehensions, Dict, Set, Starred…
+
+
+def safe_condition_eval(condition: str, context: dict) -> bool:
+    """Safely evaluate a tenant-authored SLA `condition` against `context`
+    (`{"doc": <ticket view>}`) with NO eval/exec. Returns the boolean result;
+    raises ConditionError on invalid syntax or any construct outside the strict
+    allowlist (the escapable-eval RCE class, B1)."""
+    if not condition or not isinstance(condition, str):
+        return False
+    try:
+        tree = ast.parse(condition, mode="eval")
+    except SyntaxError as exc:
+        raise ConditionError(f"invalid condition syntax: {exc}") from exc
+    doc = context.get("doc") if isinstance(context, dict) else None
+    return bool(_eval_node(tree.body, doc))
+
+
 def _get_sla(db: Session, ticket):
     """utils.py:get_sla — the SLA that applies to `ticket`, or None.
 
@@ -210,11 +336,9 @@ def _get_sla(db: Session, ticket):
         if context is None:
             context = _ctx(ticket)
         try:
-            if eval(s.condition, {"__builtins__": {}}, context):  # noqa: S307
-                # ponytail: restricted eval (no builtins) over label-resolved
-                # ticket fields — same trust model as Frappe safe_eval
-                # (tenant-admin-authored config). AST-allowlist if conditions
-                # ever come from untrusted input.
+            if safe_condition_eval(s.condition, context):
+                # B1: AST allow-list evaluation (no eval/exec). A malformed or
+                # disallowed condition raises ConditionError and is skipped.
                 return s
         except Exception:
             continue
@@ -467,7 +591,7 @@ def sla_preview(db: Session, tid: int, process: Optional[str] = None,
         if not s.condition:
             continue
         try:
-            if eval(s.condition, {"__builtins__": {}}, context):  # noqa: S307
+            if safe_condition_eval(s.condition, context):  # B1: no eval/exec
                 chosen = s
                 break
         except Exception:  # noqa: BLE001
@@ -605,7 +729,7 @@ def _validate_condition(condition, condition_json) -> None:
     that validates here is one the runtime can actually evaluate."""
     if condition:
         try:
-            eval(condition, {"__builtins__": {}}, _ctx_empty())  # noqa: S307
+            safe_condition_eval(condition, _ctx_empty())  # B1: no eval/exec
         except Exception as e:  # noqa: BLE001 — surfaced to the author as 400
             raise HTTPException(status_code=400,
                                 detail=f"The condition '{condition}' is invalid: {e}")
@@ -1136,13 +1260,13 @@ def get_sla_ep(name: str, db: Session = Depends(get_db), _: bool = Depends(requi
 
 @config_router.post("/sla")
 def create_sla_ep(body: SLAConfigIn, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
+                  _: bool = Depends(require_settings_manage)):
     return create_sla(db, tenant_id(db), body.model_dump())
 
 
 @config_router.put("/sla/{name}")
 def update_sla_ep(name: str, body: SLAConfigIn, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
+                  _: bool = Depends(require_settings_manage)):
     return update_sla(db, tenant_id(db), name, body.model_dump())
 
 
@@ -1159,31 +1283,31 @@ def get_holiday_list_ep(name: str, db: Session = Depends(get_db),
 
 @config_router.post("/holiday-lists")
 def create_holiday_list_ep(body: HolidayListIn, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     return create_holiday_list(db, tenant_id(db), body.model_dump())
 
 
 @config_router.put("/holiday-lists/{name}")
 def update_holiday_list_ep(name: str, body: HolidayListIn, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     return update_holiday_list(db, tenant_id(db), name, body.model_dump())
 
 
 @config_router.delete("/holiday-lists/{name}")
 def delete_holiday_list_ep(name: str, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     return delete_holiday_list(db, tenant_id(db), name)
 
 
 @config_router.post("/holiday-lists/{name}/weekly-off")
 def generate_weekly_off_ep(name: str, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     return generate_weekly_off(db, tenant_id(db), name)
 
 
 @config_router.post("/holiday-lists/{name}/clear")
 def clear_holidays_ep(name: str, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
+                      _: bool = Depends(require_settings_manage)):
     return clear_holidays(db, tenant_id(db), name)
 
 
@@ -1254,5 +1378,47 @@ if __name__ == "__main__":
     assert wk == [date(2024, 1, 7), date(2024, 1, 21), date(2024, 1, 28)], wk
     assert _raises(lambda: _weekly_off_date_list(date(2024, 1, 1), date(2024, 1, 31), "Funday", set()))
     assert _get_repeated(["Mon", "Tue", "Mon", "Mon"]) == "Mon"
+
+    # ── B1: safe_condition_eval adversarial allowlist self-check ─────────────
+    def _blocked(expr, ctx=None):
+        """True iff safe_condition_eval REJECTS (raises on) `expr`."""
+        try:
+            safe_condition_eval(expr, ctx if ctx is not None else {"doc": _Doc()})
+        except Exception:
+            return True
+        return False
+
+    # RCE / sandbox-escape payloads MUST be rejected (the B1 exploit class)
+    assert _blocked("().__class__.__bases__[0].__subclasses__()"), "subclasses walk not blocked"
+    assert _blocked("doc.__class__.__mro__[1].__subclasses__()"), "doc mro walk not blocked"
+    assert _blocked("__import__('os').system('id')"), "__import__ not blocked"
+    assert _blocked("doc.__class__"), "dunder attr not blocked"
+    assert _blocked("cycler.__init__.__globals__"), "foreign name/dunder not blocked"
+    assert _blocked("[x for x in doc]"), "comprehension not blocked"
+    assert _blocked("doc.priority.upper()"), "method call not blocked"
+    assert _blocked("doc['priority']"), "subscript not blocked"
+    assert _blocked("(lambda: 1)()"), "lambda/call not blocked"
+    assert _blocked("open('x')"), "bare call not blocked"
+    assert _blocked("os.system('id')"), "foreign attr-call not blocked"
+    assert _blocked("doc.priority == 'High'; doc.status == 'Open'"), "statement not blocked"
+    assert _blocked("doc.unknown_field == 'x'"), "non-schema field not blocked"
+    # legit conditions MUST evaluate (not raise) and return the right boolean
+    assert safe_condition_eval("doc.priority == 'High'", {"doc": {"priority": "High"}}) is True
+    assert safe_condition_eval("doc.priority == 'High'", {"doc": {"priority": "Low"}}) is False
+    assert safe_condition_eval("doc.process == 'Change'", {"doc": _Doc(process="Change")}) is True
+    assert safe_condition_eval("doc.priority in ['High', 'Urgent']",
+                               {"doc": {"priority": "Urgent"}}) is True
+    assert safe_condition_eval("doc.priority in ['High', 'Urgent']",
+                               {"doc": {"priority": "Low"}}) is False
+    assert safe_condition_eval("doc.status == 'Open' and doc.priority != 'Low'",
+                               {"doc": {"status": "Open", "priority": "High"}}) is True
+    assert safe_condition_eval("doc.status == 'Open' and doc.priority != 'Low'",
+                               {"doc": {"status": "Open", "priority": "Low"}}) is False
+    assert safe_condition_eval("not (doc.priority == 'Low')",
+                               {"doc": {"priority": "High"}}) is True
+    assert safe_condition_eval("doc.process == 'Change' or doc.process == 'Incident'",
+                               {"doc": _Doc(process="Incident")}) is True
+    assert safe_condition_eval("", {"doc": _Doc()}) is False          # blank is falsy, not RCE
+    print("sla B1 safe_condition_eval adversarial self-check ok")
 
     print("sla self-check ok")

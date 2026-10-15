@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, Activity, Mail } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, Activity, Mail, Paperclip, Download } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd } from "../../_ui";
 import { RichComposer, isEmptyHtml } from "../../RichText";
@@ -32,6 +32,46 @@ export default function TicketDetail() {
   const [savedReply, setSavedReply] = useState("");
 
   const { data: canned } = useHd<any>("/helpdesk/canned-responses");
+  const { data: attachData, reload: reloadAttachments } = useHd<any>(`${base}/attachments`);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const attachments: any[] = attachData?.attachments || [];
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    setUploading(true);
+    try {
+      await apiClient.post(`${base}/attachments`, form, { headers: { "Content-Type": "multipart/form-data" } });
+      setNote(`Attached ${file.name}.`);
+      reloadAttachments();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setNote(typeof msg === "string" ? msg : "Couldn't attach that file.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const downloadAttachment = async (att: { id: number; filename?: string }) => {
+    try {
+      const res = await apiClient.get(`/helpdesk/attachments/${att.id}/download`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.filename || `attachment-${att.id}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setNote("Couldn't download that attachment.");
+    }
+  };
 
   const t = data?.ticket;
   const conv: any[] = data?.conversation || [];
@@ -191,8 +231,30 @@ export default function TicketDetail() {
                 placeholder="Add an internal note…"
                 className="w-full resize-none rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm focus:border-[var(--color-base)] focus:outline-none" />
             )}
-            <div className="mt-2 flex items-center justify-end">
-              <button onClick={send} disabled={tab === "comment" ? !draft.trim() : isEmptyHtml(draft)} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send" : "Add note"}</button>
+            {/* attachments — persisted per ticket (type-allowlisted, 10MB max) */}
+            <div className="mt-2 space-y-1.5">
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {attachments.map((a) => (
+                    <button key={a.id} onClick={() => downloadAttachment(a)} title={`Download ${a.filename}`}
+                      className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                      <Paperclip size={12} className="shrink-0" />
+                      <span className="truncate">{a.filename}</span>
+                      {typeof a.size_bytes === "number" && <span className="shrink-0 text-slate-400">{Math.max(1, Math.round(a.size_bytes / 1024))} KB</span>}
+                      <Download size={12} className="shrink-0 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <input ref={fileInputRef} type="file" className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.docx,.xlsx" onChange={onPickFile} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+                  <Paperclip size={13} /> {uploading ? "Uploading…" : "Attach file"}
+                </button>
+                <button onClick={send} disabled={tab === "comment" ? !draft.trim() : isEmptyHtml(draft)} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send" : "Add note"}</button>
+              </div>
             </div>
           </div>
         </div>

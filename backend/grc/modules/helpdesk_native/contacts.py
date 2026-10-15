@@ -30,7 +30,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ...models import HDContact, HDCustomer, HDCustomerMember, HDTicket, get_db
-from .common import require_view, require_edit, tenant_id
+from .common import require_view, require_settings_manage, tenant_id
 
 router = APIRouter(prefix="/helpdesk/contacts", tags=["Help Desk (native)"])
 
@@ -225,19 +225,19 @@ def contact_info(name: str, db: Session = Depends(get_db), _: bool = Depends(req
 
 @router.post("")
 def contact_create(body: ContactBody, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
+                   _: bool = Depends(require_settings_manage)):
     return create_contact(db, tenant_id(db), body.model_dump())
 
 
 @router.post("/{name}")
 def contact_edit(name: str, body: ContactEdit, db: Session = Depends(get_db),
-                 _: bool = Depends(require_edit)):
+                 _: bool = Depends(require_settings_manage)):
     return edit_contact(db, tenant_id(db), name, body.model_dump(exclude_unset=True))
 
 
 @router.delete("/{name}")
 def contact_delete(name: str, delete_tickets: bool = False, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
+                   _: bool = Depends(require_settings_manage)):
     return delete_contact(db, tenant_id(db), name, delete_tickets)
 
 

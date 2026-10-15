@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, RefreshCw, type LucideIcon } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { sanitizeHtml } from "./_sanitize";
 
 export const STATUS_CHIP: Record<string, string> = {
   open: "bg-blue-50 text-blue-700", replied: "bg-indigo-50 text-indigo-700",
@@ -190,7 +191,7 @@ export function TimelineItem({ m }: { m: { type?: string; sender?: string; conte
           </span>
           <span className="ml-auto text-slate-400" title={d}>{timeAgo(m.date)}</span>
         </div>
-        <div className="prose prose-sm max-w-none break-words text-slate-700" dangerouslySetInnerHTML={{ __html: m.content || "" }} />
+        <div className="prose prose-sm max-w-none break-words text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.content || "") }} />
       </div>
     </div>
   );

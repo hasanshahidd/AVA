@@ -35,7 +35,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import HDAgentStatus, HDSettings, HDTicketStatus, get_db
-from .common import require_edit, require_view, tenant_id
+from .common import require_settings_manage, require_settings_view, tenant_id
 
 router = APIRouter()
 
@@ -155,12 +155,12 @@ def _public_subset(s: Optional[HDSettings]) -> dict:
 
 # ─── endpoints ─────────────────────────────────────────────────────────────
 @router.get("/helpdesk/settings")
-def get_settings(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def get_settings(db: Session = Depends(get_db), _: bool = Depends(require_settings_view)):
     return settings_row(_get_or_create(db, tenant_id(db)))
 
 
 @router.post("/helpdesk/settings")
-def update_settings(body: SettingsBody, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def update_settings(body: SettingsBody, db: Session = Depends(get_db), _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     s = _get_or_create(db, tid)
     data = body.model_dump()
@@ -173,7 +173,7 @@ def update_settings(body: SettingsBody, db: Session = Depends(get_db), _: bool =
 
 
 @router.get("/helpdesk/settings/email")
-def get_email_settings(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def get_email_settings(db: Session = Depends(get_db), _: bool = Depends(require_settings_view)):
     """The email-workflow subset for the Email Settings page: the flags, each
     template's current (possibly null) content, and the baked-in default content so
     the editor can show the fallback when the override is blank."""
@@ -189,7 +189,7 @@ def get_email_settings(db: Session = Depends(get_db), _: bool = Depends(require_
 
 @router.post("/helpdesk/settings/email")
 def update_email_settings(body: EmailSettingsBody, db: Session = Depends(get_db),
-                          _: bool = Depends(require_edit)):
+                          _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     s = _get_or_create(db, tid)
     allowed = set(_EMAIL_FLAGS) | set(_EMAIL_TEMPLATES)
@@ -202,9 +202,15 @@ def update_email_settings(body: EmailSettingsBody, db: Session = Depends(get_db)
 
 
 @router.get("/helpdesk/config")
-def get_config(db: Session = Depends(get_db)):
-    """Guest-safe public subset (Frappe `@frappe.whitelist(allow_guest=True)`), so
-    no RBAC dependency. Returns static defaults if no tenant resolves."""
+def get_config(db: Session = Depends(get_db), _: bool = Depends(require_settings_view)):
+    """Public branding subset. HARDENED (audit M4): now requires auth + settings:view
+    (was guest-accessible) and is READ-ONLY — it no longer creates/commits an
+    HDSettings row on a GET (the write-on-read is gone). An unconfigured tenant
+    returns static defaults from `_public_subset(None)` without persisting anything;
+    the settings row is created lazily on the first authenticated write."""
     tid = tenant_id(db)
-    s = _get_or_create(db, tid) if tid is not None else None
+    s = (
+        db.query(HDSettings).filter(HDSettings.tenant_id == tid).first()
+        if tid is not None else None
+    )
     return _public_subset(s)

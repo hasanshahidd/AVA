@@ -31,9 +31,9 @@ from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
     incident, problem, change, service_request, itsm_seed, request_templates,
-    portal,
+    portal, attachments,
 )
-from .common import tenant_id, require_view, require_edit
+from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
 
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk (native)"])
 
@@ -133,8 +133,8 @@ def create_ticket(body: TicketCreate, db: Session = Depends(get_db),
 
 @router.post("/tickets/{name}/status")
 def set_ticket_status(name: str, body: StatusUpdate, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
-    return tickets.set_status(db, tenant_id(db), name, body.status)
+                      current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+    return tickets.set_status(db, tenant_id(db), name, body.status, actor_email=current_user.email)
 
 
 @router.post("/tickets/{name}/reply")
@@ -145,14 +145,15 @@ def reply_ticket(name: str, body: ReplyBody, db: Session = Depends(get_db),
 
 @router.post("/tickets/{name}/update")
 def update_ticket(name: str, body: TicketUpdate, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
-    return tickets.update(db, tenant_id(db), name, body.model_dump(exclude_none=True))
+                  current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+    return tickets.update(db, tenant_id(db), name, body.model_dump(exclude_none=True),
+                          actor_email=current_user.email)
 
 
 @router.post("/tickets/{name}/assign")
 def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
-    return tickets.assign(db, tenant_id(db), name, body.agent, body.team)
+                  current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_tickets_assign)):
+    return tickets.assign(db, tenant_id(db), name, body.agent, body.team, actor_email=current_user.email)
 
 
 # ─── people (stubs) ────────────────────────────────────────────────────────
@@ -177,7 +178,9 @@ def customers(db: Session = Depends(get_db), _: bool = Depends(require_view)):
 # ─── knowledge base (stub) ──────────────────────────────────────────────────
 @router.get("/articles")
 def articles(db: Session = Depends(get_db), _: bool = Depends(require_view)):
-    return kb.list_articles(db, tenant_id(db))
+    # Agent console (tickets:view-gated) sees Draft/Archived too; the requester
+    # path (portal) calls list_articles with the safe published_only default.
+    return kb.list_articles(db, tenant_id(db), published_only=False)
 
 
 # ─── saved / canned replies (stubs) ─────────────────────────────────────────
@@ -193,18 +196,18 @@ def saved_replies(db: Session = Depends(get_db), _: bool = Depends(require_view)
 
 @router.post("/saved-replies")
 def create_saved_reply(body: SavedReplyBody, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
+                       _: bool = Depends(require_kb_author)):
     return replies.create_saved_reply(db, tenant_id(db), body.model_dump())
 
 
 @router.put("/saved-replies/{name}")
 def update_saved_reply(name: str, body: SavedReplyBody, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
+                       _: bool = Depends(require_kb_author)):
     return replies.update_saved_reply(db, tenant_id(db), name, body.model_dump())
 
 
 @router.delete("/saved-replies/{name}")
-def delete_saved_reply(name: str, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def delete_saved_reply(name: str, db: Session = Depends(get_db), _: bool = Depends(require_kb_author)):
     return replies.delete_saved_reply(db, tenant_id(db), name)
 
 
@@ -239,3 +242,4 @@ helpdesk_native_router.include_router(service_request.router)               # /h
 helpdesk_native_router.include_router(itsm_seed.router)                     # /helpdesk/itsm/seed (per-tenant ITSM seeder)
 helpdesk_native_router.include_router(request_templates.router)             # /helpdesk/request-templates + /helpdesk/sla-preview
 helpdesk_native_router.include_router(portal.router)                        # /helpdesk/portal/* (end-user requester surface)
+helpdesk_native_router.include_router(attachments.router)                   # /helpdesk/tickets/{id}/attachments + download (persisted files)

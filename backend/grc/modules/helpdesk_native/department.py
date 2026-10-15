@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import HDDepartment, Team, HDTicketType, get_db
-from .common import require_edit, require_view, tenant_id
+from .common import require_settings_manage, require_view, tenant_id
 
 router = APIRouter(prefix="/helpdesk/departments", tags=["Help Desk (native)"])
 
@@ -90,7 +90,7 @@ def list_departments(db: Session = Depends(get_db), _: bool = Depends(require_vi
 
 @router.post("")
 def create_department(body: DepartmentBody, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
+                      _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     name = (body.name or "").strip()
     if not name:
@@ -115,7 +115,7 @@ def create_department(body: DepartmentBody, db: Session = Depends(get_db),
 
 @router.put("/{dept_id}")
 def update_department(dept_id: int, body: DepartmentBody, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
+                      _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     d = _get(db, tid, dept_id)
     name = (body.name or "").strip()
@@ -144,7 +144,7 @@ def update_department(dept_id: int, body: DepartmentBody, db: Session = Depends(
 
 @router.delete("/{dept_id}")
 def delete_department(dept_id: int, db: Session = Depends(get_db),
-                      _: bool = Depends(require_edit)):
+                      _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     d = _get(db, tid, dept_id)
     # Detach dept-scoped ticket types so the FK doesn't orphan (they become global).

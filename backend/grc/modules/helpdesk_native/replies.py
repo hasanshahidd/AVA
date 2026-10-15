@@ -34,6 +34,7 @@ import re
 from typing import Optional
 
 import jinja2
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
@@ -464,13 +465,24 @@ def _render_context(ticket, user: Optional[GRCUser]) -> dict:
     return ctx
 
 
+# B2: a single IMMUTABLE Jinja sandbox for all saved-reply rendering. The
+# default `jinja2.Template` uses the unsandboxed environment, so an
+# agent-authored body like `{{ cycler.__init__.__globals__.os.popen('id') }}`
+# executes arbitrary Python (SSTI -> RCE). The sandbox raises
+# jinja2.exceptions.SecurityError on any unsafe attribute/global access and the
+# Immutable variant also blocks mutating shared objects.
+_SANDBOX_ENV = ImmutableSandboxedEnvironment(autoescape=False)
+
+
 def _render(template: str, ctx: dict) -> str:
-    """Render the message body against the ticket/user context. Templates are
-    authored by agents, never customers (so no sandbox, matching the Frappe
-    nosemgrep note). # ponytail: a bad template returns the raw body rather than
-    500-ing the endpoint; tighten to a hard error if authoring needs the feedback."""
+    """Render the message body against the ticket/user context inside the
+    IMMUTABLE Jinja sandbox (B2). The sandbox raises SecurityError on the classic
+    SSTI gadgets (`{{ ''.__class__… }}`, `{{ cycler.__init__.__globals__… }}`)
+    BEFORE any dangerous access happens, so no code can execute. On any render
+    failure (a blocked payload or a malformed template) we return the raw body
+    unrendered rather than 500 — the dangerous access never occurred."""
     try:
-        return jinja2.Template(template or "").render(**ctx)
+        return _SANDBOX_ENV.from_string(template or "").render(ctx)
     except Exception:
         return template or ""
 
@@ -671,4 +683,32 @@ if __name__ == "__main__":  # pure validation/scope logic (no DB needed)
     validate_tag_conflict([{"action_type": "Add Tag", "value": "a"},
                            {"action_type": "Remove Tag", "value": "b"}])  # distinct → ok
     assert _scope_filter(None, 1, None) is None                 # no user → filtering off
+
+    # ── B2: Jinja SSTI sandbox adversarial self-check ────────────────────────
+    # The sandbox raises SecurityError on the RCE gadgets (any unsafe-attribute
+    # WALK / call). A bare single `{{ ''.__class__ }}` is instead silently
+    # neutralised to an empty Undefined — also safe (no code runs), asserted
+    # separately below.
+    from jinja2.exceptions import SecurityError as _SecErr
+    for _payload in ("{{ ''.__class__.__mro__ }}",                       # spec-named
+                     "{{ cycler.__init__.__globals__ }}",               # spec-named
+                     "{{ ''.__class__.__base__.__subclasses__() }}",
+                     "{{ ().__class__.__bases__[0].__subclasses__() }}",
+                     "{{ cycler.__init__.__globals__['os'].popen('id').read() }}"):
+        try:
+            _SANDBOX_ENV.from_string(_payload).render({})
+            raise SystemExit(f"sandbox FAILED to block SSTI payload: {_payload!r}")
+        except _SecErr:
+            pass  # blocked as required — the exploit cannot execute
+    # bare single-level unsafe attr access is neutralised to '' (no code runs)
+    assert _SANDBOX_ENV.from_string("{{ ''.__class__ }}").render({}) == ""
+    # a normal substitution still renders through the sandbox
+    assert _SANDBOX_ENV.from_string("Hi {{ name }}").render({"name": "Sam"}) == "Hi Sam"
+    # production _render: renders legit templates, and NEUTRALISES the exploit by
+    # returning the raw (unrendered, un-executed) body instead of running it
+    assert _render("Hi {{ name }}", {"name": "Sam"}) == "Hi Sam"
+    assert _render("{{ ''.__class__.__mro__ }}", {}) == "{{ ''.__class__.__mro__ }}"
+    assert _render("{{ cycler.__init__.__globals__ }}", {}) == "{{ cycler.__init__.__globals__ }}"
+    print("saved-reply B2 jinja sandbox adversarial self-check ok")
+
     print("saved-reply engine self-check ok")

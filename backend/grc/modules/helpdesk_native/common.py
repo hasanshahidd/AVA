@@ -31,6 +31,27 @@ require_edit = require_tenant_permission("helpdesk:tickets:edit")   # agent writ
 require_requester = require_tenant_permission("helpdesk:requests:view_own")
 require_request_create = require_tenant_permission("helpdesk:requests:create")
 
+# ─── granular segregation-of-duties gates (H1) ────────────────────────────
+# Each sensitive router group binds to its OWN distinct permission instead of
+# collapsing onto tickets:edit. These resolve the permission at request time
+# via require_tenant_permission (same Administrator / primary-contact bypass),
+# so granting an agent tickets:edit no longer silently confers SLA config,
+# mailbox-credential access, change approval, KB authoring, or role grants.
+#   settings:* → SLA/holiday config, HD settings, /config, mailbox/email,
+#                masters write, people/role-grant write, agent_status.
+#   kb:*       → KB article/category/feedback authoring vs read.
+#   processes:*→ Change/Problem/Incident/Service-Request process ACTIONS vs read.
+#   tickets:assign / tickets:delete / tickets:create → fine-grained ticket ops.
+require_settings_manage = require_tenant_permission("helpdesk:settings:manage")
+require_settings_view = require_tenant_permission("helpdesk:settings:view")
+require_kb_author = require_tenant_permission("helpdesk:kb:author")
+require_kb_view = require_tenant_permission("helpdesk:kb:view")
+require_processes_manage = require_tenant_permission("helpdesk:processes:manage")
+require_processes_view = require_tenant_permission("helpdesk:processes:view")
+require_tickets_assign = require_tenant_permission("helpdesk:tickets:assign")
+require_tickets_delete = require_tenant_permission("helpdesk:tickets:delete")
+require_tickets_create = require_tenant_permission("helpdesk:tickets:create")
+
 
 def current_user_email(user: GRCUser = Depends(require_auth)) -> str:
     """The signed-in user's email — the key the requester portal isolates own

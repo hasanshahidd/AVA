@@ -33,9 +33,13 @@ from ...models import (
     GRCUser,
     get_db,
 )
-from ...routers.auth_router import require_auth, require_tenant_permission
+from ...routers.auth_router import require_auth
 from . import sla, assignment
-from .common import iso, ticket_row, ticket_detail, tenant_id, require_edit
+from .common import (
+    iso, ticket_row, ticket_detail, tenant_id, require_edit,
+    require_tickets_assign, require_tickets_delete,
+)
+from .audit import hd_audit
 
 logger = logging.getLogger(__name__)
 
@@ -169,12 +173,11 @@ def _notify(fn_name: str, db: Session, tid: int, ticket: "HDTicket", *args) -> N
     except Exception:  # noqa: BLE001
         logger.warning("helpdesk.mail hook %s failed", fn_name, exc_info=True)
 
-# delete is admin-grade (Frappe `is_admin()` gate) — mapped to AVA RBAC. The
-# Administrator role and the tenant primary contact pass automatically
-# (require_tenant_permission); any other role needs this permission granted
-# explicitly, so "only administrators can delete tickets" holds unless a tenant
-# deliberately delegates it. Convention mirrors common.require_view/require_edit.
-require_delete = require_tenant_permission("helpdesk:tickets:delete")
+# delete is admin-grade (Frappe `is_admin()` gate) — mapped to AVA RBAC via the
+# shared `require_tickets_delete` gate (helpdesk:tickets:delete). The Administrator
+# role and the tenant primary contact pass automatically; any other role needs the
+# permission granted explicitly, so "only administrators can delete tickets" holds
+# unless a tenant deliberately delegates it.
 
 
 # ─── lookups ───────────────────────────────────────────────────────────────
@@ -454,12 +457,24 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
     except Exception:  # noqa: BLE001 — SLA failure must never block ticket creation
         logger.warning("helpdesk: SLA recompute on create failed", exc_info=True)
     db.commit()
+    # H3 audit — ids + which fields were set, never the free-text subject/description.
+    hd_audit(
+        db, tenant_id=tid, actor_email=raised_by,
+        action="ticket.create", entity="ticket", entity_id=ticket.id,
+        after={
+            "process": process,
+            "status_id": status_id,
+            "priority_id": priority_id,
+            "fields_set": sorted(k for k, v in payload.items() if v not in (None, "")),
+        },
+    )
     # acknowledgement email to the raiser (gated by HD Settings.send_acknowledgement_email)
     _notify("notify_acknowledgement", db, tid, ticket)
     return {"ok": True, "name": str(ticket.id)}
 
 
-def set_status(db: Session, tid: int, name: str, status_label: str) -> dict:
+def set_status(db: Session, tid: int, name: str, status_label: str,
+               actor_email: Optional[str] = None) -> dict:
     """§A12. Status by label (the UI sends the status `name` = our label)."""
     ticket = _get_ticket(db, tid, name)
     if not ticket:
@@ -467,8 +482,14 @@ def set_status(db: Session, tid: int, name: str, status_label: str) -> dict:
     new_status = _status_by_label(db, tid, status_label)
     if not new_status:
         return {"ok": False, "error": "unknown status"}
+    old_label = ticket.status.label_agent if ticket.status else None
     _apply_status_change(db, tid, ticket, new_status)
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor_email,
+        action="ticket.status_change", entity="ticket", entity_id=ticket.id,
+        before={"status": old_label}, after={"status": new_status.label_agent},
+    )
     return {"ok": True}
 
 
@@ -489,6 +510,11 @@ def reply(db: Session, tid: int, name: str, body: dict, sender: Optional[str] = 
     else:
         _public_reply(db, tid, ticket, content, sender)
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=sender,
+        action="ticket.reply", entity="ticket", entity_id=ticket.id,
+        after={"internal": bool(body.get("internal")), "has_content": bool(content)},
+    )
     if is_public:
         # reply-via-agent email to the customer (gated by enable_reply_email_via_agent)
         _notify("notify_reply_via_agent", db, tid, ticket, content)
@@ -512,11 +538,20 @@ def _public_reply(db: Session, tid: int, ticket: HDTicket, content: str,
     _activity(db, tid, ticket, "replied")
 
 
-def update(db: Session, tid: int, name: str, payload: dict) -> dict:
+def update(db: Session, tid: int, name: str, payload: dict,
+           actor_email: Optional[str] = None) -> dict:
     """§A14. priority / ticket_type / status / agent_group by their label values."""
     ticket = _get_ticket(db, tid, name)
     if not ticket:
         return {"ok": False, "error": "not found"}
+
+    # before-snapshot of the enum/label fields this edit can touch (no PII).
+    _before = {
+        "priority": (ticket.priority.name or ticket.priority.level) if ticket.priority else None,
+        "ticket_type": ticket.ticket_type.name if ticket.ticket_type else None,
+        "status": ticket.status.label_agent if ticket.status else None,
+        "agent_group": ticket.team.name if ticket.team else None,
+    }
 
     if payload.get("priority"):
         p = (
@@ -549,6 +584,14 @@ def update(db: Session, tid: int, name: str, payload: dict) -> dict:
             _apply_status_change(db, tid, ticket, new_status)
 
     db.commit()
+    _changed = {k: payload[k] for k in ("priority", "ticket_type", "status", "agent_group")
+                if payload.get(k)}
+    if _changed:
+        hd_audit(
+            db, tenant_id=tid, actor_email=actor_email,
+            action="ticket.update", entity="ticket", entity_id=ticket.id,
+            before={k: _before.get(k) for k in _changed}, after=_changed,
+        )
     return {"ok": True}
 
 
@@ -567,11 +610,14 @@ def update_ticket(db: Session, tid: int, id, payload: dict) -> dict:
     return {"ok": True, "name": str(ticket.id)}
 
 
-def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optional[str]) -> dict:
+def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optional[str],
+           actor_email: Optional[str] = None) -> dict:
     """§A15. agent = HD agent email (null clears); team = team name (null clears)."""
     ticket = _get_ticket(db, tid, name)
     if not ticket:
         return {"ok": False, "error": "not found"}
+    old_agent = ticket.assigned_agent
+    old_team = ticket.team.name if ticket.team else None
     # The FE sends both keys; null means "clear".
     ticket.assigned_agent = agent
     _activity(db, tid, ticket, f"assigned to {agent}" if agent else "cleared assignee")
@@ -584,6 +630,12 @@ def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optiona
         assignment.remove_if_not_in_team(db, ticket)
         _activity(db, tid, ticket, f"moved to team {team}")
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor_email,
+        action="ticket.assign", entity="ticket", entity_id=ticket.id,
+        before={"agent": old_agent, "team": old_team},
+        after={"agent": agent, "team": team},
+    )
     return {"ok": True}
 
 
@@ -701,6 +753,15 @@ def bulk_reply(db: Session, tid: int, ticket_ids: list, message: str,
         except Exception as e:  # noqa: BLE001 — log + continue, like frappe.log_error
             failed.append({"name": str(t.id), "error": str(e)})
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=sender,
+        action="ticket.bulk_reply", entity="ticket",
+        after={
+            "ticket_ids": [str(t.id) for t in tickets],
+            "replied": len(tickets) - len(failed),
+            "failed": [f["name"] for f in failed],
+        },
+    )
     # reply-via-agent email per successfully-replied ticket (gated by settings)
     failed_names = {f["name"] for f in failed}
     for t in tickets:
@@ -733,14 +794,21 @@ def assign_ticket_to_agent(db: Session, tid: int, name: str,
     if not is_agent:
         return {"ok": False, "error": "Tickets can only be assigned to agents"}
 
+    old_agent = ticket.assigned_agent
     ticket.assigned_agent = agent
     _activity(db, tid, ticket, f"assigned to {agent}")
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=current_user_email,
+        action="ticket.assign", entity="ticket", entity_id=ticket.id,
+        before={"agent": old_agent}, after={"agent": agent},
+    )
     return {"ok": True, "name": str(ticket.id), "agent": agent}
 
 
 # ─── delete (api/ticket.py:78 delete_ticket) ─────────────────────────────────
-def delete_ticket(db: Session, tid: int, name: str) -> dict:
+def delete_ticket(db: Session, tid: int, name: str,
+                  actor_email: Optional[str] = None) -> dict:
     """api/ticket.py:78. Admin-only (gated at the route by `require_delete`);
     hard delete, Frappe's force=True. Conversation rows (communication / comment /
     activity / tags) carry ON DELETE CASCADE, so a Core delete of the ticket row
@@ -763,6 +831,11 @@ def delete_ticket(db: Session, tid: int, name: str) -> dict:
         HDTicket.id == tkid, HDTicket.tenant_id == tid
     ).delete(synchronize_session=False)
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor_email,
+        action="ticket.delete", entity="ticket", entity_id=tkid,
+        before={"deleted": True},
+    )
     return {"ok": True}
 
 
@@ -793,7 +866,8 @@ def get_merge_target(db: Session, tid: int, ticket: HDTicket) -> Optional[HDTick
 
 # ─── customer reply: merge-redirect + reopen (hd_ticket.py:1058 on_communication_update) ──
 def receive_customer_reply(db: Session, tid: int, name: str, content: str,
-                           sender: Optional[str] = None) -> dict:
+                           sender: Optional[str] = None,
+                           actor_email: Optional[str] = None) -> dict:
     """hd_ticket.py:1058 `on_communication_update`, the Received (customer) path:
 
       * merge redirect — a reply to a merged ticket belongs to its merge target,
@@ -832,6 +906,14 @@ def receive_customer_reply(db: Session, tid: int, name: str, content: str,
     target.last_customer_response = now
     _activity(db, tid, target, "customer replied")
     db.commit()
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor_email or sender,
+        action="ticket.customer_reply", entity="ticket", entity_id=target.id,
+        after={
+            "redirected_from": str(ticket.id) if target.id != ticket.id else None,
+            "has_content": bool(content),
+        },
+    )
     # notify the assigned agent of the customer reply (gated by enable_reply_email_to_agent)
     _notify("notify_reply_to_agents", db, tid, target, content)
     return {"ok": True, "name": str(target.id)}
@@ -966,17 +1048,21 @@ def _bulk_reply(body: BulkReplyBody, db: Session = Depends(get_db),
 @extra_router.post("/tickets/{name}/assign-agent")
 def _assign_agent(name: str, body: AssignAgentBody, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth),
-                  _: bool = Depends(require_edit)):
+                  _: bool = Depends(require_tickets_assign)):
     return assign_ticket_to_agent(db, tenant_id(db), name, body.agent,
                                   current_user_email=current_user.email)
 
 
 @extra_router.post("/tickets/{name}/customer-reply")
 def _customer_reply(name: str, body: CustomerReplyBody, db: Session = Depends(get_db),
+                    current_user: GRCUser = Depends(require_auth),
                     _: bool = Depends(require_edit)):
-    return receive_customer_reply(db, tenant_id(db), name, body.content, body.sender)
+    return receive_customer_reply(db, tenant_id(db), name, body.content, body.sender,
+                                  actor_email=current_user.email)
 
 
 @extra_router.delete("/tickets/{name}")
-def _delete_ticket(name: str, db: Session = Depends(get_db), _: bool = Depends(require_delete)):
-    return delete_ticket(db, tenant_id(db), name)
+def _delete_ticket(name: str, db: Session = Depends(get_db),
+                   current_user: GRCUser = Depends(require_auth),
+                   _: bool = Depends(require_tickets_delete)):
+    return delete_ticket(db, tenant_id(db), name, actor_email=current_user.email)
