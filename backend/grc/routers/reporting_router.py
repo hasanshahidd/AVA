@@ -1187,9 +1187,12 @@ def _pdf_response(filename_stem: str, dataset_label: str, tenant_name: Optional[
     story.append(table)
     doc.build(story)
     buf.seek(0)
-    from fastapi.responses import StreamingResponse
-    return StreamingResponse(
-        iter([buf.getvalue()]),
+    # Non-streamed Response: a StreamingResponse here crashes under the audit
+    # BaseHTTPMiddleware ("Unexpected message received: http.request"). The PDF is
+    # already fully rendered in memory.
+    from fastapi.responses import Response
+    return Response(
+        content=buf.getvalue(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename_stem}.pdf"'},
     )
