@@ -956,3 +956,42 @@ class HDDepartment(Base):
     __table_args__ = (
         Index("uq_hd_department_name", "tenant_id", "name", unique=True),
     )
+
+
+# =============================================================================
+# ATTACHMENTS (bank-hardening, functional gap) — persisted ticket/reply files.
+# Before this, reply/ticket attachments were a no-op. One row per stored file.
+# SAFE storage: the file on disk is named by `storage_key` (a random uuid hex),
+# NEVER by the client-supplied `filename`, so a crafted name (e.g. "../../x")
+# can never escape the tenant-scoped upload dir. `filename` is kept for DISPLAY
+# and the download Content-Disposition only. create_all makes this table on new
+# tenants; itsm_seed.ensure_attachment_table CREATEs it on existing ones.
+# =============================================================================
+class HDAttachment(Base):
+    __tablename__ = "grc_hd_attachment"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+
+    ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                       nullable=False, index=True)
+    # Optional link to the specific reply (HDCommunication) the file rode in on.
+    reply_id = Column(Integer, ForeignKey("grc_hd_communication.id", ondelete="SET NULL"),
+                      nullable=True, index=True)
+
+    filename = Column(String(255), nullable=False)     # ORIGINAL name — display / download only
+    content_type = Column(String(140), nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+    # Random uuid-based key; the on-disk filename AND the only path component we
+    # ever build from. Never the client filename → no path traversal.
+    storage_key = Column(String(64), nullable=False)
+    uploaded_by = Column(String(255), nullable=True)   # acting user email
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    ticket = relationship("HDTicket")
+
+    __table_args__ = (
+        Index("ix_hd_attachment_tenant_ticket", "tenant_id", "ticket_id"),
+        Index("ix_hd_attachment_storage_key", "storage_key"),
+    )

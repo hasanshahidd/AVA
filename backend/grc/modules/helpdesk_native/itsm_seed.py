@@ -446,6 +446,52 @@ def _add_columns(db: Session) -> int:
             + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS))
 
 
+def ensure_attachment_table(db: Session) -> bool:
+    """Attachment persistence (bank-hardening) — create grc_hd_attachment on an
+    EXISTING tenant DB (create_all only makes it for brand-new tenants). CREATE
+    TABLE IF NOT EXISTS + CREATE INDEX IF NOT EXISTS → idempotent, safe to re-run.
+    Mirrors the HDAttachment model in _60_helpdesk_native_models.py. Guarded so a
+    pre-existing/variant table is non-fatal."""
+    try:
+        db.execute(text(
+            """
+            CREATE TABLE IF NOT EXISTS grc_hd_attachment (
+                id SERIAL PRIMARY KEY,
+                tenant_id INTEGER NOT NULL REFERENCES grc_tenants(id),
+                ticket_id INTEGER NOT NULL REFERENCES grc_hd_ticket(id) ON DELETE CASCADE,
+                reply_id INTEGER REFERENCES grc_hd_communication(id) ON DELETE SET NULL,
+                filename VARCHAR(255) NOT NULL,
+                content_type VARCHAR(140),
+                size_bytes INTEGER,
+                storage_key VARCHAR(64) NOT NULL,
+                uploaded_by VARCHAR(255),
+                created_at TIMESTAMP DEFAULT now()
+            )
+            """
+        ))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_hd_attachment_tenant "
+            "ON grc_hd_attachment (tenant_id)"))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_hd_attachment_ticket "
+            "ON grc_hd_attachment (ticket_id)"))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_hd_attachment_reply "
+            "ON grc_hd_attachment (reply_id)"))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_hd_attachment_tenant_ticket "
+            "ON grc_hd_attachment (tenant_id, ticket_id)"))
+        db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_hd_attachment_storage_key "
+            "ON grc_hd_attachment (storage_key)"))
+        db.commit()
+        return True
+    except Exception:  # noqa: BLE001 — a pre-existing/variant table is non-fatal
+        db.rollback()
+        logger.warning("itsm_seed: grc_hd_attachment create/index skipped", exc_info=True)
+        return False
+
+
 def _ensure_departments(db: Session, tid: int) -> dict:
     """§A2 — ensure the 5 standard departments exist (enabled); return {name: id}."""
     out: dict = {}
@@ -637,6 +683,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
     priorities exist before the SLAs reference them, and the SLA backfill runs
     last (needs the per-process SLAs already seeded above)."""
     columns = _add_columns(db)
+    attachment_table = ensure_attachment_table(db)
     pri_ids = _ensure_priorities(db, tid)
     _ensure_statuses(db, tid)
     _ensure_ticket_types(db, tid, pri_ids.get("Medium"))
@@ -649,6 +696,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
     return {
         "ok": True,
         "columns_processed": columns,
+        "attachment_table": attachment_table,
         "priorities": list(pri_ids),
         "statuses": [s[0] for s in _STATUSES],
         "ticket_types": list(_TICKET_TYPES),

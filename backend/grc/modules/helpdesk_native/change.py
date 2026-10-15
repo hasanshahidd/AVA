@@ -21,7 +21,8 @@ from sqlalchemy.orm import Session
 from ...models import GRCUser, HDTicket, get_db
 from ...routers.auth_router import require_auth
 from . import tickets  # Agent A's write path; attrs resolve at call time
-from .common import require_edit, require_view, tenant_id
+from .audit import hd_audit
+from .common import require_processes_manage, require_processes_view, tenant_id
 
 router = APIRouter(prefix="/helpdesk/changes", tags=["Help Desk (native)"])
 
@@ -61,17 +62,27 @@ def _get_change(db: Session, tid: int, cid: int) -> Optional[HDTicket]:
 
 
 def _apply(db: Session, tid: int, cid: int, action: str,
-           extra: Optional[dict] = None) -> dict:
+           extra: Optional[dict] = None, actor_email: Optional[str] = None) -> dict:
     """Fetch, guard the transition (400 if illegal), write the new approval_state
-    (+ any extra extension fields) through Agent A's update_ticket."""
+    (+ any extra extension fields) through Agent A's update_ticket, then record the
+    process action in the central audit log (before→after approval_state)."""
     ticket = _get_change(db, tid, cid)
     if not ticket:
         return {"ok": False, "error": "not found"}
-    to_state = _target_state(action, ticket.approval_state or DRAFT)  # may raise 400
+    from_state = ticket.approval_state or DRAFT
+    to_state = _target_state(action, from_state)  # may raise 400
     payload = {"approval_state": to_state}
     if extra:
         payload.update(extra)
-    return tickets.update_ticket(db, tid, cid, payload)
+    r = tickets.update_ticket(db, tid, cid, payload)
+    if r.get("ok"):
+        hd_audit(
+            db, tenant_id=tid, actor_email=actor_email,
+            action=f"change.{action}", entity="change", entity_id=cid,
+            before={"approval_state": from_state},
+            after={"approval_state": to_state},
+        )
+    return r
 
 
 class ScheduleBody(BaseModel):
@@ -80,60 +91,86 @@ class ScheduleBody(BaseModel):
 
 
 @router.get("")
-def list_changes(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_changes(db: Session = Depends(get_db), _: bool = Depends(require_processes_view)):
     return tickets.list_tickets(db, tenant_id(db), process="change")
 
 
 @router.post("/{cid}/submit")
-def submit_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "submit")
+def submit_change(cid: int, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
+    return _apply(db, tenant_id(db), cid, "submit", actor_email=current_user.email)
 
 
 @router.post("/{cid}/approve")
 def approve_change(cid: int, db: Session = Depends(get_db),
                    current_user: GRCUser = Depends(require_auth),
-                   _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "approve",
-                  {"approved_by": current_user.email, "approved_at": datetime.utcnow()})
+                   _: bool = Depends(require_processes_manage)):
+    # Segregation of duties: the approver must not be the change's raiser/submitter.
+    tid = tenant_id(db)
+    change = _get_change(db, tid, cid)
+    if not change:
+        return {"ok": False, "error": "not found"}
+    submitter = (change.raised_by or "").strip().lower()
+    if submitter and submitter == (current_user.email or "").strip().lower():
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot approve a change you raised (segregation of duties).",
+        )
+    return _apply(db, tid, cid, "approve",
+                  {"approved_by": current_user.email, "approved_at": datetime.utcnow()},
+                  actor_email=current_user.email)
 
 
 @router.post("/{cid}/reject")
-def reject_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "reject")
+def reject_change(cid: int, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
+    return _apply(db, tenant_id(db), cid, "reject", actor_email=current_user.email)
 
 
 @router.post("/{cid}/schedule")
 def schedule_change(cid: int, body: ScheduleBody, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    current_user: GRCUser = Depends(require_auth),
+                    _: bool = Depends(require_processes_manage)):
     return _apply(db, tenant_id(db), cid, "schedule",
-                  {"planned_start": body.planned_start, "planned_end": body.planned_end})
+                  {"planned_start": body.planned_start, "planned_end": body.planned_end},
+                  actor_email=current_user.email)
 
 
 @router.post("/{cid}/start")
-def start_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "start")
+def start_change(cid: int, db: Session = Depends(get_db),
+                 current_user: GRCUser = Depends(require_auth),
+                 _: bool = Depends(require_processes_manage)):
+    return _apply(db, tenant_id(db), cid, "start", actor_email=current_user.email)
 
 
 @router.post("/{cid}/review")
-def review_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "review")
+def review_change(cid: int, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
+    return _apply(db, tenant_id(db), cid, "review", actor_email=current_user.email)
 
 
 @router.post("/{cid}/complete")
-def complete_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def complete_change(cid: int, db: Session = Depends(get_db),
+                    current_user: GRCUser = Depends(require_auth),
+                    _: bool = Depends(require_processes_manage)):
     # Set approval_state=closed, then ACTUALLY close the ticket via the label path
     # (tickets.update → _apply_status_change → SLA recompute). update_ticket only
     # writes extension fields, so the status close must go through update().
     tid = tenant_id(db)
-    r = _apply(db, tid, cid, "complete")
+    r = _apply(db, tid, cid, "complete", actor_email=current_user.email)
     if r.get("ok"):
-        tickets.update(db, tid, str(cid), {"status": "Closed"})
+        tickets.update(db, tid, str(cid), {"status": "Closed"}, actor_email=current_user.email)
     return r
 
 
 @router.post("/{cid}/cancel")
-def cancel_change(cid: int, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
-    return _apply(db, tenant_id(db), cid, "cancel")
+def cancel_change(cid: int, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
+    return _apply(db, tenant_id(db), cid, "cancel", actor_email=current_user.email)
 
 
 if __name__ == "__main__":  # pure transition-map self-check, no DB

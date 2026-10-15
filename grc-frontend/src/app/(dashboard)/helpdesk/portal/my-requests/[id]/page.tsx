@@ -8,10 +8,10 @@
  * (internal notes/activity are hidden from the requester) and lets them reply via
  * POST /helpdesk/portal/requests/{id}/reply.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquareText } from "lucide-react";
+import { ArrowLeft, Send, MessageSquareText, Paperclip, Download } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Chip, ErrorBanner, Loading, SlaBadge, TimelineItem, useHd } from "../../../_ui";
 
@@ -33,6 +33,41 @@ export default function MyRequestDetail() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+
+  // Attachments use the shared, owner-gated ticket endpoints (the backend lets
+  // a requester upload/list/download on their OWN ticket).
+  const attachBase = `/helpdesk/tickets/${encodeURIComponent(id)}/attachments`;
+  const { data: attachData, reload: reloadAttachments } = useHd<any>(attachBase);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const attachments: any[] = attachData?.attachments || [];
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) e.target.value = "";
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    setUploading(true); setNote(null);
+    try {
+      await apiClient.post(attachBase, form, { headers: { "Content-Type": "multipart/form-data" } });
+      setNote(`Attached ${file.name}.`); reloadAttachments();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setNote(typeof msg === "string" ? msg : "Sorry — we couldn't attach that file.");
+    } finally { setUploading(false); }
+  };
+
+  const downloadAttachment = async (att: { id: number; filename?: string }) => {
+    try {
+      const res = await apiClient.get(`/helpdesk/attachments/${att.id}/download`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = att.filename || `attachment-${att.id}`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch { setNote("Couldn't download that attachment."); }
+  };
 
   const t = data?.ticket;
   const conv: any[] = data?.conversation || [];
@@ -91,6 +126,22 @@ export default function MyRequestDetail() {
         {replies.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-300">No messages yet.</div>
         ) : replies.map((m, i) => <TimelineItem key={i} m={m} />)}
+        {attachments.length > 0 && (
+          <div className="border-t border-[#EEF1F5] pt-3">
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Attachments</div>
+            <div className="flex flex-wrap gap-1.5">
+              {attachments.map((a) => (
+                <button key={a.id} onClick={() => downloadAttachment(a)} title={`Download ${a.filename}`}
+                  className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                  <Paperclip size={12} className="shrink-0" />
+                  <span className="truncate">{a.filename}</span>
+                  {typeof a.size_bytes === "number" && <span className="shrink-0 text-slate-400">{Math.max(1, Math.round(a.size_bytes / 1024))} KB</span>}
+                  <Download size={12} className="shrink-0 text-slate-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {done ? (
@@ -110,7 +161,13 @@ export default function MyRequestDetail() {
             placeholder="Type your reply to our team…"
             className="w-full resize-y rounded-[9px] border border-[#E2E5EC] bg-white p-3 text-[13px] text-[#0F172A] outline-none placeholder:text-[#94A3B8] focus:border-[#005B96] focus:ring-2 focus:ring-[#005B96]/15"
           />
-          <div className="mt-2 flex items-center justify-end">
+          <div className="mt-2 flex items-center justify-between">
+            <input ref={fileInputRef} type="file" className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.docx,.xlsx" onChange={onPickFile} />
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-1.5 rounded-[9px] border border-[#E2E5EC] px-2.5 py-1.5 text-xs text-[#64748B] hover:bg-slate-50 disabled:opacity-40">
+              <Paperclip size={13} /> {uploading ? "Uploading…" : "Attach file"}
+            </button>
             <button onClick={send} disabled={busy || !draft.trim()} className="flex items-center gap-1.5 rounded-[9px] bg-[#005B96] px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-[#014A81] disabled:opacity-40">
               <Send size={14} /> Send reply
             </button>

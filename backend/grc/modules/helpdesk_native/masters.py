@@ -36,7 +36,7 @@ from ...models import (
     HDServiceLevelAgreement,
     HDSettings,
 )
-from .common import tenant_id, require_view, require_edit
+from .common import tenant_id, require_view, require_settings_manage
 
 router = APIRouter()
 
@@ -217,7 +217,7 @@ def list_ticket_statuses(db: Session = Depends(get_db), _: bool = Depends(requir
 
 @router.post("/ticket-statuses")
 def create_ticket_status(body: StatusCreate, db: Session = Depends(get_db),
-                         _: bool = Depends(require_edit)):
+                         _: bool = Depends(require_settings_manage)):
     # is_new() → every validate_* guard early-returns in Frappe, so create only
     # persists the reqd fields.
     tid = tenant_id(db)
@@ -237,7 +237,7 @@ def create_ticket_status(body: StatusCreate, db: Session = Depends(get_db),
 
 @router.put("/ticket-statuses/{sid}")
 def update_ticket_status(sid: int, body: StatusUpdate, db: Session = Depends(get_db),
-                         _: bool = Depends(require_edit)):
+                         _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_status(db, tid, sid)
     data = body.model_dump(exclude_unset=True)
@@ -250,7 +250,7 @@ def update_ticket_status(sid: int, body: StatusUpdate, db: Session = Depends(get
 
 @router.post("/ticket-statuses/{sid}/disable")
 def disable_ticket_status(sid: int, db: Session = Depends(get_db),
-                          _: bool = Depends(require_edit)):
+                          _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_status(db, tid, sid)
     _validate_status_update(db, tid, row, {"enabled": False})
@@ -339,7 +339,7 @@ def list_priorities(db: Session = Depends(get_db), _: bool = Depends(require_vie
 
 @router.post("/priorities")
 def create_priority(body: PriorityBody, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     name = (body.name or "").strip()
     if not name:
@@ -355,7 +355,7 @@ def create_priority(body: PriorityBody, db: Session = Depends(get_db),
 
 @router.put("/priorities/{pid}")
 def update_priority(pid: int, body: PriorityBody, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_priority(db, tid, pid)
     for k, v in body.model_dump(exclude_unset=True).items():
@@ -366,7 +366,7 @@ def update_priority(pid: int, body: PriorityBody, db: Session = Depends(get_db),
 
 @router.delete("/priorities/{pid}")
 def delete_priority(pid: int, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_priority(db, tid, pid)
     db.delete(row)
@@ -376,7 +376,7 @@ def delete_priority(pid: int, db: Session = Depends(get_db),
 
 @router.post("/ticket-types")
 def create_ticket_type(body: TypeBody, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
+                       _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     db.add(HDTicketType(
         tenant_id=tid,
@@ -392,7 +392,7 @@ def create_ticket_type(body: TypeBody, db: Session = Depends(get_db),
 
 @router.put("/ticket-types/{tyid}")
 def update_ticket_type(tyid: int, body: TypeBody, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
+                       _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_type(db, tid, tyid)
     for k, v in body.model_dump(exclude_unset=True).items():
@@ -403,7 +403,7 @@ def update_ticket_type(tyid: int, body: TypeBody, db: Session = Depends(get_db),
 
 @router.delete("/ticket-types/{tyid}")
 def delete_ticket_type(tyid: int, db: Session = Depends(get_db),
-                       _: bool = Depends(require_edit)):
+                       _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_type(db, tid, tyid)
     # on_trash → prevent_system_delete: System types can not be deleted.
@@ -515,7 +515,7 @@ def list_ticket_templates(db: Session = Depends(get_db), _: bool = Depends(requi
 
 @router.post("/ticket-templates")
 def create_ticket_template(body: TemplateBody, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     fields = body.fields or []
     _validate_template_fields(fields)
@@ -533,7 +533,7 @@ def create_ticket_template(body: TemplateBody, db: Session = Depends(get_db),
 
 @router.put("/ticket-templates/{tpid}")
 def update_ticket_template(tpid: int, body: TemplateBody, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_template(db, tid, tpid)
     data = body.model_dump(exclude_unset=True)
@@ -549,7 +549,7 @@ def update_ticket_template(tpid: int, body: TemplateBody, db: Session = Depends(
 
 @router.delete("/ticket-templates/{tpid}")
 def delete_ticket_template(tpid: int, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_template(db, tid, tpid)
     # on_trash → prevent_default_delete: the Default template can not be deleted.
@@ -613,7 +613,7 @@ def list_feedback_options(db: Session = Depends(get_db), _: bool = Depends(requi
 
 @router.post("/feedback-options")
 def create_feedback_option(body: FeedbackCreate, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     # is_new() → validate_one_enabled_option early-returns, but the rating/bounds
     # guards still run on create.
     tid = tenant_id(db)
@@ -630,7 +630,7 @@ def create_feedback_option(body: FeedbackCreate, db: Session = Depends(get_db),
 
 @router.put("/feedback-options/{fid}")
 def update_feedback_option(fid: int, body: FeedbackUpdate, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     row = _get_feedback(db, tid, fid)
     data = body.model_dump(exclude_unset=True)
@@ -667,7 +667,7 @@ def update_feedback_option(fid: int, body: FeedbackUpdate, db: Session = Depends
 
 @router.delete("/feedback-options/{fid}")
 def delete_feedback_option(fid: int, db: Session = Depends(get_db),
-                           _: bool = Depends(require_edit)):
+                           _: bool = Depends(require_settings_manage)):
     # Frappe HD Ticket Feedback Option has no on_trash guard — plain delete.
     tid = tenant_id(db)
     row = _get_feedback(db, tid, fid)

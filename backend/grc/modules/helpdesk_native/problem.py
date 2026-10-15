@@ -17,9 +17,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import HDTicket, get_db
+from ...models import GRCUser, HDTicket, get_db
+from ...routers.auth_router import require_auth
 from . import tickets  # Agent A's write path; attrs resolve at call time
-from .common import require_edit, require_view, tenant_id
+from .audit import hd_audit
+from .common import require_processes_manage, require_processes_view, tenant_id
 
 router = APIRouter(prefix="/helpdesk/problems", tags=["Help Desk (native)"])
 
@@ -59,13 +61,14 @@ class ProblemUpdate(BaseModel):
 
 
 @router.get("")
-def list_problems(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_problems(db: Session = Depends(get_db), _: bool = Depends(require_processes_view)):
     return tickets.list_tickets(db, tenant_id(db), process="problem")
 
 
 @router.post("/{pid}/link-incident")
 def link_incident(pid: int, body: IncidentLink, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
     tid = tenant_id(db)
     ticket = _get_problem(db, tid, pid)
     if not ticket:
@@ -73,28 +76,55 @@ def link_incident(pid: int, body: IncidentLink, db: Session = Depends(get_db),
     ids = _linked_ids(ticket)
     if body.incident_id not in ids:          # idempotent
         ids.append(body.incident_id)
-    return tickets.update_ticket(db, tid, pid, {"linked_incident_ids": ids})
+    r = tickets.update_ticket(db, tid, pid, {"linked_incident_ids": ids})
+    if r.get("ok"):
+        hd_audit(db, tenant_id=tid, actor_email=current_user.email,
+                 action="problem.link_incident", entity="problem", entity_id=pid,
+                 after={"incident_id": body.incident_id, "linked_count": len(ids)})
+    return r
 
 
 @router.post("/{pid}/unlink-incident")
 def unlink_incident(pid: int, body: IncidentLink, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    current_user: GRCUser = Depends(require_auth),
+                    _: bool = Depends(require_processes_manage)):
     tid = tenant_id(db)
     ticket = _get_problem(db, tid, pid)
     if not ticket:
         return {"ok": False, "error": "not found"}
     ids = [i for i in _linked_ids(ticket) if i != body.incident_id]   # idempotent
-    return tickets.update_ticket(db, tid, pid, {"linked_incident_ids": ids})
+    r = tickets.update_ticket(db, tid, pid, {"linked_incident_ids": ids})
+    if r.get("ok"):
+        hd_audit(db, tenant_id=tid, actor_email=current_user.email,
+                 action="problem.unlink_incident", entity="problem", entity_id=pid,
+                 after={"incident_id": body.incident_id, "linked_count": len(ids)})
+    return r
 
 
 @router.post("/{pid}/known-error")
 def set_known_error(pid: int, body: KnownError, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    current_user: GRCUser = Depends(require_auth),
+                    _: bool = Depends(require_processes_manage)):
     # update_ticket soft-errors on a missing/cross-tenant id, so no separate fetch.
-    return tickets.update_ticket(db, tenant_id(db), pid, {"known_error": body.known_error})
+    tid = tenant_id(db)
+    r = tickets.update_ticket(db, tid, pid, {"known_error": body.known_error})
+    if r.get("ok"):
+        hd_audit(db, tenant_id=tid, actor_email=current_user.email,
+                 action="problem.known_error", entity="problem", entity_id=pid,
+                 after={"known_error": body.known_error})
+    return r
 
 
 @router.put("/{pid}")
 def update_problem(pid: int, body: ProblemUpdate, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
-    return tickets.update_ticket(db, tenant_id(db), pid, body.model_dump(exclude_unset=True))
+                   current_user: GRCUser = Depends(require_auth),
+                   _: bool = Depends(require_processes_manage)):
+    tid = tenant_id(db)
+    payload = body.model_dump(exclude_unset=True)
+    r = tickets.update_ticket(db, tid, pid, payload)
+    if r.get("ok"):
+        # root_cause/workaround/problem_resolution are free-text → log field NAMES only.
+        hd_audit(db, tenant_id=tid, actor_email=current_user.email,
+                 action="problem.update", entity="problem", entity_id=pid,
+                 after={"fields_set": sorted(payload.keys())})
+    return r

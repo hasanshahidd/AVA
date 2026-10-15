@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import HDAgent, HDAgentStatus, HDSettings, get_db
-from .common import require_view, require_edit, tenant_id
+from .common import require_view, require_settings_manage, tenant_id
 
 router = APIRouter(prefix="/helpdesk/agent-statuses", tags=["Help Desk (native)"])
 
@@ -185,16 +185,16 @@ def list_statuses(db: Session = Depends(get_db), _: bool = Depends(require_view)
 
 @router.post("")
 def create_status(body: AgentStatusBody, db: Session = Depends(get_db),
-                  _: bool = Depends(require_edit)):
+                  _: bool = Depends(require_settings_manage)):
     return create_agent_status(db, tenant_id(db), body.model_dump())
 
 
 @router.put("/{name}")
 def edit_status(name: str, body: AgentStatusUpdate, db: Session = Depends(get_db),
-                _: bool = Depends(require_edit)):
+                _: bool = Depends(require_settings_manage)):
     return update_agent_status(db, tenant_id(db), name, body.model_dump(exclude_unset=True))
 
 
 @router.delete("/{name}")
-def remove_status(name: str, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def remove_status(name: str, db: Session = Depends(get_db), _: bool = Depends(require_settings_manage)):
     return delete_agent_status(db, tenant_id(db), name)

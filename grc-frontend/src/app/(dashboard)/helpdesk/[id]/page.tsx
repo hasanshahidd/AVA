@@ -12,6 +12,7 @@ import {
   Clock, CheckCircle2, XCircle, Building2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { sanitizeHtml } from "../_sanitize";
 
 const STATUS_META: Record<string, { label: string; dot: string; chip: string }> = {
   new:         { label: "New",         dot: "bg-blue-500",   chip: "bg-blue-50 text-blue-700" },
@@ -118,14 +119,14 @@ export default function TicketDetailPage() {
                 <span className="ml-auto flex items-center gap-1"><Clock size={12} /> {ticket.pushed_at ? new Date(ticket.pushed_at).toLocaleString() : "—"}</span>
               </div>
               {desc ? (
-                <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: desc }} />
+                <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(desc) }} />
               ) : (
                 <p className="text-sm text-slate-500">{ticket.title || "No description available."}</p>
               )}
               {rec && (
                 <div className="mt-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
                   <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-600">Recommended remediation</div>
-                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: rec }} />
+                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(rec) }} />
                 </div>
               )}
             </div>

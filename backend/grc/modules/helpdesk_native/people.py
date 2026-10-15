@@ -30,7 +30,7 @@ Conversions / gaps (noted, not faked):
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -49,7 +49,8 @@ from ...models import (
 )
 from ...routers.auth_router import require_auth
 from . import agent_status, contacts
-from .common import require_edit, require_view, tenant_id
+from .audit import hd_audit
+from .common import require_settings_manage, require_settings_view, tenant_id
 
 people_write_router = APIRouter(prefix="/helpdesk", tags=["Help Desk (native)"])
 
@@ -459,60 +460,60 @@ def set_customer_primary_contact(db: Session, tid: int, name: str, contact: str)
 # ═══════════════════════════════════════════════════════════════════════════
 @people_write_router.post("/agents")
 def agent_create(body: AgentCreate, db: Session = Depends(get_db),
-                 current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                 current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_settings_manage)):
     return create_agent(db, tenant_id(db), body.model_dump(), actor=current_user.email)
 
 
 @people_write_router.post("/agents/{user}/availability")
 def agent_availability(user: str, body: AvailabilityBody, db: Session = Depends(get_db),
-                       current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                       current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_settings_manage)):
     return set_agent_availability(db, tenant_id(db), user, body.availability, actor=current_user.email)
 
 
 @people_write_router.post("/agents/{user}/active")
 def agent_active(user: str, body: ActiveBody, db: Session = Depends(get_db),
-                 _: bool = Depends(require_edit)):
+                 _: bool = Depends(require_settings_manage)):
     return set_agent_active(db, tenant_id(db), user, body.is_active)
 
 
 @people_write_router.post("/agents/role")
-def agent_role(body: AgentRoleBody, db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def agent_role(body: AgentRoleBody, db: Session = Depends(get_db), _: bool = Depends(require_settings_manage)):
     return update_agent_role(db, tenant_id(db), body.user, body.new_role)
 
 
 @people_write_router.post("/customers")
 def customer_create(body: CustomerCreate, db: Session = Depends(get_db),
-                    current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
+                    current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_settings_manage)):
     return create_customer(db, tenant_id(db), body.model_dump(), actor=current_user.email)
 
 
 @people_write_router.post("/customers/{name}/update")
 def customer_update(name: str, body: CustomerUpdate, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     return update_customer(db, tenant_id(db), name, body.model_dump(exclude_unset=True))
 
 
 @people_write_router.delete("/customers/{name}")
 def customer_delete(name: str, delete_tickets: bool = False, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     return delete_customer(db, tenant_id(db), name, delete_tickets)
 
 
 @people_write_router.post("/customers/{name}/contacts")
 def customer_add_contacts(name: str, body: AddContacts, db: Session = Depends(get_db),
-                          _: bool = Depends(require_edit)):
+                          _: bool = Depends(require_settings_manage)):
     return add_customer_contacts(db, tenant_id(db), name, body.contacts, body.role)
 
 
 @people_write_router.delete("/customers/{name}/contacts/{contact}")
 def customer_remove_contact(name: str, contact: str, db: Session = Depends(get_db),
-                            _: bool = Depends(require_edit)):
+                            _: bool = Depends(require_settings_manage)):
     return remove_customer_contact(db, tenant_id(db), name, contact)
 
 
 @people_write_router.post("/customers/{name}/primary-contact")
 def customer_primary_contact(name: str, body: PrimaryBody, db: Session = Depends(get_db),
-                             _: bool = Depends(require_edit)):
+                             _: bool = Depends(require_settings_manage)):
     return set_customer_primary_contact(db, tenant_id(db), name, body.contact)
 
 
@@ -630,17 +631,36 @@ def revoke_hd_role(db: Session, tid: int, user_id: int, role: str) -> dict:
 
 
 @people_write_router.get("/hd-roles")
-def hd_roles_list(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def hd_roles_list(db: Session = Depends(get_db), _: bool = Depends(require_settings_view)):
     return list_hd_roles(db, tenant_id(db))
 
 
 @people_write_router.post("/hd-roles/grant")
-def hd_role_grant(body: HdRoleBody, db: Session = Depends(get_db),
-                  current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
-    return grant_hd_role(db, tenant_id(db), body.user_id, body.role, actor_id=current_user.id)
+def hd_role_grant(body: HdRoleBody, request: Request, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_settings_manage)):
+    tid = tenant_id(db)
+    res = grant_hd_role(db, tid, body.user_id, body.role, actor_id=current_user.id)
+    # audit (H3): a role grant is a security-critical entitlement change
+    hd_audit(
+        db, tenant_id=tid, actor_email=current_user.email,
+        action="helpdesk.hd_role.grant", entity="hd_user_role",
+        entity_id=body.user_id, after={"user_id": body.user_id, "role": body.role},
+        request=request,
+    )
+    return res
 
 
 @people_write_router.post("/hd-roles/revoke")
-def hd_role_revoke(body: HdRoleBody, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
-    return revoke_hd_role(db, tenant_id(db), body.user_id, body.role)
+def hd_role_revoke(body: HdRoleBody, request: Request, db: Session = Depends(get_db),
+                   current_user: GRCUser = Depends(require_auth),
+                   _: bool = Depends(require_settings_manage)):
+    tid = tenant_id(db)
+    res = revoke_hd_role(db, tid, body.user_id, body.role)
+    # audit (H3): a role revoke is a security-critical entitlement change
+    hd_audit(
+        db, tenant_id=tid, actor_email=current_user.email,
+        action="helpdesk.hd_role.revoke", entity="hd_user_role",
+        entity_id=body.user_id, before={"user_id": body.user_id, "role": body.role},
+        request=request,
+    )
+    return res

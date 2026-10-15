@@ -48,14 +48,15 @@ from email.mime.text import MIMEText
 from email.utils import parseaddr
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...crypto import decrypt_secret, encrypt_secret
 from ...models import HDEmailAccount, HDSettings, HDTicket, get_db
 from . import tickets
-from .common import require_edit, require_view, tenant_id
+from .audit import hd_audit
+from .common import current_user_email, require_settings_manage, require_settings_view, tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -528,53 +529,101 @@ class FeedbackBody(BaseModel):
 
 
 @router.get("/email-accounts")
-def list_accounts(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_accounts(db: Session = Depends(get_db), _: bool = Depends(require_settings_view)):
     tid = tenant_id(db)
     rows = db.query(HDEmailAccount).filter(HDEmailAccount.tenant_id == tid).all()
     return {"accounts": [account_dict(a) for a in rows]}
 
 
 @router.post("/email-accounts")
-def create_account(body: EmailAccountBody, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
+def create_account(body: EmailAccountBody, request: Request, db: Session = Depends(get_db),
+                   actor: str = Depends(current_user_email),
+                   _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
+    data = body.model_dump()
     acc = HDEmailAccount(tenant_id=tid)
     db.add(acc)
     db.flush()
-    _apply(db, tid, acc, body.model_dump())
+    _apply(db, tid, acc, data)
     db.commit()
     db.refresh(acc)
+    # audit (H3): mailbox config + credential change — field names/ids only, never the secret (M2 PII)
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor,
+        action="helpdesk.email_account.create", entity="hd_email_account",
+        entity_id=acc.id,
+        after={
+            "email_id": acc.email_id, "smtp_host": acc.smtp_host, "imap_host": acc.imap_host,
+            "smtp_password_set": bool(data.get("smtp_password")),
+            "imap_password_set": bool(data.get("imap_password")),
+            "enable_incoming": bool(acc.enable_incoming),
+            "enable_outgoing": bool(acc.enable_outgoing),
+            "default_outgoing": bool(acc.default_outgoing),
+        },
+        request=request,
+    )
     return account_dict(acc)
 
 
 @router.put("/email-accounts/{account_id}")
-def update_account(account_id: int, body: EmailAccountBody, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
+def update_account(account_id: int, body: EmailAccountBody, request: Request,
+                   db: Session = Depends(get_db),
+                   actor: str = Depends(current_user_email),
+                   _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     acc = db.query(HDEmailAccount).filter(
         HDEmailAccount.id == account_id, HDEmailAccount.tenant_id == tid).first()
     if not acc:
         return {"ok": False, "error": "not found"}
-    _apply(db, tid, acc, body.model_dump())
+    before = {
+        "email_id": acc.email_id, "smtp_host": acc.smtp_host, "imap_host": acc.imap_host,
+        "enable_incoming": bool(acc.enable_incoming),
+        "enable_outgoing": bool(acc.enable_outgoing),
+        "default_outgoing": bool(acc.default_outgoing),
+    }
+    data = body.model_dump()
+    _apply(db, tid, acc, data)
     db.commit()
     db.refresh(acc)
+    # audit (H3): mailbox config + credential change — never log the secret itself (M2 PII)
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor,
+        action="helpdesk.email_account.update", entity="hd_email_account",
+        entity_id=acc.id, before=before,
+        after={
+            "email_id": acc.email_id, "smtp_host": acc.smtp_host, "imap_host": acc.imap_host,
+            "enable_incoming": bool(acc.enable_incoming),
+            "enable_outgoing": bool(acc.enable_outgoing),
+            "default_outgoing": bool(acc.default_outgoing),
+            "smtp_password_changed": bool(data.get("smtp_password")),
+            "imap_password_changed": bool(data.get("imap_password")),
+        },
+        request=request,
+    )
     return account_dict(acc)
 
 
 @router.delete("/email-accounts/{account_id}")
-def delete_account(account_id: int, db: Session = Depends(get_db),
-                   _: bool = Depends(require_edit)):
+def delete_account(account_id: int, request: Request, db: Session = Depends(get_db),
+                   actor: str = Depends(current_user_email),
+                   _: bool = Depends(require_settings_manage)):
     tid = tenant_id(db)
     db.query(HDEmailAccount).filter(
         HDEmailAccount.id == account_id, HDEmailAccount.tenant_id == tid
     ).delete(synchronize_session=False)
     db.commit()
+    # audit (H3): mailbox config removal
+    hd_audit(
+        db, tenant_id=tid, actor_email=actor,
+        action="helpdesk.email_account.delete", entity="hd_email_account",
+        entity_id=account_id, request=request,
+    )
     return {"ok": True}
 
 
 @router.post("/email-accounts/{account_id}/test")
 def test_connection(account_id: int, db: Session = Depends(get_db),
-                    _: bool = Depends(require_edit)):
+                    _: bool = Depends(require_settings_manage)):
     """Attempt an SMTP and/or IMAP login with the stored credentials. Safe no-op
     (reports unconfigured) when a half has no host. Never raises."""
     tid = tenant_id(db)
@@ -621,7 +670,7 @@ def test_connection(account_id: int, db: Session = Depends(get_db),
 
 
 @router.post("/email/poll")
-def manual_poll(db: Session = Depends(get_db), _: bool = Depends(require_edit)):
+def manual_poll(db: Session = Depends(get_db), _: bool = Depends(require_settings_manage)):
     """Fetch new mail now. Safe no-op (polled=0) with no inbound account."""
     return poll(db, tenant_id(db))
 
