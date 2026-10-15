@@ -210,6 +210,9 @@ app.include_router(sbp_inventory_router)
 # Software license management (entitlements vs installed software -> effective license position) — isolated module: grc/modules/license_management
 from grc.modules.license_management.router import router as license_management_router
 app.include_router(license_management_router)
+# Scheduled & emailed reports — isolated module: grc/modules/report_scheduler (timed send is Celery, dormant until celery_app includes it; CRUD + run-now work now)
+from grc.modules.report_scheduler.router import router as report_scheduler_router
+app.include_router(report_scheduler_router)
 # Performance (exec) dashboard read-only aggregates — isolated module: grc/modules/exec_dashboard
 from grc.modules.exec_dashboard.router import router as exec_dashboard_router
 app.include_router(exec_dashboard_router)
