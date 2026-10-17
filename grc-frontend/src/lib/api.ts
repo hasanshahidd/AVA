@@ -3322,6 +3322,7 @@ export const reportingApi = {
     logic?: 'AND' | 'OR';
     search?: string;
     format: 'csv' | 'xlsx' | 'pdf' | 'html';
+    asset_categories?: string[];
   }) => apiClient.post('/reporting/export', body, { responseType: 'blob' }),
 };
 

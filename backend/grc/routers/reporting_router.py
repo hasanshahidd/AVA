@@ -77,6 +77,7 @@ class DatasetSpec:
         default_order: tuple,
         user_fields: Optional[Dict[str, str]] = None,
         ref_fields: Optional[Dict[str, tuple]] = None,
+        computed: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.model = model
         self.permissions = permissions    # any-of module perms that grant this dataset (same as the frontend)
@@ -92,6 +93,9 @@ class DatasetSpec:
         # to a readable value from another model (asset name, plugin title, HD
         # status, …). Generalises user_fields (GRCUser-only, single-output).
         self.ref_fields: Dict[str, tuple] = ref_fields or {}
+        # out_key -> callable(orm_obj) for a DERIVED (non-column) report cell, e.g.
+        # the asset "scan_mode" category computed from origin_source/discovery_state.
+        self.computed: Dict[str, Any] = computed or {}
 
 
 # Registry — key MUST match the frontend dataset key so the grid can address it.
@@ -152,6 +156,7 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
     "assets": DatasetSpec(
         ITAsset,
         permissions=["assets:asset_inventory:*"],
+        computed={"scan_mode": lambda o: _asset_scan_mode(o)},
         # Full ITAM-parity projection — identity, ownership, CIA/criticality,
         # exposure & business-impact (the live risk-posture inputs), lifecycle,
         # OS, hardware, procurement and discovery provenance. JSON blobs
@@ -176,7 +181,7 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
             "internet_facing", "op_dep_business_impact", "network_segment",
             "environment", "cde_environment",
             # Lifecycle & status
-            "status", "lifecycle_state", "discovery_state", "origin_source",
+            "status", "lifecycle_state", "discovery_state", "origin_source", "scan_mode",
             "decommissioned_at",
             # Operating system
             "os_family", "os_version", "os_edition",
@@ -704,6 +709,10 @@ class QueryBody(BaseModel):
     sorts: List[SortSpec] = Field(default_factory=list)
     filters: List[FilterSpec] = Field(default_factory=list)
     logic: str = "AND"  # how `filters` combine: AND | OR
+    # ITAsset-backed datasets only: a UNION of discovery categories to include —
+    # "credential" | "uncredential" | "easm" | "pci" | "adhoc". None/empty = the
+    # inventory default (all categories except ad-hoc pentest targets).
+    asset_categories: Optional[List[str]] = None
 
 
 class AggregateMeasureSpec(BaseModel):
@@ -721,6 +730,7 @@ class AggregateBody(BaseModel):
     logic: str = "AND"
     group_by: List[str] = Field(default_factory=list)
     measures: List[AggregateMeasureSpec] = Field(default_factory=list)
+    asset_categories: Optional[List[str]] = None
 
 
 _ALLOWED_AGG_FNS = frozenset({"count", "count_distinct", "sum", "avg", "min", "max"})
@@ -890,6 +900,11 @@ def _serialize(spec: DatasetSpec, obj: Any) -> Dict[str, Any]:
         if isinstance(v, (datetime, date)):
             v = v.isoformat()
         out[f] = v
+    for k, fn in spec.computed.items():
+        try:
+            out[k] = fn(obj)
+        except Exception:
+            out[k] = None
     return out
 
 
@@ -1042,6 +1057,63 @@ def list_server_datasets(user=Depends(require_auth)) -> Dict[str, Any]:
     }
 
 
+_ASSET_CATEGORIES = ("credential", "uncredential", "easm", "pci", "adhoc")
+_INVENTORY_CATEGORIES = ("credential", "uncredential", "easm", "pci")
+
+
+def _asset_scan_mode(obj: Any) -> Optional[str]:
+    """easm | credential | uncredential | None — mirrors assets_router._scan_mode
+    (origin_source='easm' > discovery_state='managed' > origin_source='network_sweep').
+    Shown as the report's "Scan mode" column."""
+    if (getattr(obj, "origin_source", None) or "") == "easm":
+        return "easm"
+    if getattr(obj, "discovery_state", None) == "managed":
+        return "credential"
+    if (getattr(obj, "origin_source", None) or "") == "network_sweep":
+        return "uncredential"
+    return None
+
+
+def _apply_asset_categories(q, model: Any, categories: Optional[List[str]]):
+    """Scope an ITAsset report dataset to a UNION of discovery categories the user
+    marks in the report builder: credential | uncredential | easm | pci | adhoc.
+    None/empty = inventory default (all categories except ad-hoc pentest targets).
+    Ad-hoc are transient AI-pentest targets (status/last_seen_source), never
+    inventory. The scan-mode predicates mirror assets_router.list_assets exactly."""
+    if model is not ITAsset:
+        return q
+    A = ITAsset
+    not_adhoc = and_(
+        func.coalesce(A.status, "") != "adhoc",
+        func.coalesce(A.last_seen_source, "") != "pentest-adhoc",
+    )
+    is_adhoc = or_(
+        func.coalesce(A.status, "") == "adhoc",
+        func.coalesce(A.last_seen_source, "") == "pentest-adhoc",
+    )
+    uncred = and_(func.coalesce(A.origin_source, "") == "network_sweep",
+                  func.coalesce(A.discovery_state, "") != "managed")
+    # credential = inventory that is neither easm nor uncredential (managed scans +
+    # manual/import rows, matching the register's scan_mode-null-folds-to-credential).
+    cred = and_(func.coalesce(A.origin_source, "") != "easm",
+                or_(func.coalesce(A.origin_source, "") != "network_sweep",
+                    func.coalesce(A.discovery_state, "") == "managed"))
+    per_cat = {
+        "easm": and_(not_adhoc, func.coalesce(A.origin_source, "") == "easm"),
+        "credential": and_(not_adhoc, cred),
+        "uncredential": and_(not_adhoc, uncred),
+        "pci": and_(not_adhoc, A.cde_environment.is_(True)),
+        "adhoc": is_adhoc,
+    }
+    cats = [c.strip().lower() for c in (categories or [])
+            if isinstance(c, str) and c.strip().lower() in per_cat]
+    if not cats:
+        cats = list(_INVENTORY_CATEGORIES)
+    if set(cats) >= set(_ASSET_CATEGORIES):
+        return q  # every category incl. ad-hoc -> no filter
+    return q.filter(or_(*[per_cat[c] for c in cats]))
+
+
 @router.post("/query")
 def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(require_auth)) -> Dict[str, Any]:
     """Run a paginated, filtered, sorted query for one registered dataset."""
@@ -1071,6 +1143,7 @@ def query_dataset(body: QueryBody, db: Session = Depends(get_db), user=Depends(r
     model = spec.model
     q = db.query(model)
     q = _tenant_scope(q, model, user, db)
+    q = _apply_asset_categories(q, model, body.asset_categories)
 
     q, skipped_filters = _apply_query_filters(
         q, model, spec, body.filters, body.logic, body.search,
@@ -1296,6 +1369,7 @@ def export_dataset(body: ExportBody, db: Session = Depends(get_db), user=Depends
     model = spec.model
     q = db.query(model)
     q = _tenant_scope(q, model, user, db)
+    q = _apply_asset_categories(q, model, body.asset_categories)
     q, _ = _apply_query_filters(q, model, spec, body.filters, body.logic, body.search)
     q = _apply_sort(q, model, spec, body.sorts)
     # ponytail: hard row cap so one export can't OOM the worker; raise if a tenant
@@ -1420,6 +1494,7 @@ def aggregate_dataset(body: AggregateBody, db: Session = Depends(get_db), user=D
 
     q = db.query(*select_exprs).select_from(model)
     q = _tenant_scope(q, model, user, db)
+    q = _apply_asset_categories(q, model, body.asset_categories)
     q, skipped_filters = _apply_query_filters(
         q, model, spec, body.filters, body.logic, body.search,
     )

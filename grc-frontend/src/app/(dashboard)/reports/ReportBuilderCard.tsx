@@ -92,6 +92,17 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
   const datasets = useMemo<ReportDatasetMeta[]>(() => data ?? [], [data]);
 
   const [dataset, setDataset] = useState('');
+  const ASSET_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+    { value: 'credential', label: 'Credentialed' },
+    { value: 'uncredential', label: 'Uncredentialed' },
+    { value: 'easm', label: 'EASM' },
+    { value: 'pci', label: 'PCI (CDE)' },
+    { value: 'adhoc', label: 'Ad-hoc (pentest)' },
+  ];
+  const [assetCategories, setAssetCategories] = useState<string[]>(['credential', 'uncredential', 'easm', 'pci']);
+  const toggleCategory = (v: string) =>
+    setAssetCategories((cur) => (cur.includes(v) ? cur.filter((c) => c !== v) : [...cur, v]));
+  const showScope = dataset === 'assets' || dataset === 'sbp_inventory';
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<DraftFilter[]>([]);
   const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
@@ -218,6 +229,7 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
         filters: filterPayload,
         logic,
         format,
+        asset_categories: showScope ? assetCategories : undefined,
       });
       const today = new Date().toISOString().slice(0, 10);
       const url = URL.createObjectURL(res.data as Blob);
@@ -308,6 +320,38 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
               />
             </div>
           </div>
+
+          {showScope && (
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                Asset categories
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {ASSET_CATEGORY_OPTIONS.map((opt) => {
+                  const on = assetCategories.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => toggleCategory(opt.value)}
+                      aria-pressed={on}
+                      style={on ? { borderColor: ACCENT, color: ACCENT, background: 'var(--color-base-soft)' } : undefined}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[13px] font-medium text-[var(--color-muted)] hover:bg-[var(--color-subtle)]"
+                    >
+                      <span
+                        className="inline-block h-3.5 w-3.5 rounded-[4px] border border-[var(--color-border)]"
+                        style={on ? { background: ACCENT, borderColor: ACCENT } : undefined}
+                      />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="mt-1.5 block text-[11px] text-[var(--color-muted)]">
+                Pick which discovery categories to include. Ad-hoc are transient pentest targets, not part of the inventory.
+              </span>
+            </div>
+          )}
 
           {/* Filters */}
           <div>
