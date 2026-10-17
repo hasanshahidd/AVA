@@ -794,14 +794,19 @@ def get_asset_dashboard(
             assets_needing_assessment=0
         )
     
-    query = db.query(ITAsset).filter(ITAsset.tenant_id.in_(user_tenants))
+    query = db.query(ITAsset).filter(
+        ITAsset.tenant_id.in_(user_tenants),
+        # INVENTORY ONLY: transient AI-pentest ad-hoc targets are not inventory.
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    )
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
         query = query.filter(ITAsset.tenant_id == tenant_id)
-    
+
     assets = query.all()
     total = len(assets)
-    
+
     by_type = {}
     by_criticality = {}
     by_status = {}
@@ -851,7 +856,12 @@ def get_asset_coverage(
             by_criticality={}
         )
     
-    query = db.query(ITAsset).options(joinedload(ITAsset.control_links)).filter(ITAsset.tenant_id.in_(user_tenants))
+    query = db.query(ITAsset).options(joinedload(ITAsset.control_links)).filter(
+        ITAsset.tenant_id.in_(user_tenants),
+        # INVENTORY ONLY: transient AI-pentest ad-hoc targets are not inventory.
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    )
     if tenant_id:
         validate_tenant_access(current_user, tenant_id, db)
         query = query.filter(ITAsset.tenant_id == tenant_id)

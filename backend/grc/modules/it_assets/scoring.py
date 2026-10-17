@@ -37,7 +37,15 @@ def score_inventory(db, tids, now=None):
     # CompliancePluginRun (CIS scanner results) is imported lazily inside the CIS
     # section below so a missing model/table never breaks the whole scorecard.
     now = now or datetime.utcnow()
-    assets = db.query(ITAsset).filter(ITAsset.tenant_id.in_(tids)).all()
+    # INVENTORY ONLY: transient AI-pentest ad-hoc targets (status='adhoc' / source 'pentest-adhoc')
+    # are not inventory. Every section below derives from this list / asset_ids (vuln links, CIS
+    # runs, assessments, lifecycle), so filtering once here scopes the whole scorecard.
+    from sqlalchemy import func
+    assets = db.query(ITAsset).filter(
+        ITAsset.tenant_id.in_(tids),
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    ).all()
     N = len(assets)
     asset_ids = {a.id for a in assets}
 

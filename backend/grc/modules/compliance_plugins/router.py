@@ -678,7 +678,12 @@ def assets_overview(
     # Tenant assets
     assets = (
         db.query(ITAsset)
-        .filter(ITAsset.tenant_id == tenant_id)
+        .filter(
+            ITAsset.tenant_id == tenant_id,
+            # INVENTORY ONLY: transient AI-pentest ad-hoc targets are not inventory.
+            func.coalesce(ITAsset.status, "") != "adhoc",
+            func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+        )
         .order_by(ITAsset.criticality.desc(), ITAsset.name.asc())
         .all()
     )

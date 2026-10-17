@@ -134,7 +134,10 @@ def vulnerability_samples(db: Session, tenant_ids: List[int]) -> List[dict]:
     """Open count (overall + by severity), open KEV, overdue, and MTTR — matches
     the vuln dashboard's open/overdue/mttr definitions."""
     from ..models import Vulnerability
-    rows = db.query(Vulnerability).filter(Vulnerability.tenant_id.in_(tenant_ids)).all()
+    # INVENTORY ONLY: same register rule as the vuln dashboard - drops findings that sit only on
+    # transient AI-pentest ad-hoc targets (or on no asset), so the stored trend matches the dashboard.
+    from ..modules.vuln_management._adhoc_filter import exclude_adhoc
+    rows = db.query(Vulnerability).filter(Vulnerability.tenant_id.in_(tenant_ids), exclude_adhoc(db)).all()
     open_rows = [v for v in rows if (v.status or "open") not in _VULN_RESOLVED]
     out = [_s("vuln_open", len(open_rows))]
     for sev in ("critical", "high", "medium", "low"):

@@ -21,7 +21,7 @@ from ....schemas import (
     VulnerabilityDashboard, OverdueVulnerabilityResponse, AssetExposureResponse
 )
 from ....routers.auth_router import require_auth, get_user_tenants, get_user_primary_tenant
-from .._adhoc_filter import exclude_adhoc
+from .._adhoc_filter import exclude_adhoc, inventory_assets_only
 
 router = APIRouter(prefix="/dashboard", tags=["Vulnerability Dashboard"])
 
@@ -192,6 +192,7 @@ def get_dashboard(
             .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
             .filter(
                 VulnerabilityAssetLink.vulnerability_id.in_(vuln_ids),
+                *inventory_assets_only(ITAsset),  # a finding also linked to an ad-hoc target must not count via it
                 or_(
                     ITAsset.internet_facing.is_(True),
                     ITAsset.is_internet_facing.is_(True),
@@ -235,8 +236,11 @@ def get_dashboard(
     asset_vuln_counts = db.query(
         VulnerabilityAssetLink.asset_id,
         func.count(VulnerabilityAssetLink.vulnerability_id).label("vuln_count")
-    ).join(Vulnerability).filter(
-        Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db)
+    ).join(Vulnerability).join(
+        ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id
+    ).filter(
+        Vulnerability.tenant_id.in_(user_tenants), exclude_adhoc(db),
+        *inventory_assets_only(ITAsset),  # rank inventory assets only, never an ad-hoc pentest target
     ).group_by(VulnerabilityAssetLink.asset_id).order_by(
         func.count(VulnerabilityAssetLink.vulnerability_id).desc()
     ).limit(5).all()
@@ -366,9 +370,12 @@ def get_asset_exposure(
     ]
     asset_ids = db.query(VulnerabilityAssetLink.asset_id).join(
         Vulnerability
+    ).join(
+        ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id
     ).filter(
         Vulnerability.tenant_id.in_(filter_tenants),
         exclude_adhoc(db),
+        *inventory_assets_only(ITAsset),  # inventory assets only (a vuln may also link an ad-hoc target)
         Vulnerability.status.notin_(_EXPOSURE_EXCLUDED)
     ).distinct().all()
     
@@ -2248,7 +2255,7 @@ def get_threat_intel_dashboard(
             )
             .join(VulnerabilityAssetLink, VulnerabilityAssetLink.asset_id == ITAsset.id)
             .join(Vulnerability, Vulnerability.id == VulnerabilityAssetLink.vulnerability_id)
-            .filter(Vulnerability.id.in_(open_ids))
+            .filter(Vulnerability.id.in_(open_ids), *inventory_assets_only(ITAsset))
             .group_by(ITAsset.criticality, Vulnerability.severity)
             .all()
         )
@@ -2295,7 +2302,8 @@ def get_threat_intel_dashboard(
         # blowing out the query — we just need a small preview here.
         linked_count = (
             db.query(func.count(VulnerabilityAssetLink.id))
-            .filter(VulnerabilityAssetLink.vulnerability_id == v.id)
+            .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
+            .filter(VulnerabilityAssetLink.vulnerability_id == v.id, *inventory_assets_only(ITAsset))
             .scalar() or 0
         )
         top_priority_vulns.append({
@@ -2384,7 +2392,8 @@ def get_asset_risk_heatmap(
             VulnerabilityAssetLink.vulnerability_id,
             VulnerabilityAssetLink.asset_id,
         )
-        .filter(VulnerabilityAssetLink.vulnerability_id.in_(open_vuln_ids))
+        .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
+        .filter(VulnerabilityAssetLink.vulnerability_id.in_(open_vuln_ids), *inventory_assets_only(ITAsset))
         .all()
     )
     asset_ids = sorted({a_id for _, a_id in links})

@@ -1308,7 +1308,14 @@ def compute_tenant_posture(
     # every per-asset compute below, so the response field and the math
     # stay in lock-step.
     weights = resolve_weights_for_tenant(db, tenant_id)
-    asset_q = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id)
+    asset_q = db.query(ITAsset).filter(
+        ITAsset.tenant_id == tenant_id,
+        # INVENTORY ONLY: transient AI-pentest ad-hoc targets are not inventory (same predicate as
+        # the asset register / estate_overview). Keeps them out of the rows, "highest risk",
+        # averages and band counts (and the per-day risk snapshots written from these rows).
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    )
     if owner_id is not None:
         # Owner-scoped callers (e.g. Banking User) see assets they own PLUS
         # any UNOWNED asset. An asset with no owner_id isn't assigned to

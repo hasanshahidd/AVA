@@ -760,6 +760,9 @@ def easm_scorecard(
     assets = db.query(ITAsset).filter(
         ITAsset.tenant_id == tid,
         ITAsset.internet_facing.is_(True),
+        # INVENTORY ONLY: transient AI-pentest ad-hoc targets are not inventory.
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
     ).all()
     grade_counts: Dict[str, int] = {g: 0 for g in ("A", "B", "C", "D", "F")}
     scored: List[dict] = []
