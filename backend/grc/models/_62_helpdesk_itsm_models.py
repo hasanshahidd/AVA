@@ -548,3 +548,39 @@ class HDRoleMap(Base):
     __table_args__ = (
         Index("uq_hd_role_map_code", "tenant_id", "code", unique=True),
     )
+
+
+# ----------------------------------------------------------------------------
+# INCIDENT CLASSIFICATION — the triage taxonomy a reporter drills through
+# ----------------------------------------------------------------------------
+class HDIncidentCategory(Base):
+    """Workbook sheet 16 — Incident Categories. A 3-level tree
+    (category -> subcategory -> example item) the end-user 'report a problem'
+    wizard walks and an agent classifies an incident by. The sheet has no code
+    column, so the natural key is the normalized slash-path `key` (e.g.
+    'email/mailbox/mailbox_full'), unique per tenant — the seed upserts on it.
+    `business_service_id` is reserved for later routing (e.g. the Email category
+    -> the Email business service); the workbook has no column for it yet."""
+    __tablename__ = "grc_hd_incident_category"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    key = Column(String(255), nullable=False)              # normalized slash-path (natural key)
+    name = Column(String(200), nullable=False)             # display label at this node
+    level = Column(String(20), nullable=False)             # category | subcategory | item
+    parent_id = Column(Integer, ForeignKey("grc_hd_incident_category.id"), nullable=True)
+    business_service_id = Column(Integer, ForeignKey("grc_hd_business_service.id"), nullable=True)  # reserved for routing
+    sort_order = Column(Integer, nullable=True)
+    enabled = Column(Boolean, server_default=text("true"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    parent = relationship("HDIncidentCategory", remote_side=[id])
+    business_service = relationship("HDBusinessService")
+
+    __table_args__ = (
+        Index("uq_hd_incident_category_key", "tenant_id", "key", unique=True),
+    )

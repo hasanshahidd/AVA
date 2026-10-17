@@ -31,6 +31,7 @@ from ...models import (
     HDConfigurationItem,
     HDDepartment,
     HDImportBatch,
+    HDIncidentCategory,
     HDPriorityMatrix,
     HDRequestItem,
     HDRoleMap,
@@ -103,6 +104,7 @@ _TICKET_ITSM_ALTER_COLUMNS = [
     ("business_service_id", "INTEGER REFERENCES grc_hd_business_service(id)"),
     ("ci_id", "INTEGER REFERENCES grc_hd_ci(id)"),
     ("request_item_id", "INTEGER REFERENCES grc_hd_request_item(id)"),
+    ("incident_category_id", "INTEGER REFERENCES grc_hd_incident_category(id)"),
 ]
 _PRIORITY_ALTER_COLUMNS = [
     ("code", "VARCHAR(10)"),
@@ -123,6 +125,7 @@ _ITSM_MODELS = (
     HDConfigurationItem, HDCIRelationshipType, HDCIRelationship,
     HDPriorityMatrix, HDStateTransition, HDChangeType, HDChangeRiskMatrix,
     HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
+    HDIncidentCategory,
 )
 
 # §A2 (v2) — the standard departments the request library is organized by.
@@ -509,7 +512,7 @@ def ensure_itsm_tables(db: Session) -> bool:
 
 def _ensure_itsm_indexes(db: Session) -> None:
     """Indexes `index=True` would have made on the new HDTicket link columns."""
-    for col in ("business_service_id", "ci_id"):
+    for col in ("business_service_id", "ci_id", "incident_category_id"):
         try:
             db.execute(text(
                 f"CREATE INDEX IF NOT EXISTS ix_grc_hd_ticket_{col} "

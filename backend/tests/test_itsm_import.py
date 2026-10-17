@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from grc.models import (
     HDBusinessService, HDChangeRiskMatrix, HDChangeType, HDCIAttribute,
     HDConfigurationItem, HDCIRelationship, HDCIRelationshipType, HDCIType,
-    HDImportBatch, HDPriorityMatrix, HDRequestItem, HDRoleMap,
+    HDImportBatch, HDIncidentCategory, HDPriorityMatrix, HDRequestItem, HDRoleMap,
     HDServiceCategory, HDServiceDependency, HDStateTransition,
     HDSupportGroupMap, HDTechnicalService, HDTicketPriority, HDTicketStatus,
     Team,
@@ -32,6 +32,7 @@ CATALOGUE = (
     HDRequestItem, HDCIType, HDCIAttribute, HDConfigurationItem,
     HDCIRelationshipType, HDCIRelationship, HDPriorityMatrix, HDStateTransition,
     HDChangeType, HDChangeRiskMatrix, HDSupportGroupMap, HDRoleMap,
+    HDIncidentCategory,
     HDTicketPriority, HDTicketStatus,
 )
 ALL_TABLES = (HDImportBatch, Team) + CATALOGUE
@@ -122,6 +123,13 @@ def small_bundle():
         "change_risk_matrix": [
             {"likelihood": "High", "impact": "High", "risk_level": "Very High"},
             {"likelihood": "Low", "impact": "Low", "risk_level": "Very Low"},
+        ],
+        "incident_categories": [
+            {"category": "Email", "subcategory": "Mailbox", "example_item": "Mailbox full"},
+            {"category": "Email", "subcategory": "Mailbox", "example_item": "Cannot send or receive"},
+            {"category": "Email", "subcategory": "Spam/Phishing", "example_item": "Phishing reported"},
+            {"category": "Hardware", "subcategory": "Laptop", "example_item": "Won't power on"},
+            {"category": "Network"},   # category-only row (no subcategory/item)
         ],
     }
     return {"bundle_version": "test-1", "source_filename": "hand.xlsx",
@@ -332,6 +340,38 @@ def test_tenants_are_isolated(db):
         import_bundle(db, 3, only_reqs)
 
 
+# --- incident classification tree -----------------------------------------------------
+def test_incident_category_tree(db):
+    import_bundle(db, TENANT, small_bundle())
+    allc = db.query(HDIncidentCategory).filter_by(tenant_id=TENANT).all()
+    by_key = {c.key: c for c in allc}
+    # category node, no parent
+    assert by_key["email"].level == "category" and by_key["email"].parent_id is None
+    # subcategory parented to its category
+    assert by_key["email/mailbox"].level == "subcategory"
+    assert by_key["email/mailbox"].parent_id == by_key["email"].id
+    # leaf item parented to its subcategory, display name preserved
+    full = by_key["email/mailbox/mailbox_full"]
+    assert full.level == "item" and full.name == "Mailbox full"
+    assert full.parent_id == by_key["email/mailbox"].id
+    # two items share the one Mailbox subcategory (no duplicate subcategory node)
+    lv = lambda l: sum(1 for c in allc if c.level == l)  # noqa: E731
+    assert (lv("category"), lv("subcategory"), lv("item")) == (3, 3, 4)
+    # a category-only row has no children
+    net = by_key["network"]
+    assert net.level == "category" and not any(c.parent_id == net.id for c in allc)
+
+
+def test_incident_categories_idempotent(db):
+    import_bundle(db, TENANT, small_bundle())
+    n = db.query(HDIncidentCategory).count()
+    assert n == 10                                           # 3 categories + 3 subcategories + 4 items
+    second = import_bundle(db, TENANT, copy.deepcopy(small_bundle()))
+    assert db.query(HDIncidentCategory).count() == n         # no new rows
+    st = second.summary["incident_categories"]
+    assert st["inserted"] == 0 and st["updated"] == 0        # true no-op (skipped counts upsert calls, not rows)
+
+
 # --- real workbook (skipped where it is not present) -------------------------------------
 V3 = os.path.join(exp.DOWNLOADS, "AVA_ServiceDesk_ITSM_enriched_v3.xlsx")
 
@@ -348,6 +388,10 @@ def test_real_v3_workbook_imports_and_is_idempotent(db):
     assert db.query(HDRequestItem).count() == 192
     assert db.query(HDServiceDependency).count() > db.query(HDTechnicalService).count()   # M:N
     assert db.query(HDPriorityMatrix).count() == 9
+    # incident classification tree built from the 223 rows of sheet 16
+    email = db.query(HDIncidentCategory).filter_by(tenant_id=TENANT, key="email", level="category").one()
+    assert db.query(HDIncidentCategory).filter_by(parent_id=email.id).count() > 0   # has subcategories
+    assert db.query(HDIncidentCategory).filter_by(tenant_id=TENANT, level="item").count() > 100
     n = counts(db)
     second = import_bundle(db, TENANT, b)
     assert counts(db) == n

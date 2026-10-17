@@ -38,6 +38,7 @@ from ...models import (
     HDCIType,
     HDConfigurationItem,
     HDImportBatch,
+    HDIncidentCategory,
     HDPriorityMatrix,
     HDRequestItem,
     HDRoleMap,
@@ -72,6 +73,7 @@ _KEYS = {
     "priority_matrix": ("priority_matrix",),
     "change_types": ("change_types",),
     "change_risk_matrix": ("change_risk_matrix",),
+    "incident_categories": ("incident_categories",),
 }
 # process -> entity key of its state sheet
 _STATE_KEYS = {
@@ -91,6 +93,7 @@ _SUMMARY_ENTITIES = (
     "ci_attributes", "ci_relationship_types", "configuration_items",
     "ci_relationships", "priorities", "priority_matrix", "statuses",
     "state_transitions", "change_types", "change_risk_matrix",
+    "incident_categories",
 )
 
 
@@ -574,6 +577,38 @@ def _apply_states(ctx: _Ctx) -> None:
                            {"guard": _trunc(guard, 40)})
 
 
+def _apply_incident_categories(ctx: _Ctx) -> None:
+    """Sheet 16 — build the category -> subcategory -> example-item tree. No code
+    column, so each node's natural key is its normalized slash-path; upsert on it
+    makes a re-seed a no-op. sort_order is first-seen order (stable across runs)."""
+    sort_by_key: dict = {}
+
+    def node(key: str, name: str, level: str, parent_id: Optional[int]) -> int:
+        key = _trunc(key, 255)
+        if key not in sort_by_key:
+            sort_by_key[key] = len(sort_by_key)
+        row = ctx.upsert("incident_categories", HDIncidentCategory,
+                         {"tenant_id": ctx.tid, "key": key},
+                         {"name": _trunc(name, 200), "level": level,
+                          "parent_id": parent_id, "sort_order": sort_by_key[key]})
+        return row.id
+
+    for r in ctx.rows("incident_categories"):
+        cat = _g(r, "category")
+        if not cat:
+            ctx.bad("incident_categories", None, "category", None, "missing category"); continue
+        sub = _g(r, "subcategory")
+        item = _g(r, "example_item", "item", "example")
+        ckey = _slug(cat)
+        pid = node(ckey, cat, "category", None)
+        base = ckey
+        if sub:
+            base = f"{ckey}/{_slug(sub)}"
+            pid = node(base, sub, "subcategory", pid)
+        if item:
+            node(f"{base}/{_slug(item)}", item, "item", pid)
+
+
 def _apply_change(ctx: _Ctx) -> None:
     for r in ctx.rows("change_types"):
         name = _g(r, "change_type", "name")
@@ -606,6 +641,7 @@ _STEPS = (
     _apply_cmdb,
     _apply_priorities, _apply_states,
     _apply_change,
+    _apply_incident_categories,
 )
 
 

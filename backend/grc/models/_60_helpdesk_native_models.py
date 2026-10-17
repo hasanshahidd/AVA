@@ -260,6 +260,7 @@ class HDTicket(Base):
     business_service_id = Column(Integer, ForeignKey("grc_hd_business_service.id"), nullable=True, index=True)
     ci_id = Column(Integer, ForeignKey("grc_hd_ci.id"), nullable=True, index=True)
     request_item_id = Column(Integer, ForeignKey("grc_hd_request_item.id"), nullable=True)
+    incident_category_id = Column(Integer, ForeignKey("grc_hd_incident_category.id"), nullable=True, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
