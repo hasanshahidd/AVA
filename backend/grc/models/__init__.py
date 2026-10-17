@@ -38,3 +38,4 @@ from ._asset_risk_snapshot import AssetRiskSnapshot  # noqa: F401 - AVA risk pos
 
 from ._60_helpdesk_native_models import *  # noqa: F401,F403 - AVA-native Help Desk engine models
 from ._61_helpdesk_mail_models import *  # noqa: F401,F403 - AVA-native Help Desk email model
+from ._62_helpdesk_itsm_models import *  # noqa: F401,F403 - AVA-native Help Desk ITSM foundation (workbook ingest)
