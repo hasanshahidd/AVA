@@ -18,8 +18,28 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ...models import (
+    Base,
+    HDApproval,
+    HDApprovalVote,
+    HDBusinessService,
+    HDChangeRiskMatrix,
+    HDChangeType,
+    HDCIAttribute,
+    HDCIRelationship,
+    HDCIRelationshipType,
+    HDCIType,
+    HDConfigurationItem,
     HDDepartment,
+    HDImportBatch,
+    HDPriorityMatrix,
+    HDRequestItem,
+    HDRoleMap,
+    HDServiceCategory,
+    HDServiceDependency,
     HDServiceLevelAgreement,
+    HDStateTransition,
+    HDSupportGroupMap,
+    HDTechnicalService,
     HDTicket,
     HDTicketPriority,
     HDTicketStatus,
@@ -75,6 +95,35 @@ _TEMPLATE_ALTER_COLUMNS = [
     ("icon", "VARCHAR(40)"),
     ("enabled", "BOOLEAN DEFAULT true"),
 ]
+
+# ITSM foundation linking columns (workbook ingest, models/_62). Same mechanism.
+# These REFERENCE the _62 tables, so `ensure_itsm_tables` must run first (it does,
+# in `_add_columns`). The index names mirror what `index=True` would create.
+_TICKET_ITSM_ALTER_COLUMNS = [
+    ("business_service_id", "INTEGER REFERENCES grc_hd_business_service(id)"),
+    ("ci_id", "INTEGER REFERENCES grc_hd_ci(id)"),
+    ("request_item_id", "INTEGER REFERENCES grc_hd_request_item(id)"),
+]
+_PRIORITY_ALTER_COLUMNS = [
+    ("code", "VARCHAR(10)"),
+    ("rank", "INTEGER"),
+]
+_STATUS_ALTER_COLUMNS = [
+    ("process", "VARCHAR(20)"),
+    ("is_initial", "BOOLEAN DEFAULT false"),
+    ("is_terminal", "BOOLEAN DEFAULT false"),
+    ("sort_order", "INTEGER"),
+]
+
+# Every table declared in models/_62_helpdesk_itsm_models.py. create_all (with
+# checkfirst) sorts them by FK dependency, so list order is irrelevant.
+_ITSM_MODELS = (
+    HDImportBatch, HDServiceCategory, HDBusinessService, HDTechnicalService,
+    HDServiceDependency, HDRequestItem, HDCIType, HDCIAttribute,
+    HDConfigurationItem, HDCIRelationshipType, HDCIRelationship,
+    HDPriorityMatrix, HDStateTransition, HDChangeType, HDChangeRiskMatrix,
+    HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
+)
 
 # §A2 (v2) — the standard departments the request library is organized by.
 _DEPARTMENTS = ["IT", "Sales", "Finance", "HR", "Facilities",
@@ -439,11 +488,50 @@ def _alter_add_columns(db: Session, table: str, cols: list) -> int:
     return added
 
 
+def ensure_itsm_tables(db: Session) -> bool:
+    """Create the grc_hd_* ITSM foundation tables (models/_62) on an EXISTING
+    tenant DB. New tenant DBs get them from Base.metadata.create_all; this is the
+    idempotent equivalent for DBs that pre-date the models (checkfirst => no-op
+    when a table already exists). Non-fatal on failure, like the other ensures."""
+    try:
+        db.commit()  # release any open txn before DDL on a separate connection
+        Base.metadata.create_all(
+            bind=db.get_bind(),
+            tables=[m.__table__ for m in _ITSM_MODELS],
+            checkfirst=True,
+        )
+        return True
+    except Exception:  # noqa: BLE001 — a pre-existing/variant table is non-fatal
+        db.rollback()
+        logger.warning("itsm_seed: ITSM foundation table create skipped", exc_info=True)
+        return False
+
+
+def _ensure_itsm_indexes(db: Session) -> None:
+    """Indexes `index=True` would have made on the new HDTicket link columns."""
+    for col in ("business_service_id", "ci_id"):
+        try:
+            db.execute(text(
+                f"CREATE INDEX IF NOT EXISTS ix_grc_hd_ticket_{col} "
+                f"ON grc_hd_ticket ({col})"))
+            db.commit()
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            logger.warning("itsm_seed: index on grc_hd_ticket.%s skipped", col, exc_info=True)
+
+
 def _add_columns(db: Session) -> int:
     """§3.1 + §A1 — migrate the HDTicket extension columns AND the new
-    HDTicketTemplate request-library columns onto existing tenant tables."""
-    return (_alter_add_columns(db, "grc_hd_ticket", _ALTER_COLUMNS)
-            + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS))
+    HDTicketTemplate request-library columns onto existing tenant tables, then
+    the ITSM linking columns (tables first: the ticket FKs reference them)."""
+    ensure_itsm_tables(db)
+    added = (_alter_add_columns(db, "grc_hd_ticket", _ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_ticket", _TICKET_ITSM_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_ticket_priority", _PRIORITY_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_ticket_status", _STATUS_ALTER_COLUMNS))
+    _ensure_itsm_indexes(db)
+    return added
 
 
 def ensure_attachment_table(db: Session) -> bool:

@@ -45,6 +45,12 @@ class HDTicketStatus(Base):
     color = Column(String(30), nullable=True)
     order = Column(Integer, nullable=True)
     enabled = Column(Boolean, default=True)
+    # ITSM lifecycle metadata (workbook ingest). create_all can't add these to
+    # existing tenant DBs, so itsm_seed ALTERs them in.
+    process = Column(String(20), nullable=True)            # incident|problem|change|service_request, or "shared" when the label is used by >1 process
+    is_initial = Column(Boolean, server_default=text("false"))
+    is_terminal = Column(Boolean, server_default=text("false"))
+    sort_order = Column(Integer, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -64,6 +70,10 @@ class HDTicketPriority(Base):
     level = Column(String(60), nullable=False, default="Medium")  # Urgent | High | Medium | Low
     description = Column(Text, nullable=True)
     disabled = Column(Boolean, default=False)
+    # ITSM priority code/rank (workbook ingest). create_all can't add these to
+    # existing tenant DBs, so itsm_seed ALTERs them in.
+    code = Column(String(10), nullable=True)               # "P1".."P5"
+    rank = Column(Integer, nullable=True)                  # 1 = most severe
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -244,6 +254,12 @@ class HDTicket(Base):
     # service request
     request_category = Column(String(100), nullable=True)
     request_subcategory = Column(String(100), nullable=True)
+    # ITSM catalogue/CMDB links (workbook ingest, models/_62). Plain nullable FK
+    # columns; create_all can't add these to existing tenant DBs, so itsm_seed
+    # ALTERs them in.
+    business_service_id = Column(Integer, ForeignKey("grc_hd_business_service.id"), nullable=True, index=True)
+    ci_id = Column(Integer, ForeignKey("grc_hd_ci.id"), nullable=True, index=True)
+    request_item_id = Column(Integer, ForeignKey("grc_hd_request_item.id"), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
