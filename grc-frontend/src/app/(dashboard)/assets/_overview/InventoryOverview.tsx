@@ -137,6 +137,8 @@ const MODAL_CSS = [
   '[data-inv-modal] :is(h1,h2,h3,h4,h5,p,li,label,span,dt,dd,b,a){color:inherit}',
   ...INK.map((c) => `[data-inv-modal] [class~="text-[${c}]"]{color:${c}!important}`),
   '[data-inv-modal] a[class~="hover:text-[#005B96]"]:hover,[data-inv-modal] a:hover [class~="hover:text-[#005B96]"]{color:#005B96!important}',
+  '@keyframes invScrimIn{from{opacity:0}to{opacity:1}}',
+  '@keyframes invDrawerIn{from{transform:translateX(24px);opacity:.3}to{transform:translateX(0);opacity:1}}',
 ].join('');
 
 export default function InventoryOverview() {
@@ -255,7 +257,12 @@ const MoreLink = ({ href, children }: { href: string; children: ReactNode }) => 
   </Go>
 );
 const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <p className="m-0 mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.07em] text-[#94A3B8]">{children}</p>
+  <p className="m-0 mb-1.5 text-[10.5px] font-semibold uppercase tracking-[.07em] text-[#64748B]">{children}</p>
+);
+/** A crisper small-caps section header (darker, no built-in margin) — used by the compliance-score
+    card and the drill-down drawer so their section titles read clearly, not washed out. */
+const ModalEyebrow = ({ children }: { children: ReactNode }) => (
+  <h3 className="m-0 text-[11px] font-semibold uppercase tracking-[.07em] text-[#64748B]">{children}</h3>
 );
 /** Small labelled figure (local — tolerant of ReactNode values + alarm tone). */
 function Fig({ label, value, sub, alarm }: { label: ReactNode; value: ReactNode; sub?: ReactNode; alarm?: boolean }) {
@@ -327,28 +334,35 @@ const Dot = ({ c }: { c: string }) => <i aria-hidden className="ml-2.5 mr-1 inli
    but the top level never summarised them. This card rolls that per-asset score up to a fleet
    average + grade, a band distribution (incl. assets with no scan), and a worst-first leaderboard
    that links straight into the assets needing work. All from /assets/inventory-overview.fleet_cis. */
-const BAND: Record<FleetBand, { label: string; c: string }> = {
-  excellent: { label: 'Excellent', c: T.success },
-  good: { label: 'Good', c: '#65A30D' },
-  fair: { label: 'Fair', c: SEV.medium.c },
-  poor: { label: 'Poor', c: SEV.critical.c },
+/* `c` = the mark/fill colour (distribution bar, dots); `ink` = the AA text colour for the
+   score and badges; `bg` = the badge tint. The two greens clear the normal-vision floor
+   (ΔE 19.3) and the adjacent-pair CVD floor; band fills always ship beside a text label. */
+const BAND: Record<FleetBand, { label: string; range: string; c: string; ink: string; bg: string }> = {
+  excellent: { label: 'Excellent', range: '≥ 85', c: T.success, ink: T.success, bg: '#E7F5EE' },
+  good: { label: 'Good', range: '70–84', c: '#10B981', ink: '#047857', bg: '#E7F5EE' },
+  fair: { label: 'Fair', range: '50–69', c: SEV.medium.c, ink: SEV.medium.ink, bg: SEV.medium.bg },
+  poor: { label: 'Poor', range: '< 50', c: SEV.critical.c, ink: SEV.critical.ink, bg: SEV.critical.bg },
 };
-/** Small average-score ring, coloured by grade band — the same visual language as the
-    per-asset score donut, so the rollup reads as "the same score, summarised". */
+/** The fleet-average score ring — one confident number, the arc and the number both in the
+    band's colour (the number in the darker `ink` for AA), paired with a band label so colour
+    is never the only cue. The same visual language as the per-asset score donut. */
 function ScoreRing({ score, grade }: { score: number | null; grade: string | null }) {
-  const size = 92, sw = 9, r = (size - sw) / 2, circ = 2 * Math.PI * r;
-  const col = grade && BAND[grade as FleetBand] ? BAND[grade as FleetBand].c : GREY;
-  const filled = score == null ? 0 : (Math.max(0, Math.min(100, score)) / 100) * circ;
+  const size = 108, sw = 11, r = (size - sw) / 2, circ = 2 * Math.PI * r;
+  const band = (grade && BAND[grade as FleetBand]) || null;
+  const arcC = band ? band.c : GREY;
+  const inkC = band ? band.ink : '#64748B';
+  const pct = score == null ? 0 : Math.max(0, Math.min(100, score));
+  const filled = (pct / 100) * circ;
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={sw} stroke="#EEF1F5" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={sw} stroke={col}
-          strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round" />
+        {pct > 0 && <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={sw} stroke={arcC}
+          strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round" />}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[23px] font-bold tabular-nums" style={{ color: col }}>{score == null ? '—' : Math.round(score)}</span>
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-[#94A3B8]">/ 100</span>
+        <span className="text-[32px] font-semibold leading-none tabular-nums" style={{ color: inkC }}>{score == null ? '—' : Math.round(score)}</span>
+        <span className="mt-1 text-[10px] font-medium uppercase tracking-[.09em] text-[#64748B]">out of 100</span>
       </div>
     </div>
   );
@@ -367,53 +381,75 @@ function FleetScoreCard({ inv, className }: { inv: Q<InvOverview>; className: st
   else {
     const tone = GRADE_TONE[f.grade ?? ''] ?? SEV.info;
     const parts: Part[] = [
-      { key: 'excellent', label: 'Excellent ≥85', n: f.bands.excellent, c: BAND.excellent.c },
-      { key: 'good', label: 'Good 70–84', n: f.bands.good, c: BAND.good.c },
-      { key: 'fair', label: 'Fair 50–69', n: f.bands.fair, c: BAND.fair.c },
-      { key: 'poor', label: 'Poor <50', n: f.bands.poor, c: BAND.poor.c },
+      { key: 'excellent', label: BAND.excellent.label, n: f.bands.excellent, c: BAND.excellent.c },
+      { key: 'good', label: BAND.good.label, n: f.bands.good, c: BAND.good.c },
+      { key: 'fair', label: BAND.fair.label, n: f.bands.fair, c: BAND.fair.c },
+      { key: 'poor', label: BAND.poor.label, n: f.bands.poor, c: BAND.poor.c },
       { key: 'unscanned', label: 'Not scanned', n: f.unscanned, c: GREY },
     ];
+    const legend: { key: string; label: string; range: string; n: number; c: string }[] = [
+      ...(['excellent', 'good', 'fair', 'poor'] as FleetBand[]).map((b) => ({ key: b, label: BAND[b].label, range: BAND[b].range, n: f.bands[b], c: BAND[b].c })),
+      { key: 'unscanned', label: 'Not scanned', range: 'no scan', n: f.unscanned, c: GREY },
+    ];
     inner = (
-      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-12">
-        {/* Average */}
-        <div className="flex items-center gap-4 lg:col-span-3">
+      <div className="grid flex-1 grid-cols-1 gap-x-7 gap-y-6 lg:grid-cols-12">
+        {/* Fleet average — one confident score */}
+        <div className="flex items-center gap-5 lg:col-span-4">
           <ScoreRing score={f.avg} grade={f.grade} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] font-semibold text-[#0F172A]">Fleet average</span>
+              <span className="text-[13.5px] font-semibold text-[#0F172A]">Fleet average</span>
               <Pill tone={tone}>{tone.label}</Pill>
             </div>
-            <p className="m-0 mt-1 text-[11.5px] leading-[1.5] text-[#64748B]">
-              CIS benchmark score across <b className="text-[#334155]">{nfmt(f.scanned)}</b> scanned {f.scanned === 1 ? 'asset' : 'assets'}
-              {f.unscanned > 0 ? <> · <b className="text-[#334155]">{nfmt(f.unscanned)}</b> not scanned yet</> : null}
+            <p className="m-0 mt-2 text-[12px] leading-[1.55] text-[#475569]">
+              Mean CIS benchmark score across <span className="font-semibold text-[#0F172A]">{nfmt(f.scanned)}</span> scanned {f.scanned === 1 ? 'asset' : 'assets'}
+              {f.unscanned > 0 ? <> · <span className="font-semibold text-[#0F172A]">{nfmt(f.unscanned)}</span> not yet scanned</> : null}.
             </p>
           </div>
         </div>
-        {/* Distribution */}
-        <div className="flex flex-col justify-center lg:col-span-5 lg:border-l lg:border-[#EEF1F5] lg:pl-6">
-          <div className="mb-1.5 flex items-baseline justify-between gap-2">
-            <Eyebrow>Score distribution</Eyebrow><span className="text-[11px] text-[#64748B]">{nfmt(total)} assets</span>
+        {/* Distribution — segmented bar + labelled legend */}
+        <div className="flex flex-col justify-center lg:col-span-4 lg:border-l lg:border-[#EEF1F5] lg:pl-7">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <ModalEyebrow>Score distribution</ModalEyebrow>
+            <span className="text-[11px] tabular-nums text-[#64748B]"><span className="font-semibold text-[#0F172A]">{nfmt(total)}</span> assets</span>
           </div>
-          <StackBar parts={parts} label="Assets by score band" height={12} />
-          <div className="mt-2.5"><PartLegend parts={parts} total={total} cols={3} /></div>
-        </div>
-        {/* Worst-first */}
-        <div className="flex min-w-0 flex-col lg:col-span-4 lg:border-l lg:border-[#EEF1F5] lg:pl-6">
-          <div className="mb-1 flex items-baseline justify-between gap-2">
-            <Eyebrow>Lowest-scoring assets</Eyebrow><MoreLink href={REG}>Register</MoreLink>
-          </div>
-          <ul className="m-0 flex flex-1 list-none flex-col p-0">
-            {f.worst.map((w) => (
-              <li key={w.id} className="border-b border-[#F1F3F7] last:border-0">
-                <Link href={`/assets/${w.id}`} className="group flex min-h-[29px] items-center gap-2.5 text-[12.5px] hover:text-[#005B96]">
-                  <span aria-hidden className="h-[8px] w-[8px] shrink-0 rounded-full" style={{ background: BAND[w.band].c }} />
-                  <span className="min-w-0 flex-1 truncate text-[#334155]" title={`${w.name}${w.criticality ? ` · ${w.criticality}` : ''}`}>{w.name}</span>
-                  <b className="shrink-0 tabular-nums" style={{ color: BAND[w.band].c }}>{Math.round(w.score)}</b>
-                  <ChevronRight size={13} aria-hidden className="shrink-0 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
-                </Link>
+          <StackBar parts={parts} label="Assets by score band" height={14} />
+          <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-x-6 gap-y-[7px] p-0 sm:grid-cols-2">
+            {legend.map((p) => (
+              <li key={p.key} className="flex items-center gap-2 text-[12px]">
+                <i aria-hidden className="h-[10px] w-[10px] shrink-0 rounded-[3px]" style={{ background: p.c }} />
+                <span className="min-w-0 flex-1 truncate text-[#334155]">{p.label} <span className="text-[#94A3B8]">{p.range}</span></span>
+                <span className="shrink-0 font-semibold tabular-nums text-[#0F172A]">{nfmt(p.n)}</span>
+                <span className="w-[34px] shrink-0 text-right text-[11px] tabular-nums text-[#64748B]">{share(p.n, total) || '0%'}</span>
               </li>
             ))}
           </ul>
+        </div>
+        {/* Lowest-scoring — score badge + name, each row clickable */}
+        <div className="flex min-w-0 flex-col lg:col-span-4 lg:border-l lg:border-[#EEF1F5] lg:pl-7">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <ModalEyebrow>Lowest-scoring assets</ModalEyebrow><MoreLink href={REG}>Register</MoreLink>
+          </div>
+          {f.worst.length === 0 ? (
+            <p className="m-0 text-[12px] text-[#64748B]">No scored assets yet.</p>
+          ) : (
+            <ul className="m-0 flex flex-1 list-none flex-col p-0">
+              {f.worst.map((w) => {
+                const b = BAND[w.band];
+                return (
+                  <li key={w.id} className="border-b border-[#F1F3F7] last:border-0">
+                    <Link href={`/assets/${w.id}`} className="group flex min-h-[34px] items-center gap-3 py-1 text-[12.5px]">
+                      <span aria-hidden className="inline-flex h-[23px] w-[36px] shrink-0 items-center justify-center rounded-[7px] text-[12px] font-semibold tabular-nums"
+                        style={{ background: b.bg, color: b.ink }}>{Math.round(w.score)}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium text-[#0F172A] transition group-hover:text-[#005B96]" title={`${w.name}${w.criticality ? ` · ${w.criticality}` : ''}`}>{w.name}</span>
+                      {w.criticality && <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-[.03em] text-[#94A3B8]">{w.criticality}</span>}
+                      <ChevronRight size={14} aria-hidden className="shrink-0 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     );
@@ -501,7 +537,7 @@ function SidePanel({ kind, q, lists, note, stats, roots, className }: {
             <dt className="truncate text-[11.5px] text-[#64748B]">{st.label}</dt>
             <dd className="m-0 mt-0.5 flex min-w-0 items-baseline gap-1.5 text-[18px] font-semibold leading-[1.25]" style={{ color: st.alarm ? SEV.critical.ink : T.text }}>
               {st.alarm && <AlertTriangle size={14} aria-label="Needs attention" className="self-center" />}{st.value}
-              {st.sub && <span className="truncate text-[11.5px] font-normal text-[#94A3B8]">{st.sub}</span>}
+              {st.sub && <span className="truncate text-[11.5px] font-normal text-[#64748B]">{st.sub}</span>}
             </dd>
           </div>
         ))}
@@ -549,9 +585,10 @@ function BarRowBody({ label, n, total, max, gap, color, expandable }: {
 }
 const triggerCls = 'flex w-full min-h-[31px] cursor-pointer flex-col justify-center gap-[4px] rounded-[6px] px-1.5 text-left transition hover:bg-[#F3F7FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#005B96]';
 
-/** Blur-background pop-up: a fixed scrim (dim + backdrop blur) over the whole dashboard, a
-    centered white panel whose body scrolls internally. Click-scrim / Esc / X closes. Rendered in a
-    <body> portal so the dashboard's zoom:0.8 and .assets-light colour scope don't touch it. */
+/** Right-side slide-over drawer: a dim+blur scrim over the whole dashboard and a full-height white
+    panel that slides in from the right, its body scrolling internally. Click-scrim / Esc / X closes.
+    Rendered in a <body> portal so the dashboard's zoom:0.8 and .assets-light colour scope don't touch
+    it. Roomy padding + a clear header (title · one-line summary · close) replace the old cramped pop-up. */
 function DrillModal({ color, title, meta, onClose, children }: {
   color: string; title: ReactNode; meta?: ReactNode; onClose: () => void; children: ReactNode;
 }) {
@@ -565,34 +602,58 @@ function DrillModal({ color, title, meta, onClose, children }: {
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div data-inv-modal role="presentation" onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-               padding: 16, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', fontFamily: FONT }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', justifyContent: 'flex-end',
+               background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)',
+               fontFamily: FONT, animation: 'invScrimIn .18s ease-out' }}>
       <style>{MODAL_CSS}</style>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
-        style={{ width: 'min(580px, 100%)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                 background: '#fff', borderRadius: 16, border: '1px solid #E2E5EC', borderTop: `3px solid ${color}`, boxShadow: '0 24px 64px rgba(15,23,42,0.3)' }}>
-        <header style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px 12px', borderBottom: '1px solid #EEF1F5' }}>
-          <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: color, marginTop: 5, flex: 'none' }} />
+        style={{ width: 'min(500px, 100%)', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                 background: '#fff', borderLeft: `3px solid ${color}`, boxShadow: '-24px 0 64px rgba(15,23,42,0.22)',
+                 animation: 'invDrawerIn .24s cubic-bezier(.22,.61,.36,1)' }}>
+        <header style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '20px 22px 16px', borderBottom: '1px solid #EEF1F5' }}>
+          <span aria-hidden style={{ width: 12, height: 12, borderRadius: 4, background: color, marginTop: 4, flex: 'none' }} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 600, color: '#0F172A', lineHeight: 1.3 }}>{title}</div>
-            {meta && <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>{meta}</div>}
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', lineHeight: 1.3 }}>{title}</div>
+            {meta && <div style={{ fontSize: 12.5, color: '#64748B', marginTop: 3, lineHeight: 1.4 }}>{meta}</div>}
           </div>
           <button type="button" onClick={onClose} aria-label="Close"
-            style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, flex: 'none', borderRadius: 8, border: '1px solid #E2E5EC', background: '#fff', color: '#334155', cursor: 'pointer' }}>
-            <X size={15} aria-hidden />
+            style={{ display: 'grid', placeItems: 'center', width: 30, height: 30, flex: 'none', borderRadius: 8, border: '1px solid #E2E5EC', background: '#fff', color: '#334155', cursor: 'pointer' }}>
+            <X size={16} aria-hidden />
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: 16 }}>{children}</div>
+        <div style={{ overflowY: 'auto', padding: '20px 22px 24px' }}>{children}</div>
       </div>
     </div>,
     document.body,
   );
 }
+/** One well-separated section inside the drawer: a divider + generous spacing above (unless `first`),
+    an optional small-caps title with an optional right-aligned aside. Keeps the drawer's sections
+    from running together the way the old cramped mt-3 blocks did. */
+function ModalSection({ title, aside, first, children }: { title?: ReactNode; aside?: ReactNode; first?: boolean; children: ReactNode }) {
+  return (
+    <section className={first ? '' : 'mt-5 border-t border-[#EEF1F5] pt-5'}>
+      {title != null && (
+        <div className="mb-2.5 flex items-baseline justify-between gap-3">
+          <ModalEyebrow>{title}</ModalEyebrow>
+          {aside}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
 
-/** The real asset NAMES, grouped by the sub-kind / version they fall under (class → sub → the
-    actual machines/hosts/domains). Each name links to its detail where an id exists; larger sets
-    link out to the register. Honest empty state when no names are recorded. */
-function SampleNames({ samples, total, where }: { samples?: Sample[]; total: number; where: 'external' | 'internal' }) {
+/** The set of sub-kind / version labels that are past vendor end-of-life — so the asset list can
+    flag the version groups whose machines carry an end-of-life OS/engine. */
+const eolSubs = (subs?: Sub[]) => new Set((subs ?? []).filter((s) => (s.eol_past ?? 0) > 0).map((s) => s.label));
+
+/** The real machines/hosts/domains, as a proper list (no loose chips): grouped by the sub-kind /
+    version they fall under, each group a bordered block with a header (version · count · an
+    end-of-life badge where the version is past support) over one clean row per asset — name bold &
+    dark, criticality as a labelled status, the whole row clickable to its detail where an id exists.
+    Larger sets link out to the register. Honest empty state when no names are recorded. */
+function AssetList({ samples, total, where, eol }: { samples?: Sample[]; total: number; where: 'external' | 'internal'; eol?: Set<string> }) {
   const list = samples ?? [];
   const groups: { sub: string; items: Sample[] }[] = [];
   const idx = new Map<string, number>();
@@ -602,43 +663,63 @@ function SampleNames({ samples, total, where }: { samples?: Sample[]; total: num
     if (i === undefined) { i = groups.length; idx.set(k, i); groups.push({ sub: k, items: [] }); }
     groups[i].items.push(s);
   }
-  const critC = (c?: string) => (c ? (SEV as Record<string, Tone>)[c]?.c ?? GREY : '');
+  const critTone = (c?: string): Tone | null => (c ? (SEV as Record<string, Tone>)[c] ?? null : null);
+  if (list.length === 0) return <p className="m-0 text-[12px] text-[#64748B]">No named assets recorded for this group.</p>;
   return (
     <div className="min-w-0">
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <Eyebrow>Named assets</Eyebrow>
-        {list.length > 0 && <span className="text-[11px] text-[#64748B]">{nfmt(list.length)}{total > list.length ? ` of ${nfmt(total)}` : ''} shown</span>}
-      </div>
-      {list.length === 0 ? (
-        <p className="m-0 text-[11.5px] text-[#94A3B8]">No named assets recorded for this group.</p>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {groups.map((g) => (
-            <div key={g.sub} className="min-w-0">
-              <p className="m-0 mb-1 text-[11.5px] font-semibold text-[#334155]">{g.sub} <span className="font-normal text-[#94A3B8]">· {nfmt(g.items.length)}</span></p>
-              <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-col gap-3">
+        {groups.map((g) => {
+          const past = eol?.has(g.sub);
+          return (
+            <div key={g.sub} className="overflow-hidden rounded-[10px] border border-[#E6EAF0]">
+              <div className="flex items-center gap-2 border-b border-[#EEF1F5] bg-[#F8FAFC] px-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#0F172A]">{g.sub}</span>
+                {past && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-[2px] text-[10.5px] font-semibold"
+                    style={{ background: SEV.critical.bg, color: SEV.critical.ink }}>
+                    <AlertTriangle size={11} aria-hidden /> End-of-life
+                  </span>
+                )}
+                <span className="shrink-0 text-[11px] tabular-nums text-[#64748B]"><span className="font-semibold text-[#0F172A]">{nfmt(g.items.length)}</span> {g.items.length === 1 ? 'asset' : 'assets'}</span>
+              </div>
+              <ul className="m-0 list-none p-0">
                 {g.items.map((s, i) => {
+                  const t = critTone(s.crit);
                   const inner = (
                     <>
-                      {s.crit && <i aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: critC(s.crit) }} title={s.crit} />}
-                      <span className="max-w-[210px] truncate">{s.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#0F172A] group-hover:text-[#005B96]">{s.name}</span>
+                      {t && (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] text-[#64748B]">
+                          <i aria-hidden className="h-[7px] w-[7px] rounded-full" style={{ background: t.c }} />{t.label}
+                        </span>
+                      )}
                     </>
                   );
-                  return s.id != null ? (
-                    <Link key={`${s.id}-${i}`} href={`/assets/${s.id}`} title={`${s.name}${s.crit ? ` · ${s.crit}` : ''}`}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[#E6EAF0] bg-white px-2 py-[3px] text-[11px] font-medium text-[#334155] transition hover:border-[#C7D2E4] hover:text-[#005B96]">
-                      {inner}
-                    </Link>
-                  ) : (
-                    <span key={`n-${i}`} title={s.name} className="inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[#E6EAF0] bg-white px-2 py-[3px] text-[11px] font-medium text-[#334155]">
-                      {inner}
-                    </span>
+                  return (
+                    <li key={s.id != null ? `${s.id}-${i}` : `n-${i}`} className="border-t border-[#F1F4F8] first:border-t-0">
+                      {s.id != null ? (
+                        <Link href={`/assets/${s.id}`} title={`${s.name}${s.crit ? ` · ${s.crit}` : ''}`}
+                          className="group flex items-center gap-3 px-3 py-[8px] transition hover:bg-[#F6F9FC]">
+                          {inner}
+                          <ChevronRight size={13} aria-hidden className="shrink-0 text-[#CBD5E1] transition group-hover:translate-x-0.5 group-hover:text-[#64748B]" />
+                        </Link>
+                      ) : (
+                        <div className="group flex items-center gap-3 px-3 py-[8px]" title={s.name}>
+                          {inner}<span aria-hidden className="w-[13px] shrink-0" />
+                        </div>
+                      )}
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </div>
-          ))}
-          {total > list.length && <div className="pt-0.5"><MoreLink href={`${REG}&view=${where}`}>View all {nfmt(total)} in the register</MoreLink></div>}
+          );
+        })}
+      </div>
+      {total > list.length && (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-[11.5px] text-[#64748B]"><span className="font-semibold text-[#0F172A]">{nfmt(list.length)}</span> of {nfmt(total)} shown</span>
+          <MoreLink href={`${REG}&view=${where}`}>View all in the register</MoreLink>
         </div>
       )}
     </div>
@@ -656,11 +737,14 @@ function ClassBar({ cls, total, max, color, where }: { cls: Cls; total: number; 
       {open && (
         <DrillModal color={color} onClose={() => setOpen(false)} title={cls.label}
           meta={<>{nfmt(cls.n)} {cls.n === 1 ? 'asset' : 'assets'} · {share(cls.n, total) || '0%'} of {where === 'external' ? 'external surface' : 'internal estate'}</>}>
-          <Eyebrow>{where === 'internal' ? 'OS / engine within this kind' : 'Exposure within this kind'}</Eyebrow>
-          <SubBreakdown subs={subs} color={color} />
-          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><CoverageStrip cls={cls} side={where} /></div>
-          <div className="mt-3"><CritMini crit={cls.crit} n={cls.n} /></div>
-          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><SampleNames samples={cls.samples} total={cls.n} where={where} /></div>
+          <ModalSection first title={where === 'internal' ? 'OS / engine in this class' : 'Exposure in this class'}>
+            <SubBreakdown subs={subs} color={color} />
+          </ModalSection>
+          <ModalSection title="Coverage & hygiene"><CoverageStrip cls={cls} side={where} /></ModalSection>
+          <ModalSection><CritMini crit={cls.crit} n={cls.n} /></ModalSection>
+          <ModalSection title="Named assets">
+            <AssetList samples={cls.samples} total={cls.n} where={where} eol={eolSubs(cls.subtypes)} />
+          </ModalSection>
         </DrillModal>
       )}
     </li>
@@ -670,7 +754,7 @@ function OsBar({ os, total, max, color }: { os: Sub; total: number; max: number;
   const [open, setOpen] = useState(false);
   const vers = (os.subtypes ?? []).filter((v) => v.n > 0 && v.label !== os.label);
   const suffix = versions(os);
-  const label = <>{os.label}{suffix ? <span className="text-[11.5px] text-[#94A3B8]"> · {suffix}</span> : null}</>;
+  const label = <>{os.label}{suffix ? <span className="text-[11.5px] text-[#64748B]"> · {suffix}</span> : null}</>;
   const openable = os.n > 0 && (vers.length > 0 || (os.samples?.length ?? 0) > 0);
   const row = <BarRowBody label={label} n={os.n} total={total} max={max} gap={os.gap} color={color} expandable={openable} />;
   if (!openable) return <li className="flex min-h-[31px] flex-col justify-center gap-[4px] px-1.5" title={`${os.label}: ${nfmt(os.n)}${suffix ? ` (${suffix})` : ''}`}>{row}</li>;
@@ -679,11 +763,11 @@ function OsBar({ os, total, max, color }: { os: Sub; total: number; max: number;
       <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={triggerCls}>{row}</button>
       {open && (
         <DrillModal color={color} onClose={() => setOpen(false)} title={os.label}
-          meta={<>{nfmt(os.n)} {os.n === 1 ? 'host' : 'hosts'}{(os.eol_past ?? 0) > 0 ? ` · ${nfmt(os.eol_past)} past end-of-life` : ''}</>}>
-          <Eyebrow>Versions in use</Eyebrow>
-          <SubBreakdown subs={vers} color={color} />
-          {(os.eol_past ?? 0) > 0 && <p className="m-0 mt-2 text-[11px] font-medium" style={{ color: SEV.critical.ink }}>{nfmt(os.eol_past)} past vendor end-of-life</p>}
-          <div className="mt-3 border-t border-[#EEF1F5] pt-3"><SampleNames samples={os.samples} total={os.n} where="internal" /></div>
+          meta={<>{nfmt(os.n)} {os.n === 1 ? 'host' : 'hosts'}{(os.eol_past ?? 0) > 0 ? <> · <span style={{ color: SEV.critical.ink, fontWeight: 600 }}>{nfmt(os.eol_past)} past end-of-life</span></> : null}</>}>
+          <ModalSection first title="Versions in use"><SubBreakdown subs={vers} color={color} /></ModalSection>
+          <ModalSection title="Named assets">
+            <AssetList samples={os.samples} total={os.n} where="internal" eol={eolSubs(vers)} />
+          </ModalSection>
         </DrillModal>
       )}
     </li>
@@ -697,18 +781,21 @@ function PlainBar({ row, total, max, color }: { row: { label: string; n: number;
   );
 }
 function SubBreakdown({ subs, color }: { subs: Sub[]; color: string }) {
-  if (!subs.length) return <p className="m-0 mt-1 text-[11px] text-[#94A3B8]">Not profiled yet.</p>;
+  if (!subs.length) return <p className="m-0 text-[12px] text-[#64748B]">Not profiled yet.</p>;
   const max = Math.max(1, ...subs.map((s) => s.n));
   return (
-    <ul className="m-0 mt-1 flex list-none flex-col gap-[6px] p-0">
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
       {subs.map((s) => (
-        <li key={s.label} className="flex items-center gap-2 text-[11.5px]" title={(s.eol_past ?? 0) > 0 ? `${s.label}: ${s.eol_past} past vendor end-of-life` : s.label}>
-          <span className="min-w-0 flex-1 truncate" style={{ color: s.gap ? '#94A3B8' : '#334155' }}>{s.label}</span>
-          {(s.eol_past ?? 0) > 0 && <span aria-hidden className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: SEV.critical.c }} title={`${s.eol_past} past end-of-life`} />}
-          <span className="h-[6px] w-[48px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
+        <li key={s.label} className="flex items-center gap-2.5 text-[12px]" title={(s.eol_past ?? 0) > 0 ? `${s.label}: ${s.eol_past} past vendor end-of-life` : s.label}>
+          <span className="min-w-0 flex-1 truncate" style={{ color: s.gap ? '#64748B' : '#334155' }}>{s.label}</span>
+          {(s.eol_past ?? 0) > 0 && (
+            <span className="inline-flex shrink-0 items-center rounded-full px-1.5 py-[1px] text-[10px] font-semibold tabular-nums"
+              style={{ background: SEV.critical.bg, color: SEV.critical.ink }} title={`${s.eol_past} past end-of-life`}>EOL {nfmt(s.eol_past)}</span>
+          )}
+          <span className="h-[6px] w-[56px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
             <span className="block h-full rounded-full" style={{ width: `${(s.n / max) * 100}%`, minWidth: s.n > 0 ? 3 : 0, background: s.gap ? GREY : color }} />
           </span>
-          <span className="w-[30px] shrink-0 text-right tabular-nums text-[#64748B]">{nfmt(s.n)}</span>
+          <span className="w-[34px] shrink-0 text-right font-semibold tabular-nums text-[#0F172A]">{nfmt(s.n)}</span>
         </li>
       ))}
     </ul>
@@ -717,8 +804,8 @@ function SubBreakdown({ subs, color }: { subs: Sub[]; color: string }) {
 function Mini({ label, value, alarm }: { label: ReactNode; value: ReactNode; alarm?: boolean }) {
   return (
     <div className="min-w-0">
-      <p className="m-0 truncate text-[10px] font-medium uppercase tracking-[.04em] text-[#94A3B8]">{label}</p>
-      <p className="m-0 text-[13px] font-semibold leading-[1.2] tabular-nums" style={{ color: alarm ? SEV.critical.ink : '#0F172A' }}>{value}</p>
+      <p className="m-0 truncate text-[10.5px] font-medium uppercase tracking-[.04em] text-[#64748B]">{label}</p>
+      <p className="m-0 mt-0.5 text-[14px] font-semibold leading-[1.2] tabular-nums" style={{ color: alarm ? SEV.critical.ink : '#0F172A' }}>{value}</p>
     </div>
   );
 }
@@ -731,20 +818,27 @@ function CoverageStrip({ cls, side }: { cls: Cls; side: 'external' | 'internal' 
     if (cls.cis != null) metrics.push({ label: 'CIS', value: share(cls.cis, cls.n) || '0%' });
     if (cls.eol) metrics.push({ label: 'Past EOL', value: nfmt(cls.eol.past), alarm: cls.eol.past > 0 });
   }
-  return <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-2 min-[380px]:grid-cols-4 sm:grid-cols-2">{metrics.map((m) => <Mini key={m.label} {...m} />)}</div>;
+  return <div className="grid grid-cols-2 gap-x-5 gap-y-3 min-[380px]:grid-cols-4 sm:grid-cols-2">{metrics.map((m) => <Mini key={m.label} {...m} />)}</div>;
 }
 function CritMini({ crit, n }: { crit: Crit; n: number }) {
   const parts: Part[] = CRIT.map((x) => ({ key: x.k, label: x.label, n: crit[x.k] ?? 0, c: x.c }));
   const rated = parts.filter((p) => p.key !== 'unrated').reduce((s, p) => s + p.n, 0);
   return (
     <div className="min-w-0">
-      <div className="mb-1 flex items-baseline justify-between gap-2"><Eyebrow>Criticality</Eyebrow><span className="text-[10.5px] text-[#94A3B8]">{nfmt(rated)} of {nfmt(n)} rated</span></div>
-      <StackBar parts={parts} label="Criticality mix" height={8} />
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-[#64748B]">
-        {parts.filter((p) => p.n > 0).map((p) => (
-          <span key={p.key} className="inline-flex items-center gap-1"><i aria-hidden className="inline-block h-[7px] w-[7px] rounded-[2px]" style={{ background: p.c }} />{p.label} <b className="tabular-nums text-[#334155]">{nfmt(p.n)}</b></span>
-        ))}
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <ModalEyebrow>Criticality</ModalEyebrow>
+        <span className="text-[11px] tabular-nums text-[#64748B]"><span className="font-semibold text-[#0F172A]">{nfmt(rated)}</span> of {nfmt(n)} rated</span>
       </div>
+      <StackBar parts={parts} label="Criticality mix" height={10} />
+      <ul className="m-0 mt-2.5 grid list-none grid-cols-2 gap-x-5 gap-y-1 p-0 min-[400px]:grid-cols-3">
+        {parts.filter((p) => p.n > 0).map((p) => (
+          <li key={p.key} className="flex items-center gap-1.5 text-[11.5px]">
+            <i aria-hidden className="inline-block h-[8px] w-[8px] shrink-0 rounded-[2px]" style={{ background: p.c }} />
+            <span className="text-[#64748B]">{p.label}</span>
+            <b className="ml-auto font-semibold tabular-nums text-[#0F172A]">{nfmt(p.n)}</b>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -821,8 +915,8 @@ function SideRows({ kind, side, estate }: { kind: keyof typeof SIDE; side: Side;
           <td className="py-1.5 pl-3 pr-3">
             <span className={`block truncate font-medium ${c.gap ? 'text-[#64748B]' : 'text-[#0F172A]'}`}>{c.label}</span>
             {/* One line of whole subtype chips; the full breakdown is in the tooltip. */}
-            <span className="mt-0.5 flex h-[17px] flex-wrap gap-x-1.5 overflow-hidden text-[11.5px] leading-[17px] text-[#94A3B8]" title={c.subtypes.map((x) => `${x.label}: ${nfmt(x.n)}`).join(' · ')}>
-              {c.subtypes.map((x, i) => <span key={x.label} className="whitespace-nowrap">{i > 0 && '· '}{x.label} <b className="font-semibold text-[#64748B]">{nfmt(x.n)}</b></span>)}
+            <span className="mt-0.5 flex h-[17px] flex-wrap gap-x-1.5 overflow-hidden text-[11.5px] leading-[17px] text-[#64748B]" title={c.subtypes.map((x) => `${x.label}: ${nfmt(x.n)}`).join(' · ')}>
+              {c.subtypes.map((x, i) => <span key={x.label} className="whitespace-nowrap">{i > 0 && '· '}{x.label} <b className="font-semibold text-[#334155]">{nfmt(x.n)}</b></span>)}
             </span>
           </td>
           <td className="py-1.5 text-right font-semibold tabular-nums">{nfmt(c.n)}</td>
@@ -1216,7 +1310,7 @@ function CoverageCard({ q, className }: { q: Q<Estate>; className: string }) {
 /** One telemetry domain: a bold domain header + its coverage rows (full-width when one, 2-up when two).
     The whole band is a drill trigger → a blur pop-up (reused DrillModal) with the domain's coverage
     figures and the internal host NAMES those signals are measured across (the same per-class samples
-    the Internal-estate drill renders via SampleNames). Per-host signal status isn't fabricated. */
+    the Internal-estate drill renders via AssetList). Per-host signal status isn't fabricated. */
 function CovDomain({ label, blurb, rows, params, samples, total }: {
   label: string; blurb: string; rows: (CovDim | undefined)[]; params: ReactNode; samples: Sample[]; total: number;
 }) {
@@ -1242,25 +1336,22 @@ function CovDomain({ label, blurb, rows, params, samples, total }: {
         <DrillModal color={T.base} onClose={() => setOpen(false)} title={label} meta={blurb}>
           {/* The real telemetry PARAMETERS for this domain (primary), then a one-line coverage summary
               and the internal host names those signals are measured across. */}
-          {params ?? (
-            <>
-              <Eyebrow>{label} telemetry</Eyebrow>
-              <p className="m-0 text-[11.5px] text-[#94A3B8]">Not collected yet.</p>
-            </>
-          )}
+          <ModalSection first title={`${label} telemetry`}>
+            {params ?? <p className="m-0 text-[12px] text-[#64748B]">Not collected yet.</p>}
+          </ModalSection>
           {real.length > 0 && (
-            <p className="m-0 mt-3 border-t border-[#EEF1F5] pt-3 text-[11.5px] leading-[1.6] text-[#64748B]">
-              <span className="font-semibold uppercase tracking-[.04em] text-[#94A3B8]">Coverage</span>
-              {' — '}
-              {real.map((r) => `${r.label} ${r.of ? pctOf(r.n, r.of) : 0}% (${nfmt(r.n)} of ${nfmt(r.of)})`).join('  ·  ')}
-            </p>
+            <ModalSection title="Coverage">
+              <ul className="m-0 grid list-none grid-cols-1 gap-x-8 p-0 sm:grid-cols-2">
+                {real.map((r) => <CovRow key={r.label} {...r} bare />)}
+              </ul>
+            </ModalSection>
           )}
-          <div className="mt-3 border-t border-[#EEF1F5] pt-3">
-            <p className="m-0 mb-2 text-[11.5px] leading-[1.5] text-[#64748B]">
-              Internal hosts the {label.toLowerCase()} signals are measured across — per-host signal status isn&rsquo;t broken out here.
+          <ModalSection title="Internal hosts measured">
+            <p className="m-0 mb-3 text-[12px] leading-[1.5] text-[#64748B]">
+              The {label.toLowerCase()} signals are measured across these internal hosts — per-host signal status isn&rsquo;t broken out here.
             </p>
-            <SampleNames samples={samples} total={total} where="internal" />
-          </div>
+            <AssetList samples={samples} total={total} where="internal" />
+          </ModalSection>
         </DrillModal>
       )}
     </>
