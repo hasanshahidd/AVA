@@ -22,6 +22,7 @@ from ...models import (
     HDTicket,
     HDTicketStatus,
     HDTicketPriority,
+    HDPriorityMatrix,
     HDTicketType,
     Team,
     HDAgent,
@@ -78,8 +79,26 @@ def priority_name_from_matrix(impact: Optional[str], urgency: Optional[str]) -> 
 
 def priority_from_matrix(db: Session, tid: int, impact: Optional[str],
                          urgency: Optional[str]) -> Optional[int]:
-    """§4. Resolve the matrix priority name to a tenant HDTicketPriority.id.
-    Missing cell or no such priority → None."""
+    """§4. Resolve an (impact, urgency) pair to a tenant HDTicketPriority.id.
+
+    Prefers the tenant's OWN ingested priority matrix (grc_hd_priority_matrix,
+    seeded from the ITSM workbook) so the owner's authored impact x urgency grid
+    is authoritative. Falls back to the built-in ITIL 4-level names only when the
+    tenant has no matrix row for that cell (e.g. before the ITSM seed has run),
+    so behaviour is unchanged on un-seeded tenants. Missing cell → None."""
+    imp = (impact or "").strip().lower()
+    urg = (urgency or "").strip().lower()
+    if imp and urg:
+        cell = (
+            db.query(HDPriorityMatrix.priority_id)
+            .filter(HDPriorityMatrix.tenant_id == tid,
+                    func.lower(HDPriorityMatrix.impact) == imp,
+                    func.lower(HDPriorityMatrix.urgency) == urg)
+            .first()
+        )
+        if cell and cell[0]:
+            return cell[0]
+    # fallback: built-in matrix name -> tenant priority by name
     name = priority_name_from_matrix(impact, urgency)
     if not name:
         return None
