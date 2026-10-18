@@ -289,6 +289,10 @@ def _find_team(ctx: _Ctx, name: str) -> Optional[int]:
 
 
 def _apply_support_groups(ctx: _Ctx) -> None:
+    # DROPPED-BY-DESIGN: 'Tier' (L1/L2/L3/Process), 'Scope' (prose remit) and
+    # 'Coverage' (24x7 / business hours) are descriptive group metadata. This table
+    # is purely the GRP-* -> AVA team bridge (code/name/team_id); the authoritative
+    # team record (and its own coverage) lives on grc_teams, so they are not copied.
     for r in ctx.rows("support_groups"):
         code, name = _g(r, "code", "group_id"), _g(r, "name")
         if not code or not name:
@@ -338,6 +342,10 @@ def _apply_business_services(ctx: _Ctx) -> None:
         cat = ctx.ref("business_services", code, "category_id", HDServiceCategory, _g(r, "category_id"))
         # support_group_id has no column on the business service; still validated so a typo can't slide through.
         ctx.ref("business_services", code, "support_group_id", HDSupportGroupMap, _g(r, "support_group_id"))
+        # DROPPED-BY-DESIGN: 'Sla Tier' (Tier 1..4 label) and 'Industry Specific'
+        # (Yes/No flag) are descriptive catalogue metadata with no column here —
+        # criticality + industry_tag already carry the routing-relevant signal, and
+        # SLA targets live in sheet 08 keyed by priority, not a per-service tier.
         status = _lower(_g(r, "status"))
         ctx.coded("business_services", HDBusinessService, code, {
             "name": _trunc(name, 200), "category_id": cat, "description": _g(r, "description"),
@@ -405,6 +413,8 @@ def _apply_request_items(ctx: _Ctx) -> None:
         if grp_id is not None:
             team_id = ctx.db.query(HDSupportGroupMap.team_id).filter_by(id=grp_id).scalar()
         sla = _g(r, "fulfilment_sla_hours", "sla_hours")
+        # DROPPED-BY-DESIGN: 'Industry' (All/Banking/Aviation/…) has no column on the
+        # request item; the parent business service already carries industry_tag.
         status = _lower(_g(r, "status"))
         ctx.coded("request_items", HDRequestItem, code, {
             "name": _trunc(name, 200), "business_service_id": bs_id, "category_id": cat_id,
@@ -420,6 +430,9 @@ def _apply_request_items(ctx: _Ctx) -> None:
 
 def _apply_cmdb(ctx: _Ctx) -> None:
     # --- CI types (two-pass: parents may be declared after children)
+    # DROPPED-BY-DESIGN: the sheet's flat 'Category' label (Service/Hardware/
+    # Software/Cloud/Network/Facility) is not stored — CI types are organised by
+    # their own parent_cit_id tree, which subsumes that grouping.
     trows = ctx.rows("ci_types")
     for r in trows:
         code, name = _g(r, "code", "cit_id"), _g(r, "name")
@@ -445,11 +458,19 @@ def _apply_cmdb(ctx: _Ctx) -> None:
         idx_by_type[type_id] = idx_by_type.get(type_id, 0) + 1
         dtype = _lower(_g(r, "datatype")) or "string"
         desc = _g(r, "description")
+        # The 'Description' cell is consumed into enum `options` (slash-delimited
+        # choices). PARTIAL-BY-DESIGN: for non-enum attributes the free-text hint
+        # (e.g. "Owning team", "Physical/logical location") has no column on
+        # HDCIAttribute and is not retained — the attribute name + datatype are the
+        # dictionary key. (If product later needs the hint, add a `description`
+        # column here; see the audit note in docs/ITSM_INGEST_AUDIT.md.)
         options = [o.strip() for o in str(desc).split("/") if o.strip()] if (dtype == "enum" and desc and "/" in str(desc)) else None
         ctx.upsert("ci_attributes", HDCIAttribute, {"ci_type_id": type_id, "name": _trunc(name, 140)},
                    {"idx": idx_by_type[type_id], "datatype": _trunc(dtype, 20),
                     "required": _yes(_g(r, "required")), "options": options})
     # --- relationship types
+    # DROPPED-BY-DESIGN: the sheet's 'Description' (e.g. "Source needs target to
+    # function") has no column; forward name + inverse_name define the edge type.
     for r in ctx.rows("ci_relationship_types"):
         code, name = _g(r, "code", "rel_id"), _g(r, "name")
         if not code or not name:
@@ -584,6 +605,10 @@ def _apply_states(ctx: _Ctx) -> None:
             label = _g(r, "state", "status")
             if not label:
                 continue
+            # DROPPED-BY-DESIGN: the state-sheet 'Description' (e.g. "Logged, not yet
+            # assigned") is not persisted — HDTicketStatus has no workbook-fed
+            # description column; the label + category + initial/terminal flags are
+            # what the lifecycle engine consumes.
             nxt = _g(r, "allowed_next") or ""
             terminal = (not nxt) or nxt.strip().lower() in ("(terminal)", "terminal", "-", "none")
             out.append((label, "" if terminal else nxt))
@@ -750,7 +775,10 @@ def _apply_departments(ctx: _Ctx) -> None:
     (a typo'd code is a real bug), but the GRP's OWN team match can be null, and
     a null never clobbers a team an admin already set on the department.
     parent_department_id has no column on HDDepartment -> ignored (no sub-tree
-    to maintain yet)."""
+    to maintain yet). DROPPED-BY-DESIGN: the long 'Department Id' (DEPT-IT) is not
+    persisted — the short 'Code' cell (IT) IS the stored natural key; 'Self Service
+    Created' and 'Seeded' are workbook-authoring provenance flags, not product
+    data, so they are not copied either."""
     for r in ctx.rows("departments"):
         code, name = _g(r, "code"), _g(r, "name")
         if not code or not name:
@@ -803,6 +831,9 @@ def _apply_change(ctx: _Ctx) -> None:
             ctx.bad("change_types", code, "code/name", None, "missing code or name"); continue
         auth = str(_g(r, "authorisation", "authorization") or "").lower()
         desc = _g(r, "description")
+        # DROPPED-BY-DESIGN: 'Typical Risk' (Low / Low-Medium-High / High) is an
+        # advisory hint with no column; actual per-change risk is computed from the
+        # impact x likelihood change-risk matrix (sheet 26), not this label.
         requires_cab = not auth.startswith("no cab")
         auto = ("pre-authoris" in auth or "pre-authoriz" in auth or "pre-approv" in auth
                 or "pre-approv" in str(desc or "").lower())
