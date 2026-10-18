@@ -17,6 +17,7 @@ from grc.models import (
     HDChangeType,
     HDDepartment,
     HDIncidentCategory,
+    HDKPI,
     HDPriorityMatrix,
     HDRoleMap,
     HDSLATarget,
@@ -45,6 +46,7 @@ ALL_TABLES = (
     HDDepartment,
     HDRoleMap,
     HDSupportGroupMap,
+    HDKPI,
 )
 
 
@@ -211,6 +213,21 @@ def test_cab_delete_and_missing_item_400(db):
     ga.delete_cab(db, TENANT, cid)
     assert db.query(HDCABConfig).count() == 0
     _raises(404, ga.delete_cab, db, TENANT, cid)
+
+
+def test_kpi_upsert_list_delete(db):
+    r1 = ga.put_kpi(db, TENANT, ga.KPIPut(process="Incident", kpi="MTTR",
+                                          target="P1 < 4h", frequency="Monthly"))
+    assert r1["created"] is True
+    # upsert by (process, kpi), process case-normalised → updates in place, no dup
+    r2 = ga.put_kpi(db, TENANT, ga.KPIPut(process="incident", kpi="MTTR", target="P1 < 2h"))
+    assert r2["created"] is False
+    assert db.query(HDKPI).count() == 1
+    kpis = ga.list_kpis(db, TENANT)["kpis"]
+    assert kpis[0]["target"] == "P1 < 2h" and kpis[0]["process"] == "incident"
+    ga.delete_kpi(db, TENANT, kpis[0]["id"])
+    assert db.query(HDKPI).count() == 0
+    _raises(404, ga.delete_kpi, db, TENANT, kpis[0]["id"])
 
 
 # ─── state transitions ─────────────────────────────────────────────────────

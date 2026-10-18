@@ -17,7 +17,7 @@ from grc.models import (
     HDArticle, HDArticleCategory, HDBusinessService, HDCABConfig,
     HDChangeRiskMatrix, HDChangeType, HDCIAttribute,
     HDConfigurationItem, HDCIRelationship, HDCIRelationshipType, HDCIType,
-    HDDepartment, HDImportBatch, HDIncidentCategory, HDPriorityMatrix,
+    HDDepartment, HDImportBatch, HDIncidentCategory, HDKPI, HDPriorityMatrix,
     HDProcessField, HDRaci, HDRequestItem, HDRoleMap,
     HDServiceCategory, HDServiceDependency, HDSLATarget, HDStateTransition,
     HDSupportGroupMap, HDTechnicalService, HDTicketPriority, HDTicketStatus,
@@ -36,7 +36,7 @@ CATALOGUE = (
     HDChangeType, HDChangeRiskMatrix, HDSupportGroupMap, HDRoleMap,
     HDIncidentCategory,
     HDSLATarget, HDProcessField, HDRaci, HDCABConfig,
-    HDDepartment, HDArticleCategory, HDArticle,
+    HDDepartment, HDArticleCategory, HDArticle, HDKPI,
     HDTicketPriority, HDTicketStatus,
 )
 ALL_TABLES = (HDImportBatch, Team) + CATALOGUE
@@ -134,6 +134,12 @@ def small_bundle():
             {"category": "Email", "subcategory": "Spam/Phishing", "example_item": "Phishing reported"},
             {"category": "Hardware", "subcategory": "Laptop", "example_item": "Won't power on"},
             {"category": "Network"},   # category-only row (no subcategory/item)
+        ],
+        "performance_kpis": [
+            {"process": "Incident", "kpi": "Mean Time to Resolve", "definition": "Avg New->Resolved",
+             "target": "P1 < 4h", "frequency": "Monthly"},
+            {"process": "Change", "kpi": "Change Success Rate", "definition": "% changes with no incident",
+             "target": ">= 95%", "frequency": "Monthly"},
         ],
         "sla_targets": [
             {"process": "Incident", "priority_or_type": "P1 – Critical", "response_target": "15 min",
@@ -558,6 +564,7 @@ def test_real_v3_workbook_imports_and_is_idempotent(db):
     assert db.query(HDCABConfig).count() == 10
     assert db.query(HDDepartment).count() == 15
     assert db.query(HDArticle).count() == 57
+    assert db.query(HDKPI).count() == 28          # sheet 29 — now ingested (no longer deferred)
     n = counts(db)
     second = import_bundle(db, TENANT, b)
     assert counts(db) == n

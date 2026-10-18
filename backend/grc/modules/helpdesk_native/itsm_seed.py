@@ -33,6 +33,7 @@ from ...models import (
     HDDepartment,
     HDImportBatch,
     HDIncidentCategory,
+    HDKPI,
     HDPriorityMatrix,
     HDProcessField,
     HDRaci,
@@ -137,7 +138,7 @@ _ITSM_MODELS = (
     HDPriorityMatrix, HDStateTransition, HDChangeType, HDChangeRiskMatrix,
     HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
     HDIncidentCategory,
-    HDSLATarget, HDProcessField, HDRaci, HDCABConfig,
+    HDSLATarget, HDProcessField, HDRaci, HDCABConfig, HDKPI,
 )
 
 # §A2 (v2) — the standard departments the request library is organized by.

@@ -587,6 +587,34 @@ class HDIncidentCategory(Base):
 
 
 # ----------------------------------------------------------------------------
+# PERFORMANCE — the KPI definitions the Insights views report against
+# ----------------------------------------------------------------------------
+class HDKPI(Base):
+    """Workbook sheet 29 — Performance & Availability KPIs. Definition rows only
+    (name + definition + target + cadence) per process; the live Insights numbers
+    are computed later from tickets. Natural key = (tenant, process, kpi)."""
+    __tablename__ = "grc_hd_kpi"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    process = Column(String(40), nullable=False)          # incident | problem | change | service_request | general...
+    kpi = Column(String(200), nullable=False)             # KPI name (e.g. "Mean Time to Resolve")
+    definition = Column(Text, nullable=True)
+    target = Column(String(120), nullable=True)           # e.g. "P1 < 4h", ">= 70%"
+    frequency = Column(String(60), nullable=True)         # Monthly / Weekly / ...
+    sort_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_kpi_process_name", "tenant_id", "process", "kpi", unique=True),
+    )
+
+
+# ----------------------------------------------------------------------------
 # SLA / RACI / CAB — the remaining governance sheets (08, 15/17/19/21/22/25/28,
 # 27). Phase 2 continuation of the same workbook ingest.
 # ----------------------------------------------------------------------------

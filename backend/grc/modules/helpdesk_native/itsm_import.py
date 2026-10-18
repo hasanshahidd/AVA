@@ -43,6 +43,7 @@ from ...models import (
     HDDepartment,
     HDImportBatch,
     HDIncidentCategory,
+    HDKPI,
     HDPriorityMatrix,
     HDProcessField,
     HDRaci,
@@ -93,6 +94,7 @@ _KEYS = {
     "departments": ("departments",),
     "kb_categories": ("kb_categories",),
     "kb_articles": ("kb_articles",),
+    "kpis": ("performance_kpis", "kpis"),
 }
 # process -> entity key of its state sheet
 _STATE_KEYS = {
@@ -114,7 +116,7 @@ _SUMMARY_ENTITIES = (
     "state_transitions", "change_types", "change_risk_matrix",
     "incident_categories",
     "sla_targets", "process_fields", "raci", "cab", "departments",
-    "kb_categories", "kb_articles",
+    "kb_categories", "kb_articles", "kpis",
 )
 
 # process label (any casing) -> the process key used throughout this module.
@@ -852,6 +854,21 @@ def _apply_change(ctx: _Ctx) -> None:
 
 
 # order matters: each step's references must already be upserted
+def _apply_kpis(ctx: _Ctx) -> None:
+    """Sheet 29 — Performance & Availability KPIs. Definition rows per process,
+    upserted by (tenant, process, kpi). The live numbers are computed from tickets
+    in the Insights layer; this just stores the authored definitions + targets."""
+    for i, r in enumerate(ctx.rows("kpis")):
+        process = _lower(_g(r, "process")) or "general"
+        kpi = _g(r, "kpi", "name")
+        if not kpi:
+            ctx.bad("kpis", process, "kpi", None, "missing kpi name"); continue
+        ctx.upsert("kpis", HDKPI,
+                   {"tenant_id": ctx.tid, "process": _trunc(process, 40), "kpi": _trunc(kpi, 200)},
+                   {"definition": _g(r, "definition"), "target": _trunc(_g(r, "target"), 120),
+                    "frequency": _trunc(_g(r, "frequency"), 60), "sort_order": i})
+
+
 _STEPS = (
     _apply_support_groups, _apply_roles,
     _apply_categories, _apply_business_services, _apply_technical_services, _apply_request_items,
@@ -860,7 +877,7 @@ _STEPS = (
     _apply_change,
     _apply_incident_categories,
     _apply_sla_targets, _apply_fields, _apply_raci, _apply_cab,
-    _apply_departments, _apply_kb,
+    _apply_departments, _apply_kb, _apply_kpis,
 )
 
 

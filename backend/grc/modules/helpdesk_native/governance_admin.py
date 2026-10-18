@@ -40,6 +40,7 @@ from ...models import (
     HDChangeType,
     HDDepartment,
     HDIncidentCategory,
+    HDKPI,
     HDPriorityMatrix,
     HDRoleMap,
     HDSLATarget,
@@ -581,6 +582,77 @@ def r_put_cab(body: CABPut, db: Session = Depends(get_db),
 def r_delete_cab(cid: int, db: Session = Depends(get_db),
                  _: bool = Depends(require_settings_manage)):
     return delete_cab(db, tenant_id(db), cid)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# KPIs (sheet 29) — definition rows the Insights views report against
+# ═══════════════════════════════════════════════════════════════════════════
+class KPIPut(BaseModel):
+    process: str
+    kpi: str
+    definition: Optional[str] = None
+    target: Optional[str] = None
+    frequency: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+def _kpi_row(k: HDKPI) -> dict:
+    return {"id": k.id, "process": k.process, "kpi": k.kpi, "definition": k.definition,
+            "target": k.target, "frequency": k.frequency, "sort_order": k.sort_order}
+
+
+def list_kpis(db: Session, tid: int, process: Optional[str] = None) -> dict:
+    q = db.query(HDKPI).filter(HDKPI.tenant_id == tid)
+    if process:
+        q = q.filter(HDKPI.process == process.strip().lower())
+    rows = q.order_by(HDKPI.process, HDKPI.sort_order, HDKPI.id).all()
+    return {"kpis": [_kpi_row(k) for k in rows]}
+
+
+def put_kpi(db: Session, tid: int, body: KPIPut) -> dict:
+    process = _req_text(body.process, "process").lower()
+    kpi = _req_text(body.kpi, "kpi")
+    row = (db.query(HDKPI)
+           .filter(HDKPI.tenant_id == tid, HDKPI.process == process, HDKPI.kpi == kpi)
+           .first())
+    created = row is None
+    if created:
+        row = HDKPI(tenant_id=tid, process=process, kpi=kpi, definition=body.definition,
+                    target=body.target, frequency=body.frequency, sort_order=body.sort_order)
+        db.add(row)
+    else:
+        row.definition = body.definition
+        row.target = body.target
+        row.frequency = body.frequency
+        if body.sort_order is not None:
+            row.sort_order = body.sort_order
+    db.commit()
+    return {"ok": True, "created": created, "kpi": _kpi_row(row)}
+
+
+def delete_kpi(db: Session, tid: int, kid: int) -> dict:
+    row = _get_or_404(db, HDKPI, tid, kid, "KPI")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/kpis")
+def r_list_kpis(process: Optional[str] = Query(None), db: Session = Depends(get_db),
+                _: bool = Depends(require_settings_view)):
+    return list_kpis(db, tenant_id(db), process)
+
+
+@router.put("/kpis")
+def r_put_kpi(body: KPIPut, db: Session = Depends(get_db),
+              _: bool = Depends(require_settings_manage)):
+    return put_kpi(db, tenant_id(db), body)
+
+
+@router.delete("/kpis/{kid}")
+def r_delete_kpi(kid: int, db: Session = Depends(get_db),
+                 _: bool = Depends(require_settings_manage)):
+    return delete_kpi(db, tenant_id(db), kid)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
