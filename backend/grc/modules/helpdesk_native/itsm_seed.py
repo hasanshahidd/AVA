@@ -22,6 +22,7 @@ from ...models import (
     HDApproval,
     HDApprovalVote,
     HDBusinessService,
+    HDCABConfig,
     HDChangeRiskMatrix,
     HDChangeType,
     HDCIAttribute,
@@ -33,11 +34,14 @@ from ...models import (
     HDImportBatch,
     HDIncidentCategory,
     HDPriorityMatrix,
+    HDProcessField,
+    HDRaci,
     HDRequestItem,
     HDRoleMap,
     HDServiceCategory,
     HDServiceDependency,
     HDServiceLevelAgreement,
+    HDSLATarget,
     HDStateTransition,
     HDSupportGroupMap,
     HDTechnicalService,
@@ -117,6 +121,13 @@ _STATUS_ALTER_COLUMNS = [
     ("sort_order", "INTEGER"),
 ]
 
+# Phase 2 continuation — additive `code` columns so the workbook's own
+# DEPT-*/KBC-*/KB-* codes can upsert idempotently onto the existing Frappe-
+# converted engine tables (same ALTER-add mechanism, not a model change).
+_DEPARTMENT_ALTER_COLUMNS = [("code", "VARCHAR(40)")]
+_ARTICLE_CATEGORY_ALTER_COLUMNS = [("code", "VARCHAR(40)")]
+_ARTICLE_ALTER_COLUMNS = [("code", "VARCHAR(40)")]
+
 # Every table declared in models/_62_helpdesk_itsm_models.py. create_all (with
 # checkfirst) sorts them by FK dependency, so list order is irrelevant.
 _ITSM_MODELS = (
@@ -126,6 +137,7 @@ _ITSM_MODELS = (
     HDPriorityMatrix, HDStateTransition, HDChangeType, HDChangeRiskMatrix,
     HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
     HDIncidentCategory,
+    HDSLATarget, HDProcessField, HDRaci, HDCABConfig,
 )
 
 # §A2 (v2) — the standard departments the request library is organized by.
@@ -532,7 +544,10 @@ def _add_columns(db: Session) -> int:
              + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket", _TICKET_ITSM_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket_priority", _PRIORITY_ALTER_COLUMNS)
-             + _alter_add_columns(db, "grc_hd_ticket_status", _STATUS_ALTER_COLUMNS))
+             + _alter_add_columns(db, "grc_hd_ticket_status", _STATUS_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_department", _DEPARTMENT_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_article_category", _ARTICLE_CATEGORY_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_article", _ARTICLE_ALTER_COLUMNS))
     _ensure_itsm_indexes(db)
     return added
 

@@ -584,3 +584,111 @@ class HDIncidentCategory(Base):
     __table_args__ = (
         Index("uq_hd_incident_category_key", "tenant_id", "key", unique=True),
     )
+
+
+# ----------------------------------------------------------------------------
+# SLA / RACI / CAB — the remaining governance sheets (08, 15/17/19/21/22/25/28,
+# 27). Phase 2 continuation of the same workbook ingest.
+# ----------------------------------------------------------------------------
+class HDSLATarget(Base):
+    """Workbook sheet 08 — SLA / OLA Targets. Response/resolution targets per
+    process and priority (or, for change/service_request, a type label like
+    'Standard'/'Emergency' instead of a P-code). The raw label is kept verbatim
+    (priority_label) since not every row parses to a P-code; priority_code and
+    the *_minutes columns are the best-effort parse, nullable when the workbook
+    cell is a prose target ('Per offering SLA', 'Immediate (ECAB)', ...)."""
+    __tablename__ = "grc_hd_sla_target"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    process = Column(String(20), nullable=False)           # incident|service_request|problem|change
+    priority_label = Column(String(60), nullable=False)    # raw "priority_or_type" cell
+    priority_code = Column(String(10), nullable=True)      # parsed P1..P5, else null
+    service_window = Column(String(20), nullable=True)     # 24x7 | business hours
+    response_minutes = Column(Integer, nullable=True)
+    resolution_minutes = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_sla_target", "tenant_id", "process", "priority_label", "service_window", unique=True),
+    )
+
+
+class HDProcessField(Base):
+    """Workbook sheets 15/21/25 — Incident/Problem/Change Fields. The data
+    dictionary for each process record (field name, free-text type like
+    'Auto'/'String'/'Ref:CIT-USER', required, description). There is no
+    service_request fields sheet in the workbook."""
+    __tablename__ = "grc_hd_process_field"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    process = Column(String(20), nullable=False)           # incident|problem|change
+    name = Column(String(200), nullable=False)              # the sheet's "Field" cell
+    field_type = Column(String(60), nullable=True)          # free text: Auto/String/Text/Enum/Ref:...
+    required = Column(Boolean, nullable=True)
+    description = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_process_field", "tenant_id", "process", "name", unique=True),
+    )
+
+
+class HDRaci(Base):
+    """Workbook sheets 17/19/22/28 — Incident/Request/Problem/Change RACI. Role
+    values are ROLE-* codes (sometimes a comma-list) kept as plain text — RACI
+    is advisory/reportable, not a hard FK gate like other cross-references."""
+    __tablename__ = "grc_hd_raci"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    process = Column(String(20), nullable=False)            # incident|service_request|problem|change
+    activity = Column(String(200), nullable=False)
+    responsible = Column(String(160), nullable=True)
+    accountable = Column(String(160), nullable=True)
+    consulted = Column(String(255), nullable=True)
+    informed = Column(String(255), nullable=True)
+    sort_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_raci", "tenant_id", "process", "activity", unique=True),
+    )
+
+
+class HDCABConfig(Base):
+    """Workbook sheet 27 — Change Advisory Board Model. Key/value configuration
+    rows (cadence, chair, standing members, quorum, ...) rather than a fixed
+    schema — the workbook authors it as free-text item/detail pairs."""
+    __tablename__ = "grc_hd_cab_config"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    source_batch_id = Column(Integer, ForeignKey("grc_hd_import_batch.id"), nullable=True)
+
+    item = Column(String(140), nullable=False)
+    detail = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("uq_hd_cab_config", "tenant_id", "item", unique=True),
+    )

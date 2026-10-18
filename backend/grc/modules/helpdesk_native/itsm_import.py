@@ -29,7 +29,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ...models import (
+    HDArticle,
+    HDArticleCategory,
     HDBusinessService,
+    HDCABConfig,
     HDChangeRiskMatrix,
     HDChangeType,
     HDCIAttribute,
@@ -37,13 +40,17 @@ from ...models import (
     HDCIRelationshipType,
     HDCIType,
     HDConfigurationItem,
+    HDDepartment,
     HDImportBatch,
     HDIncidentCategory,
     HDPriorityMatrix,
+    HDProcessField,
+    HDRaci,
     HDRequestItem,
     HDRoleMap,
     HDServiceCategory,
     HDServiceDependency,
+    HDSLATarget,
     HDStateTransition,
     HDSupportGroupMap,
     HDTechnicalService,
@@ -74,6 +81,18 @@ _KEYS = {
     "change_types": ("change_types",),
     "change_risk_matrix": ("change_risk_matrix",),
     "incident_categories": ("incident_categories",),
+    "sla_targets": ("sla_targets",),
+    "incident_fields": ("incident_fields",),
+    "problem_fields": ("problem_fields",),
+    "change_fields": ("change_fields",),
+    "incident_raci": ("incident_raci",),
+    "request_raci": ("request_raci",),
+    "problem_raci": ("problem_raci",),
+    "change_raci": ("change_raci",),
+    "change_cab": ("change_cab",),
+    "departments": ("departments",),
+    "kb_categories": ("kb_categories",),
+    "kb_articles": ("kb_articles",),
 }
 # process -> entity key of its state sheet
 _STATE_KEYS = {
@@ -94,7 +113,15 @@ _SUMMARY_ENTITIES = (
     "ci_relationships", "priorities", "priority_matrix", "statuses",
     "state_transitions", "change_types", "change_risk_matrix",
     "incident_categories",
+    "sla_targets", "process_fields", "raci", "cab", "departments",
+    "kb_categories", "kb_articles",
 )
+
+# process label (any casing) -> the process key used throughout this module.
+_PROCESS_MAP = {
+    "incident": "incident", "service request": "service_request",
+    "service_request": "service_request", "problem": "problem", "change": "change",
+}
 
 
 # --- small parsing helpers -----------------------------------------------------
@@ -145,6 +172,42 @@ def _parse_priority(label: Any) -> tuple[Optional[str], Optional[str]]:
     if not m:
         return None, None
     return m.group(1).upper(), (m.group(2).strip() or None)
+
+
+def _parse_duration_minutes(v: Any) -> Optional[int]:
+    """Best-effort SLA-target -> minutes: '15 min'->15, '4 hours'->240,
+    '2 business days'->960 (business day = 8h = 480 min), '30 days (RCA)'->43200
+    (calendar day = 1440 min). A prose target with no leading number ('Per
+    offering SLA', 'Immediate (ECAB)', 'Pre-approved', 'Per plan'/'model'/
+    'schedule') has nothing to parse -> None (left for `notes`)."""
+    if v is None:
+        return None
+    m = re.match(r"^\s*(\d+)\s*(business\s*day|day|hour|hr|min)", str(v), flags=re.I)
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2).lower()
+    if unit.startswith("business"):
+        return n * 480
+    if unit.startswith("day"):
+        return n * 1440
+    if unit.startswith("hour") or unit.startswith("hr"):
+        return n * 60
+    return n  # min
+
+
+def _compose_kb_content(symptom: Any, cause: Any, resolution: Any, tags: Any) -> Optional[str]:
+    """Fold the workbook's symptom/cause/resolution cells (there is no column
+    for them on HDArticle) into one body under headings, with tags appended."""
+    parts: list[str] = []
+    if symptom:
+        parts.append(f"## Symptom\n{symptom}")
+    if cause:
+        parts.append(f"## Cause\n{cause}")
+    if resolution:
+        parts.append(f"## Resolution\n{resolution}")
+    if tags:
+        parts.append(f"**Tags:** {tags}")
+    return "\n\n".join(parts) or None
 
 
 # --- import context ------------------------------------------------------------
@@ -609,6 +672,129 @@ def _apply_incident_categories(ctx: _Ctx) -> None:
             node(f"{base}/{_slug(item)}", item, "item", pid)
 
 
+def _apply_sla_targets(ctx: _Ctx) -> None:
+    """Sheet 08 — SLA / OLA Targets. priority_label is kept verbatim (not every
+    row is a P-code: change/service_request rows use type labels like
+    'Standard'/'Emergency'); priority_code/*_minutes are the best-effort parse."""
+    for i, r in enumerate(ctx.rows("sla_targets")):
+        process = _PROCESS_MAP.get(_lower(_g(r, "process")) or "")
+        label = _g(r, "priority_or_type")
+        if not process or not label:
+            ctx.bad("sla_targets", label, "process/priority_or_type", None,
+                    "missing process or priority_or_type"); continue
+        code, _l = _parse_priority(label)
+        ctx.upsert("sla_targets", HDSLATarget,
+                   {"tenant_id": ctx.tid, "process": process, "priority_label": _trunc(label, 60),
+                    "service_window": _trunc(_lower(_g(r, "service_window")), 20)},
+                   {"priority_code": code,
+                    "response_minutes": _parse_duration_minutes(_g(r, "response_target")),
+                    "resolution_minutes": _parse_duration_minutes(_g(r, "resolution_target")),
+                    "notes": _g(r, "notes"), "sort_order": i})
+
+
+# sheet -> the process its fields/RACI rows belong to.
+_FIELD_SHEETS = (("incident_fields", "incident"), ("problem_fields", "problem"), ("change_fields", "change"))
+_RACI_SHEETS = (("incident_raci", "incident"), ("request_raci", "service_request"),
+                ("problem_raci", "problem"), ("change_raci", "change"))
+
+
+def _apply_fields(ctx: _Ctx) -> None:
+    """Sheets 15/21/25 — Incident/Problem/Change Fields (data dictionary). There
+    is no service_request fields sheet in the workbook."""
+    for sheet, process in _FIELD_SHEETS:
+        for i, r in enumerate(ctx.rows(sheet)):
+            name = _g(r, "field")
+            if not name:
+                ctx.bad("process_fields", process, "field", None, "missing field name"); continue
+            ctx.upsert("process_fields", HDProcessField,
+                       {"tenant_id": ctx.tid, "process": process, "name": _trunc(name, 200)},
+                       {"field_type": _trunc(_g(r, "type"), 60), "required": _yes(_g(r, "required")),
+                        "description": _g(r, "description"), "sort_order": i})
+
+
+def _apply_raci(ctx: _Ctx) -> None:
+    """Sheets 17/19/22/28 — per-process RACI. Role values (ROLE-* codes, some-
+    times comma-lists) are stored as plain text, never validated against
+    HDRoleMap — RACI is advisory/reportable, not a hard FK gate."""
+    for sheet, default_process in _RACI_SHEETS:
+        for i, r in enumerate(ctx.rows(sheet)):
+            process = _PROCESS_MAP.get(_lower(_g(r, "process")) or "", default_process)
+            activity = _g(r, "activity")
+            if not activity:
+                ctx.bad("raci", process, "activity", None, "missing activity"); continue
+            ctx.upsert("raci", HDRaci,
+                       {"tenant_id": ctx.tid, "process": process, "activity": _trunc(activity, 200)},
+                       {"responsible": _trunc(_g(r, "responsible"), 160),
+                        "accountable": _trunc(_g(r, "accountable"), 160),
+                        "consulted": _trunc(_g(r, "consulted"), 255),
+                        "informed": _trunc(_g(r, "informed"), 255),
+                        "sort_order": i})
+
+
+def _apply_cab(ctx: _Ctx) -> None:
+    """Sheet 27 — Change Advisory Board Model. Free-text item/detail pairs
+    (cadence, chair, standing members, quorum, ...), not a fixed schema."""
+    for i, r in enumerate(ctx.rows("change_cab")):
+        item = _g(r, "item")
+        if not item:
+            ctx.bad("cab", None, "item", None, "missing item"); continue
+        ctx.upsert("cab", HDCABConfig, {"tenant_id": ctx.tid, "item": _trunc(item, 140)},
+                   {"detail": _g(r, "detail"), "sort_order": i})
+
+
+def _apply_departments(ctx: _Ctx) -> None:
+    """Sheet 31 — Departments (Sample). Upserts onto the existing, converted-
+    Frappe HDDepartment table by its new `code` column. default_support_group_id
+    resolves to an AVA team the same soft way _apply_support_groups/
+    _apply_technical_services do: the GRP-* reference itself is fail-closed
+    (a typo'd code is a real bug), but the GRP's OWN team match can be null, and
+    a null never clobbers a team an admin already set on the department.
+    parent_department_id has no column on HDDepartment -> ignored (no sub-tree
+    to maintain yet)."""
+    for r in ctx.rows("departments"):
+        code, name = _g(r, "code"), _g(r, "name")
+        if not code or not name:
+            ctx.bad("departments", code, "code/name", None, "missing code or name"); continue
+        existing = ctx.db.query(HDDepartment).filter_by(tenant_id=ctx.tid, code=code).first()
+        grp = _g(r, "default_support_group_id")
+        grp_id = ctx.ref("departments", code, "default_support_group_id", HDSupportGroupMap, grp) if grp else None
+        team_id = ctx.db.query(HDSupportGroupMap.team_id).filter_by(id=grp_id).scalar() if grp_id is not None else None
+        if team_id is None:
+            team_id = existing.default_team_id if existing else None  # never clobber an admin-set team with null
+        status = _lower(_g(r, "status"))
+        ctx.upsert("departments", HDDepartment,
+                   {"tenant_id": ctx.tid, "code": _trunc(code, 40)},
+                   {"name": _trunc(name, 140), "default_team_id": team_id,
+                    "enabled": (status == "active") if status else True})
+
+
+def _apply_kb(ctx: _Ctx) -> None:
+    """Sheets 32/33 — KB Categories / Articles. Category links onto the
+    existing, converted-Frappe HDArticleCategory/HDArticle tables by their new
+    `code` columns. related_service_id is validation-only in the spec but has
+    no column to hold it, so (to avoid breaking a KB article on a stale SVC
+    reference) it is ignored outright; audience/level fold away, tags fold into
+    the composed content."""
+    for r in ctx.rows("kb_categories"):
+        code, name = _g(r, "kb_category_id"), _g(r, "name")
+        if not code or not name:
+            ctx.bad("kb_categories", code, "kb_category_id/name", None, "missing kb_category_id or name"); continue
+        ctx.upsert("kb_categories", HDArticleCategory,
+                   {"tenant_id": ctx.tid, "code": _trunc(code, 40)},
+                   {"category_name": _trunc(name, 255)})
+    for r in ctx.rows("kb_articles"):
+        code, title = _g(r, "kb_id"), _g(r, "title")
+        if not code or not title:
+            ctx.bad("kb_articles", code, "kb_id/title", None, "missing kb_id or title"); continue
+        cat_code = _g(r, "kb_category_id")
+        cat_id = ctx.ref("kb_articles", code, "kb_category_id", HDArticleCategory, cat_code) if cat_code else None
+        status = "Published" if _lower(_g(r, "status")) == "published" else "Draft"
+        content = _compose_kb_content(_g(r, "symptom"), _g(r, "cause"), _g(r, "resolution"), _g(r, "tags"))
+        ctx.upsert("kb_articles", HDArticle,
+                   {"tenant_id": ctx.tid, "code": _trunc(code, 40)},
+                   {"title": _trunc(title, 255), "category_id": cat_id, "status": status, "content": content})
+
+
 def _apply_change(ctx: _Ctx) -> None:
     for r in ctx.rows("change_types"):
         name = _g(r, "change_type", "name")
@@ -642,6 +828,8 @@ _STEPS = (
     _apply_priorities, _apply_states,
     _apply_change,
     _apply_incident_categories,
+    _apply_sla_targets, _apply_fields, _apply_raci, _apply_cab,
+    _apply_departments, _apply_kb,
 )
 
 

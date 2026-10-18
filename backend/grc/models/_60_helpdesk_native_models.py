@@ -591,6 +591,7 @@ class HDArticleCategory(Base):
     icon = Column(String(140), nullable=True)
     # Frappe nested-set (nsm_parent_field=parent_hd_article_category) -> self-FK:
     parent_category_id = Column(Integer, ForeignKey("grc_hd_article_category.id"), nullable=True)
+    code = Column(String(40), nullable=True)                # ITSM workbook KBC-* code (itsm_seed ALTER on existing tenants)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -612,6 +613,7 @@ class HDArticle(Base):
     idx = Column(Integer, nullable=True)                   # publish-order within a category (Frappe before_save append)
     views = Column(Integer, nullable=True, default=0)
     content = Column(Text, nullable=True)
+    code = Column(String(40), nullable=True)                # ITSM workbook KB-* code (itsm_seed ALTER on existing tenants)
     # title_slug is a Frappe virtual (computed) field -> not stored.
 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -964,6 +966,7 @@ class HDDepartment(Base):
     description = Column(Text, nullable=True)
     default_team_id = Column(Integer, ForeignKey("grc_teams.id"), nullable=True)  # tickets route here — AVA Administration team (grc_teams)
     enabled = Column(Boolean, default=True)
+    code = Column(String(40), nullable=True)                # ITSM workbook DEPT-* short code, e.g. "IT" (itsm_seed ALTER on existing tenants)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

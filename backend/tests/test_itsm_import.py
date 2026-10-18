@@ -14,10 +14,12 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 
 from grc.models import (
-    HDBusinessService, HDChangeRiskMatrix, HDChangeType, HDCIAttribute,
+    HDArticle, HDArticleCategory, HDBusinessService, HDCABConfig,
+    HDChangeRiskMatrix, HDChangeType, HDCIAttribute,
     HDConfigurationItem, HDCIRelationship, HDCIRelationshipType, HDCIType,
-    HDImportBatch, HDIncidentCategory, HDPriorityMatrix, HDRequestItem, HDRoleMap,
-    HDServiceCategory, HDServiceDependency, HDStateTransition,
+    HDDepartment, HDImportBatch, HDIncidentCategory, HDPriorityMatrix,
+    HDProcessField, HDRaci, HDRequestItem, HDRoleMap,
+    HDServiceCategory, HDServiceDependency, HDSLATarget, HDStateTransition,
     HDSupportGroupMap, HDTechnicalService, HDTicketPriority, HDTicketStatus,
     Team,
 )
@@ -33,6 +35,8 @@ CATALOGUE = (
     HDCIRelationshipType, HDCIRelationship, HDPriorityMatrix, HDStateTransition,
     HDChangeType, HDChangeRiskMatrix, HDSupportGroupMap, HDRoleMap,
     HDIncidentCategory,
+    HDSLATarget, HDProcessField, HDRaci, HDCABConfig,
+    HDDepartment, HDArticleCategory, HDArticle,
     HDTicketPriority, HDTicketStatus,
 )
 ALL_TABLES = (HDImportBatch, Team) + CATALOGUE
@@ -130,6 +134,63 @@ def small_bundle():
             {"category": "Email", "subcategory": "Spam/Phishing", "example_item": "Phishing reported"},
             {"category": "Hardware", "subcategory": "Laptop", "example_item": "Won't power on"},
             {"category": "Network"},   # category-only row (no subcategory/item)
+        ],
+        "sla_targets": [
+            {"process": "Incident", "priority_or_type": "P1 – Critical", "response_target": "15 min",
+             "resolution_target": "4 hours", "service_window": "24x7", "notes": "Major incident bridge"},
+            {"process": "Incident", "priority_or_type": "P3 – Medium", "response_target": "4 hours",
+             "resolution_target": "2 business days", "service_window": "Business hours", "notes": "Standard"},
+            {"process": "Change", "priority_or_type": "Standard", "response_target": "Pre-approved",
+             "resolution_target": "Per plan", "service_window": "Business hours", "notes": "Pre-authorised"},
+        ],
+        "incident_fields": [
+            {"field": "Incident ID", "type": "Auto", "required": "Yes", "description": "Unique reference"},
+            {"field": "Priority", "type": "Enum", "required": "Yes", "description": "P1..P5"},
+        ],
+        "problem_fields": [
+            {"field": "Problem ID", "type": "Auto", "required": "Yes", "description": "PRBxxxxxxx"},
+        ],
+        "change_fields": [
+            {"field": "Change ID", "type": "Auto", "required": "Yes", "description": "CHGxxxxxxx"},
+            {"field": "Change type", "type": "Ref:change_types", "required": "Yes", "description": "Standard/Normal"},
+        ],
+        "incident_raci": [
+            {"process": "Incident", "activity": "Log & classify", "responsible": "ROLE-AGENT",
+             "accountable": "ROLE-INCMGR", "consulted": "ROLE-REQ", "informed": "ROLE-SVCOWN"},
+        ],
+        "request_raci": [
+            {"process": "Service Request", "activity": "Approve", "responsible": "ROLE-APPROVER",
+             "accountable": "ROLE-SVCOWN", "consulted": "ROLE-AGENT", "informed": "ROLE-REQ"},
+        ],
+        "problem_raci": [
+            {"process": "Problem", "activity": "Root-cause analysis", "responsible": "ROLE-SME",
+             "accountable": "ROLE-PRBMGR", "consulted": "ROLE-TECH", "informed": "ROLE-SVCOWN"},
+        ],
+        "change_raci": [
+            {"process": "Change", "activity": "Authorise", "responsible": "ROLE-CABMEM",
+             "accountable": "ROLE-CHGMGR", "consulted": "ROLE-SVCOWN", "informed": "ROLE-SDMGR"},
+        ],
+        "change_cab": [
+            {"item": "Chair", "detail": "Change Manager (ROLE-CHGMGR)"},
+            {"item": "CAB cadence", "detail": "Weekly; ECAB on demand"},
+        ],
+        "departments": [
+            {"department_id": "DEPT-IT", "name": "Information Technology", "code": "IT",
+             "parent_department_id": None, "default_support_group_id": "GRP-NET",
+             "self_service_created": "No", "status": "Active", "seeded": "Yes"},
+            {"department_id": "DEPT-MKT", "name": "Marketing", "code": "MKT",
+             "parent_department_id": None, "default_support_group_id": None,
+             "self_service_created": "No", "status": "Active", "seeded": "Yes"},
+        ],
+        "kb_categories": [
+            {"kb_category_id": "KBC-GETTING", "name": "Getting Started & Accounts"},
+        ],
+        "kb_articles": [
+            {"kb_id": "KB-001", "kb_category_id": "KBC-GETTING", "title": "Reset your password",
+             "audience": "End User", "level": "Entry", "symptom": "Cannot sign in.",
+             "cause": "Expired password.", "resolution": "Use the self-service portal.",
+             "related_service_id": "SVC-9999",   # intentionally dangling: must NOT fail the import
+             "tags": "password,login", "status": "Published"},
         ],
     }
     return {"bundle_version": "test-1", "source_filename": "hand.xlsx",
@@ -372,6 +433,104 @@ def test_incident_categories_idempotent(db):
     assert st["inserted"] == 0 and st["updated"] == 0        # true no-op (skipped counts upsert calls, not rows)
 
 
+# --- Phase 2 continuation: SLA targets / process fields / RACI / CAB / departments / KB -------
+def test_sla_targets_parse_minutes_and_priority_code(db):
+    import_bundle(db, TENANT, small_bundle())
+    p1 = db.query(HDSLATarget).filter_by(tenant_id=TENANT, process="incident",
+                                          priority_label="P1 – Critical").one()
+    assert p1.priority_code == "P1" and p1.service_window == "24x7"
+    assert (p1.response_minutes, p1.resolution_minutes) == (15, 240)
+    p3 = db.query(HDSLATarget).filter_by(tenant_id=TENANT, process="incident",
+                                          priority_label="P3 – Medium").one()
+    assert (p3.response_minutes, p3.resolution_minutes) == (240, 960)      # 2 business days = 2*480
+    standard = db.query(HDSLATarget).filter_by(tenant_id=TENANT, process="change",
+                                                priority_label="Standard").one()
+    assert standard.priority_code is None                                  # not a P-code
+    assert standard.response_minutes is None and standard.resolution_minutes is None  # prose targets
+    assert db.query(HDSLATarget).count() == 3
+
+
+def test_process_fields_per_process(db):
+    import_bundle(db, TENANT, small_bundle())
+    assert db.query(HDProcessField).filter_by(tenant_id=TENANT, process="incident").count() == 2
+    assert db.query(HDProcessField).filter_by(tenant_id=TENANT, process="problem").count() == 1
+    chg = db.query(HDProcessField).filter_by(tenant_id=TENANT, process="change",
+                                              name="Change type").one()
+    assert chg.field_type == "Ref:change_types" and chg.required is True
+    pid = db.query(HDProcessField).filter_by(tenant_id=TENANT, process="incident",
+                                              name="Incident ID").one()
+    assert pid.field_type == "Auto" and pid.required is True
+
+
+def test_raci_stored_per_process(db):
+    import_bundle(db, TENANT, small_bundle())
+    assert db.query(HDRaci).count() == 4
+    chg = db.query(HDRaci).filter_by(tenant_id=TENANT, process="change", activity="Authorise").one()
+    assert chg.responsible == "ROLE-CABMEM" and chg.accountable == "ROLE-CHGMGR"
+    req = db.query(HDRaci).filter_by(tenant_id=TENANT, process="service_request").one()
+    assert req.activity == "Approve"
+
+
+def test_cab_config_key_value(db):
+    import_bundle(db, TENANT, small_bundle())
+    chair = db.query(HDCABConfig).filter_by(tenant_id=TENANT, item="Chair").one()
+    assert chair.detail == "Change Manager (ROLE-CHGMGR)"
+    assert db.query(HDCABConfig).count() == 2
+
+
+def test_department_resolves_to_team_and_is_idempotent(db):
+    db.add(Team(tenant_id=TENANT, name="Network (L2/L3)"))
+    db.commit()
+    team = db.query(Team).one()
+    first = import_bundle(db, TENANT, small_bundle())
+    it = db.query(HDDepartment).filter_by(tenant_id=TENANT, code="IT").one()
+    assert it.name == "Information Technology" and it.default_team_id == team.id
+    mkt = db.query(HDDepartment).filter_by(tenant_id=TENANT, code="MKT").one()
+    assert mkt.default_team_id is None
+    n = db.query(HDDepartment).count()
+
+    second = import_bundle(db, TENANT, copy.deepcopy(small_bundle()))
+    assert db.query(HDDepartment).count() == n
+    st = second.summary.get("departments", {"inserted": 0, "updated": 0})
+    assert st["inserted"] == 0 and st["updated"] == 0
+
+    # an admin-set team is never clobbered by a later import whose group has no match
+    mkt.default_team_id = team.id
+    db.commit()
+    import_bundle(db, TENANT, small_bundle())
+    assert db.get(HDDepartment, mkt.id).default_team_id == team.id
+    assert first.status == "applied"
+
+
+def test_kb_category_and_article_composed(db):
+    import_bundle(db, TENANT, small_bundle())
+    cat = db.query(HDArticleCategory).filter_by(tenant_id=TENANT, code="KBC-GETTING").one()
+    assert cat.category_name == "Getting Started & Accounts"
+    art = db.query(HDArticle).filter_by(tenant_id=TENANT, code="KB-001").one()
+    assert art.title == "Reset your password" and art.category_id == cat.id
+    assert art.status == "Published"
+    assert "## Symptom" in art.content and "Cannot sign in." in art.content
+    assert "## Cause" in art.content and "## Resolution" in art.content
+    assert "**Tags:** password,login" in art.content
+
+
+def test_kb_article_ignores_dangling_related_service_id(db):
+    # related_service_id "SVC-9999" (set in small_bundle) resolves nowhere and
+    # has no column to validate against -> the import must still succeed.
+    batch = import_bundle(db, TENANT, small_bundle())
+    assert batch.status == "applied"
+
+
+def test_sla_fields_raci_cab_kb_are_idempotent(db):
+    import_bundle(db, TENANT, small_bundle())
+    n = counts(db)
+    second = import_bundle(db, TENANT, copy.deepcopy(small_bundle()))
+    assert counts(db) == n
+    for ent in ("sla_targets", "process_fields", "raci", "cab", "kb_categories", "kb_articles"):
+        st = second.summary.get(ent, {"inserted": 0, "updated": 0})
+        assert st["inserted"] == 0 and st["updated"] == 0, (ent, st)
+
+
 # --- real workbook (skipped where it is not present) -------------------------------------
 V3 = os.path.join(exp.DOWNLOADS, "AVA_ServiceDesk_ITSM_enriched_v3.xlsx")
 
@@ -392,6 +551,13 @@ def test_real_v3_workbook_imports_and_is_idempotent(db):
     email = db.query(HDIncidentCategory).filter_by(tenant_id=TENANT, key="email", level="category").one()
     assert db.query(HDIncidentCategory).filter_by(parent_id=email.id).count() > 0   # has subcategories
     assert db.query(HDIncidentCategory).filter_by(tenant_id=TENANT, level="item").count() > 100
+    # Phase 2 continuation sheets (08/15/17/19/21/22/25/27/28/31/32/33)
+    assert db.query(HDSLATarget).count() == 11
+    assert db.query(HDProcessField).count() == 30 + 17 + 22
+    assert db.query(HDRaci).count() == 28
+    assert db.query(HDCABConfig).count() == 10
+    assert db.query(HDDepartment).count() == 15
+    assert db.query(HDArticle).count() == 57
     n = counts(db)
     second = import_bundle(db, TENANT, b)
     assert counts(db) == n
