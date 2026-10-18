@@ -31,7 +31,7 @@ from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
     incident, problem, change, service_request, itsm_seed, request_templates,
-    portal, attachments,
+    portal, attachments, catalogue_admin, cmdb_admin,
 )
 from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
 
@@ -243,3 +243,5 @@ helpdesk_native_router.include_router(itsm_seed.router)                     # /h
 helpdesk_native_router.include_router(request_templates.router)             # /helpdesk/request-templates + /helpdesk/sla-preview
 helpdesk_native_router.include_router(portal.router)                        # /helpdesk/portal/* (end-user requester surface)
 helpdesk_native_router.include_router(attachments.router)                   # /helpdesk/tickets/{id}/attachments + download (persisted files)
+helpdesk_native_router.include_router(catalogue_admin.router)                # /helpdesk/admin/catalogue (service catalogue CRUD)
+helpdesk_native_router.include_router(cmdb_admin.router)                     # /helpdesk/admin/cmdb (CMDB CRUD + graph)
