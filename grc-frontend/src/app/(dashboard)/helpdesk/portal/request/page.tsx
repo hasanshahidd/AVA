@@ -25,9 +25,9 @@
  *                   fields?: [{key,label,type?: text|textarea|select|number|date|checkbox,
  *                              required?,hint?,options?: string[]}]}] }
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, CheckCircle2, ArrowLeft, ArrowRight, Check, Search, FolderOpen, Inbox, BookOpen, ShieldCheck } from "lucide-react";
+import { ClipboardList, CheckCircle2, ArrowLeft, ArrowRight, Check, Search, FolderOpen, Inbox, BookOpen, ShieldCheck, Clock } from "lucide-react";
 import { Empty, Loading, PageHeader, useHd } from "../../_ui";
 import { Field, Input, Textarea, Select, Btn, FormError, hdCall } from "../../_admin";
 
@@ -211,6 +211,16 @@ export default function RequestSomething() {
     setErr(null); setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
   const back = () => { setErr(null); setStep((s) => Math.max(s - 1, 0)); };
+  // Completed steps in the indicator (and "Change" links on the review) jump straight back.
+  const jump = (i: number) => { if (i < step) { setErr(null); setStep(i); } };
+
+  // Bring the top of the wizard into view whenever the step changes (not on first paint).
+  const topRef = useRef<HTMLDivElement | null>(null);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [step]);
 
   const answerLines = (): string[] =>
     (item?.fields || [])
@@ -256,73 +266,91 @@ export default function RequestSomething() {
 
   if (doneId) {
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 py-20 text-center">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
-          <CheckCircle2 size={30} />
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-5 py-16 text-center text-[#0F172A]">
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/60">
+          <CheckCircle2 size={34} />
         </div>
-        <h1 className="text-xl font-semibold text-[#0F172A]">Request submitted!</h1>
-        <p className="text-sm text-[#64748B]">
-          Your request <span className="font-mono font-semibold text-[#005B96]">#{doneId}</span> has been received.
-          {needsApproval
-            ? " It needs an approval first — we'll let you know as soon as it's decided."
-            : " You can follow its progress and reply from My Requests."}
-        </p>
-        <div className="flex items-center gap-2">
+        <div>
+          <h1 className="text-xl font-semibold text-[#0F172A]">Request submitted!</h1>
+          <p className="mt-1.5 text-sm text-[#64748B]">
+            Your request <span className="font-mono font-semibold text-[#005B96]">#{doneId}</span> has been received.
+            {needsApproval
+              ? " It needs an approval first — we'll let you know as soon as it's decided."
+              : " You can follow its progress and reply from My Requests."}
+          </p>
+        </div>
+
+        {item && (
+          <div className="w-full rounded-xl border border-[#EEF1F5] bg-white p-4 text-left">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">You requested</div>
+            <div className="mt-1 font-medium">{item.name}</div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {item.category}
+              {item.service ? ` · ${item.service}` : ""}
+            </div>
+            <ul className="mt-3 space-y-1.5 border-t border-[#EEF1F5] pt-3 text-[12.5px] text-[#475569]">
+              <li className="flex items-start gap-2">
+                <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> It's on its way to the right team.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                {needsApproval ? "An approver will review it first, and you'll hear the outcome." : "Our team will pick it up and keep you posted."}
+              </li>
+              <li className="flex items-start gap-2">
+                <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> Follow progress or reply any time from My Requests.
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(doneId)}`}>
-            <Btn variant="primary">View my request</Btn>
+            <Btn variant="primary" className="!h-9 !px-4 !text-[13px]">View my request</Btn>
           </Link>
-          <Btn variant="ghost" onClick={reset}>Request something else</Btn>
+          <Btn variant="ghost" className="!h-9 !px-4 !text-[13px]" onClick={reset}>Request something else</Btn>
         </div>
       </div>
     );
   }
 
+  const urgencyOptions = URGENCY.some((u) => u.value === urgency)
+    ? URGENCY
+    : [...URGENCY, { value: urgency, label: cap(urgency) }];
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 text-[#0F172A]">
+    <div ref={topRef} className="mx-auto flex max-w-3xl scroll-mt-4 flex-col gap-5 text-[#0F172A]">
       <PageHeader
         icon={ClipboardList}
         title="Request something"
         subtitle="Pick what you need and we'll take care of the rest."
       />
 
-      {/* progress indicator */}
-      <ol className="flex items-center gap-2">
-        {STEPS.map((label, i) => {
-          const done = i < step;
-          const active = i === step;
-          return (
-            <li key={label} className="flex flex-1 items-center gap-2">
-              <span
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${
-                  done ? "bg-emerald-500 text-white" : active ? "bg-[#005B96] text-white" : "bg-[#EEF1F5] text-[#94A3B8]"
-                }`}
-              >
-                {done ? <Check size={13} /> : i + 1}
-              </span>
-              <span className={`text-[12px] font-medium ${active ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{label}</span>
-              {i < STEPS.length - 1 && <span className={`h-px flex-1 ${done ? "bg-emerald-300" : "bg-[#E2E5EC]"}`} />}
-            </li>
-          );
-        })}
-      </ol>
+      <Stepper step={step} onJump={jump} />
 
-      <div className="rounded-2xl border border-[#EEF1F5] bg-white p-5">
+      <div className="rounded-2xl border border-[#EEF1F5] bg-white p-5 sm:p-6">
         <FormError msg={err} />
 
         {loading ? (
           <Loading what="the catalogue" />
         ) : items.length === 0 ? (
-          <Empty
-            icon={Inbox}
-            title="Nothing to request yet"
-            hint="No request items are published for you yet. You can still report an issue."
-          />
+          <>
+            <Empty
+              icon={Inbox}
+              title="Nothing to request yet"
+              hint="No request items are published for you yet. You can still report an issue."
+            />
+            <div className="mt-4 flex justify-center">
+              <Link href="/helpdesk/portal/report">
+                <Btn variant="primary" className="!h-9 !px-4 !text-[13px]">Report an issue</Btn>
+              </Link>
+            </div>
+          </>
         ) : (
           <>
             {/* STEP 1 — category */}
             {step === 0 && (
-              <div className="flex flex-col gap-3">
-                <h2 className="text-[15px] font-semibold">What kind of request is it?</h2>
+              <div className="flex flex-col gap-4">
+                <StepHead title="What kind of request is it?" hint="Choose a category and we'll show you what's available." />
                 <div className="grid gap-3 sm:grid-cols-2">
                   {categories.map((c) => {
                     const sel = category === c.name;
@@ -331,17 +359,25 @@ export default function RequestSomething() {
                         key={c.name}
                         type="button"
                         onClick={() => pickCategory(c.name)}
-                        className={`flex items-start gap-3 rounded-xl border p-4 text-left transition hover:shadow-sm ${
-                          sel ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-200 bg-white"
+                        className={`group flex items-center gap-3.5 rounded-xl border p-4 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
+                          sel ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-200 bg-white hover:border-[#005B96]/40"
                         }`}
                       >
-                        <FolderOpen size={18} className="mt-0.5 shrink-0 text-[#005B96]" />
+                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#005B96]/10 text-[#005B96] transition group-hover:bg-[#005B96] group-hover:text-white">
+                          <FolderOpen size={20} />
+                        </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-medium text-[#0F172A]">{c.name}</span>
+                          <span className="block font-semibold text-[#0F172A]">{c.name}</span>
                           <span className="mt-0.5 block text-xs text-slate-500">
                             {c.description || `${c.count} ${c.count === 1 ? "option" : "options"}`}
                           </span>
+                          {c.description && (
+                            <span className="mt-1 block text-[11px] text-[#94A3B8]">
+                              {c.count} {c.count === 1 ? "option" : "options"}
+                            </span>
+                          )}
                         </span>
+                        <ArrowRight size={16} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#005B96]" />
                       </button>
                     );
                   })}
@@ -351,69 +387,119 @@ export default function RequestSomething() {
 
             {/* STEP 2 — request item */}
             {step === 1 && (
-              <div className="flex flex-col gap-3">
-                <h2 className="text-[15px] font-semibold">What would you like in “{category}”?</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search this category…"
-                      className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm outline-none focus:border-[#005B96]"
-                    />
-                  </div>
-                  {services.length > 1 && (
-                    <div className="w-52">
-                      <Select value={service} onChange={(e) => setService(e.target.value)}>
-                        <option value="">All services</option>
-                        {services.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </Select>
-                    </div>
-                  )}
+              <div className="flex flex-col gap-4">
+                <StepHead
+                  title={`What would you like in “${category}”?`}
+                  hint="Pick the one that fits best — you'll add the details next."
+                />
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search this category…"
+                    aria-label="Search this category"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none placeholder:text-[#94A3B8] focus:border-[#005B96] focus:ring-2 focus:ring-[#005B96]/15"
+                  />
                 </div>
-                {visible.length === 0 ? (
-                  <Empty icon={Inbox} title="No matching requests" hint="Try a different search or category." />
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {visible.map((i) => {
-                      const sel = item?.key === i.key;
+                {services.length > 1 && (
+                  <div role="group" aria-label="Filter by service" className="flex flex-wrap items-center gap-1.5">
+                    {["", ...services].map((s) => {
+                      const on = service === s;
                       return (
                         <button
-                          key={i.key}
+                          key={s || "__all"}
                           type="button"
-                          onClick={() => pickItem(i)}
-                          className={`rounded-xl border p-4 text-left transition hover:shadow-sm ${
-                            sel ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-200 bg-white"
+                          aria-pressed={on}
+                          onClick={() => setService(s)}
+                          className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
+                            on
+                              ? "border-[#005B96] bg-[#005B96] text-white"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-[#005B96]/40 hover:text-[#005B96]"
                           }`}
                         >
-                          <span className="block font-medium text-[#0F172A]">{i.name}</span>
-                          {i.description && (
-                            <span className="mt-1 block text-xs text-slate-500">{i.description}</span>
-                          )}
-                          <span className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                            {i.service && <span className="rounded-full bg-slate-100 px-2 py-0.5">{i.service}</span>}
-                            {i.approvalRequired && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
-                                <ShieldCheck size={11} /> Needs approval
-                              </span>
-                            )}
-                            {i.slaHours != null && <span>~{i.slaHours}h to fulfil</span>}
-                          </span>
+                          {s || "All services"}
                         </button>
                       );
                     })}
                   </div>
+                )}
+                {visible.length === 0 ? (
+                  <Empty icon={Inbox} title="No matching requests" hint="Try a different search or category." />
+                ) : (
+                  <>
+                    <div className="text-xs text-[#94A3B8]">
+                      {visible.length} {visible.length === 1 ? "option" : "options"}
+                    </div>
+                    <div role="radiogroup" aria-label="Request items" className="grid gap-3 sm:grid-cols-2">
+                      {visible.map((i) => {
+                        const sel = item?.key === i.key;
+                        return (
+                          <button
+                            key={i.key}
+                            type="button"
+                            role="radio"
+                            aria-checked={sel}
+                            onClick={() => pickItem(i)}
+                            className={`relative flex flex-col rounded-xl border p-4 pr-10 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
+                              sel ? "border-[#005B96] bg-[#005B96]/5 shadow-sm" : "border-slate-200 bg-white hover:border-[#005B96]/40"
+                            }`}
+                          >
+                            <span
+                              className={`absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full border transition ${
+                                sel ? "border-[#005B96] bg-[#005B96] text-white" : "border-slate-300 bg-white text-transparent"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                            <span className="block font-semibold text-[#0F172A]">{i.name}</span>
+                            {i.description && (
+                              <span className="mt-1 line-clamp-3 block text-xs text-slate-500">{i.description}</span>
+                            )}
+                            <span className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                              {i.service && <span className="rounded-full bg-slate-100 px-2 py-0.5">{i.service}</span>}
+                              {i.approvalRequired && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                                  <ShieldCheck size={11} /> Needs approval
+                                </span>
+                              )}
+                              {i.slaHours != null && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock size={11} /> ~{i.slaHours}h to fulfil
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             )}
 
             {/* STEP 3 — details */}
             {step === 2 && item && (
-              <div className="flex flex-col gap-4">
-                <div>
-                  <h2 className="text-[15px] font-semibold">{item.name}</h2>
-                  {item.description && <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>}
+              <div className="flex flex-col gap-5">
+                <StepHead title="A few details" hint="Just what we need to get this done for you." />
+
+                <div className="flex items-start gap-3 rounded-xl border border-[#EEF1F5] bg-[#F9FAFC] p-3.5">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#005B96]/10 text-[#005B96]">
+                    <ClipboardList size={19} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold">{item.name}</div>
+                    {item.description && <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                      <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">{item.category}</span>
+                      {item.approvalRequired && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                          <ShieldCheck size={11} /> Needs approval
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {suggestions.length > 0 && (
@@ -433,95 +519,139 @@ export default function RequestSomething() {
                   </div>
                 )}
 
-                {item.fields.map((f) => (
-                  <Field key={f.key} label={f.label} required={f.required} hint={f.hint}>
-                    {f.type === "textarea" ? (
-                      <Textarea
-                        value={answers[f.key] || ""}
-                        onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
-                      />
-                    ) : f.type === "select" ? (
-                      <Select
-                        value={answers[f.key] || ""}
-                        onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
-                      >
-                        <option value="">Select…</option>
-                        {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </Select>
-                    ) : f.type === "checkbox" ? (
-                      <span className="inline-flex items-center gap-2 text-[13px]">
-                        <input
-                          type="checkbox"
-                          checked={answers[f.key] === "yes"}
-                          onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.checked ? "yes" : "" }))}
-                        />
-                        Yes
-                      </span>
-                    ) : (
-                      <Input
-                        type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
-                        value={answers[f.key] || ""}
-                        onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
-                      />
-                    )}
-                  </Field>
-                ))}
+                {item.fields.length > 0 && (
+                  <div className="flex flex-col gap-4">
+                    {item.fields.map((f) => (
+                      <Field key={f.key} label={f.label} required={f.required} hint={f.hint}>
+                        {f.type === "textarea" ? (
+                          <Textarea
+                            value={answers[f.key] || ""}
+                            onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+                          />
+                        ) : f.type === "select" ? (
+                          <Select
+                            value={answers[f.key] || ""}
+                            onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+                          >
+                            <option value="">Select…</option>
+                            {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </Select>
+                        ) : f.type === "checkbox" ? (
+                          <span className="inline-flex items-center gap-2 text-[13px]">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 accent-[#005B96]"
+                              checked={answers[f.key] === "yes"}
+                              onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.checked ? "yes" : "" }))}
+                            />
+                            Yes
+                          </span>
+                        ) : (
+                          <Input
+                            type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                            value={answers[f.key] || ""}
+                            onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+                          />
+                        )}
+                      </Field>
+                    ))}
+                  </div>
+                )}
 
-                <Field label="Anything else we should know?" hint="Why you need it, who it's for, when you need it by.">
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder={item.defaultDescription || "Add any details…"}
-                  />
-                </Field>
-                <Field label="How soon do you need it?">
-                  <Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                    {URGENCY.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                  </Select>
-                </Field>
+                <div className="flex flex-col gap-4 border-t border-[#EEF1F5] pt-5">
+                  <Field label="Anything else we should know?" hint="Why you need it, who it's for, when you need it by.">
+                    <Textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder={item.defaultDescription || "Add any details…"}
+                    />
+                  </Field>
+
+                  <div>
+                    <span id="request-urgency-label" className="mb-1.5 block text-[11.5px] font-semibold text-[#475569]">
+                      How soon do you need it?
+                    </span>
+                    <div role="radiogroup" aria-labelledby="request-urgency-label" className="grid gap-2 sm:grid-cols-3">
+                      {urgencyOptions.map((u) => {
+                        const on = urgency === u.value;
+                        const [title, sub] = u.label.split(" — ");
+                        return (
+                          <button
+                            key={u.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => setUrgency(u.value)}
+                            className={`rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
+                              on ? "border-[#005B96] bg-[#005B96]/5 shadow-sm" : "border-slate-200 bg-white hover:border-[#005B96]/40"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${URGENCY_DOT[u.value] || "bg-slate-400"}`} aria-hidden="true" />
+                              <span className="text-[13px] font-semibold">{title}</span>
+                              {on && <Check size={13} className="ml-auto text-[#005B96]" aria-hidden="true" />}
+                            </span>
+                            {sub && <span className="mt-0.5 block text-[11.5px] text-slate-500">{cap(sub)}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* STEP 4 — review */}
             {step === 3 && item && (
-              <div className="flex flex-col gap-3">
-                <h2 className="text-[15px] font-semibold">Review your request</h2>
-                <dl className="divide-y divide-[#EEF1F5] rounded-xl border border-[#EEF1F5] text-sm">
-                  <ReviewRow label="Category" value={item.category} />
-                  <ReviewRow label="Request" value={item.name} />
+              <div className="flex flex-col gap-4">
+                <StepHead title="Review your request" hint="Check everything looks right, then submit." />
+                <dl className="divide-y divide-[#EEF1F5] overflow-hidden rounded-xl border border-[#EEF1F5] text-sm">
+                  <ReviewRow label="Category" value={item.category} onEdit={() => jump(0)} />
+                  <ReviewRow label="Request" value={item.name} onEdit={() => jump(1)} />
                   {item.service && <ReviewRow label="Service" value={item.service} />}
                   {item.fields.map((f) => (
                     <ReviewRow
                       key={f.key}
                       label={f.label}
                       value={f.type === "checkbox" ? (answers[f.key] === "yes" ? "Yes" : "No") : answers[f.key] || "—"}
+                      onEdit={() => jump(2)}
                     />
                   ))}
-                  <ReviewRow label="Details" value={notes.trim() || "—"} />
-                  <ReviewRow label="Urgency" value={urgencyLabel(urgency)} />
+                  <ReviewRow label="Details" value={notes.trim() || "—"} onEdit={() => jump(2)} />
+                  <ReviewRow label="Urgency" value={urgencyLabel(urgency)} onEdit={() => jump(2)} />
                 </dl>
                 {item.approvalRequired && (
                   <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
                     <ShieldCheck size={14} /> This request needs an approval before it can be fulfilled.
                   </div>
                 )}
+                <p className="text-xs text-[#94A3B8]">
+                  After you submit, you can follow progress and reply from My Requests.
+                </p>
               </div>
             )}
 
             {/* nav */}
-            <div className="mt-5 flex items-center justify-between gap-2 border-t border-[#EEF1F5] pt-4">
+            <div className="mt-6 flex items-center justify-between gap-2 border-t border-[#EEF1F5] pt-4">
               <div>
                 {step > 0 ? (
-                  <Btn variant="ghost" onClick={back} icon={<ArrowLeft size={14} />}>Back</Btn>
+                  <Btn variant="ghost" className="!h-9 !px-4 !text-[13px]" onClick={back} icon={<ArrowLeft size={14} />}>Back</Btn>
                 ) : (
-                  <Link href="/helpdesk/portal/my-requests"><Btn variant="ghost">Cancel</Btn></Link>
+                  <Link href="/helpdesk/portal/my-requests"><Btn variant="ghost" className="!h-9 !px-4 !text-[13px]">Cancel</Btn></Link>
                 )}
               </div>
-              {step < STEPS.length - 1 ? (
-                <Btn variant="primary" onClick={next} icon={<ArrowRight size={14} />}>Next</Btn>
-              ) : (
-                <Btn variant="primary" onClick={submit} busy={busy}>Submit request</Btn>
-              )}
+              <div className="flex items-center gap-3">
+                <span className="hidden text-xs text-[#94A3B8] sm:inline">Step {step + 1} of {STEPS.length}</span>
+                {step < STEPS.length - 1 ? (
+                  <Btn variant="primary" className="!h-9 !px-4 !text-[13px]" onClick={next}>
+                    Next <ArrowRight size={14} />
+                  </Btn>
+                ) : (
+                  <Btn variant="primary" className="!h-9 !px-4 !text-[13px]" onClick={submit} busy={busy} icon={<Check size={14} />}>
+                    Submit request
+                  </Btn>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -530,11 +660,95 @@ export default function RequestSomething() {
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+// ── small presentational helpers ────────────────────────────────────────────
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+const URGENCY_DOT: Record<string, string> = {
+  low: "bg-sky-400",
+  medium: "bg-amber-400",
+  high: "bg-red-500",
+};
+
+function StepHead({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="flex gap-4 px-4 py-2.5">
+    <div>
+      <h2 className="text-[16px] font-semibold text-[#0F172A]">{title}</h2>
+      {hint && <p className="mt-0.5 text-[13px] text-[#64748B]">{hint}</p>}
+    </div>
+  );
+}
+
+/** Numbered progress indicator. Completed steps are buttons that jump back. */
+function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }) {
+  return (
+    <nav aria-label="Progress">
+      <ol className="flex items-center gap-2">
+        {STEPS.map((label, i) => {
+          const done = i < step;
+          const active = i === step;
+          const last = i === STEPS.length - 1;
+          const circle = (
+            <span
+              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-semibold transition ${
+                done
+                  ? "bg-emerald-500 text-white"
+                  : active
+                    ? "bg-[#005B96] text-white ring-4 ring-[#005B96]/15"
+                    : "bg-[#EEF1F5] text-[#94A3B8]"
+              }`}
+            >
+              {done ? <Check size={14} strokeWidth={3} /> : i + 1}
+            </span>
+          );
+          const text = (
+            <span
+              className={`text-[12.5px] font-medium ${active ? "text-[#0F172A]" : done ? "text-emerald-700" : "hidden text-[#94A3B8] sm:inline"}`}
+            >
+              {label}
+            </span>
+          );
+          return (
+            <li key={label} aria-current={active ? "step" : undefined} className={`flex items-center gap-2 ${last ? "" : "flex-1"}`}>
+              {done ? (
+                <button
+                  type="button"
+                  onClick={() => onJump(i)}
+                  title={`Go back to ${label}`}
+                  className="flex items-center gap-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                >
+                  {circle}
+                  {text}
+                </button>
+              ) : (
+                <>
+                  {circle}
+                  {text}
+                </>
+              )}
+              {!last && <span className={`h-0.5 flex-1 rounded-full transition ${done ? "bg-emerald-300" : "bg-[#E2E5EC]"}`} />}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function ReviewRow({ label, value, onEdit }: { label: string; value: string; onEdit?: () => void }) {
+  return (
+    <div className="flex items-start gap-4 px-4 py-3">
       <dt className="w-32 shrink-0 text-[12px] font-semibold text-[#64748B]">{label}</dt>
       <dd className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[#0F172A]">{value}</dd>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Change ${label.toLowerCase()}`}
+          className="shrink-0 rounded-md px-1.5 text-[12px] font-semibold text-[#005B96] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40"
+        >
+          Change
+        </button>
+      )}
     </div>
   );
 }

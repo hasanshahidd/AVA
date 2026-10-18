@@ -72,31 +72,58 @@ function RowBtns({ children }: { children: React.ReactNode }) {
 }
 
 // ── page ────────────────────────────────────────────────────────────────────
-const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: "types", label: "CI Types", icon: Layers },
-  { id: "cis", label: "Configuration Items", icon: Server },
-  { id: "reltypes", label: "Relationship Types", icon: GitBranch },
-  { id: "rels", label: "Relationships", icon: Link2 },
-  { id: "graph", label: "Graph", icon: Network },
+const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
+  { id: "types", label: "CI Types", icon: Layers, hint: "The kinds of things you track (server, database…) and the custom fields each one carries." },
+  { id: "cis", label: "Configuration Items", icon: Server, hint: "Every tracked asset, with its owner, criticality and environment." },
+  { id: "reltypes", label: "Relationship Types", icon: GitBranch, hint: "The vocabulary for how items connect, read in both directions." },
+  { id: "rels", label: "Relationships", icon: Link2, hint: "Links between configuration items: source, relationship, target." },
+  { id: "graph", label: "Graph", icon: Network, hint: "A readable map of items grouped by type, with what each one points to and what points back." },
 ];
+
+/** First-run empty state with the create action right in it. */
+function EmptyAction({ icon: Icon, title, hint, action }: {
+  icon: typeof Layers; title: string; hint: string; action: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center">
+      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-[var(--color-base)]/10 text-[var(--color-base)]">
+        <Icon size={24} strokeWidth={1.75} />
+      </div>
+      <p className="font-medium text-slate-700">{title}</p>
+      <p className="mx-auto mt-1 mb-4 max-w-sm text-sm text-slate-400">{hint}</p>
+      <div className="flex justify-center">{action}</div>
+    </div>
+  );
+}
+
+/** Direction-aware relationship pill:  ── depends on ──▶ */
+function RelPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+      {children}
+    </span>
+  );
+}
 
 export default function CmdbAdminPage() {
   const [tab, setTab] = useState<Tab>("types");
+  const activeTab = TABS.find((t) => t.id === tab) || TABS[0];
   return (
     <div className="space-y-5 p-6">
       <PageHeader icon={Boxes} title="CMDB" subtitle="Configuration items, their types, and how they relate" />
-      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div role="tablist" aria-label="CMDB sections" className="flex flex-wrap gap-1 border-b border-slate-200">
         {TABS.map((t) => {
           const Icon = t.icon;
           const on = tab === t.id;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`-mb-px inline-flex items-center gap-2 border-b-2 px-3.5 py-2 text-sm font-medium transition ${on ? "border-[var(--color-base)] text-[var(--color-base)]" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+            <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setTab(t.id)}
+              className={`-mb-px inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-base)]/30 ${on ? "border-[var(--color-base)] bg-[var(--color-base)]/5 text-[var(--color-base)]" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700"}`}>
               <Icon size={15} /> {t.label}
             </button>
           );
         })}
       </div>
+      <p className="-mt-2 text-sm text-slate-500">{activeTab.hint}</p>
       {tab === "types" && <TypesTab />}
       {tab === "cis" && <CisTab />}
       {tab === "reltypes" && <RelTypesTab />}
@@ -117,14 +144,18 @@ function TypesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{types.length} CI type{types.length === 1 ? "" : "s"}</p>
+        <p className="text-sm font-medium text-slate-600">{types.length} CI type{types.length === 1 ? "" : "s"}</p>
         <div className="flex items-center gap-2">
           <RefreshBtn onClick={reload} loading={loading} />
           <NewBtn label="New CI type" onClick={() => setEdit({ code: "", name: "", description: "", parent_id: "" })} />
         </div>
       </div>
       {error && <ErrorBanner msg={error} />}
-      {loading ? <Loading what="CI types" /> : types.length === 0 ? <Empty icon={Layers} title="No CI types yet" hint="Create a type (e.g. Server, Database) to start adding configuration items." /> : (
+      {loading ? <Loading what="CI types" /> : types.length === 0 ? (
+        <EmptyAction icon={Layers} title="No CI types yet — add your first"
+          hint="Create a type (e.g. Server, Database) to start adding configuration items."
+          action={<NewBtn label="New CI type" onClick={() => setEdit({ code: "", name: "", description: "", parent_id: "" })} />} />
+      ) : (
         <Table head={["Code", "Name", "Parent", "Description", ""]}>
           {types.map((t: any) => (
             <tr key={t.id} className="hover:bg-slate-50/60">
@@ -223,7 +254,7 @@ function AttributesModal({ type, onClose }: { type: any; onClose: () => void }) 
         <FormError msg={err} />
         {error && <ErrorBanner msg={error} />}
         {loading ? <Loading what="attributes" /> : attrs.length === 0 ? (
-          <p className="text-sm text-slate-400">No attributes defined for this type yet.</p>
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm text-slate-400">No attributes defined for this type yet — add the first one below.</p>
         ) : (
           <Table head={["Name", "Datatype", "Required", "Options", ""]}>
             {attrs.map((a: any) => (
@@ -289,15 +320,15 @@ function CisTab() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-52">
-            <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="Filter by CI type">
               <option value="">All CI types</option>
               {types.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </Select>
           </div>
           <div className="w-52">
-            <Input type="number" min={0} value={svcFilter} onChange={(e) => setSvcFilter(e.target.value)} placeholder="Business service ID" />
+            <Input type="number" min={0} value={svcFilter} onChange={(e) => setSvcFilter(e.target.value)} placeholder="Business service ID" aria-label="Filter by business service ID" />
           </div>
-          <span className="text-sm text-slate-500">{cis.length} item{cis.length === 1 ? "" : "s"}</span>
+          <span className="text-sm font-medium text-slate-600">{cis.length} item{cis.length === 1 ? "" : "s"}</span>
         </div>
         <div className="flex items-center gap-2">
           <RefreshBtn onClick={reload} loading={loading} />
@@ -306,7 +337,13 @@ function CisTab() {
       </div>
       {error && <ErrorBanner msg={error} />}
       {rowErr && <FormError msg={rowErr} />}
-      {loading ? <Loading what="configuration items" /> : cis.length === 0 ? <Empty icon={Server} title="No configuration items" hint={qs ? "Try clearing the filters." : "Create a CI to start building the CMDB."} /> : (
+      {loading ? <Loading what="configuration items" /> : cis.length === 0 ? (
+        qs ? <Empty icon={Server} title="No configuration items match" hint="Try clearing the filters." /> : (
+          <EmptyAction icon={Server} title="No configuration items yet — add your first"
+            hint="Create a CI to start building the CMDB."
+            action={<NewBtn label="New CI" onClick={() => setEdit(blank)} />} />
+        )
+      ) : (
         <Table head={["Code", "Name", "Type", "Service", "Status", "Criticality", "Environment", "Owner", ""]}>
           {cis.map((c: any) => (
             <tr key={c.id} className="hover:bg-slate-50/60">
@@ -430,20 +467,30 @@ function RelTypesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{rows.length} relationship type{rows.length === 1 ? "" : "s"}</p>
+        <p className="text-sm font-medium text-slate-600">{rows.length} relationship type{rows.length === 1 ? "" : "s"}</p>
         <div className="flex items-center gap-2">
           <RefreshBtn onClick={reload} loading={loading} />
           <NewBtn label="New relationship type" onClick={() => setEdit({ code: "", name: "", inverse_name: "" })} />
         </div>
       </div>
       {error && <ErrorBanner msg={error} />}
-      {loading ? <Loading what="relationship types" /> : rows.length === 0 ? <Empty icon={GitBranch} title="No relationship types yet" hint="Define how CIs relate, e.g. “depends on” / “is depended on by”." /> : (
+      {loading ? <Loading what="relationship types" /> : rows.length === 0 ? (
+        <EmptyAction icon={GitBranch} title="No relationship types yet — add your first"
+          hint="Define how CIs relate, e.g. “depends on” / “is depended on by”."
+          action={<NewBtn label="New relationship type" onClick={() => setEdit({ code: "", name: "", inverse_name: "" })} />} />
+      ) : (
         <Table head={["Code", "Name", "Inverse name", ""]}>
           {rows.map((r: any) => (
             <tr key={r.id} className="hover:bg-slate-50/60">
               <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.code}</td>
               <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{r.name}</td>
-              <td className="px-4 py-2.5 text-slate-600">{r.inverse_name || <span className="text-slate-300">—</span>}</td>
+              <td className="px-4 py-2.5 text-slate-600">
+                {r.inverse_name ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-slate-300">←</span>{r.inverse_name}
+                  </span>
+                ) : <span className="text-slate-300">—</span>}
+              </td>
               <td className="px-4 py-2.5">
                 <RowBtns><Btn icon={<Pencil size={13} />} onClick={() => setEdit({ id: r.id, code: r.code || "", name: r.name || "", inverse_name: r.inverse_name || "" })}>Edit</Btn></RowBtns>
               </td>
@@ -513,7 +560,7 @@ function RelsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{rels.length} relationship{rels.length === 1 ? "" : "s"}</p>
+        <p className="text-sm font-medium text-slate-600">{rels.length} relationship{rels.length === 1 ? "" : "s"}</p>
         <div className="flex items-center gap-2">
           <RefreshBtn onClick={() => { reload(); cisRes.reload(); rtRes.reload(); }} loading={loading} />
           <NewBtn label="New relationship" onClick={() => setAdding(true)} />
@@ -521,12 +568,16 @@ function RelsTab() {
       </div>
       {error && <ErrorBanner msg={error} />}
       {rowErr && <FormError msg={rowErr} />}
-      {loading ? <Loading what="relationships" /> : rels.length === 0 ? <Empty icon={Link2} title="No relationships yet" hint="Link two configuration items with a relationship type." /> : (
+      {loading ? <Loading what="relationships" /> : rels.length === 0 ? (
+        <EmptyAction icon={Link2} title="No relationships yet — add your first"
+          hint="Link two configuration items with a relationship type."
+          action={<NewBtn label="New relationship" onClick={() => setAdding(true)} />} />
+      ) : (
         <Table head={["Source", "Relationship", "Target", ""]}>
           {rels.map((r: any) => (
             <tr key={r.id} className="hover:bg-slate-50/60">
               <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{r.source_name || nm(r.source_ci_id)}</td>
-              <td className="px-4 py-2.5"><span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{r.rel_name || r.rel_type_name || (rtName.get(r.rel_type_id) as string) || `#${r.rel_type_id}`}</span></td>
+              <td className="px-4 py-2.5"><RelPill>{r.rel_name || r.rel_type_name || (rtName.get(r.rel_type_id) as string) || `#${r.rel_type_id}`} <span aria-hidden="true">→</span></RelPill></td>
               <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{r.target_name || nm(r.target_ci_id)}</td>
               <td className="px-4 py-2.5"><RowBtns><Btn variant="danger" icon={<Trash2 size={13} />} onClick={() => remove(r)}>Delete</Btn></RowBtns></td>
             </tr>
@@ -597,9 +648,9 @@ function GraphTab() {
     edges.forEach((e: any) => m.set(e.source, [...(m.get(e.source) || []), e]));
     return m;
   }, [edges]);
-  const incomingCount = useMemo(() => {
-    const m = new Map<any, number>();
-    edges.forEach((e: any) => m.set(e.target, (m.get(e.target) || 0) + 1));
+  const incoming = useMemo(() => {
+    const m = new Map<any, any[]>();
+    edges.forEach((e: any) => m.set(e.target, [...(m.get(e.target) || []), e]));
     return m;
   }, [edges]);
 
@@ -614,46 +665,91 @@ function GraphTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{nodes.length} node{nodes.length === 1 ? "" : "s"} · {edges.length} edge{edges.length === 1 ? "" : "s"}</p>
+        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-600">
+          <span>{nodes.length} node{nodes.length === 1 ? "" : "s"}</span>
+          <span className="text-slate-300">·</span>
+          <span>{edges.length} edge{edges.length === 1 ? "" : "s"}</span>
+          <span className="ml-2 hidden items-center gap-1.5 text-xs font-normal text-slate-400 sm:inline-flex">
+            Reading a row:
+            <RelPill>relationship</RelPill>
+            <span aria-hidden="true">→</span> target
+          </span>
+        </div>
         <div className="flex items-center gap-2">
-          <div className="w-64"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter nodes…" /></div>
+          <div className="w-64"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter nodes…" aria-label="Filter nodes" /></div>
           <RefreshBtn onClick={() => { reload(); typesRes.reload(); }} loading={loading} />
         </div>
       </div>
       {error && <ErrorBanner msg={error} />}
       {loading ? <Loading what="graph" /> : groups.length === 0 ? <Empty icon={Network} title="Nothing to show" hint={q ? "Try a different filter." : "Add configuration items and relationships to see the graph."} /> : (
-        <div className="space-y-6">
+        <div className="space-y-7">
           {groups.map(([tname, list]) => (
             <section key={tname}>
-              <div className="mb-2 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
                 <h2 className="text-base font-semibold text-[var(--color-text)]">{tname}</h2>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{list.length}</span>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {list.map((n: any) => {
                   const out = outgoing.get(n.id) || [];
+                  const inc = incoming.get(n.id) || [];
                   return (
-                    <div key={n.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div key={n.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm">
                       <div className="flex items-start gap-3">
-                        <Server size={18} className="mt-0.5 shrink-0 text-slate-400" />
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                          <Server size={17} />
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-[var(--color-text)]">{n.name || n.code}</div>
+                          <div className="truncate font-medium text-[var(--color-text)]" title={n.name || n.code}>{n.name || n.code}</div>
                           <div className="mt-0.5 truncate font-mono text-xs text-slate-400">{n.code}</div>
                         </div>
                         <Chip value={n.status} map={CI_STATUS_CHIP} />
                       </div>
-                      <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs">
-                        {out.length === 0 ? <div className="text-slate-300">No outgoing relationships</div> : out.map((e: any) => {
-                          const t = nodeById.get(e.target) as any;
-                          return (
-                            <div key={e.id} className="flex items-center gap-1.5">
-                              <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">{e.rel_name || `#${e.rel_type_id}`}</span>
-                              <span className="text-slate-400">→</span>
-                              <span className="truncate text-slate-700">{t ? (t.name || t.code) : `#${e.target}`}</span>
+
+                      <div className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-xs">
+                        {out.length === 0 && inc.length === 0 && (
+                          <div className="text-slate-400">Not connected to anything yet.</div>
+                        )}
+
+                        {out.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Outgoing <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-medium text-slate-500">{out.length}</span>
                             </div>
-                          );
-                        })}
-                        {(incomingCount.get(n.id) || 0) > 0 && <div className="pt-1 text-slate-400">{incomingCount.get(n.id)} incoming</div>}
+                            <div className="space-y-1.5">
+                              {out.map((e: any) => {
+                                const t = nodeById.get(e.target) as any;
+                                return (
+                                  <div key={e.id} className="flex items-center gap-1.5">
+                                    <RelPill>{e.rel_name || `#${e.rel_type_id}`}</RelPill>
+                                    <span className="text-slate-400" aria-hidden="true">→</span>
+                                    <span className="truncate text-slate-700">{t ? (t.name || t.code) : `#${e.target}`}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {inc.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Incoming <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-medium text-slate-500">{inc.length}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {inc.map((e: any) => {
+                                const s = nodeById.get(e.source) as any;
+                                return (
+                                  <div key={e.id} className="flex items-center gap-1.5">
+                                    <span className="truncate text-slate-700">{s ? (s.name || s.code) : `#${e.source}`}</span>
+                                    <span className="text-slate-400" aria-hidden="true">→</span>
+                                    <RelPill>{e.rel_name || `#${e.rel_type_id}`}</RelPill>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

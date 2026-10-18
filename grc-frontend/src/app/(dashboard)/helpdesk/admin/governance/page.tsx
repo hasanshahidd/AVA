@@ -77,7 +77,7 @@ function IconBtn({ title, onClick, danger, disabled, children }: {
 }) {
   return (
     <button type="button" title={title} aria-label={title} onClick={onClick} disabled={disabled}
-      className={`grid h-7 w-7 place-items-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${danger ? "text-rose-500 hover:bg-rose-50" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
+      className={`grid h-7 w-7 place-items-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${danger ? "text-rose-500 hover:bg-rose-50 focus-visible:ring-rose-300" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-[var(--color-base)]/40"}`}>
       {children}
     </button>
   );
@@ -130,23 +130,37 @@ function axisOf(values: string[], order: string[], fallback: string[]): string[]
   return [...base].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
+/** A real grid: axis titles, row + column headers, evenly sized bordered cells. */
 function MatrixGrid({ rows, cols, rowLabel, colLabel, cell }: {
   rows: string[]; cols: string[]; rowLabel: string; colLabel: string; cell: (r: string, c: string) => ReactNode;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="w-full text-sm">
+      <table className="w-full border-collapse text-sm">
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="px-4 py-2.5 text-left font-medium">{rowLabel} ↓ &nbsp;/&nbsp; {colLabel} →</th>
-            {cols.map((c) => <th key={c} className="px-4 py-2.5 text-left font-medium">{c}</th>)}
+            <th rowSpan={2} className="w-36 border-b border-r border-slate-200 px-4 py-2.5 text-left align-bottom font-semibold">
+              {rowLabel} <span aria-hidden="true">↓</span>
+            </th>
+            <th colSpan={Math.max(cols.length, 1)} className="border-b border-slate-200 px-4 py-2 text-center font-semibold">
+              {colLabel} <span aria-hidden="true">→</span>
+            </th>
+          </tr>
+          <tr>
+            {cols.map((c) => (
+              <th key={c} scope="col" className="min-w-[170px] border-b border-l border-slate-200 px-4 py-2 text-center font-medium normal-case tracking-normal text-slate-700 first:border-l-0">
+                {c}
+              </th>
+            ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody>
           {rows.map((r) => (
-            <tr key={r}>
-              <td className="bg-slate-50/60 px-4 py-3 font-medium text-[var(--color-text)]">{r}</td>
-              {cols.map((c) => <td key={c} className="min-w-[150px] px-3 py-2 align-top">{cell(r, c)}</td>)}
+            <tr key={r} className="border-b border-slate-100 last:border-b-0">
+              <th scope="row" className="border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left font-medium text-[var(--color-text)]">{r}</th>
+              {cols.map((c, ci) => (
+                <td key={c} className={`px-3 py-2.5 align-middle ${ci > 0 ? "border-l border-slate-100" : ""}`}>{cell(r, c)}</td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -160,9 +174,35 @@ function AddLevel({ label, onAdd }: { label: string; onAdd: (v: string) => void 
   const submit = () => { const t = v.trim(); if (!t) return; onAdd(t); setV(""); };
   return (
     <div className="flex items-center gap-2">
-      <Input value={v} onChange={(e) => setV(e.target.value)} placeholder={label}
+      <Input value={v} onChange={(e) => setV(e.target.value)} placeholder={label} aria-label={label}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }} className="!w-44" />
       <Btn variant="ghost" icon={<Plus size={14} />} onClick={submit} disabled={!v.trim()}>Add</Btn>
+    </div>
+  );
+}
+
+/** Footer strip under a matrix: add a new row/column level. */
+function AxisAdders({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Extend the grid</span>
+      {children}
+    </div>
+  );
+}
+
+/** First-run empty state with the create action right in it. */
+function EmptyAction({ icon: Icon, title, hint, action }: {
+  icon: LucideIcon; title: string; hint: string; action: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center">
+      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-[var(--color-base)]/10 text-[var(--color-base)]">
+        <Icon size={24} strokeWidth={1.75} />
+      </div>
+      <p className="font-medium text-slate-700">{title}</p>
+      <p className="mx-auto mt-1 mb-4 max-w-sm text-sm text-slate-400">{hint}</p>
+      <div className="flex justify-center">{action}</div>
     </div>
   );
 }
@@ -207,6 +247,7 @@ function PriorityMatrixTab() {
                 const c = find(i, u);
                 return (
                   <Select value={c ? String(c.priority_id) : ""} disabled={busy === `${i}|${u}`}
+                    aria-label={`Priority for ${i} impact, ${u} urgency`}
                     onChange={(e) => change(i, u, e.target.value)}>
                     <option value="">— unset —</option>
                     {priorities.map((p) => <option key={p.id} value={String(p.id)}>{p.name || p.level}</option>)}
@@ -216,10 +257,10 @@ function PriorityMatrixTab() {
                   </Select>
                 );
               }} />
-            <div className="flex flex-wrap items-center gap-6">
+            <AxisAdders>
               <AddLevel label="Add impact level" onAdd={(v) => setExtraImpacts((x) => [...x, v])} />
               <AddLevel label="Add urgency level" onAdd={(v) => setExtraUrgencies((x) => [...x, v])} />
-            </div>
+            </AxisAdders>
           </>
         )}
       </Gate>
@@ -306,7 +347,7 @@ function SlaTargetsTab() {
   return (
     <Section title="SLA targets" description="Response and resolution targets by process and priority."
       action={<div className="flex items-center gap-2">
-        <Select value={proc} onChange={(e) => setProc(e.target.value)} className="!w-44">
+        <Select value={proc} onChange={(e) => setProc(e.target.value)} className="!w-44" aria-label="Filter by process">
           <option value="">All processes</option>
           {PROCESSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </Select>
@@ -315,13 +356,21 @@ function SlaTargetsTab() {
       </div>}>
       {err && <FormError msg={err} />}
       <Gate hd={hd} what="SLA targets">
-        {groups.length === 0 ? <Empty icon={Timer} title="No SLA targets" hint="Add a target to start tracking response and resolution times." /> : (
+        {groups.length === 0 ? (
+          proc ? (
+            <Empty icon={Timer} title={`No ${procLabel(proc).toLowerCase()} SLA targets`} hint="Try another process, or add a target for this one." />
+          ) : (
+            <EmptyAction icon={Timer} title="No SLA targets yet — add your first"
+              hint="Add a target to start tracking response and resolution times."
+              action={<Btn variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({ target: null })}>New target</Btn>} />
+          )
+        ) : (
           <div className="space-y-5">
             {groups.map(([p, list]) => (
               <div key={p}>
                 <div className="mb-2 flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-[var(--color-text)]">{procLabel(p)}</h3>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{list.length}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{list.length} target{list.length === 1 ? "" : "s"}</span>
                 </div>
                 <Table head={["Priority", "Code", "Service window", "Response", "Resolution", "Notes", ""]}>
                   {list.map((t) => (
@@ -399,17 +448,21 @@ function ChangeTypesTab() {
       </div>}>
       {err && <FormError msg={err} />}
       <Gate hd={hd} what="change types">
-        {types.length === 0 ? <Empty icon={GitBranch} title="No change types" hint="Add a change type such as Standard, Normal or Emergency." /> : (
+        {types.length === 0 ? (
+          <EmptyAction icon={GitBranch} title="No change types yet — add your first"
+            hint="Add a change type such as Standard, Normal or Emergency."
+            action={<Btn variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({ type: null })}>New type</Btn>} />
+        ) : (
           <Table head={["Code", "Name", "Requires CAB", "Auto-approve", "Description", ""]}>
             {types.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50/60">
                 <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{t.code}</td>
                 <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{t.name}</td>
                 <td className="px-4 py-2.5">
-                  <Toggle checked={!!t.requires_cab} onChange={(v) => act(`cab${t.id}`, () => call("patch", `${G}/change-types/${t.id}`, { requires_cab: v }))} />
+                  <Toggle checked={!!t.requires_cab} label={t.requires_cab ? "Yes" : "No"} onChange={(v) => act(`cab${t.id}`, () => call("patch", `${G}/change-types/${t.id}`, { requires_cab: v }))} />
                 </td>
                 <td className="px-4 py-2.5">
-                  <Toggle checked={!!t.auto_approve} onChange={(v) => act(`aa${t.id}`, () => call("patch", `${G}/change-types/${t.id}`, { auto_approve: v }))} />
+                  <Toggle checked={!!t.auto_approve} label={t.auto_approve ? "Yes" : "No"} onChange={(v) => act(`aa${t.id}`, () => call("patch", `${G}/change-types/${t.id}`, { auto_approve: v }))} />
                 </td>
                 <td className="max-w-[320px] truncate px-4 py-2.5 text-slate-500" title={t.description || ""}>{t.description || <Muted>—</Muted>}</td>
                 <td className="px-4 py-2.5">
@@ -434,6 +487,10 @@ const RISK_LEVELS = ["Low", "Medium", "High", "Critical"];
 const RISK_CHIP: Record<string, string> = {
   low: "bg-sky-50 text-sky-700", medium: "bg-amber-50 text-amber-700",
   high: "bg-orange-50 text-orange-700", critical: "bg-red-50 text-red-700",
+};
+// Soft cell backdrop so the risk grid reads like a heat-map at a glance.
+const RISK_TINT: Record<string, string> = {
+  low: "bg-sky-50/60", medium: "bg-amber-50/60", high: "bg-orange-50/70", critical: "bg-red-50/70",
 };
 
 function RiskMatrixTab() {
@@ -460,9 +517,11 @@ function RiskMatrixTab() {
             const c = find(i, l);
             const k = `${i}|${l}`;
             const opts = c && !RISK_LEVELS.includes(c.risk_level) ? [...RISK_LEVELS, c.risk_level] : RISK_LEVELS;
+            const tint = c ? RISK_TINT[String(c.risk_level || "").toLowerCase()] || "bg-slate-50" : "";
             return (
-              <div className="space-y-1.5">
+              <div className={`space-y-1.5 rounded-lg p-2 transition-colors ${tint}`}>
                 <Select value={c ? c.risk_level : ""} disabled={busy === k}
+                  aria-label={`Risk level for ${i} impact, ${l} likelihood`}
                   onChange={(e) => { const v = e.target.value; if (!v) { if (c) clear(c, i, l); } else put(i, l, v, c ? !!c.cab_required : true); }}>
                   <option value="">— unset —</option>
                   {opts.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -478,10 +537,10 @@ function RiskMatrixTab() {
               </div>
             );
           }} />
-        <div className="flex flex-wrap items-center gap-6">
+        <AxisAdders>
           <AddLevel label="Add impact level" onAdd={(v) => setExtraImpacts((x) => [...x, v])} />
           <AddLevel label="Add likelihood level" onAdd={(v) => setExtraLikelihoods((x) => [...x, v])} />
-        </div>
+        </AxisAdders>
       </Gate>
     </Section>
   );
@@ -534,7 +593,11 @@ function CabTab() {
       </div>}>
       {err && <FormError msg={err} />}
       <Gate hd={hd} what="CAB configuration">
-        {items.length === 0 ? <Empty icon={ShieldCheck} title="No CAB settings" hint="Add settings such as quorum, cadence or emergency approvers." /> : (
+        {items.length === 0 ? (
+          <EmptyAction icon={ShieldCheck} title="No CAB settings yet — add your first"
+            hint="Add settings such as quorum, cadence or emergency approvers."
+            action={<Btn variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({ item: null })}>New setting</Btn>} />
+        ) : (
           <Table head={["Setting", "Detail", "Order", ""]}>
             {items.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50/60">
@@ -587,14 +650,16 @@ function TransitionsTab() {
   return (
     <Section title="State transitions" description="Which status moves are allowed in each process lifecycle."
       action={<div className="flex items-center gap-2">
-        <Select value={proc} onChange={(e) => setProc(e.target.value)} className="!w-44">
+        <Select value={proc} onChange={(e) => setProc(e.target.value)} className="!w-44" aria-label="Process">
           {PROCESSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </Select>
         <RefreshBtn onClick={hd.reload} loading={hd.loading} />
       </div>}>
       {err && <FormError msg={err} />}
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 text-sm font-semibold text-[var(--color-text)]">Add a {procLabel(proc).toLowerCase()} transition</div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-text)]">
+          <Plus size={14} className="text-[var(--color-base)]" /> Add a {procLabel(proc).toLowerCase()} transition
+        </div>
         <div className="grid gap-3 md:grid-cols-5">
           <Field label="From status" required>
             <Select value={from} onChange={(e) => setFrom(e.target.value)}>
@@ -620,9 +685,9 @@ function TransitionsTab() {
           <Table head={["From", "", "To", "Guard", "Required role", ""]}>
             {transitions.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50/60">
-                <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{t.from_status || `#${t.from_status_id}`}</td>
-                <td className="w-8 px-0 text-slate-300"><ArrowRight size={14} /></td>
-                <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{t.to_status || `#${t.to_status_id}`}</td>
+                <td className="px-4 py-2.5"><span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-medium text-[var(--color-text)]">{t.from_status || `#${t.from_status_id}`}</span></td>
+                <td className="w-8 px-0 text-slate-300"><ArrowRight size={14} aria-label="moves to" /></td>
+                <td className="px-4 py-2.5"><span className="inline-flex rounded-md bg-[var(--color-base)]/10 px-2 py-0.5 font-medium text-[var(--color-base)]">{t.to_status || `#${t.to_status_id}`}</span></td>
                 <td className="px-4 py-2.5 text-slate-600">{t.guard || <Muted>—</Muted>}</td>
                 <td className="px-4 py-2.5 text-slate-600">{t.required_role || <Muted>—</Muted>}</td>
                 <td className="px-4 py-2.5">
@@ -684,7 +749,8 @@ function CatNode({ n, depth, showRetired, collapsed, toggle, busy, onAdd, onRena
     <div>
       <div className={`group flex items-center gap-2 rounded-lg py-1.5 pr-2 hover:bg-slate-50 ${n.enabled ? "" : "opacity-60"}`} style={{ paddingLeft: 8 + depth * 22 }}>
         <button type="button" onClick={() => toggle(n.id)} disabled={kids.length === 0}
-          className="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-400 hover:bg-slate-100 disabled:opacity-0">
+          aria-label={`${isOpen ? "Collapse" : "Expand"} ${n.name}`} aria-expanded={isOpen}
+          className="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-base)]/40 disabled:opacity-0">
           {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </button>
         <span className={`truncate text-sm ${depth === 0 ? "font-semibold" : "font-medium"} text-[var(--color-text)]`}>{n.name}</span>
@@ -737,7 +803,11 @@ function CategoriesTab() {
       </div>}>
       {err && <FormError msg={err} />}
       <Gate hd={hd} what="categories">
-        {roots.length === 0 ? <Empty icon={Network} title="No incident categories" hint="Create a top-level category to get started." /> : (
+        {roots.length === 0 ? (
+          <EmptyAction icon={Network} title="No incident categories yet — add your first"
+            hint="Create a top-level category, then add subcategories and items beneath it."
+            action={<Btn variant="primary" icon={<Plus size={14} />} onClick={() => setModal({ mode: "add", parent: null })}>New category</Btn>} />
+        ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-2">
             {roots.map((r) => (
               <CatNode key={r.id} n={r} depth={0} showRetired={showRetired} collapsed={collapsed} toggle={toggle} busy={busy}
@@ -814,7 +884,11 @@ function DepartmentsTab() {
       </div>}>
       {err && <FormError msg={err} />}
       <Gate hd={hd} what="departments">
-        {depts.length === 0 ? <Empty icon={Building2} title="No departments" hint="Create a department such as IT, HR or Facilities." /> : (
+        {depts.length === 0 ? (
+          <EmptyAction icon={Building2} title="No departments yet — add your first"
+            hint="Create a department such as IT, HR or Facilities."
+            action={<Btn variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({ dept: null })}>New department</Btn>} />
+        ) : (
           <Table head={["Name", "Code", "Default team", "Status", ""]}>
             {depts.map((d) => (
               <tr key={d.id} className={`hover:bg-slate-50/60 ${d.enabled ? "" : "opacity-60"}`}>
@@ -919,6 +993,7 @@ function SupportGroupsTab() {
                 <td className="px-4 py-2.5 font-medium text-[var(--color-text)]">{g.name || <Muted>—</Muted>}</td>
                 <td className="w-72 px-4 py-2">
                   <Select value={g.team_id != null ? String(g.team_id) : ""} disabled={busy === `g${g.id}`}
+                    aria-label={`AVA team for ${g.name || g.code}`}
                     onChange={(e) => act(`g${g.id}`, () => call("patch", `${G}/support-groups/${g.id}`, { team_id: e.target.value ? Number(e.target.value) : null }))}>
                     <option value="">— unmapped —</option>
                     {teams.map((t) => <option key={t.id} value={String(t.id)}>{t.team_name || t.name}{t.disabled ? " (inactive)" : ""}</option>)}
@@ -937,17 +1012,18 @@ function SupportGroupsTab() {
 // ════════════════════════════════════════════════════════════════════════════
 // page
 // ════════════════════════════════════════════════════════════════════════════
-const TABS: { id: string; label: string; icon: LucideIcon; Comp: () => JSX.Element }[] = [
-  { id: "priority", label: "Priority matrix", icon: Layers, Comp: PriorityMatrixTab },
-  { id: "sla", label: "SLA targets", icon: Timer, Comp: SlaTargetsTab },
-  { id: "change-types", label: "Change types", icon: GitBranch, Comp: ChangeTypesTab },
-  { id: "risk", label: "Risk matrix", icon: AlertTriangle, Comp: RiskMatrixTab },
-  { id: "cab", label: "CAB config", icon: ShieldCheck, Comp: CabTab },
-  { id: "transitions", label: "State transitions", icon: ArrowRight, Comp: TransitionsTab },
-  { id: "categories", label: "Incident categories", icon: Network, Comp: CategoriesTab },
-  { id: "departments", label: "Departments", icon: Building2, Comp: DepartmentsTab },
-  { id: "roles", label: "Roles", icon: KeyRound, Comp: RolesTab },
-  { id: "groups", label: "Support groups", icon: Users, Comp: SupportGroupsTab },
+// Two groups: the ITSM rulebook, then the mapping onto AVA's org structure.
+const TABS: { id: string; label: string; icon: LucideIcon; group: "rules" | "org"; Comp: () => JSX.Element }[] = [
+  { id: "priority", label: "Priority matrix", icon: Layers, group: "rules", Comp: PriorityMatrixTab },
+  { id: "sla", label: "SLA targets", icon: Timer, group: "rules", Comp: SlaTargetsTab },
+  { id: "change-types", label: "Change types", icon: GitBranch, group: "rules", Comp: ChangeTypesTab },
+  { id: "risk", label: "Risk matrix", icon: AlertTriangle, group: "rules", Comp: RiskMatrixTab },
+  { id: "cab", label: "CAB config", icon: ShieldCheck, group: "rules", Comp: CabTab },
+  { id: "transitions", label: "State transitions", icon: ArrowRight, group: "rules", Comp: TransitionsTab },
+  { id: "categories", label: "Incident categories", icon: Network, group: "rules", Comp: CategoriesTab },
+  { id: "departments", label: "Departments", icon: Building2, group: "org", Comp: DepartmentsTab },
+  { id: "roles", label: "Roles", icon: KeyRound, group: "org", Comp: RolesTab },
+  { id: "groups", label: "Support groups", icon: Users, group: "org", Comp: SupportGroupsTab },
 ];
 
 export default function GovernancePage() {
@@ -957,15 +1033,23 @@ export default function GovernancePage() {
   return (
     <div className="space-y-5 p-6">
       <PageHeader icon={ShieldCheck} title="Governance & Org Mapping" subtitle="ITSM rules, lifecycle and the mapping of Help Desk roles, groups and departments to AVA" />
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {TABS.map((t) => {
+      <div role="tablist" aria-label="Governance sections" className="flex items-end gap-1 overflow-x-auto border-b border-slate-200">
+        {TABS.map((t, idx) => {
           const Icon = t.icon;
           const on = t.id === tab;
+          const startsOrg = idx > 0 && t.group !== TABS[idx - 1].group;
           return (
-            <button key={t.id} type="button" onClick={() => setTab(t.id)}
-              className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium transition ${on ? "border-[var(--color-base)] text-[var(--color-base)]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-              <Icon size={15} /> {t.label}
-            </button>
+            <div key={t.id} className="flex shrink-0 items-end">
+              {startsOrg && (
+                <div className="mx-2 mb-2 flex items-center gap-2 self-center border-l border-slate-200 pl-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Org mapping
+                </div>
+              )}
+              <button type="button" role="tab" aria-selected={on} onClick={() => setTab(t.id)}
+                className={`-mb-px flex shrink-0 items-center gap-2 rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-base)]/30 ${on ? "border-[var(--color-base)] bg-[var(--color-base)]/5 text-[var(--color-base)]" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}>
+                <Icon size={15} /> {t.label}
+              </button>
+            </div>
           );
         })}
       </div>

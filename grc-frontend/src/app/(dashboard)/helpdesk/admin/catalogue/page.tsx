@@ -100,6 +100,22 @@ function Sub({ children }: { children: ReactNode }) {
 
 const Dash = () => <span className="text-slate-300">—</span>;
 
+/** First-run empty state with the create action right in it. */
+function EmptyAction({ icon: Icon, title, hint, action }: {
+  icon: typeof FolderTree; title: string; hint: string; action: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center">
+      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-[var(--color-base)]/10 text-[var(--color-base)]">
+        <Icon size={24} strokeWidth={1.75} />
+      </div>
+      <p className="font-medium text-slate-700">{title}</p>
+      <p className="mx-auto mt-1 mb-4 max-w-sm text-sm text-slate-400">{hint}</p>
+      <div className="flex justify-center">{action}</div>
+    </div>
+  );
+}
+
 // ── one CRUD tab (table + create/edit modal + retire/restore) ───────────────
 function EntityTab({
   noun, icon, rows, loading, path, fields, columns, reloadAll, renderExpanded,
@@ -179,10 +195,18 @@ function EntityTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${noun.toLowerCase()}s…`}
-            className="w-72 rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm outline-none focus:border-[var(--color-base)]" />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${noun.toLowerCase()}s…`}
+              aria-label={`Search ${noun.toLowerCase()}s`}
+              className="w-72 rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm outline-none focus:border-[var(--color-base)] focus:ring-2 focus:ring-[var(--color-base)]/15" />
+          </div>
+          {rows.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {visible.length === rows.length ? `${rows.length} total` : `Showing ${visible.length} of ${rows.length}`}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <Toggle checked={showRetired} onChange={setShowRetired} label="Show retired" />
@@ -191,16 +215,21 @@ function EntityTab({
       </div>
 
       {rowErr && (
-        <div className="flex items-start justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
           <span>{rowErr}</span>
-          <button onClick={() => setRowErr(null)} className="shrink-0 text-rose-400 hover:text-rose-600"><X size={15} /></button>
+          <button onClick={() => setRowErr(null)} aria-label="Dismiss error" className="shrink-0 text-rose-400 hover:text-rose-600"><X size={15} /></button>
         </div>
       )}
 
       {loading && rows.length === 0 ? <Loading what={`${noun.toLowerCase()}s`} />
+        : rows.length === 0 ? (
+          <EmptyAction icon={icon} title={`No ${noun.toLowerCase()}s yet — add your first`}
+            hint={`${noun}s you create here appear in the catalogue and can be retired or restored at any time.`}
+            action={<NewBtn onClick={openCreate} label={`New ${noun.toLowerCase()}`} />} />
+        )
         : visible.length === 0 ? (
           <Empty icon={icon} title={`No ${noun.toLowerCase()}s found`}
-            hint={q || rows.length > 0 ? "Try a different search or show retired rows." : `Create the first ${noun.toLowerCase()} to get started.`} />
+            hint={q ? "Try a different search, or show retired rows." : "Everything here is retired — turn on “Show retired” to see it."} />
         ) : (
           <Table head={head}>
             {visible.map((r) => {
@@ -208,14 +237,16 @@ function EntityTab({
               const isOpen = !!open[r.id];
               return (
                 <Fragment key={r.id}>
-                  <tr className={retired ? "bg-slate-50/60 text-slate-400" : "hover:bg-slate-50/50"}>
+                  <tr className={`transition-colors ${retired ? "bg-slate-50/60 text-slate-400" : "hover:bg-slate-50/70"}`}>
                     {columns.map((c, i) => (
                       <td key={c.head} className="px-4 py-2.5 align-top">
                         {i === 0 && renderExpanded ? (
                           <div className="flex items-start gap-1.5">
                             <button onClick={() => setOpen((o) => ({ ...o, [r.id]: !o[r.id] }))}
                               title="Supporting technical services"
-                              className="mt-0.5 shrink-0 rounded text-slate-400 hover:text-slate-700">
+                              aria-label={`${isOpen ? "Hide" : "Show"} supporting technical services for ${r.name || r.code}`}
+                              aria-expanded={isOpen}
+                              className="mt-0.5 shrink-0 rounded text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-base)]/40">
                               {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                             </button>
                             <div>{c.cell(r)}</div>
@@ -226,7 +257,7 @@ function EntityTab({
                     <td className="px-4 py-2.5 align-top">
                       <Chip value={retired ? "Retired" : "Active"} map={STATE_CHIP} />
                     </td>
-                    <td className="px-4 py-2.5 align-top">
+                    <td className="whitespace-nowrap px-4 py-2.5 align-top">
                       <div className="flex items-center gap-1.5">
                         <Btn variant="ghost" icon={<Pencil size={13} />} onClick={() => openEdit(r)}>Edit</Btn>
                         {retired
@@ -236,8 +267,8 @@ function EntityTab({
                     </td>
                   </tr>
                   {renderExpanded && isOpen && (
-                    <tr className="bg-slate-50/40">
-                      <td colSpan={colSpan} className="px-4 py-3">{renderExpanded(r)}</td>
+                    <tr className="bg-slate-50/60">
+                      <td colSpan={colSpan} className="border-l-2 border-[var(--color-base)]/40 px-4 py-3 pl-8">{renderExpanded(r)}</td>
                     </tr>
                   )}
                 </Fragment>
@@ -320,17 +351,20 @@ function Dependencies({ service, technical, reloadAll }: { service: any; technic
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
         <Link2 size={13} /> Supporting technical services
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium normal-case text-slate-500">{deps.length}</span>
       </div>
+      <p className="mb-3 text-xs text-slate-400">The technical services this business service relies on. Link the ones that, if they fail, would affect it.</p>
       {error && <ErrorBanner msg={error} />}
-      {err && <div className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">{err}</div>}
+      {err && <div role="alert" className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">{err}</div>}
       {loading && deps.length === 0 ? (
         <div className="py-3 text-sm text-slate-400">Loading links…</div>
       ) : deps.length === 0 ? (
-        <div className="py-1 text-sm text-slate-400">No technical services linked yet.</div>
+        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm text-slate-400">
+          No technical services linked yet — pick one below to add the first link.
+        </div>
       ) : (
         <div className="flex flex-wrap gap-2">
           {deps.map((d) => (
@@ -341,16 +375,17 @@ function Dependencies({ service, technical, reloadAll }: { service: any; technic
               {d.criticality && <Chip value={d.criticality} map={CRIT_CHIP} />}
               <button onClick={() => remove(d.technical_service_id)} disabled={removing === d.technical_service_id}
                 title="Remove link"
-                className="grid h-5 w-5 place-items-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">
+                aria-label={`Remove link to ${d.technical_service || `#${d.technical_service_id}`}`}
+                className="grid h-5 w-5 place-items-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:opacity-50">
                 <X size={13} />
               </button>
             </span>
           ))}
         </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
         <div className="w-72">
-          <Select value={pick} onChange={(e) => setPick(e.target.value)}>
+          <Select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Technical service to link">
             <option value="">{available.length === 0 ? "No more technical services to add" : "Select a technical service…"}</option>
             {available.map((t) => <option key={t.id} value={String(t.id)}>{t.name} ({t.code})</option>)}
           </Select>
@@ -459,12 +494,13 @@ export default function CatalogueAdminPage() {
     { head: "Cost", cell: (r) => (r.cost == null ? <Dash /> : r.cost) },
   ];
 
-  const tabs: { key: TabKey; label: string; icon: typeof FolderTree; count: number }[] = [
-    { key: "categories", label: "Categories", icon: FolderTree, count: categories.length },
-    { key: "services", label: "Business Services", icon: Layers, count: services.length },
-    { key: "technical", label: "Technical Services", icon: Server, count: technical.length },
-    { key: "requests", label: "Request Items", icon: ClipboardList, count: requests.length },
+  const tabs: { key: TabKey; label: string; icon: typeof FolderTree; count: number; hint: string }[] = [
+    { key: "categories", label: "Categories", icon: FolderTree, count: categories.length, hint: "Group services and request items so users can find them." },
+    { key: "services", label: "Business Services", icon: Layers, count: services.length, hint: "What the business consumes. Expand a row to link the technical services behind it." },
+    { key: "technical", label: "Technical Services", icon: Server, count: technical.length, hint: "The underlying systems that deliver business services." },
+    { key: "requests", label: "Request Items", icon: ClipboardList, count: requests.length, hint: "The things users can ask for from the portal, with their approval and SLA rules." },
   ];
+  const activeTab = tabs.find((t) => t.key === tab) || tabs[0];
 
   return (
     <div className="space-y-5 p-6">
@@ -473,22 +509,23 @@ export default function CatalogueAdminPage() {
         actions={<RefreshBtn onClick={reloadAll} loading={loading} />} />
       {error && <ErrorBanner msg={error} />}
 
-      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div role="tablist" aria-label="Catalogue sections" className="flex flex-wrap gap-1 border-b border-slate-200">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
           return (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+            <button key={t.key} type="button" role="tab" aria-selected={active} onClick={() => setTab(t.key)}
+              className={`-mb-px inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-base)]/30 ${
                 active
-                  ? "border-[var(--color-base)] text-[var(--color-base)]"
-                  : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                  ? "border-[var(--color-base)] bg-[var(--color-base)]/5 text-[var(--color-base)]"
+                  : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700"}`}>
               <Icon size={15} /> {t.label}
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{t.count}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${active ? "bg-[var(--color-base)]/10 text-[var(--color-base)]" : "bg-slate-100 text-slate-500"}`}>{t.count}</span>
             </button>
           );
         })}
       </div>
+      <p className="-mt-2 text-sm text-slate-500">{activeTab.hint}</p>
 
       {tab === "categories" && (
         <EntityTab noun="Category" icon={FolderTree} rows={categories} loading={cats.loading} path="/categories"
