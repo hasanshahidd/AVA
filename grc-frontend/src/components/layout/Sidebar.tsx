@@ -132,30 +132,41 @@ const navigation: NavEntry[] = [
     // helpdesk:tickets:view; the three requester items need only the end-user
     // perms, so a requester-only user sees JUST those three, an agent the console.
     items: [
-      // ── agent console ──
-      { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard, requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket,          requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Incidents',        href: '/helpdesk/incidents',  icon: AlertCircle,     requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Problems',         href: '/helpdesk/problems',   icon: Bug,             requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Changes',          href: '/helpdesk/changes',    icon: GitPullRequest,  requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Service Requests', href: '/helpdesk/service-requests', icon: ClipboardList, requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Agents',           href: '/helpdesk/agents',     icon: Users,           requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2,       requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact,         requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen,        requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText, requiredPermissions: ['helpdesk:tickets:view'] },
-      { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings,        requiredPermissions: ['helpdesk:tickets:view'] },
-      // ── Administration — ALL ITSM management + end-user screens consolidated under
-      //    one dropdown FOR TESTING (settings-gated so an admin reaches every screen).
-      //    TODO: split back by role — the portal items (Request/My Requests/My Approvals/
-      //    Report) become requester-only again; the top three stay settings-gated.
+      // Three sub-dropdowns for the three Help Desk audiences. ALL are admin-visible
+      // now FOR TESTING (settings-gated); split back by role later — the End-user
+      // Portal items become requester-only again.
+      {
+        name: 'Agent Console',
+        icon: LayoutDashboard,
+        defaultOpen: true,
+        items: [
+          { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard, requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket,          requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Incidents',        href: '/helpdesk/incidents',  icon: AlertCircle,     requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Problems',         href: '/helpdesk/problems',   icon: Bug,             requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Changes',          href: '/helpdesk/changes',    icon: GitPullRequest,  requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Service Requests', href: '/helpdesk/service-requests', icon: ClipboardList, requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Agents',           href: '/helpdesk/agents',     icon: Users,           requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Customers',        href: '/helpdesk/customers',  icon: Building2,       requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact,         requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen,        requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText, requiredPermissions: ['helpdesk:tickets:view'] },
+          { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings,        requiredPermissions: ['helpdesk:tickets:view'] },
+        ],
+      },
       {
         name: 'Administration',
         icon: Settings,
         items: [
-          { name: 'Service Catalogue', href: '/helpdesk/admin/catalogue',  icon: Bookmark,          requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'CMDB',              href: '/helpdesk/admin/cmdb',        icon: Server,            requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'Governance',        href: '/helpdesk/admin/governance',  icon: Shield,            requiredPermissions: ['helpdesk:settings:manage'] },
+          { name: 'Service Catalogue', href: '/helpdesk/admin/catalogue',  icon: Bookmark, requiredPermissions: ['helpdesk:settings:manage'] },
+          { name: 'CMDB',              href: '/helpdesk/admin/cmdb',        icon: Server,   requiredPermissions: ['helpdesk:settings:manage'] },
+          { name: 'Governance',        href: '/helpdesk/admin/governance',  icon: Shield,   requiredPermissions: ['helpdesk:settings:manage'] },
+        ],
+      },
+      {
+        name: 'End-user Portal',
+        icon: ClipboardCheck,
+        items: [
           { name: 'Request something', href: '/helpdesk/portal/request',     icon: ClipboardCheck,    requiredPermissions: ['helpdesk:settings:manage'] },
           { name: 'My Requests',       href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:settings:manage'] },
           { name: 'My Approvals',      href: '/helpdesk/portal/my-approvals', icon: ShieldCheck,      requiredPermissions: ['helpdesk:settings:manage'] },
