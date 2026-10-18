@@ -136,7 +136,7 @@ export default function CmdbAdminPage() {
 // ── CI types + attribute definitions ───────────────────────────────────────
 function TypesTab() {
   const { data, loading, error, reload } = useHd<any>(`${BASE}/types`);
-  const types = asList(data, "types", "items");
+  const types = asList(data, "ci_types", "types", "items");
   const byId = useMemo(() => new Map<any, any>(types.map((t: any) => [t.id, t] as [any, any])), [types]);
   const [edit, setEdit] = useState<any | null>(null);   // {id?,code,name,description,parent_id}
   const [attrsFor, setAttrsFor] = useState<any | null>(null);
@@ -301,7 +301,7 @@ function CisTab() {
   const { data, loading, error, reload } = useHd<any>(`${BASE}/cis${qs ? `?${qs}` : ""}`);
   const typesRes = useHd<any>(`${BASE}/types`);
   const cis = asList(data, "cis", "items");
-  const types = asList(typesRes.data, "types", "items");
+  const types = asList(typesRes.data, "ci_types", "types", "items");
   const typeName = useMemo(() => new Map<any, any>(types.map((t: any) => [t.id, t.name] as [any, any])), [types]);
   const [edit, setEdit] = useState<any | null>(null);
   const [rowErr, setRowErr] = useState<string | null>(null);
@@ -638,7 +638,7 @@ function GraphTab() {
   const typesRes = useHd<any>(`${BASE}/types`);
   const nodes = asList(data?.nodes ?? [], "nodes");
   const edges = asList(data?.edges ?? [], "edges");
-  const types = asList(typesRes.data, "types", "items");
+  const types = asList(typesRes.data, "ci_types", "types", "items");
   const typeName = useMemo(() => new Map<any, any>(types.map((t: any) => [t.id, t.name] as [any, any])), [types]);
   const nodeById = useMemo(() => new Map<any, any>(nodes.map((n: any) => [n.id, n] as [any, any])), [nodes]);
   const [q, setQ] = useState("");
