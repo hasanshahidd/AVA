@@ -10,6 +10,8 @@ import os
 
 os.environ.setdefault("SESSION_SECRET", "test-engine")  # tickets.py imports auth_router
 
+from datetime import datetime, timedelta
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,10 +22,11 @@ from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
     HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
 )
+from grc.models import HDSLATarget, HDServiceLevelAgreement
 from grc.modules.helpdesk_native.tickets import (
     priority_from_matrix, transition_allowed, update, update_ticket,
 )
-from grc.modules.helpdesk_native import approvals
+from grc.modules.helpdesk_native import approvals, sla
 
 TENANT = 1
 
@@ -300,3 +303,70 @@ def test_requirements_for_change(adb):
     # risk forces CAB even when the change type is unknown/unset
     risky = approvals.requirements_for_change(adb, TENANT, _change(adb, change_risk="high"))
     assert risky is not None and risky["kind"] == "cab"
+
+
+# ─── piece #4: SLA clock from ingested targets (with pause) ───────────────────
+@pytest.fixture
+def sladb():
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDTicketPriority, HDSLATarget, HDServiceLevelAgreement):
+        m.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def _sla_setup(sladb, created, resp=15, reso=240, window="24x7"):
+    p1 = HDTicketPriority(tenant_id=TENANT, name="Urgent", level="Urgent", code="P1", rank=1)
+    sladb.add(p1); sladb.flush()
+    sladb.add(HDSLATarget(tenant_id=TENANT, process="incident", priority_label="P1 - Critical",
+                          priority_code="P1", service_window=window,
+                          response_minutes=resp, resolution_minutes=reso))
+    t = HDTicket(tenant_id=TENANT, subject="x", process="incident", status_category="Open",
+                 priority_id=p1.id, created_at=created)
+    sladb.add(t); sladb.commit()
+    return t
+
+
+def test_sla_due_dates_from_ingested_target(sladb):
+    created = datetime.utcnow()  # near-now so the deadlines are still in the future
+    t = _sla_setup(sladb, created, resp=15, reso=240)
+    sla.recompute(sladb, t)
+    assert t.response_by == created + timedelta(minutes=15)
+    assert t.resolution_by == created + timedelta(minutes=240)
+    assert t.agreement_status == "First Response Due"
+    assert t.sla_id is None
+
+
+def test_sla_pause_freezes_then_extends_on_resume(sladb):
+    created = datetime.utcnow()
+    t = _sla_setup(sladb, created, resp=15, reso=240)
+    sla.recompute(sladb, t)
+    base_reso = t.resolution_by
+    # pause
+    t.status_category = "Paused"
+    sla.recompute(sladb, t, prev_status_category="Open")
+    assert t.agreement_status == "Paused" and t.on_hold_since is not None
+    # simulate 30 minutes held, then resume
+    t.on_hold_since = datetime.utcnow() - timedelta(minutes=30)
+    t.status_category = "Open"
+    sla.recompute(sladb, t, prev_status_category="Paused")
+    # resolution deadline pushed out by ~the held 30 minutes
+    assert t.on_hold_since is None and t.total_hold_time >= 29 * 60
+    assert (t.resolution_by - base_reso) >= timedelta(minutes=29)
+
+
+def test_sla_breach_marks_failed(sladb):
+    created = datetime(2020, 1, 1, 9, 0, 0)  # long past → deadlines already blown
+    t = _sla_setup(sladb, created, resp=15, reso=240)
+    sla.recompute(sladb, t)
+    assert t.agreement_status == "Failed"
+
+
+def test_sla_no_target_clears_fields(sladb):
+    # a process with no ingested target and no Frappe policy → no due dates
+    t = HDTicket(tenant_id=TENANT, subject="x", process="problem", status_category="Open",
+                 created_at=datetime(2026, 1, 1, 9, 0, 0))
+    sladb.add(t); sladb.commit()
+    sla.recompute(sladb, t)
+    assert t.response_by is None and t.resolution_by is None

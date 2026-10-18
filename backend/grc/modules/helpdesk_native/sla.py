@@ -30,6 +30,7 @@ from ...models import (
     HDServiceHolidayList,
     HDServiceLevelAgreement,
     HDServiceLevelPriority,
+    HDSLATarget,
     Team,
     HDTicket,
     HDTicketPriority,
@@ -438,6 +439,69 @@ def compute_sla_block(db: Session, ticket) -> dict:
     }
 
 
+# ─── ITSM SLA targets (flow #4) ──────────────────────────────────────────────
+# The workbook's SLA sheet is ingested into grc_hd_sla_target (process + priority
+# + window + response/resolution minutes), NOT the Frappe HDServiceLevelAgreement
+# policy table. When a tenant has no Frappe policy for a ticket (the ITSM case),
+# the clock is driven from the matching ingested target instead. 24x7 baseline:
+# due = anchor + minutes (elapsed), with a simple pause that freezes the clock
+# while the ticket is Paused and pushes resolution_by by the held time on resume.
+# (Business-hours-window math stays the Frappe engine's job when a policy exists.)
+
+def _itsm_target(db: Session, ticket):
+    """The ingested SLA target matching this ticket's process + priority, or None."""
+    process = (ticket.process or "incident").lower()
+    code = ticket.priority.code if ticket.priority else None
+    q = (db.query(HDSLATarget)
+         .filter(HDSLATarget.tenant_id == ticket.tenant_id,
+                 func.lower(HDSLATarget.process) == process))
+    if code:
+        return q.filter(HDSLATarget.priority_code == code).first()
+    return q.first()
+
+
+def _itsm_agreement_status(ticket, now: datetime) -> None:
+    if ticket.status_category == RESOLVED:
+        ticket.agreement_status = (
+            "Failed" if (ticket.resolution_by and ticket.resolution_date
+                         and ticket.resolution_date > ticket.resolution_by)
+            else "Fulfilled")
+        return
+    if ticket.status_category == PAUSED:
+        ticket.agreement_status = "Paused"
+        return
+    breached = ((ticket.response_by and not ticket.first_responded_on and now > ticket.response_by)
+                or (ticket.resolution_by and now > ticket.resolution_by))
+    ticket.agreement_status = ("Failed" if breached
+                               else ("First Response Due" if not ticket.first_responded_on
+                                     else "Resolution Due"))
+
+
+def _apply_itsm_target(ticket, tgt, now: datetime,
+                       prev_status_category: Optional[str] = None) -> None:
+    """Set response_by / resolution_by from an ingested target, with a simple
+    elapsed-time pause (freeze while Paused, extend resolution by held time)."""
+    if not ticket.service_level_agreement_creation:
+        ticket.service_level_agreement_creation = ticket.created_at or now
+    anchor = ticket.service_level_agreement_creation
+    ticket.sla_id = None  # no Frappe policy drives this ticket
+
+    cat = ticket.status_category
+    if cat == PAUSED and ticket.on_hold_since is None:
+        ticket.on_hold_since = now
+    held = float(ticket.total_hold_time or 0)
+    if prev_status_category == PAUSED and cat != PAUSED and ticket.on_hold_since:
+        held += (now - ticket.on_hold_since).total_seconds()
+        ticket.total_hold_time = held
+        ticket.on_hold_since = None
+
+    resp = int(tgt.response_minutes or 0)
+    reso = int(tgt.resolution_minutes or 0)
+    ticket.response_by = (anchor + timedelta(minutes=resp)) if resp else None
+    ticket.resolution_by = (anchor + timedelta(minutes=reso) + timedelta(seconds=held)) if reso else None
+    _itsm_agreement_status(ticket, now)
+
+
 def recompute(db: Session, ticket, *, prev_status_category: Optional[str] = None) -> None:
     """Apply the SLA after a status/field change — the native equivalent of
     set_sla + HDServiceLevelAgreement.apply (spec §1.1–§1.6). Mutates the
@@ -451,6 +515,12 @@ def recompute(db: Session, ticket, *, prev_status_category: Optional[str] = None
     now = datetime.utcnow()
     sla = _get_sla(db, ticket)
     if not sla:
+        # flow #4: no Frappe policy — drive the clock from the ingested ITSM target
+        # for this process+priority when one exists.
+        tgt = _itsm_target(db, ticket)
+        if tgt is not None:
+            _apply_itsm_target(ticket, tgt, now, prev_status_category=prev_status_category)
+            return
         ticket.sla_id = None
         ticket.response_by = None
         ticket.resolution_by = None
