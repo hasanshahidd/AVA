@@ -18,9 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import GRCUser, HDTicket, get_db
+from ...models import GRCUser, HDApproval, HDTicket, get_db
 from ...routers.auth_router import require_auth
-from . import tickets  # Agent A's write path; attrs resolve at call time
+from . import tickets, approvals, sla  # write path + approvals/SLA engines; resolve at call time
 from .audit import hd_audit
 from .common import require_processes_manage, require_processes_view, tenant_id
 
@@ -85,6 +85,84 @@ def _apply(db: Session, tid: int, cid: int, action: str,
     return r
 
 
+# ─── approvals / CAB wire-up (flow #3+#4 → live change flow) ──────────────────
+class VoteBody(BaseModel):
+    role: Optional[str] = None       # the ROLE-* the approver is voting as (CAB)
+    comment: Optional[str] = None
+
+
+def _open_approval(db: Session, tid: int, cid: int) -> Optional[HDApproval]:
+    """The pending approval gating this change, if any."""
+    return (db.query(HDApproval)
+            .filter(HDApproval.tenant_id == tid, HDApproval.ticket_id == cid,
+                    HDApproval.state == "pending")
+            .order_by(HDApproval.id.desc())
+            .first())
+
+
+def submit_and_route(db: Session, tid: int, cid: int, actor_email: Optional[str]) -> dict:
+    """Submit a change, then route it: a Standard/pre-authorised change (no CAB
+    needed per the seeded rules) auto-approves; anything else opens a CAB/ECAB
+    approval and FREEZES the SLA clock while it waits (approval_state drives the
+    SLA pause in sla.recompute)."""
+    r = _apply(db, tid, cid, "submit", actor_email=actor_email)
+    if not r.get("ok"):
+        return r
+    change = _get_change(db, tid, cid)
+    req = approvals.requirements_for_change(db, tid, change)
+    if req is None:
+        _apply(db, tid, cid, "approve",
+               {"approved_by": "system:auto-standard", "approved_at": datetime.utcnow()},
+               actor_email=actor_email)
+        return {"ok": True, "approval_state": "approved", "cab": False, "auto_approved": True}
+    ap = approvals.open_approval(db, tid, change, kind=req["kind"],
+                                 required_quorum=req["required_quorum"],
+                                 required_role_codes=req["required_role_codes"],
+                                 opened_by=actor_email)
+    try:
+        sla.recompute(db, change, prev_status_category=change.status_category)
+    except Exception:  # noqa: BLE001 — SLA pause must never block opening the CAB
+        pass
+    db.commit()
+    hd_audit(db, tenant_id=tid, actor_email=actor_email, action="change.cab_opened",
+             entity="change", entity_id=cid,
+             after={"kind": ap.kind, "required_quorum": ap.required_quorum})
+    return {"ok": True, "approval_state": "pending_approval", "cab": True,
+            "approval_id": ap.id, "required_quorum": ap.required_quorum}
+
+
+def vote(db: Session, tid: int, cid: int, actor_email: Optional[str], decision: str,
+         role: Optional[str] = None, comment: Optional[str] = None) -> dict:
+    """Cast an approve/reject on the change's open approval (CAB), resuming the SLA
+    clock once the approval is decided. Segregation of duties: the voter must not
+    be the change's raiser. With no open approval, falls back to the legacy
+    single-approver action so older changes still work."""
+    change = _get_change(db, tid, cid)
+    if not change:
+        return {"ok": False, "error": "not found"}
+    raiser = (change.raised_by or "").strip().lower()
+    if raiser and raiser == (actor_email or "").strip().lower():
+        raise HTTPException(status_code=400,
+                            detail="You cannot vote on a change you raised (segregation of duties).")
+    ap = _open_approval(db, tid, cid)
+    if ap is None:
+        extra = ({"approved_by": actor_email, "approved_at": datetime.utcnow()}
+                 if decision == "approve" else None)
+        return _apply(db, tid, cid, decision, extra, actor_email=actor_email)
+    approvals.cast_vote(db, tid, ap.id, actor_email, decision, role=role, comment=comment)
+    db.refresh(change)
+    if change.approval_state in ("approved", "rejected"):
+        try:
+            sla.recompute(db, change, prev_status_category=change.status_category)
+        except Exception:  # noqa: BLE001
+            pass
+    db.commit()
+    hd_audit(db, tenant_id=tid, actor_email=actor_email, action=f"change.vote.{decision}",
+             entity="change", entity_id=cid,
+             after={"approval_state": change.approval_state, "approval_id": ap.id})
+    return {"ok": True, "approval_state": change.approval_state, "approval_id": ap.id}
+
+
 class ScheduleBody(BaseModel):
     planned_start: Optional[datetime] = None
     planned_end: Optional[datetime] = None
@@ -99,34 +177,23 @@ def list_changes(db: Session = Depends(get_db), _: bool = Depends(require_proces
 def submit_change(cid: int, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth),
                   _: bool = Depends(require_processes_manage)):
-    return _apply(db, tenant_id(db), cid, "submit", actor_email=current_user.email)
+    return submit_and_route(db, tenant_id(db), cid, current_user.email)
 
 
 @router.post("/{cid}/approve")
-def approve_change(cid: int, db: Session = Depends(get_db),
+def approve_change(cid: int, body: Optional[VoteBody] = None, db: Session = Depends(get_db),
                    current_user: GRCUser = Depends(require_auth),
                    _: bool = Depends(require_processes_manage)):
-    # Segregation of duties: the approver must not be the change's raiser/submitter.
-    tid = tenant_id(db)
-    change = _get_change(db, tid, cid)
-    if not change:
-        return {"ok": False, "error": "not found"}
-    submitter = (change.raised_by or "").strip().lower()
-    if submitter and submitter == (current_user.email or "").strip().lower():
-        raise HTTPException(
-            status_code=400,
-            detail="You cannot approve a change you raised (segregation of duties).",
-        )
-    return _apply(db, tid, cid, "approve",
-                  {"approved_by": current_user.email, "approved_at": datetime.utcnow()},
-                  actor_email=current_user.email)
+    return vote(db, tenant_id(db), cid, current_user.email, "approve",
+                role=(body.role if body else None), comment=(body.comment if body else None))
 
 
 @router.post("/{cid}/reject")
-def reject_change(cid: int, db: Session = Depends(get_db),
+def reject_change(cid: int, body: Optional[VoteBody] = None, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth),
                   _: bool = Depends(require_processes_manage)):
-    return _apply(db, tenant_id(db), cid, "reject", actor_email=current_user.email)
+    return vote(db, tenant_id(db), cid, current_user.email, "reject",
+                role=(body.role if body else None), comment=(body.comment if body else None))
 
 
 @router.post("/{cid}/schedule")

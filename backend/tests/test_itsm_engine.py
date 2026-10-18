@@ -363,6 +363,22 @@ def test_sla_breach_marks_failed(sladb):
     assert t.agreement_status == "Failed"
 
 
+def test_sla_pauses_while_pending_approval(sladb):
+    # bridge to #3: an open approval (approval_state=pending_approval) freezes the SLA
+    created = datetime.utcnow()
+    t = _sla_setup(sladb, created, resp=15, reso=240)
+    sla.recompute(sladb, t)
+    assert t.agreement_status == "First Response Due"
+    t.approval_state = "pending_approval"
+    sla.recompute(sladb, t)
+    assert t.agreement_status == "Paused" and t.on_hold_since is not None
+    # decision resumes the clock and banks the held time
+    t.on_hold_since = datetime.utcnow() - timedelta(minutes=20)
+    t.approval_state = "approved"
+    sla.recompute(sladb, t)
+    assert t.on_hold_since is None and t.total_hold_time >= 19 * 60
+
+
 def test_sla_no_target_clears_fields(sladb):
     # a process with no ingested target and no Frappe policy → no due dates
     t = HDTicket(tenant_id=TENANT, subject="x", process="problem", status_category="Open",

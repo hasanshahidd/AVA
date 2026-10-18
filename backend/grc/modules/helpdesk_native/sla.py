@@ -467,7 +467,7 @@ def _itsm_agreement_status(ticket, now: datetime) -> None:
                          and ticket.resolution_date > ticket.resolution_by)
             else "Fulfilled")
         return
-    if ticket.status_category == PAUSED:
+    if ticket.status_category == PAUSED or (ticket.approval_state or "") == "pending_approval":
         ticket.agreement_status = "Paused"
         return
     breached = ((ticket.response_by and not ticket.first_responded_on and now > ticket.response_by)
@@ -486,11 +486,16 @@ def _apply_itsm_target(ticket, tgt, now: datetime,
     anchor = ticket.service_level_agreement_creation
     ticket.sla_id = None  # no Frappe policy drives this ticket
 
+    # Paused by an explicit Paused status OR by an open approval (#3 bridge): the
+    # SLA clock freezes while a change waits for CAB sign-off. Resume is detected
+    # by on_hold_since being set while no longer paused — robust whether the pause
+    # came from a status change or an approval, and independent of prev category.
     cat = ticket.status_category
-    if cat == PAUSED and ticket.on_hold_since is None:
+    paused = (cat == PAUSED) or ((ticket.approval_state or "") == "pending_approval")
+    if paused and ticket.on_hold_since is None:
         ticket.on_hold_since = now
     held = float(ticket.total_hold_time or 0)
-    if prev_status_category == PAUSED and cat != PAUSED and ticket.on_hold_since:
+    if (not paused) and ticket.on_hold_since:
         held += (now - ticket.on_hold_since).total_seconds()
         ticket.total_hold_time = held
         ticket.on_hold_since = None
