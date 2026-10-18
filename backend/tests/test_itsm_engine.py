@@ -16,8 +16,12 @@ from sqlalchemy.orm import sessionmaker
 
 from types import SimpleNamespace
 
-from grc.models import HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition
-from grc.modules.helpdesk_native.tickets import priority_from_matrix, transition_allowed
+from grc.models import (
+    HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
+)
+from grc.modules.helpdesk_native.tickets import (
+    priority_from_matrix, transition_allowed, update, update_ticket,
+)
 
 TENANT = 1
 
@@ -146,3 +150,47 @@ def test_guard_blocks_until_approved(sdb):
     assert not ok and "approval" in reason
     ok2, _ = transition_allowed(sdb, TENANT, tk(ids["Pending"], approval_state="approved"), to_resolved)
     assert ok2
+
+
+# ─── audit fixes: the label editor must not bypass #2, and impact/urgency edits
+#     must re-derive priority (#1) ──────────────────────────────────────────────
+@pytest.fixture
+def tdb():
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDTicketStatus, HDStateTransition, HDTicketPriority, HDPriorityMatrix):
+        m.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def test_update_editor_rejects_illegal_status(tdb):
+    # New -> Assigned is the only legal incident move
+    st = {}
+    for lbl in ("New", "Assigned", "Resolved"):
+        r = HDTicketStatus(tenant_id=TENANT, label_agent=lbl, category="Open")
+        tdb.add(r); st[lbl] = r
+    tdb.flush()
+    tdb.add(HDStateTransition(tenant_id=TENANT, process="incident",
+                              from_status_id=st["New"].id, to_status_id=st["Assigned"].id))
+    t = HDTicket(tenant_id=TENANT, subject="x", process="incident",
+                 status_id=st["New"].id, status_category="Open")
+    tdb.add(t); tdb.commit()
+    # the label editor (update) must reject an illegal jump, same as set_status
+    res = update(tdb, TENANT, str(t.id), {"status": "Resolved"})
+    assert res["ok"] is False and "illegal" in res["error"]
+    tdb.refresh(t)
+    assert t.status_id == st["New"].id      # nothing mutated on reject
+
+
+def test_update_ticket_recomputes_priority_on_reclassify(tdb):
+    p1 = HDTicketPriority(tenant_id=TENANT, name="Urgent", level="Urgent", code="P1", rank=1)
+    tdb.add(p1); tdb.flush()
+    tdb.add(HDPriorityMatrix(tenant_id=TENANT, impact="high", urgency="high", priority_id=p1.id))
+    t = HDTicket(tenant_id=TENANT, subject="x", process="incident", status_category="Open")
+    tdb.add(t); tdb.commit()
+    assert t.priority_id is None
+    # editing impact+urgency must re-derive the P-level from the matrix
+    update_ticket(tdb, TENANT, t.id, {"impact": "high", "urgency": "high"})
+    tdb.refresh(t)
+    assert t.priority_id == p1.id and t.impact == "high" and t.urgency == "high"

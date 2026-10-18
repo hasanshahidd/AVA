@@ -607,6 +607,17 @@ def update(db: Session, tid: int, name: str, payload: dict,
         "agent_group": ticket.team.name if ticket.team else None,
     }
 
+    # flow #2: validate a status change (if any) BEFORE mutating anything, so an
+    # illegal transition rejects cleanly with no half-applied edit. Same data-driven
+    # rule as set_status — this editor must not be a bypass.
+    pending_status = None
+    if payload.get("status"):
+        pending_status = _status_by_label(db, tid, payload["status"])
+        if pending_status:
+            ok, reason = transition_allowed(db, tid, ticket, pending_status)
+            if not ok:
+                return {"ok": False, "error": reason}
+
     if payload.get("priority"):
         p = (
             db.query(HDTicketPriority)
@@ -632,10 +643,8 @@ def update(db: Session, tid: int, name: str, payload: dict,
         if team:
             ticket.agent_group_id = team.id
             assignment.remove_if_not_in_team(db, ticket)
-    if payload.get("status"):
-        new_status = _status_by_label(db, tid, payload["status"])
-        if new_status:
-            _apply_status_change(db, tid, ticket, new_status)
+    if pending_status is not None:
+        _apply_status_change(db, tid, ticket, pending_status)
 
     db.commit()
     _changed = {k: payload[k] for k in ("priority", "ticket_type", "status", "agent_group")
@@ -660,6 +669,14 @@ def update_ticket(db: Session, tid: int, id, payload: dict) -> dict:
         return {"ok": False, "error": "not found"}
     for k, v in _extension_kwargs(payload).items():
         setattr(ticket, k, v)
+    # flow #1: keep priority in step with an impact/urgency edit — recompute from
+    # the (workbook-seeded) matrix so a reclassification re-derives the P-level,
+    # just as create does. Only when both are now present.
+    if (payload.get("impact") is not None or payload.get("urgency") is not None) \
+            and ticket.impact and ticket.urgency:
+        pid = priority_from_matrix(db, tid, ticket.impact, ticket.urgency)
+        if pid:
+            ticket.priority_id = pid
     db.commit()
     return {"ok": True, "name": str(ticket.id)}
 
