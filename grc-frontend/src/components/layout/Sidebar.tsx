@@ -136,6 +136,8 @@ const navigation: NavEntry[] = [
       { name: 'Report an issue',  href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:requests:create'], requesterOnly: true },
       { name: 'My Requests',      href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:requests:view_own'], requesterOnly: true },
       { name: 'Help / Knowledge Base', href: '/helpdesk/portal/kb',     icon: BookOpen,          requiredPermissions: ['helpdesk:requests:view_own'], requesterOnly: true },
+      { name: 'Request something', href: '/helpdesk/portal/request',     icon: ClipboardCheck,    requiredPermissions: ['helpdesk:requests:create'], requesterOnly: true },
+      { name: 'My Approvals',     href: '/helpdesk/portal/my-approvals', icon: ShieldCheck,       requiredPermissions: ['helpdesk:requests:view_own'], requesterOnly: true },
       // ── agent console ──
       { name: 'Dashboard',        href: '/helpdesk/dashboard',  icon: LayoutDashboard, requiredPermissions: ['helpdesk:tickets:view'] },
       { name: 'Tickets',          href: '/helpdesk/tickets',    icon: Ticket,          requiredPermissions: ['helpdesk:tickets:view'] },
@@ -149,6 +151,10 @@ const navigation: NavEntry[] = [
       { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen,        requiredPermissions: ['helpdesk:tickets:view'] },
       { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText, requiredPermissions: ['helpdesk:tickets:view'] },
       { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings,        requiredPermissions: ['helpdesk:tickets:view'] },
+      // ── administration (ITSM data management) — settings-gated ──
+      { name: 'Service Catalogue', href: '/helpdesk/admin/catalogue',  icon: Bookmark, requiredPermissions: ['helpdesk:settings:manage'] },
+      { name: 'CMDB',              href: '/helpdesk/admin/cmdb',        icon: Server,   requiredPermissions: ['helpdesk:settings:manage'] },
+      { name: 'Governance',        href: '/helpdesk/admin/governance',  icon: Shield,   requiredPermissions: ['helpdesk:settings:manage'] },
     ],
   },
   // Reports — its own top-level module.

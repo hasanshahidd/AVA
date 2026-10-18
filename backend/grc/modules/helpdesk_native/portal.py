@@ -14,14 +14,22 @@ extra layer here is the per-USER filter.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db
-from . import department, kb, itsm_seed, tickets
+from ...models import (
+    get_db,
+    HDApproval,
+    HDApprovalVote,
+    HDBusinessService,
+    HDRequestItem,
+    HDServiceCategory,
+    HDTicket,
+)
+from . import department, kb, itsm_seed, tickets, approvals, sla
 from .common import (
     current_user_email,
     require_request_create,
@@ -42,10 +50,18 @@ class RequestCreate(BaseModel):
     urgency: Optional[str] = None
     request_category: Optional[str] = None
     request_subcategory: Optional[str] = None
+    request_item_id: Optional[int] = None  # links the ticket to the chosen catalogue item
+    fields: Optional[Any] = None           # wizard field answers (already folded into description by the UI)
 
 
 class RequestReply(BaseModel):
     content: str = ""
+
+
+class PortalVote(BaseModel):
+    decision: str                          # approve | reject | abstain
+    comment: Optional[str] = None
+    role: Optional[str] = None             # the ROLE-* the approver votes as (CAB)
 
 
 # ─── own-ticket helper ─────────────────────────────────────────────────────
@@ -69,13 +85,24 @@ def create_request(body: RequestCreate, db: Session = Depends(get_db),
     can never file as someone else."""
     tid = tenant_id(db)
     data = body.model_dump(exclude_none=True)
+    # request_item_id / fields are handled here (create_ticket doesn't take them):
+    # the UI already folds field answers into `description`; we just persist the
+    # catalogue link after the ticket exists.
+    req_item_id = data.pop("request_item_id", None)
+    data.pop("fields", None)
     # Same department→Team routing the agent create does, so the request lands
     # on the right queue; assignment + SLA then run unchanged in create_ticket.
     if data.get("department_id"):
         team_id = department.resolve_department_team(db, tid, data["department_id"])
         if team_id:
             data["agent_group_id"] = team_id
-    return tickets.create_ticket(db, tid, data, raised_by=email)
+    res = tickets.create_ticket(db, tid, data, raised_by=email)
+    if req_item_id and res.get("ok"):
+        t = tickets._get_ticket(db, tid, res["name"])
+        if t is not None:
+            t.request_item_id = req_item_id
+            db.commit()
+    return res
 
 
 @router.get("/my-requests")
@@ -131,3 +158,83 @@ def knowledge_base(db: Session = Depends(get_db), email: str = Depends(current_u
     """Browse the knowledge base (gated on requests:view_own so any requester can
     read self-help; authoring stays behind the agent kb:author/edit gates)."""
     return kb.list_articles(db, tenant_id(db))
+
+
+@router.get("/catalogue")
+def portal_catalogue(db: Session = Depends(get_db), email: str = Depends(current_user_email),
+                     _: bool = Depends(require_requester)):
+    """The live service catalogue for the end-user request wizard: enabled
+    categories, business services and request items from the ingested tables.
+    Read-only + requester-gated (the admin /helpdesk/admin/catalogue surface is
+    settings-gated and not for end users)."""
+    tid = tenant_id(db)
+    cats = db.query(HDServiceCategory).filter_by(tenant_id=tid, enabled=True).all()
+    svcs = db.query(HDBusinessService).filter_by(tenant_id=tid, enabled=True).all()
+    reqs = db.query(HDRequestItem).filter_by(tenant_id=tid, enabled=True).all()
+    return {
+        "categories": [{"id": c.id, "name": c.name, "description": c.description,
+                        "parent_id": c.parent_id} for c in cats],
+        "services": [{"id": s.id, "name": s.name, "category_id": s.category_id,
+                      "description": s.description} for s in svcs],
+        "requests": [{"id": r.id, "code": r.code, "name": r.name, "description": r.description,
+                      "category_id": r.category_id, "business_service_id": r.business_service_id,
+                      "approval_required": r.approval_required, "sla_hours": r.sla_hours,
+                      "cost": r.cost} for r in reqs],
+    }
+
+
+@router.get("/my-approvals")
+def portal_my_approvals(db: Session = Depends(get_db), email: str = Depends(current_user_email),
+                        _: bool = Depends(require_requester)):
+    """Pending approvals the signed-in user can still act on (hasn't voted yet).
+    Interim scope: tenant-wide pending approvals minus ones this user already
+    voted on — a precise user→ROLE eligibility filter waits on the user-role map."""
+    tid = tenant_id(db)
+    voted = [v[0] for v in db.query(HDApprovalVote.approval_id)
+             .join(HDApproval, HDApproval.id == HDApprovalVote.approval_id)
+             .filter(HDApproval.tenant_id == tid, HDApprovalVote.approver == email).all()]
+    q = db.query(HDApproval).filter(HDApproval.tenant_id == tid, HDApproval.state == "pending")
+    if voted:
+        q = q.filter(~HDApproval.id.in_(voted))
+    out = []
+    for ap in q.order_by(HDApproval.id.desc()).all():
+        t = db.query(HDTicket).filter_by(id=ap.ticket_id, tenant_id=tid).first()
+        approve_count = (db.query(HDApprovalVote)
+                         .filter_by(approval_id=ap.id, decision="approve").count())
+        out.append({
+            "id": ap.id, "kind": ap.kind, "ticket_name": str(ap.ticket_id),
+            "subject": t.subject if t else None,
+            "requested_by": t.raised_by if t else None,
+            "opened_at": ap.opened_at.isoformat() if ap.opened_at else None,
+            "required_quorum": ap.required_quorum, "approve_count": approve_count,
+        })
+    return {"approvals": out}
+
+
+@router.post("/approvals/{aid}/vote")
+def portal_vote(aid: int, body: PortalVote, db: Session = Depends(get_db),
+                email: str = Depends(current_user_email),
+                _: bool = Depends(require_request_create)):
+    """Cast a vote on a pending approval from the portal, resuming the ticket's SLA
+    once the approval is decided. Segregation of duties: you cannot vote on a
+    request you raised."""
+    tid = tenant_id(db)
+    decision = (body.decision or "").strip().lower()
+    if decision not in ("approve", "reject", "abstain"):
+        raise HTTPException(status_code=400, detail="decision must be approve, reject or abstain")
+    ap = db.query(HDApproval).filter_by(id=aid, tenant_id=tid).first()
+    if ap is None:
+        raise HTTPException(status_code=404, detail="not found")
+    t = db.query(HDTicket).filter_by(id=ap.ticket_id, tenant_id=tid).first()
+    if t and (t.raised_by or "").lower() == (email or "").lower():
+        raise HTTPException(status_code=400,
+                            detail="You cannot vote on a request you raised (segregation of duties).")
+    approvals.cast_vote(db, tid, aid, email, decision, role=body.role, comment=body.comment)
+    db.refresh(ap)
+    if t is not None and ap.state in ("approved", "rejected"):
+        try:
+            sla.recompute(db, t, prev_status_category=t.status_category)
+        except Exception:  # noqa: BLE001 — SLA resume must never fail the vote
+            pass
+    db.commit()
+    return {"ok": True, "state": ap.state}
