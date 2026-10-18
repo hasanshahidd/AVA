@@ -14,8 +14,10 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from grc.models import HDTicketPriority, HDPriorityMatrix
-from grc.modules.helpdesk_native.tickets import priority_from_matrix
+from types import SimpleNamespace
+
+from grc.models import HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition
+from grc.modules.helpdesk_native.tickets import priority_from_matrix, transition_allowed
 
 TENANT = 1
 
@@ -78,3 +80,69 @@ def test_tenant_isolation(db):
     db.commit()
     # a different tenant has no matrix row -> falls back to built-in, not tenant 1's cell
     assert priority_from_matrix(db, 999, "high", "high") is None
+
+
+# ─── piece #2: data-driven state-transition enforcement ──────────────────────
+@pytest.fixture
+def sdb():
+    engine = create_engine("sqlite://")
+    for m in (HDTicketStatus, HDStateTransition):
+        m.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def seed_states(sdb):
+    st = {}
+    for lbl in ("New", "Assigned", "Pending", "Resolved"):
+        row = HDTicketStatus(tenant_id=TENANT, label_agent=lbl, category="Open")
+        sdb.add(row); st[lbl] = row
+    sdb.flush()
+    def tr(a, b, guard=None):
+        sdb.add(HDStateTransition(tenant_id=TENANT, process="incident",
+                                  from_status_id=st[a].id, to_status_id=st[b].id, guard=guard))
+    tr("New", "Assigned"); tr("Assigned", "Resolved"); tr("Assigned", "Pending")
+    tr("Pending", "Resolved", guard="approved")
+    sdb.commit()
+    return {k: v.id for k, v in st.items()}
+
+
+def tk(status_id, process="incident", approval_state=None):
+    return SimpleNamespace(status_id=status_id, process=process, approval_state=approval_state)
+
+
+def test_legal_transition_allowed(sdb):
+    ids = seed_states(sdb)
+    ok, reason = transition_allowed(sdb, TENANT, tk(ids["New"]), SimpleNamespace(id=ids["Assigned"], label_agent="Assigned"))
+    assert ok and reason is None
+
+
+def test_illegal_transition_rejected(sdb):
+    ids = seed_states(sdb)
+    ok, reason = transition_allowed(sdb, TENANT, tk(ids["New"]), SimpleNamespace(id=ids["Resolved"], label_agent="Resolved"))
+    assert not ok and "illegal transition" in reason
+
+
+def test_noop_same_status_allowed(sdb):
+    ids = seed_states(sdb)
+    ok, _ = transition_allowed(sdb, TENANT, tk(ids["New"]), SimpleNamespace(id=ids["New"], label_agent="New"))
+    assert ok
+
+
+def test_unseeded_process_not_enforced(sdb):
+    ids = seed_states(sdb)
+    # 'question' has no transitions seeded -> allow anything (legacy behaviour)
+    ok, _ = transition_allowed(sdb, TENANT, tk(ids["New"], process="question"),
+                               SimpleNamespace(id=ids["Resolved"], label_agent="Resolved"))
+    assert ok
+
+
+def test_guard_blocks_until_approved(sdb):
+    ids = seed_states(sdb)
+    to_resolved = SimpleNamespace(id=ids["Resolved"], label_agent="Resolved")
+    # Pending -> Resolved carries guard 'approved'
+    ok, reason = transition_allowed(sdb, TENANT, tk(ids["Pending"], approval_state=None), to_resolved)
+    assert not ok and "approval" in reason
+    ok2, _ = transition_allowed(sdb, TENANT, tk(ids["Pending"], approval_state="approved"), to_resolved)
+    assert ok2

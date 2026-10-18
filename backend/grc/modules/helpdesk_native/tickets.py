@@ -23,6 +23,7 @@ from ...models import (
     HDTicketStatus,
     HDTicketPriority,
     HDPriorityMatrix,
+    HDStateTransition,
     HDTicketType,
     Team,
     HDAgent,
@@ -252,6 +253,37 @@ def is_valid_status_transition(old_status, new_status) -> bool:
     if old_status.category == RESOLVED and new_status.category == RESOLVED:
         return False
     return True
+
+
+def transition_allowed(db: Session, tid: int, ticket, new_status) -> tuple[bool, Optional[str]]:
+    """Flow #2 — enforce the data-driven state machine (grc_hd_state_transition,
+    seeded from the workbook's 'Allowed Next'). Returns (ok, reason).
+
+    Only enforces when the tenant has transitions seeded for THIS ticket's process
+    (so legacy / un-seeded tenants are unchanged). A no-op (same status) is always
+    allowed. A matched transition carrying guard='approved' additionally requires
+    the ticket to be approved first — the bridge to the approvals engine (#3)."""
+    cur = ticket.status_id
+    if cur is None or new_status.id == cur:
+        return True, None
+    process = (ticket.process or "incident")
+    defined = (db.query(HDStateTransition.id)
+               .filter(HDStateTransition.tenant_id == tid,
+                       HDStateTransition.process == process).first())
+    if defined is None:
+        return True, None  # this process has no state machine seeded → don't enforce
+    row = (db.query(HDStateTransition)
+           .filter(HDStateTransition.tenant_id == tid,
+                   HDStateTransition.process == process,
+                   HDStateTransition.from_status_id == cur,
+                   HDStateTransition.to_status_id == new_status.id)
+           .first())
+    if row is None:
+        return False, (f"illegal transition: a {process} cannot move to "
+                       f"'{new_status.label_agent}' from its current state")
+    if row.guard == "approved" and (getattr(ticket, "approval_state", None) or "") != "approved":
+        return False, f"moving to '{new_status.label_agent}' requires approval first"
+    return True, None
 
 
 def _activity(db: Session, tid: int, ticket: HDTicket, action: str) -> None:
@@ -501,6 +533,9 @@ def set_status(db: Session, tid: int, name: str, status_label: str,
     new_status = _status_by_label(db, tid, status_label)
     if not new_status:
         return {"ok": False, "error": "unknown status"}
+    ok, reason = transition_allowed(db, tid, ticket, new_status)
+    if not ok:
+        return {"ok": False, "error": reason}
     old_label = ticket.status.label_agent if ticket.status else None
     _apply_status_change(db, tid, ticket, new_status)
     db.commit()
