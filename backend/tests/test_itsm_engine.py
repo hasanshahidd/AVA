@@ -18,10 +18,12 @@ from types import SimpleNamespace
 
 from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
+    HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
 )
 from grc.modules.helpdesk_native.tickets import (
     priority_from_matrix, transition_allowed, update, update_ticket,
 )
+from grc.modules.helpdesk_native import approvals
 
 TENANT = 1
 
@@ -194,3 +196,107 @@ def test_update_ticket_recomputes_priority_on_reclassify(tdb):
     update_ticket(tdb, TENANT, t.id, {"impact": "high", "urgency": "high"})
     tdb.refresh(t)
     assert t.priority_id == p1.id and t.impact == "high" and t.urgency == "high"
+
+
+# ─── piece #3: approvals / CAB engine ────────────────────────────────────────
+@pytest.fixture
+def adb():
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix):
+        m.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def _change(adb, **kw):
+    t = HDTicket(tenant_id=TENANT, subject="chg", process="change", status_category="Open", **kw)
+    adb.add(t); adb.commit()
+    return t
+
+
+def test_open_approval_parks_ticket(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="cab", required_quorum=3,
+                                 required_role_codes=["ROLE-CHGMGR", "ROLE-SVCOWN"])
+    adb.commit()
+    assert ap.state == "pending"
+    adb.refresh(t)
+    assert t.approval_state == "pending_approval"
+
+
+def test_request_single_signoff_approves(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="request", required_quorum=1)
+    approvals.cast_vote(adb, TENANT, ap.id, "mgr@x.com", "approve", role="ROLE-APPROVER")
+    adb.commit()
+    adb.refresh(t); adb.refresh(ap)
+    assert ap.state == "approved" and t.approval_state == "approved"
+
+
+def test_cab_needs_quorum_and_required_roles(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="cab", required_quorum=3,
+                                 required_role_codes=["ROLE-CHGMGR", "ROLE-SVCOWN"])
+    approvals.cast_vote(adb, TENANT, ap.id, "a@x.com", "approve", role="ROLE-CHGMGR")
+    approvals.cast_vote(adb, TENANT, ap.id, "b@x.com", "approve", role="ROLE-SVCOWN")
+    adb.refresh(ap)
+    assert ap.state == "pending"        # only 2 of 3 quorum
+    approvals.cast_vote(adb, TENANT, ap.id, "c@x.com", "approve", role="ROLE-TECH")
+    adb.commit(); adb.refresh(ap); adb.refresh(t)
+    assert ap.state == "approved" and t.approval_state == "approved"
+
+
+def test_cab_blocks_when_required_role_absent(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="cab", required_quorum=2,
+                                 required_role_codes=["ROLE-CHGMGR"])
+    approvals.cast_vote(adb, TENANT, ap.id, "a@x.com", "approve", role="ROLE-TECH")
+    approvals.cast_vote(adb, TENANT, ap.id, "b@x.com", "approve", role="ROLE-SME")
+    adb.refresh(ap)
+    assert ap.state == "pending"        # quorum met but Change Manager hasn't approved
+    approvals.cast_vote(adb, TENANT, ap.id, "cm@x.com", "approve", role="ROLE-CHGMGR")
+    adb.refresh(ap)
+    assert ap.state == "approved"
+
+
+def test_one_reject_fails_and_late_votes_ignored(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="cab", required_quorum=3)
+    approvals.cast_vote(adb, TENANT, ap.id, "a@x.com", "reject", role="ROLE-CHGMGR", comment="too risky")
+    adb.commit(); adb.refresh(ap); adb.refresh(t)
+    assert ap.state == "rejected" and t.approval_state == "rejected"
+    # a vote after the decision is a no-op
+    approvals.cast_vote(adb, TENANT, ap.id, "b@x.com", "approve", role="ROLE-SVCOWN")
+    adb.refresh(ap)
+    assert ap.state == "rejected"
+
+
+def test_revote_updates_in_place(adb):
+    t = _change(adb)
+    ap = approvals.open_approval(adb, TENANT, t, kind="request", required_quorum=1)
+    approvals.cast_vote(adb, TENANT, ap.id, "a@x.com", "abstain")
+    assert adb.query(HDApprovalVote).filter_by(approval_id=ap.id).count() == 1
+    approvals.cast_vote(adb, TENANT, ap.id, "a@x.com", "approve")  # same approver changes mind
+    adb.refresh(ap)
+    assert adb.query(HDApprovalVote).filter_by(approval_id=ap.id).count() == 1
+    assert ap.state == "approved"
+
+
+def test_requirements_for_change(adb):
+    adb.add(HDChangeType(tenant_id=TENANT, code="standard", name="Standard",
+                         requires_cab=False, auto_approve=True))
+    adb.add(HDChangeType(tenant_id=TENANT, code="normal", name="Normal", requires_cab=True))
+    adb.add(HDChangeType(tenant_id=TENANT, code="emergency", name="Emergency", requires_cab=True))
+    adb.add(HDChangeRiskMatrix(tenant_id=TENANT, impact="high", likelihood="high",
+                               risk_level="high", cab_required=True))
+    adb.commit()
+    assert approvals.requirements_for_change(adb, TENANT, _change(adb, change_type="standard")) is None
+    normal = approvals.requirements_for_change(adb, TENANT, _change(adb, change_type="normal"))
+    assert normal["kind"] == "cab" and normal["required_quorum"] == 3
+    assert "ROLE-CHGMGR" in normal["required_role_codes"]
+    emer = approvals.requirements_for_change(adb, TENANT, _change(adb, change_type="emergency"))
+    assert emer["kind"] == "ecab"
+    # risk forces CAB even when the change type is unknown/unset
+    risky = approvals.requirements_for_change(adb, TENANT, _change(adb, change_risk="high"))
+    assert risky is not None and risky["kind"] == "cab"
