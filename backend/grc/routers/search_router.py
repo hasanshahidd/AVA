@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -749,13 +750,25 @@ def _xlsx_response(filename: str, headers: List[str], rows: List[List[Any]]) -> 
     )
 
 
+# openpyxl rejects these control bytes with IllegalCharacterError (→ 500 on
+# export). Scanner-plugin text in vuln rows carries them; assets/tickets don't,
+# which is why only the vulnerabilities XLSX was failing.
+_ILLEGAL_XLSX = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
 def _xlsx_safe(value: Any) -> Any:
-    """Convert datetimes + None to spreadsheet-friendly values."""
+    """Coerce a value to something openpyxl can actually write: strip the control
+    bytes it rejects, keep numbers numeric, and stringify JSON-column dict/list
+    values (a cell can't hold one)."""
     if value is None:
         return ""
+    if isinstance(value, str):
+        return _ILLEGAL_XLSX.sub("", value)
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        return value
     if isinstance(value, datetime):
         return value.isoformat()
-    return value
+    return _ILLEGAL_XLSX.sub("", str(value))
 
 
 def _report_export(
