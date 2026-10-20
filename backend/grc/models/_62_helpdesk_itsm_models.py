@@ -193,6 +193,7 @@ class HDRequestItem(Base):
     name = Column(String(200), nullable=False)
     business_service_id = Column(Integer, ForeignKey("grc_hd_business_service.id"), nullable=True, index=True)
     category_id = Column(Integer, ForeignKey("grc_hd_service_category.id"), nullable=True)
+    ci_type_id = Column(Integer, ForeignKey("grc_hd_ci_type.id"), nullable=True, index=True)  # kind of asset this request concerns
     description = Column(Text, nullable=True)
     approval_required = Column(Boolean, server_default=text("false"))
     approver_role = Column(String(60), nullable=True)      # ROLE-* code (resolved via HDRoleMap)
@@ -207,6 +208,7 @@ class HDRequestItem(Base):
 
     business_service = relationship("HDBusinessService")
     category = relationship("HDServiceCategory")
+    ci_type = relationship("HDCIType")
 
     __table_args__ = (
         Index("uq_hd_request_item_code", "tenant_id", "code", unique=True),

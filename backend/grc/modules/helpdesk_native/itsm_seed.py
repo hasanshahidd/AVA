@@ -121,6 +121,11 @@ _TICKET_ITSM_ALTER_COLUMNS = [
     ("incident_category_id", "INTEGER REFERENCES grc_hd_incident_category(id)"),
     ("support_group_code", "VARCHAR(40)"),
 ]
+# Catalogue request item — optional CI-type (asset kind) association. References
+# grc_hd_ci_type, which ensure_itsm_tables creates first (both in _ITSM_MODELS).
+_REQUEST_ITEM_ALTER_COLUMNS = [
+    ("ci_type_id", "INTEGER REFERENCES grc_hd_ci_type(id)"),
+]
 _PRIORITY_ALTER_COLUMNS = [
     ("code", "VARCHAR(10)"),
     ("rank", "INTEGER"),
@@ -589,6 +594,7 @@ def _add_columns(db: Session) -> int:
     added = (_alter_add_columns(db, "grc_hd_ticket", _ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket_template", _TEMPLATE_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket", _TICKET_ITSM_ALTER_COLUMNS)
+             + _alter_add_columns(db, "grc_hd_request_item", _REQUEST_ITEM_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket_priority", _PRIORITY_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_ticket_status", _STATUS_ALTER_COLUMNS)
              + _alter_add_columns(db, "grc_hd_department", _DEPARTMENT_ALTER_COLUMNS)

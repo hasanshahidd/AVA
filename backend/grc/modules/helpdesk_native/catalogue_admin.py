@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from ...models import (
     HDBusinessService,
+    HDCIType,
     HDRequestItem,
     HDServiceCategory,
     HDServiceDependency,
@@ -80,6 +81,19 @@ def _require_business_service(db: Session, tid: int, business_service_id: Option
     ):
         raise HTTPException(
             status_code=400, detail=f"business_service_id {business_service_id} does not exist"
+        )
+
+
+def _require_ci_type(db: Session, tid: int, ci_type_id: Optional[int]) -> None:
+    if ci_type_id is None:
+        return
+    if not (
+        db.query(HDCIType.id)
+        .filter(HDCIType.tenant_id == tid, HDCIType.id == ci_type_id)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400, detail=f"ci_type_id {ci_type_id} does not exist"
         )
 
 
@@ -553,6 +567,7 @@ class RequestItemCreate(BaseModel):
     name: str
     business_service_id: Optional[int] = None
     category_id: Optional[int] = None
+    ci_type_id: Optional[int] = None
     description: Optional[str] = None
     approval_required: Optional[bool] = None
     approver_role: Optional[str] = None
@@ -567,6 +582,7 @@ class RequestItemUpdate(BaseModel):
     name: Optional[str] = None
     business_service_id: Optional[int] = None
     category_id: Optional[int] = None
+    ci_type_id: Optional[int] = None
     description: Optional[str] = None
     approval_required: Optional[bool] = None
     approver_role: Optional[str] = None
@@ -586,6 +602,8 @@ def _request_item_row(r: HDRequestItem) -> dict:
         "business_service": r.business_service.name if r.business_service else None,
         "category_id": r.category_id,
         "category": r.category.name if r.category else None,
+        "ci_type_id": r.ci_type_id,
+        "ci_type": r.ci_type.name if r.ci_type else None,
         "description": r.description,
         "approval_required": bool(r.approval_required),
         "approver_role": r.approver_role,
@@ -628,12 +646,14 @@ def create_request_item(db: Session, tid: int, body: RequestItemCreate) -> dict:
         raise HTTPException(status_code=409, detail=f"request item code '{code}' already exists")
     _require_business_service(db, tid, body.business_service_id)
     _require_category(db, tid, body.category_id)
+    _require_ci_type(db, tid, body.ci_type_id)
     row = HDRequestItem(
         tenant_id=tid,
         code=code,
         name=body.name,
         business_service_id=body.business_service_id,
         category_id=body.category_id,
+        ci_type_id=body.ci_type_id,
         description=body.description,
         approval_required=bool(body.approval_required),
         approver_role=body.approver_role,
@@ -655,6 +675,8 @@ def update_request_item(db: Session, tid: int, rid: int, body: RequestItemUpdate
         _require_business_service(db, tid, data["business_service_id"])
     if "category_id" in data:
         _require_category(db, tid, data["category_id"])
+    if "ci_type_id" in data:
+        _require_ci_type(db, tid, data["ci_type_id"])
     for k, v in data.items():
         setattr(row, k, v)
     db.commit()

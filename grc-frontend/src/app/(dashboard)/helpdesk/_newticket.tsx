@@ -123,12 +123,15 @@ export function NewTicketDialog({
   const agentsRes = useHd<{ agents: Agent[] }>("/helpdesk/agents");
   const teamsRes = useHd<{ teams: Team[] }>("/helpdesk/teams");
   const sgRes = useHd<{ support_groups: { code: string; name: string; mapped: boolean }[] }>("/helpdesk/support-groups");
+  // Customers list — {name: "<id>", customer_name}. The picker sends customer_id = Number(name).
+  const customersRes = useHd<{ customers: { name: string; customer_name?: string | null }[] }>("/helpdesk/customers");
 
   const [process, setProcess] = useState<Process>("incident");
   const [departmentId, setDepartmentId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
+  const [customerId, setCustomerId] = useState("");
 
   // assignment (optional — unassigned routes by department)
   const [assignee, setAssignee] = useState("");
@@ -219,7 +222,7 @@ export function NewTicketDialog({
 
   const reset = () => {
     setProcess("incident");
-    setDepartmentId(""); setSubject(""); setDescription(""); setContact("");
+    setDepartmentId(""); setSubject(""); setDescription(""); setContact(""); setCustomerId("");
     setAssignee(""); setTeam(""); setSupportGroup(""); setCi(null);
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
@@ -243,6 +246,7 @@ export function NewTicketDialog({
       department_id: departmentId ? Number(departmentId) : null,
     };
     if (contact.trim()) payload.contact = contact.trim();
+    if (customerId) payload.customer_id = Number(customerId);
     if (assignee) payload.assigned_agent = assignee; // explicit assignee (wins over auto-assign)
     if (team) payload.team = team;
     if (supportGroup) payload.support_group_code = supportGroup; // routes to the group's mapped team
@@ -568,9 +572,19 @@ export function NewTicketDialog({
           </Field>
         </div>
 
-        <Field label="Contact email" hint="Who raised this, if not an internal user.">
-          <Input type="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="person@company.com" />
-        </Field>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <Field label="Customer" hint="Optional — the organisation this ticket belongs to.">
+            <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} disabled={!(customersRes.data?.customers || []).length}>
+              <option value="">{(customersRes.data?.customers || []).length ? "— None —" : "No customers configured"}</option>
+              {(customersRes.data?.customers || []).map((c) => (
+                <option key={c.name} value={c.name}>{c.customer_name || c.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Contact email" hint="Who raised this, if not an internal user.">
+            <Input type="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="person@company.com" />
+          </Field>
+        </div>
       </div>
     </Modal>
   );

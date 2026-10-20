@@ -8,11 +8,11 @@
  * ITIL process and derives priority, so we only collect subject + details + a
  * plain "how urgent" hint. On success we bounce to My Requests.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MessageSquareText, CheckCircle2 } from "lucide-react";
-import { PageHeader } from "../../_ui";
+import { MessageSquareText, CheckCircle2, BookOpen, FileText } from "lucide-react";
+import { PageHeader, useHd } from "../../_ui";
 import { Field, Input, Textarea, Select, Btn, FormError, hdCall } from "../../_admin";
 import { AssetPicker, type PickedAsset } from "../_asset_picker";
 
@@ -21,6 +21,24 @@ const URGENCY = [
   { value: "medium", label: "Soon — it's slowing me down" },
   { value: "high", label: "Urgent — I can't work until it's fixed" },
 ];
+
+const hiddenRe = /draft|archiv/i;
+// Deflection: suggest published articles whose title shares a 4+ char word with
+// the subject, best overlap first. Mirrors the request wizard's ranking.
+function suggestArticles(subject: string, articles: any[]): any[] {
+  const words = subject.toLowerCase().match(/[a-z0-9]{4,}/g) || [];
+  if (!words.length) return [];
+  return articles
+    .filter((a) => !hiddenRe.test(a.status || ""))
+    .map((a) => {
+      const title = (a.title || "").toLowerCase();
+      return { a, score: words.filter((w) => title.includes(w)).length };
+    })
+    .filter((x) => x.score > 0)
+    .sort((x, y) => y.score - x.score)
+    .slice(0, 3)
+    .map((x) => x.a);
+}
 
 export default function ReportIssue() {
   const router = useRouter();
@@ -31,6 +49,12 @@ export default function ReportIssue() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [doneId, setDoneId] = useState<string | null>(null);
+
+  const kb = useHd<{ articles: any[] }>("/helpdesk/portal/kb");
+  const suggestions = useMemo(
+    () => suggestArticles(subject, Array.isArray(kb.data?.articles) ? kb.data!.articles : []),
+    [subject, kb.data],
+  );
 
   const submit = async () => {
     if (!subject.trim()) { setErr("Please give your issue a short title."); return; }
@@ -88,6 +112,26 @@ export default function ReportIssue() {
           <Field label="What's the problem?" required hint="A short title, e.g. “Can't log in to email”.">
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary" autoFocus />
           </Field>
+          {suggestions.length > 0 && (
+            <div className="rounded-xl border border-[#BAE0F3] bg-[#F0F8FD] p-4">
+              <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#005B96]">
+                <BookOpen size={14} /> These help articles might fix it faster
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {suggestions.map((a) => (
+                  <li key={a.name}>
+                    <Link
+                      href={`/helpdesk/portal/kb/${encodeURIComponent(a.name)}`}
+                      className="inline-flex items-center gap-2 text-sm text-[#0F172A] hover:text-[#005B96] hover:underline"
+                    >
+                      <FileText size={14} className="shrink-0 text-[#005B96]" />
+                      {a.title || a.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <Field label="Tell us more" hint="What happened, when it started, anything you've already tried.">
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the issue…" />
           </Field>

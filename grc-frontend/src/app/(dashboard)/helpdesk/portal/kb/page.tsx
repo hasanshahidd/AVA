@@ -79,7 +79,11 @@ export default function PortalKnowledgeBase() {
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {list.map((a) => (
-                  <div key={a.name} className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm">
+                  <Link
+                    key={a.name}
+                    href={`/helpdesk/portal/kb/${encodeURIComponent(a.name)}`}
+                    className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[#005B96] hover:shadow-sm"
+                  >
                     <div className="flex items-start gap-3">
                       <FileText size={18} className="mt-0.5 shrink-0 text-[#005B96]" />
                       <div className="min-w-0 flex-1">
@@ -87,7 +91,7 @@ export default function PortalKnowledgeBase() {
                         <div className="mt-1 text-xs text-slate-500">Updated {timeAgo(a.modified)}</div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

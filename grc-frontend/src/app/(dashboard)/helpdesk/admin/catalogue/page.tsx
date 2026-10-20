@@ -404,12 +404,15 @@ export default function CatalogueAdminPage() {
   const svcs = useHd<any>(`${BASE}/services`);
   const techs = useHd<any>(`${BASE}/technical`);
   const reqs = useHd<any>(`${BASE}/requests`);
+  // CI types come from the CMDB admin (reused by the request-item form picker).
+  const ciTypesRes = useHd<any>(`/helpdesk/admin/cmdb/types`);
   const [tab, setTab] = useState<TabKey>("categories");
 
   const categories: any[] = Array.isArray(cats.data?.categories) ? cats.data.categories : [];
   const services: any[] = Array.isArray(svcs.data?.services) ? svcs.data.services : [];
   const technical: any[] = Array.isArray(techs.data?.technical) ? techs.data.technical : [];
   const requests: any[] = Array.isArray(reqs.data?.requests) ? reqs.data.requests : [];
+  const ciTypes: any[] = Array.isArray(ciTypesRes.data?.ci_types) ? ciTypesRes.data.ci_types : [];
 
   const loading = cats.loading || svcs.loading || techs.loading || reqs.loading;
   const error = cats.error || svcs.error || techs.error || reqs.error;
@@ -417,6 +420,7 @@ export default function CatalogueAdminPage() {
 
   const catOpts: Opt[] = categories.filter((c) => c.enabled !== false).map((c) => ({ value: String(c.id), label: c.name }));
   const svcOpts: Opt[] = services.filter((s) => s.enabled !== false).map((s) => ({ value: String(s.id), label: s.name }));
+  const ciTypeOpts: Opt[] = ciTypes.map((t) => ({ value: String(t.id), label: t.name }));
   const critOpts: Opt[] = ["low", "medium", "high", "critical"].map((v) => ({ value: v, label: v }));
 
   const categoryFields: FieldDef[] = [
@@ -448,6 +452,7 @@ export default function CatalogueAdminPage() {
     { key: "name", label: "Name", kind: "text", required: true },
     { key: "business_service_id", label: "Business service", kind: "ref", options: svcOpts },
     { key: "category_id", label: "Category", kind: "ref", options: catOpts },
+    { key: "ci_type_id", label: "Asset type (CI type)", kind: "ref", options: ciTypeOpts },
     { key: "description", label: "Description", kind: "textarea" },
     { key: "approval_required", label: "Approval required", kind: "bool" },
     { key: "approver_role", label: "Approver role", kind: "text" },

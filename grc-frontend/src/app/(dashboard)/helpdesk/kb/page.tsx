@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { BookOpen, Search, FileText, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Chip, PageHeader, RefreshBtn, Empty, ErrorBanner, Loading, timeAgo, useHd } from "../_ui";
@@ -38,7 +39,7 @@ export default function KnowledgeBasePage() {
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {list.map((a) => (
-                  <div key={a.name} className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm">
+                  <Link key={a.name} href={`/helpdesk/kb/${encodeURIComponent(a.name)}`} className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[var(--color-base)] hover:shadow-sm">
                     <div className="flex items-start gap-3">
                       <FileText size={18} className="mt-0.5 shrink-0 text-slate-400" />
                       <div className="min-w-0 flex-1">
@@ -54,7 +55,7 @@ export default function KnowledgeBasePage() {
                       </div>
                       <Chip value={a.status || "Draft"} />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

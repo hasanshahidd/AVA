@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from ...models import (GRCUser, HDAgent, HDArticle, HDArticleCategory,
                        HDArticleFeedback, get_db)
 from ...routers.auth_router import require_auth
-from .common import iso, require_kb_author, require_kb_view, tenant_id
+from .common import iso, require_kb_author, require_kb_view, require_requester, tenant_id
 
 GENERAL = "General"
 
@@ -488,6 +488,15 @@ class FeedbackBody(BaseModel):
 @kb_write_router.get("/articles/{name}")
 def r_get_article(name: str, db: Session = Depends(get_db),
                   user: GRCUser = Depends(require_auth), _: bool = Depends(require_kb_view)):
+    return get_article(db, tenant_id(db), name, user.email)
+
+
+@kb_write_router.get("/portal/kb/{name}")
+def r_portal_get_article(name: str, db: Session = Depends(get_db),
+                         user: GRCUser = Depends(require_auth), _: bool = Depends(require_requester)):
+    """Requester-portal read-one (gated on requests:view_own, like the portal /kb
+    list). Reuses get_article: its non-agent gate means a requester only ever reads
+    a Published article's body — Draft/Archived → 403, cross-tenant id → 404."""
     return get_article(db, tenant_id(db), name, user.email)
 
 
