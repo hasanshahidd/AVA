@@ -1101,13 +1101,48 @@ def _ensure_feedback_options(db: Session, tid: int) -> int:
     return created
 
 
+# The governance SLA-targets screen reads grc_hd_sla_target, which is ONLY filled by
+# a workbook import — so on a seed-only tenant it's empty even though tickets carry
+# live SLA clocks (those come from the SLA engine, HDServiceLevelAgreement). Seed the
+# target rows from the SAME _SLA_DEFS the engine uses so the screen is authoritative.
+_SLA_TARGET_META = {  # priority label -> (code, sort_order)
+    "Urgent": ("P1", 1), "High": ("P2", 2), "Medium": ("P3", 3), "Low": ("P5", 5),
+}
+_SLA_PROCESS_BY_NAME = {
+    "Incident SLA": "incident", "Service Request SLA": "service_request",
+    "Change SLA": "change", "Problem SLA": "problem",
+}
+
+
+def _ensure_sla_targets(db: Session, tid: int) -> int:
+    created = 0
+    for service_level, _cond, targets in _SLA_DEFS:
+        process = _SLA_PROCESS_BY_NAME.get(service_level)
+        if not process:
+            continue
+        for level, (resp, reso) in targets.items():
+            code, order = _SLA_TARGET_META.get(level, (None, None))
+            if (db.query(HDSLATarget.id)
+                    .filter(HDSLATarget.tenant_id == tid, HDSLATarget.process == process,
+                            HDSLATarget.priority_label == level).first()):
+                continue
+            db.add(HDSLATarget(tenant_id=tid, process=process, priority_label=level,
+                               priority_code=code, service_window="24x7",
+                               response_minutes=resp // 60, resolution_minutes=reso // 60,
+                               sort_order=order))
+            created += 1
+    db.commit()
+    return created
+
+
 def ensure_governance_baseline(db: Session, tid: int) -> int:
     """Idempotent, cheap (count + insert-missing, no recompute) — safe to run on
     every boot so established tenants that predate this seed heal too. Returns the
-    number of rows created across change types, risk matrix, incident categories
-    and feedback options."""
+    number of rows created across change types, risk matrix, incident categories,
+    feedback options and SLA targets."""
     return (_ensure_change_types(db, tid) + _ensure_risk_matrix(db, tid)
-            + _ensure_incident_categories(db, tid) + _ensure_feedback_options(db, tid))
+            + _ensure_incident_categories(db, tid) + _ensure_feedback_options(db, tid)
+            + _ensure_sla_targets(db, tid))
 
 
 def seed_itsm(db: Session, tid: int) -> dict:

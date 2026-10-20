@@ -1187,6 +1187,14 @@ def sync_status(db: Session = Depends(get_db), _: bool = Depends(require_setting
     # Installed-software CIs are per-host drill-down detail, not estate: split them
     # out so the UI can headline the real CI estate instead of an inflated total
     # (a 12-host estate otherwise reads as ~1,400 "total CIs", which is noise).
+    # estate = ALL CIs minus software — NOT linked_ci_count minus software: software
+    # CIs carry ava_asset_id=None so they're already absent from linked_ci_count, and
+    # subtracting them from it went negative (QA: "Configuration items: -1,381").
+    total = (
+        db.query(HDConfigurationItem)
+        .filter(HDConfigurationItem.tenant_id == tid)
+        .count()
+    )
     soft_type_id = (
         db.query(HDCIType.id)
         .filter(HDCIType.tenant_id == tid, HDCIType.code == CIT_SOFTWARE)
@@ -1205,7 +1213,7 @@ def sync_status(db: Session = Depends(get_db), _: bool = Depends(require_setting
         "inventory_count": (last.summary or {}).get("inventory_count") if last else None,
         "linked_ci_count": linked,
         "software_ci_count": software,
-        "estate_ci_count": linked - software,   # real CIs minus per-host software
+        "estate_ci_count": max(total - software, 0),   # all non-software CIs (hosts/domains/manual)
         "retired_ci_count": retired,
     }
 

@@ -26,6 +26,7 @@ from ...models import (
     HDApproval,
     HDApprovalVote,
     HDBusinessService,
+    HDCIType,
     HDConfigurationItem,
     HDRequestItem,
     HDServiceCategory,
@@ -236,10 +237,18 @@ def portal_assets(q: Optional[str] = None, db: Session = Depends(get_db),
     tid = tenant_id(db)
     el = (email or "").strip().lower()
     ql = (q or "").strip().lower()
-    cis = (db.query(HDConfigurationItem)
-           .filter(HDConfigurationItem.tenant_id == tid,
-                   func.lower(func.coalesce(HDConfigurationItem.status, "")) != "retired")
-           .all())
+    # Exclude installed-software CIs: a requester attaches a real asset (host /
+    # workstation / service), not a software package. Without this, searching
+    # "DESKTOP" surfaced "Chrome Remote Desktop Host" etc. alongside the workstation.
+    soft_type_id = (db.query(HDCIType.id)
+                    .filter(HDCIType.tenant_id == tid, HDCIType.code == "CIT-SOFTWARE")
+                    .scalar())
+    query = db.query(HDConfigurationItem).filter(
+        HDConfigurationItem.tenant_id == tid,
+        func.lower(func.coalesce(HDConfigurationItem.status, "")) != "retired")
+    if soft_type_id is not None:
+        query = query.filter(HDConfigurationItem.ci_type_id != soft_type_id)
+    cis = query.all()
     mine = lambda c: el != "" and (c.owner or "").strip().lower() == el  # noqa: E731
     if ql:
         hits = [c for c in cis if ql in (c.name or "").lower() or ql in (c.code or "").lower()]

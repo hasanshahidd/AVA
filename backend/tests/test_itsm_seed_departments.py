@@ -15,14 +15,16 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import (
     HDChangeRiskMatrix, HDChangeType, HDDepartment, HDIncidentCategory,
-    HDServiceCategory, HDTicketFeedbackOption, HDTicketType,
+    HDServiceCategory, HDSLATarget, HDTicketFeedbackOption, HDTicketType,
 )
 from grc.modules.helpdesk_native.itsm_seed import (
     _CHANGE_TYPES, _DEPARTMENTS, _DEPT_STD, _FEEDBACK_OPTIONS, _INCIDENT_CATEGORIES,
-    _RISK_MATRIX, _ensure_departments, ensure_governance_baseline, seed_if_empty,
+    _RISK_MATRIX, _SLA_DEFS, _SLA_PROCESS_BY_NAME, _ensure_departments,
+    ensure_governance_baseline, seed_if_empty,
 )
 
 TENANT = 1
+_SLA_TARGET_COUNT = sum(len(t) for sl, _c, t in _SLA_DEFS if sl in _SLA_PROCESS_BY_NAME)
 
 
 @pytest.fixture
@@ -38,7 +40,7 @@ def db():
 @pytest.fixture
 def gov_db():
     engine = create_engine("sqlite://")
-    for m in (HDChangeType, HDChangeRiskMatrix, HDIncidentCategory, HDTicketFeedbackOption):
+    for m in (HDChangeType, HDChangeRiskMatrix, HDIncidentCategory, HDTicketFeedbackOption, HDSLATarget):
         m.__table__.create(engine)
     s = sessionmaker(bind=engine)()
     yield s
@@ -48,7 +50,10 @@ def gov_db():
 def test_governance_baseline_seeds_everything_once(gov_db):
     created = ensure_governance_baseline(gov_db, TENANT)
     assert created == (len(_CHANGE_TYPES) + len(_RISK_MATRIX)
-                       + len(_INCIDENT_CATEGORIES) + len(_FEEDBACK_OPTIONS))
+                       + len(_INCIDENT_CATEGORIES) + len(_FEEDBACK_OPTIONS)
+                       + _SLA_TARGET_COUNT)
+    # Governance SLA-targets screen reads these; empty = QA's "No SLA targets yet".
+    assert gov_db.query(HDSLATarget).filter_by(tenant_id=TENANT, process="change").count() > 0
     # The approval engine keys off these: Standard auto-approves (no CAB), Emergency
     # always needs one. A missing/empty table silently breaks Change routing.
     std = gov_db.query(HDChangeType).filter_by(tenant_id=TENANT, code="standard").one()
