@@ -12,6 +12,7 @@ is pure (matrix + SLA target table) and needs no DB.
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, text
@@ -935,6 +936,47 @@ def ensure_agents_from_roles(db: Session, tid: int) -> dict:
     return {"created": created, "agents": sorted(by_email)}
 
 
+def _slug(s: str, maxlen: int = 40) -> str:
+    out = re.sub(r"[^A-Za-z0-9]+", "-", s or "").strip("-").upper()
+    return out[:maxlen] or "X"
+
+
+def _ensure_service_catalog(db: Session, tid: int) -> dict:
+    """Seed the Service Catalogue (grc_hd_service_category + grc_hd_request_item)
+    from SERVICE_CATALOG: one category per top-level key, one request item per
+    subcategory under it. This is what the 'Request something' wizard and the
+    Service Catalogue admin READ — seed_request_templates fills a DIFFERENT table
+    (grc_hd_ticket_template), so without this the catalogue tables stayed empty
+    (the return dict's 'service_catalog' was only the Python constant, not rows).
+    Idempotent: categories matched by name, items by (category, name); single
+    commit. Item codes are index-based so they can't collide on truncation."""
+    cats = items = 0
+    for ci, (cat_name, subs) in enumerate(SERVICE_CATALOG.items()):
+        cat = (db.query(HDServiceCategory)
+               .filter(HDServiceCategory.tenant_id == tid, HDServiceCategory.name == cat_name)
+               .first())
+        if not cat:
+            cat = HDServiceCategory(tenant_id=tid, code=f"CAT-{_slug(cat_name, 32)}",
+                                    name=cat_name, sort_order=ci, enabled=True)
+            db.add(cat)
+            db.flush()
+            cats += 1
+        for si, sub in enumerate(subs):
+            exists = (db.query(HDRequestItem.id)
+                      .filter(HDRequestItem.tenant_id == tid,
+                              HDRequestItem.category_id == cat.id,
+                              HDRequestItem.name == sub)
+                      .first())
+            if exists:
+                continue
+            db.add(HDRequestItem(tenant_id=tid, code=f"REQ-{ci:02d}-{si:02d}", name=sub,
+                                 category_id=cat.id, description=f"{sub} ({cat_name})",
+                                 approval_required=False, enabled=True))
+            items += 1
+    db.commit()
+    return {"categories_created": cats, "request_items_created": items}
+
+
 def seed_itsm(db: Session, tid: int) -> dict:
     """§3 — idempotent ITSM seed. Order matters: columns exist before backfill,
     priorities exist before the SLAs reference them, and the SLA backfill runs
@@ -946,6 +988,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
     _ensure_ticket_types(db, tid, pri_ids.get("Medium"))
     slas_created = _ensure_slas(db, tid, pri_ids)
     depts = _ensure_departments(db, tid)
+    catalog = _ensure_service_catalog(db, tid)   # grc_hd_service_category + grc_hd_request_item
     templates_created = seed_request_templates(db, tid)
     backfill = backfill_process(db, tid)
     sla_targets_filled = backfill_sla_target_resolutions(db, tid)  # §3.6b
@@ -962,6 +1005,8 @@ def seed_itsm(db: Session, tid: int) -> dict:
         "statuses": [s[0] for s in _STATUSES],
         "ticket_types": list(_TICKET_TYPES),
         "service_catalog": list(SERVICE_CATALOG),
+        "service_categories_created": catalog["categories_created"],
+        "request_items_created": catalog["request_items_created"],
         "slas": [d[0] for d in _SLA_DEFS],
         "slas_created": slas_created,
         "departments": list(depts),
