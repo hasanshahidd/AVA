@@ -3551,6 +3551,9 @@ export interface AdminRole {
   name: string;
   description: string;
   is_system_role: boolean;
+  /** Administrator bypasses per-permission checks (grants *:*:*), so it holds no
+   *  RolePermission rows — the UI shows "Full access" rather than "0". */
+  bypasses_all?: boolean;
   user_count: number;
   permissions: string[];
   created_at: string;
