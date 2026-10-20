@@ -15,7 +15,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.orm import Session
 
 from ...models import (
@@ -51,6 +51,7 @@ from ...models import (
     HDTechnicalService,
     HDTicket,
     HDTicketCI,
+    HDTicketFeedbackOption,
     HDTicketKBLink,
     HDTicketPriority,
     HDTicketStatus,
@@ -669,27 +670,53 @@ def ensure_attachment_table(db: Session) -> bool:
         return False
 
 
+# Extra name variants (lower-cased) a canonical department has been seen under,
+# beyond its standard name + short alias — so the merge below catches them too.
+_DEPT_EXTRA_ALIASES = {"IT": {"it support"}}
+# Tables whose department_id FK must be repointed before a stray row is deleted.
+_DEPT_FK_TABLES = ("grc_hd_ticket", "grc_hd_ticket_type", "grc_hd_ticket_template")
+
+
+def _merge_department(db: Session, from_id: int, to_id: int, fk_tables) -> None:
+    """Repoint every department_id FK off a stray row onto the survivor, so the
+    stray can be deleted without orphaning tickets/types/templates. department_id
+    is a global PK, so matching on it alone is unambiguous. `fk_tables` is the
+    pre-resolved list of FK tables that actually exist (resolved once up front —
+    a mid-transaction reflection would ROLLBACK the pending merge)."""
+    for tbl in fk_tables:
+        db.execute(text(f"UPDATE {tbl} SET department_id = :to WHERE department_id = :frm"),
+                   {"to": to_id, "frm": from_id})
+
+
 def _ensure_departments(db: Session, tid: int) -> dict:
     """§A2 — ensure the request-library departments exist under their STANDARD
     name + code (enabled); return {short_name: id}. Resolving through _DEPT_STD
     means "IT" finds the existing "Information Technology" instead of creating an
-    uncoded duplicate. A department found without a code gets its standard code
-    stamped (heals pre-existing uncoded strays)."""
+    uncoded duplicate.
+
+    DEDUP + HEAL: when a canonical department already has alias twins (QA found
+    "Finance" + "Finance & Accounting", "HR" + "Human Resources", "IT" + "IT
+    Support" + "Information Technology", "Legal" + "Legal & Compliance" all as
+    separate rows), one survivor is kept + canonicalised and every other matched
+    row is MERGED into it: its department_id FK references are repointed and the
+    stray row deleted. Idempotent — after the first heal no strays remain."""
+    # Resolve which FK tables exist ONCE, before any pending mutation: a
+    # reflection (inspect().has_table) run mid-transaction emits a ROLLBACK that
+    # would discard the pending merges.
+    insp = inspect(db.bind)
+    fk_tables = [t for t in _DEPT_FK_TABLES if insp.has_table(t)]
+
     out: dict = {}
+    merges: list = []  # (stray_obj, survivor_id) — applied after the resolve loop
     for short in _DEPARTMENTS:
         std_name, code = _DEPT_STD[short]
-        # Match an existing department by its standard name, its short/alias name,
-        # OR its code — so a pre-existing "Finance" or "HR" is REUSED and
-        # canonicalised, not duplicated as "Finance & Accounting" / "Human
-        # Resources" (QA found both existing side by side). Prefer a row already
-        # on the standard name/code; only rename an alias row when no standard-named
-        # row exists (so we never create a name collision).
-        aliases = {std_name.lower(), short.lower()}
+        aliases = {std_name.lower(), short.lower()} | _DEPT_EXTRA_ALIASES.get(short, set())
         matches = (db.query(HDDepartment)
                    .filter(HDDepartment.tenant_id == tid,
                            or_(func.lower(HDDepartment.name).in_(aliases),
                                HDDepartment.code == code))
                    .all())
+        # Survivor: prefer the row already on the standard name/code.
         d = next((m for m in matches if m.name == std_name or m.code == code),
                  matches[0] if matches else None)
         if d is None:
@@ -699,10 +726,17 @@ def _ensure_departments(db: Session, tid: int) -> dict:
         else:
             if not d.code:
                 d.code = code
-            if (d.name != std_name and d.name.lower() in aliases
-                    and not any(m.name == std_name for m in matches)):
+            if d.name != std_name:
                 d.name = std_name  # heal "Finance" -> "Finance & Accounting"
+        for m in matches:
+            if m.id != d.id:
+                merges.append((m, d.id))  # fold every other matched row into d
         out[short] = d.id
+
+    # Repoint FKs off each stray onto its survivor, then delete the stray.
+    for stray, survivor_id in merges:
+        _merge_department(db, stray.id, survivor_id, fk_tables)
+        db.delete(stray)
     db.commit()
     return out
 
@@ -992,6 +1026,90 @@ def _ensure_service_catalog(db: Session, tid: int) -> dict:
     return {"categories_created": cats, "request_items_created": items}
 
 
+# ── governance + feedback baseline ──────────────────────────────────────────
+# These are universal ITIL/ITSM product defaults, not customer-specific config:
+# the Change approval engine (approvals.requirements_for_change) resolves CAB/ECAB
+# from the tenant's change types + risk matrix, so an empty table silently breaks
+# the Change process. The CSAT scale and a starter set of incident categories are
+# likewise baseline. (Customer-specific content — CAB membership, KB articles, and
+# the actual feedback ratings on tickets — stays empty for the client to fill.)
+_CHANGE_TYPES = [
+    # code, name, requires_cab, auto_approve, description
+    ("standard", "Standard", False, True, "Pre-authorised, low-risk, repeatable change — skips CAB."),
+    ("normal", "Normal", True, False, "Assessed and authorised by the CAB before implementation."),
+    ("major", "Major", True, False, "High-impact normal change requiring full CAB review."),
+    ("emergency", "Emergency", True, False, "Urgent change authorised by the Emergency CAB (ECAB)."),
+]
+# impact × likelihood (the house low/medium/high vocabulary) → risk_level, cab_required
+_RISK_MATRIX = [
+    ("low", "low", "low", False), ("low", "medium", "low", False), ("low", "high", "medium", True),
+    ("medium", "low", "low", False), ("medium", "medium", "medium", True), ("medium", "high", "high", True),
+    ("high", "low", "medium", True), ("high", "medium", "high", True), ("high", "high", "very_high", True),
+]
+_INCIDENT_CATEGORIES = [
+    "Hardware", "Software", "Network", "Access & Accounts",
+    "Email & Collaboration", "Security", "Other",
+]
+_FEEDBACK_OPTIONS = [  # Frappe HD 5-point CSAT scale (rating stored as 0.2 steps)
+    (0.2, "Very poor"), (0.4, "Poor"), (0.6, "Neutral"), (0.8, "Good"), (1.0, "Excellent"),
+]
+
+
+def _ensure_change_types(db: Session, tid: int) -> int:
+    created = 0
+    for code, name, requires_cab, auto_approve, desc in _CHANGE_TYPES:
+        if not db.query(HDChangeType).filter_by(tenant_id=tid, code=code).first():
+            db.add(HDChangeType(tenant_id=tid, code=code, name=name,
+                                requires_cab=requires_cab, auto_approve=auto_approve,
+                                description=desc))
+            created += 1
+    db.commit()
+    return created
+
+
+def _ensure_risk_matrix(db: Session, tid: int) -> int:
+    created = 0
+    for impact, likelihood, level, cab in _RISK_MATRIX:
+        if not (db.query(HDChangeRiskMatrix)
+                .filter_by(tenant_id=tid, impact=impact, likelihood=likelihood).first()):
+            db.add(HDChangeRiskMatrix(tenant_id=tid, impact=impact, likelihood=likelihood,
+                                      risk_level=level, cab_required=cab))
+            created += 1
+    db.commit()
+    return created
+
+
+def _ensure_incident_categories(db: Session, tid: int) -> int:
+    created = 0
+    for i, name in enumerate(_INCIDENT_CATEGORIES):
+        key = _slug(name)
+        if not db.query(HDIncidentCategory).filter_by(tenant_id=tid, key=key).first():
+            db.add(HDIncidentCategory(tenant_id=tid, key=key, name=name,
+                                      level="category", sort_order=i))
+            created += 1
+    db.commit()
+    return created
+
+
+def _ensure_feedback_options(db: Session, tid: int) -> int:
+    created = 0
+    for rating, label in _FEEDBACK_OPTIONS:
+        if not db.query(HDTicketFeedbackOption).filter_by(tenant_id=tid, rating=rating).first():
+            db.add(HDTicketFeedbackOption(tenant_id=tid, rating=rating, label=label, disabled=False))
+            created += 1
+    db.commit()
+    return created
+
+
+def ensure_governance_baseline(db: Session, tid: int) -> int:
+    """Idempotent, cheap (count + insert-missing, no recompute) — safe to run on
+    every boot so established tenants that predate this seed heal too. Returns the
+    number of rows created across change types, risk matrix, incident categories
+    and feedback options."""
+    return (_ensure_change_types(db, tid) + _ensure_risk_matrix(db, tid)
+            + _ensure_incident_categories(db, tid) + _ensure_feedback_options(db, tid))
+
+
 def seed_itsm(db: Session, tid: int) -> dict:
     """§3 — idempotent ITSM seed. Order matters: columns exist before backfill,
     priorities exist before the SLAs reference them, and the SLA backfill runs
@@ -1004,6 +1122,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
     slas_created = _ensure_slas(db, tid, pri_ids)
     depts = _ensure_departments(db, tid)
     catalog = _ensure_service_catalog(db, tid)   # grc_hd_service_category + grc_hd_request_item
+    governance_created = ensure_governance_baseline(db, tid)  # change types / risk / incident / feedback
     templates_created = seed_request_templates(db, tid)
     backfill = backfill_process(db, tid)
     sla_targets_filled = backfill_sla_target_resolutions(db, tid)  # §3.6b
@@ -1026,6 +1145,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
         "slas_created": slas_created,
         "departments": list(depts),
         "templates_created": templates_created,
+        "governance_created": governance_created,
         "backfilled": backfill["updated"],
         "sla_targets_filled": sla_targets_filled["filled"],
         "slas_recomputed": sla_backfill["recomputed"],
@@ -1043,18 +1163,29 @@ def seed_if_empty(db: Session, tid: int) -> bool:
     emptiness so established tenants aren't re-seeded / SLA-recomputed every boot.
     Idempotent + non-fatal (mirrors _add_columns' boot contract).
 
-    NOTE: this seeds what seed_itsm owns (catalogue + ticket master data + roles).
-    CMDB CIs/CI-types come from the inventory->CMDB sync (needs real assets), and
-    governance/feedback/KB are admin-configured — none of those are seeded here."""
+    NOTE: this seeds what seed_itsm owns (catalogue + ticket master data + roles)
+    plus the governance/feedback BASELINE (universal ITIL change types, risk matrix,
+    incident categories and the CSAT scale — see ensure_governance_baseline). That
+    baseline runs even on an already-seeded tenant, so boxes that predate it heal.
+    CMDB CIs/CI-types still come from the inventory->CMDB sync (needs real assets),
+    and the customer-specific content (CAB membership, KB articles, the actual
+    feedback ratings on tickets) is left empty for the client to fill."""
     try:
         db.rollback()  # start clean — a prior boot step may have left an aborted txn
     except Exception:  # noqa: BLE001
         pass
     try:
+        # Governance/feedback baseline + department dedup are cheap + idempotent, so
+        # heal them on every boot (established tenants that predate these had empty
+        # change types / risk matrix — which silently broke Change approval routing
+        # — and duplicate department rows: "Finance" alongside "Finance &
+        # Accounting", etc.). Both run regardless of the catalogue-emptiness guard.
+        gov_healed = ensure_governance_baseline(db, tid) > 0
+        _ensure_departments(db, tid)
         already = db.query(HDServiceCategory).filter(
             HDServiceCategory.tenant_id == tid).first() is not None
         if already:
-            return False
+            return gov_healed
         seed_itsm(db, tid)
         logger.info("itsm_seed: boot-seeded standard ITSM data for empty tenant %s", tid)
         return True
