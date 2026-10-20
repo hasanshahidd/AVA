@@ -5,14 +5,17 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, ShieldCheck, Activity, Mail, Paperclip, Download, ExternalLink } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd } from "../../_ui";
+import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd, utcDate } from "../../_ui";
 import { AffectedCiPicker, inventoryUrl } from "../../_ci";
 import { RichComposer, isEmptyHtml } from "../../RichText";
 import { RelatedTickets } from "./_related";
 import { ImpactedCis } from "./_impacted";
 import { Knowledge } from "./_knowledge";
 
-const fmt = (v?: string | null) => (v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString() : "—");
+// Backend created/creation are NAIVE UTC (datetime.utcnow(), no zone). new Date()
+// would read them as LOCAL → the date lands a day early west of UTC (QA: a ticket
+// created 21 Oct showed 20/10). utcDate normalises naive strings to UTC first.
+const fmt = (v?: string | null) => { const d = utcDate(v); return isNaN(d.getTime()) ? "—" : d.toLocaleString(); };
 const doneRe = /replied|resolved|closed/i;
 type ConvTab = "replies" | "comments" | "activity";
 
