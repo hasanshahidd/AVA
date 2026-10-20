@@ -7,13 +7,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from grc.models import GRCUser, ITAsset, get_db
-from grc.routers.auth_router import get_user_primary_tenant, require_auth
+from grc.routers.auth_router import get_user_primary_tenant, require_auth, require_tenant_permission
 
 from .service import compute_asset_risk, compute_tenant_posture
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/risk-posture", tags=["Risk Posture"])
+# Authz gate (QA finding): every risk-posture endpoint exposes org-wide attack-surface data, so
+# require the risks:view permission on the whole router. Administrator role bypasses (see
+# require_tenant_permission). Without this a helpdesk-only user could read the full posture by URL.
+router = APIRouter(
+    prefix="/risk-posture",
+    tags=["Risk Posture"],
+    dependencies=[Depends(require_tenant_permission("erm:risks:view"))],
+)
 
 
 def _is_owner_scoped(current_user: GRCUser, tenant_id: int, db: Session) -> bool:

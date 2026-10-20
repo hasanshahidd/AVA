@@ -33,7 +33,7 @@ from ..schemas import (
     AssetDetailResponse, AssetCoverageAnalysis,
     LifecycleTransitionRequest,
 )
-from .auth_router import require_auth, get_user_tenants, get_user_primary_tenant, decode_token
+from .auth_router import require_auth, get_user_tenants, get_user_primary_tenant, decode_token, require_tenant_permission
 # Phase 5.4 + 5.3 helpers — keep all logic out of the router body.
 from ..services.asset_criticality import recompute_for_asset as recompute_asset_criticality
 from ..services import asset_lifecycle
@@ -45,7 +45,14 @@ logger = logging.getLogger(__name__)
 # Per-database-per-tenant: the tenant DB *is* the active session, so tenant
 # users are just GRCUser rows in the current request's session.
 
-router = APIRouter(prefix="/assets", tags=["IT Assets"])
+# Authz gate (QA finding): the IT Asset Inventory API exposes full asset detail (incl. Rescan
+# controls). Require asset_inventory:view on the whole router so helpdesk-only users can't read
+# assets by direct URL / ticket CI link. Administrator role bypasses (see require_tenant_permission).
+router = APIRouter(
+    prefix="/assets",
+    tags=["IT Assets"],
+    dependencies=[Depends(require_tenant_permission("assets:asset_inventory:view"))],
+)
 
 SECURITY_COMPLIANCE_BENCHMARK = "CIS_WS2012R2"
 SECURITY_COMPLIANCE_CONTROLS_FILE = os.path.abspath(
