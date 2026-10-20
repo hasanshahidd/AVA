@@ -29,7 +29,8 @@ Act as an agent working real tickets:
 - Triage, assign (to agents/teams), reply, use saved replies and **KB deflection**, add internal notes, escalate, resolve, reopen, and capture feedback.
 - Confirm **SLA** timers start, pause, and breach correctly, and that priority is derived as expected.
 - Run each ITIL process you can reach: **Incident**, **Service Request** (with approvals), **Problem**, and **Change** — for Change, drive a Standard (should auto-approve), a Normal/Major (should route to **CAB**), and an Emergency (should route to **ECAB**), and confirm the approval behaviour actually fires. If change types or the risk matrix are missing, Change routing misbehaves — report it.
-- Follow the cross-module threads that surface in the console: a vulnerability pushed to a ticket (does the finding link back to its ticket and sync status?), the pentest → vuln register → ticket path, and asset ↔ CI linkage. Report any one-directional or inconsistent link.
+- Follow the cross-module threads that surface in the console: a vulnerability pushed to a ticket (does the finding link back to its ticket?), the pentest → vuln register → ticket path, and asset ↔ CI linkage. Report any one-directional or inconsistent link.
+- **Status-sync capstone:** take a ticket that was pushed from a vulnerability finding and **resolve it in the console**, then go back to that finding — its link should now show resolved and its remediation plan should read *applied* (no manual sync / no connector poll). Reopen the ticket and confirm the finding goes active again. Report if the finding does not follow.
 
 ## Area 3 — End User (the portal)
 
