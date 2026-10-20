@@ -70,6 +70,31 @@ REL_RUNSON = "REL-RUNSON"         # app     —runs on→      parent host
 # CI-type code for installed-software child CIs (ensured idempotently).
 CIT_SOFTWARE = "CIT-SOFTWARE"
 
+# Display names for the CI types the sync maps assets onto. The sync AUTO-CREATES
+# any of these it needs (like CIT-SOFTWARE always has), so "sync from inventory"
+# works on a fresh tenant with ZERO manual CI-type setup — previously a missing
+# type silently SKIPPED every asset of that kind (QA: 0 of 12 hosts imported until
+# you hand-created undocumented codes like CIT-SERVER).
+_CIT_NAMES = {
+    "CIT-SERVER": "Server",
+    "CIT-WORKSTATION": "Workstation",
+    "CIT-WEBSVC": "Web Service",
+    "CIT-DBINST": "Database Instance",
+    "CIT-NETDEV": "Network Device",
+    "CIT-CLOUDSVC": "Cloud Service",
+    "CIT-K8S": "Kubernetes Cluster",
+    "CIT-APP": "Application",
+    CIT_SOFTWARE: "Installed Software",
+}
+# Relationship types the sync creates (forward, inverse) — also auto-created, so
+# software→host / domain→endpoint edges link instead of being skipped (which left
+# software orphaned as "top-level" CIs and broke the CMDB counts).
+_REL_DEFS = {
+    REL_CONTAINS: ("Contains", "Contained by"),
+    REL_INSTALLED: ("Installed on", "Has installed"),
+    REL_RUNSON: ("Runs on", "Hosts"),
+}
+
 # ci_kind values (stored in attributes.ava.kind; derived onto /cis rows).
 KIND_DOMAIN = "domain"
 KIND_ENDPOINT = "endpoint"
@@ -634,13 +659,9 @@ def sync_inventory_to_cmdb(
         nonlocal summary
         category = _scan_category(asset)
         tcode = ci_type_code
-        ci_type_row = ci_types.get(tcode)
-        if ci_type_row is None:
-            summary["skipped"].append({
-                "asset_id": asset.id, "name": asset.name,
-                "reason": f"CI type {tcode} does not exist in tenant",
-            })
-            return None
+        # Auto-create the CI type if the tenant doesn't have it yet, so a fresh
+        # CMDB syncs every host instead of skipping them for a missing type code.
+        ci_type_row = _ensure_ci_type(db, tid, ci_types, tcode, dry_run, type_name_by_code)
 
         status = _asset_status(asset)
         desired_name = _trunc(asset.name, _LEN_NAME)
@@ -872,16 +893,49 @@ class _PlaceholderType:
         self.name = name
 
 
+def _ensure_ci_type(db, tid, ci_types, code, dry_run, type_name_by_code=None):
+    """Return the CI type for `code`, creating it if missing (mirrors the
+    CIT-SOFTWARE ensure) so the sync never skips an asset for a not-yet-created
+    type. Dry run returns a placeholder so planning/counting runs without writing."""
+    t = ci_types.get(code)
+    if t is not None:
+        return t
+    name = _CIT_NAMES.get(code, code)
+    if dry_run:
+        t = _PlaceholderType(code, name)
+    else:
+        t = HDCIType(tenant_id=tid, code=code, name=name,
+                     description="Auto-created by the AVA inventory sync.")
+        db.add(t)
+        db.flush()
+    ci_types[code] = t
+    if type_name_by_code is not None:
+        type_name_by_code[code] = name
+    return t
+
+
+def _ensure_rel_type(db, tid, rel_types, code, dry_run):
+    """Return the relationship type for `code`, creating it if missing, so the
+    containment edges (software→host, domain→endpoint) link instead of being
+    skipped — which otherwise orphans software as top-level CIs."""
+    rt = rel_types.get(code)
+    if rt is not None:
+        return rt
+    fwd, inv = _REL_DEFS.get(code, (code, None))
+    if dry_run:
+        rt = _PlaceholderType(code, fwd)
+    else:
+        rt = HDCIRelationshipType(tenant_id=tid, code=code, name=fwd, inverse_name=inv)
+        db.add(rt)
+        db.flush()
+    rel_types[code] = rt
+    return rt
+
+
 def _upsert_synthetic_domain(db, tid, apex, domain_block, ci_types, dry_run,
                              summary, ci_by_code, synced_iso, members):
     code = _trunc(f"AVA-DOM-{apex}", _LEN_CODE)
-    webtype = ci_types.get("CIT-WEBSVC")
-    if webtype is None:
-        summary["skipped"].append({
-            "asset_id": None, "name": apex,
-            "reason": "CI type CIT-WEBSVC does not exist in tenant",
-        })
-        return None
+    webtype = _ensure_ci_type(db, tid, ci_types, "CIT-WEBSVC", dry_run)
     # Synthetic domains have no inventory row, so inherit exposure/category from the
     # members (coordinator fix) — otherwise _inventory_derived reports Internal / no
     # category for them in GET /cis.
@@ -1008,13 +1062,9 @@ def _plan_software(asset, db, tid, ci_types, dry_run, summary, synced_iso,
 
 def _materialize_edges(db, tid, planned_edges, rel_types, edge_set, dry_run, summary):
     for source_ci, target_ci, rel_code in planned_edges:
-        rt = rel_types.get(rel_code)
-        if rt is None:
-            summary["skipped"].append({
-                "asset_id": None, "name": rel_code,
-                "reason": f"relationship type {rel_code} does not exist in tenant",
-            })
-            continue
+        # Auto-create the relationship type if missing, so containment edges link
+        # (software→host, domain→endpoint) instead of being skipped.
+        rt = _ensure_rel_type(db, tid, rel_types, rel_code, dry_run)
         sid = getattr(source_ci, "id", None)
         tgid = getattr(target_ci, "id", None)
         if dry_run:

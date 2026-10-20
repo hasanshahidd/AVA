@@ -378,3 +378,46 @@ def test_default_business_service_mapping(db):
         tenant_id=TENANT, code=cis["DESKTOP-TEST"].code).first().business_service_id == svc_ws.id
     third = _sync(db)
     assert third["created"] == 0 and third["updated"] == 0, third
+
+
+def test_autocreate_ci_and_rel_types_on_empty_tenant():
+    """QA regression: a fresh CMDB with NO CI types used to SKIP every host
+    ('CI type CIT-SERVER does not exist in tenant') — syncing 0 of N assets. The
+    sync must now AUTO-CREATE the CI types (and relationship types) it needs, so
+    'sync from inventory' works out of the box with zero manual setup."""
+    engine = create_engine("sqlite://")
+    for t in TABLES:
+        t.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    s.add(Tenant(id=TENANT, name="Acme", slug="acme"))
+    s.commit()
+    # Deliberately seed NO HDCIType / HDCIRelationshipType — the bug scenario.
+    _asset(s, name="win-srv-01", platform_kind="server")
+    _asset(s, name="DESKTOP-1", platform_kind="server", os_family="windows",
+           os_version="Microsoft Windows 11 Pro 23H2", os_edition="Pro")
+    out = m.sync_inventory_to_cmdb(s, TENANT, dry_run=False, actor_email=None)
+    # hosts created, NOT skipped for a missing type
+    missing = [x for x in out["skipped"] if "does not exist" in (x.get("reason") or "")]
+    assert out["created"] >= 2, out
+    assert not missing, missing
+    # the needed CI types were auto-created
+    assert s.query(HDCIType).filter_by(tenant_id=TENANT, code="CIT-SERVER").first() is not None
+    assert s.query(HDCIType).filter_by(tenant_id=TENANT, code="CIT-WORKSTATION").first() is not None
+    s.close()
+
+
+def test_autocreate_dry_run_plans_without_writing():
+    """Same empty tenant, dry run: it must PLAN the host creates (created>0, no
+    'does not exist' skips) yet write no CI types."""
+    engine = create_engine("sqlite://")
+    for t in TABLES:
+        t.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    s.add(Tenant(id=TENANT, name="Acme", slug="acme"))
+    s.commit()
+    _asset(s, name="win-srv-02", platform_kind="server")
+    out = m.sync_inventory_to_cmdb(s, TENANT, dry_run=True, actor_email=None)
+    missing = [x for x in out["skipped"] if "does not exist" in (x.get("reason") or "")]
+    assert out["created"] >= 1 and not missing, out
+    assert s.query(HDCIType).filter_by(tenant_id=TENANT).count() == 0  # dry run wrote nothing
+    s.close()
