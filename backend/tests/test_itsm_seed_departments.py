@@ -15,11 +15,11 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import (
     HDChangeRiskMatrix, HDChangeType, HDDepartment, HDIncidentCategory,
-    HDTicketFeedbackOption, HDTicketType,
+    HDServiceCategory, HDTicketFeedbackOption, HDTicketType,
 )
 from grc.modules.helpdesk_native.itsm_seed import (
     _CHANGE_TYPES, _DEPARTMENTS, _DEPT_STD, _FEEDBACK_OPTIONS, _INCIDENT_CATEGORIES,
-    _RISK_MATRIX, _ensure_departments, ensure_governance_baseline,
+    _RISK_MATRIX, _ensure_departments, ensure_governance_baseline, seed_if_empty,
 )
 
 TENANT = 1
@@ -68,6 +68,29 @@ def test_governance_baseline_is_idempotent(gov_db):
     assert second == 0
     assert gov_db.query(HDChangeType).filter_by(tenant_id=TENANT).count() == len(_CHANGE_TYPES)
     assert gov_db.query(HDTicketFeedbackOption).filter_by(tenant_id=TENANT).count() == len(_FEEDBACK_OPTIONS)
+
+
+def test_seed_if_empty_still_dedupes_when_governance_tables_absent():
+    """Boot resilience: the governance heal throws (its tables don't exist on this
+    tenant), but the department dedup must STILL run — the heals are independent."""
+    engine = create_engine("sqlite://")
+    # Deliberately NOT creating the governance tables, so ensure_governance_baseline
+    # raises "no such table" and must be swallowed without skipping the dept merge.
+    for m in (HDDepartment, HDTicketType, HDServiceCategory):
+        m.__table__.create(engine)
+    s = sessionmaker(bind=engine)()
+    s.add(HDServiceCategory(tenant_id=TENANT, code="CAT-X", name="X"))  # already-seeded → skip seed_itsm
+    for nm in ("Finance", "Finance & Accounting"):
+        s.add(HDDepartment(tenant_id=TENANT, name=nm, enabled=True))
+    s.commit()
+
+    seed_if_empty(s, TENANT)  # must not raise
+
+    rows = s.query(HDDepartment).filter_by(tenant_id=TENANT).all()
+    # The twin collapsed even though the governance heal blew up first.
+    assert s.query(HDDepartment).filter_by(tenant_id=TENANT, name="Finance").first() is None
+    assert any(r.name == "Finance & Accounting" for r in rows)
+    s.close()
 
 
 def test_merges_existing_alias_twins_and_repoints_fks(db):

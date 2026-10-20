@@ -289,12 +289,23 @@ def on_startup():
             from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
             from grc.modules.helpdesk_native.itsm_seed import _add_columns, seed_if_empty
             for _tid, _slug, _sess in iter_tenant_sessions():
+                # Schema sync and data seed are INDEPENDENT: a failure in the
+                # column/table self-heal must not skip the data seed (which heals
+                # the governance baseline + dedupes departments and starts clean
+                # with its own rollback). Sharing one try/except previously meant a
+                # throwing _add_columns silently swallowed the seed, so on some
+                # boxes every heal only ever landed when seed_if_empty was run by
+                # hand.
                 try:
                     _add_columns(_sess)            # schema self-heal (columns + ITSM tables)
-                    seed_if_empty(_sess, _tid)     # data seed for an empty/fresh tenant (no-op once seeded)
                 except Exception:  # noqa: BLE001
                     _sess.rollback()
-                    _logging.getLogger(__name__).warning("helpdesk schema/data sync failed tenant=%s", _slug, exc_info=True)
+                    _logging.getLogger(__name__).warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
+                try:
+                    seed_if_empty(_sess, _tid)     # data seed / baseline heal (own clean-session rollback)
+                except Exception:  # noqa: BLE001
+                    _sess.rollback()
+                    _logging.getLogger(__name__).warning("helpdesk data seed failed tenant=%s", _slug, exc_info=True)
         except Exception:  # noqa: BLE001
             _logging.getLogger(__name__).warning("helpdesk schema sync skipped", exc_info=True)
 

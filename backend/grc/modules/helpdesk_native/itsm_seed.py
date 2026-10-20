@@ -1174,14 +1174,28 @@ def seed_if_empty(db: Session, tid: int) -> bool:
         db.rollback()  # start clean — a prior boot step may have left an aborted txn
     except Exception:  # noqa: BLE001
         pass
+    # Governance/feedback baseline + department dedup are cheap + idempotent, so
+    # heal them on every boot (established tenants that predate these had empty
+    # change types / risk matrix — which silently broke Change approval routing —
+    # and duplicate department rows). They run regardless of the catalogue guard,
+    # and INDEPENDENTLY of each other and of the catalogue seed below: each starts
+    # from a clean transaction so one failing (e.g. a table the schema sync didn't
+    # create) never skips the others.
+    gov_healed = False
+    for _heal in (ensure_governance_baseline, _ensure_departments):
+        try:
+            db.rollback()
+            result = _heal(db, tid)
+            if _heal is ensure_governance_baseline:
+                gov_healed = (result or 0) > 0
+        except Exception:  # noqa: BLE001 — one heal failing must not block the others
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            logger.warning("itsm_seed: boot heal %s failed for tenant %s",
+                           getattr(_heal, "__name__", _heal), tid, exc_info=True)
     try:
-        # Governance/feedback baseline + department dedup are cheap + idempotent, so
-        # heal them on every boot (established tenants that predate these had empty
-        # change types / risk matrix — which silently broke Change approval routing
-        # — and duplicate department rows: "Finance" alongside "Finance &
-        # Accounting", etc.). Both run regardless of the catalogue-emptiness guard.
-        gov_healed = ensure_governance_baseline(db, tid) > 0
-        _ensure_departments(db, tid)
         already = db.query(HDServiceCategory).filter(
             HDServiceCategory.tenant_id == tid).first() is not None
         if already:
