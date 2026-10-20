@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
 import { MascotFront, MascotSide } from '@/components/auth/mascots';
 import './login.css';
 
@@ -66,13 +66,15 @@ const SOURCES: [name: string, desc: string, domain: string][] = [
 ];
 const fav = (domain: string) => `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
 
-const CHIPS = ['Exposure Monitoring', 'Exploit Alerts', 'Vulnerabilities', 'Connectors', 'IT Asset Discovery', 'Inventory', 'CVEs'];
+const CHIPS = ['IT Asset Discovery', 'Asset Inventory', 'Vulnerabilities', 'CTEM', 'AI Pentest', 'CIS Benchmarks', 'Risk Posture', 'Exposure Monitoring', 'Exploit Alerts', 'CVEs', 'Connectors', 'Reporting'];
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const [showPw, setShowPw] = useState(false);
+  // Which face of the glassy double-slider is showing.
+  const [mode, setMode] = useState<'signin' | 'register'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -346,127 +348,320 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative grid h-screen w-screen max-w-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-white font-sans text-[#0A0B1A]">
+    <div className="relative h-screen w-screen overflow-hidden bg-white font-sans text-[#0A0B1A]">
       {intro && <IntroCurtain />}
       {bgLive && <RadarBackdrop />}
 
-      {/* header */}
-      <header className="lg-fade relative z-[2] flex items-center justify-end px-[clamp(1.5rem,4vw,3.5rem)] pb-[clamp(.6rem,1.4vh,1rem)] pt-[clamp(1rem,3.2vh,2.4rem)] [animation-delay:.05s]">
-        <div className="inline-flex items-center gap-2 text-[.78rem] font-medium text-[#64748B]">
-          <span className="h-[7px] w-[7px] rounded-full bg-[#005B96] shadow-[0_0_0_3px_rgba(0,91,150,.15)]" />
-          Attack surface online
-        </div>
-      </header>
-
-      {/* main */}
-      <main className="relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)] items-center gap-[clamp(1.5rem,4vw,4rem)] px-[clamp(1.5rem,4vw,3.5rem)]">
-        <Hero />
-        <section className="flex min-w-0 justify-center">
-          <div className="relative w-full max-w-[27rem] min-w-0">
-            {/* peeker mascot: climbs up from behind the card after the intro */}
-            <div
-              className={clsx('pointer-events-none absolute -left-9 -top-12 z-[1] h-[108px] w-[90px]', intro ? 'lg-peeker' : 'lg-peeker-static')}
-            >
-              <div className={clsx('h-full w-full', intro ? 'lg-bob' : 'lg-bob-now')}>
-                <MascotFront variant="blue" className="h-full w-full" />
-              </div>
-            </div>
-            {ssoRedirecting ? (
-              <SsoHandoffCard tenantName={tenantName} tenantSlug={tenantSlug} onCancel={cancelSsoSignIn} />
-            ) : (
-              <LoginCard
-                showPw={showPw}
-                onTogglePw={() => setShowPw(v => !v)}
-                email={email}
-                password={password}
-                onEmail={setEmail}
-                onPassword={(v) => { setPassword(v); setPasswordInvalid(false); }}
-                onSubmit={handleSubmit}
-                onMicrosoft={handleSsoSignIn}
-                pending={isLoading}
-                error={error}
-                info={info}
-                passwordInvalid={passwordInvalid}
-                tenantFromQuery={tenantFromQuery}
-                tenantName={tenantName}
-                tenantSlug={tenantSlug}
-                onSwitch={clearTenantContext}
-                registrationOpen={registrationOpen}
-              />
-            )}
+      {ssoRedirecting ? (
+        <div className="relative z-[2] grid h-full place-items-center px-6">
+          <div className="w-full max-w-[27rem]">
+            <SsoHandoffCard tenantName={tenantName} tenantSlug={tenantSlug} onCancel={cancelSsoSignIn} />
           </div>
-        </section>
-      </main>
-
-      {/* threat intelligence marquee */}
-      <footer className="lg-fade relative z-[1] min-w-0 pb-3 pt-1 text-center [animation-delay:.6s]">
-        <p className="mb-1.5 text-[.66rem] font-semibold uppercase tracking-[.2em] text-[#94A3B8]">Threat intelligence built in</p>
-        <div className="lg-mask relative mx-auto min-h-[50px] w-[min(92%,74rem)] overflow-hidden">
-          {bgLive && (
-            <>
-              <div className="lg-beam pointer-events-none absolute bottom-0 left-0 top-0 z-[2] w-[110px] [background:linear-gradient(to_right,transparent,rgba(0,91,150,.1)_40%,rgba(50,121,163,.26)_50%,rgba(0,91,150,.1)_60%,transparent)]" />
-              <div className="lg-marq-slow flex w-max gap-2.5 py-1">
-                {[...SOURCES, ...SOURCES].map(([n, d, dom], i) => (
-                  <div key={i} className="flex items-center gap-2 whitespace-nowrap rounded-[14px] border border-[#EAECF2] bg-white py-1.5 pl-1.5 pr-4 shadow-[0_6px_16px_-12px_rgba(10,11,26,.35)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={fav(dom)} alt="" className="h-7 w-7 rounded-[7px] bg-[#F8FAFC] p-0.5" />
-                    <span className="flex flex-col text-left leading-tight">
-                      <span className="text-[.8rem] font-semibold text-[#0A0B1A]">{n}</span>
-                      <span className="text-[.66rem] text-[#64748B]">{d}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
-      </footer>
+      ) : (
+        <AuthSlider
+          mode={mode}
+          onMode={setMode}
+          bgLive={bgLive}
+          intro={intro}
+          showPw={showPw}
+          onTogglePw={() => setShowPw(v => !v)}
+          email={email}
+          password={password}
+          onEmail={setEmail}
+          onPassword={(v) => { setPassword(v); setPasswordInvalid(false); }}
+          onSubmit={handleSubmit}
+          onMicrosoft={handleSsoSignIn}
+          pending={isLoading}
+          error={error}
+          info={info}
+          passwordInvalid={passwordInvalid}
+          tenantFromQuery={tenantFromQuery}
+          tenantName={tenantName}
+          tenantSlug={tenantSlug}
+          onSwitch={clearTenantContext}
+          registrationOpen={registrationOpen}
+        />
+      )}
+
+      {/* trust band — runs FULL WIDTH across both panels, pinned to the bottom */}
+      {!ssoRedirecting && <ThreatMarquee live={bgLive} brandLeft={mode === 'register'} />}
     </div>
   );
 }
 
-function Hero() {
+// Trust band — a full-width strip across the bottom of BOTH panels. The pills
+// use a frosted-white treatment that stays legible whether they scroll over the
+// blue brand side or the white form side (no per-side recolouring needed).
+function ThreatMarquee({ live, brandLeft }: { live: boolean; brandLeft: boolean }) {
+  // The seam sits ~53% across in Sign in (blue on the right) and ~47% in
+  // Register (blue on the left). Two identical, perfectly-synced marquee layers
+  // are clipped to the white side and the blue side respectively, so each chip
+  // flips styling exactly as it crosses the seam.
+  const seam = brandLeft ? 42 : 58;
+  // onWhite (blue chips) shows the WHITE region; onBlue (white chips) shows the
+  // BLUE region. In Register the blue panel is on the LEFT, so the two clips
+  // mirror — the blue-chip clip and white-chip clip must stay complementary or
+  // they overlap near the seam.
+  const whiteClip = brandLeft ? `inset(0 0 0 ${seam}%)` : `inset(0 ${100 - seam}% 0 0)`;
+  const blueClip = brandLeft ? `inset(0 ${100 - seam}% 0 0)` : `inset(0 0 0 ${seam}%)`;
+  const clipT = 'transition-[clip-path] duration-[860ms] ease-[cubic-bezier(.72,.02,.24,1)]';
   return (
-    <section className="flex min-w-0 max-w-[36rem] flex-col gap-[clamp(.6rem,1.7vh,1.15rem)]">
-      <div className="lg-fade inline-flex items-center gap-3 [animation-delay:.06s]">
-        <LogoMark className="lg-logo-spin h-11 w-11" />
-        <span className="inline-flex items-center gap-2">
-          <span className="text-[2.7rem] font-extrabold tracking-[-.03em]">Ava</span>
-          <span className="rounded-[9px] bg-[#005B96] px-2 py-1 text-[.9rem] font-bold tracking-[.09em] text-white">AI</span>
-        </span>
-      </div>
-      <div className="lg-fade inline-flex items-center gap-3 [animation-delay:.12s]">
-        <span className="h-px w-8 bg-[#005B96]" />
-        <span className="text-[.72rem] font-semibold uppercase tracking-[.22em] text-[#014A81]">AI-native cybersecurity assurance</span>
-      </div>
-      <h1 className="lg-fade m-0 text-balance text-[clamp(1.75rem,3.2vw,2.85rem)] font-bold leading-[1.05] tracking-[-.035em] [animation-delay:.2s]">
-        See your <span className="text-[#005B96]">attack surface</span> the way attackers do.
-      </h1>
-      <p className="lg-fade m-0 text-[clamp(1.05rem,1.6vw,1.35rem)] text-[#475569] [animation-delay:.28s]">
-        Every exposure. <b className="font-semibold text-[#005B96]">One view.</b>
+    <div className="lg-fade pointer-events-none absolute inset-x-0 bottom-0 z-[15] pb-2.5 pt-2 [animation-delay:.6s]">
+      <p className="mb-1.5 text-center">
+        <span className="rounded-full bg-white/85 px-2 py-1 text-[.46rem] font-semibold uppercase tracking-[.1em] text-[#2E86C2] shadow-[0_0_22px_rgba(46,134,194,.45),0_4px_12px_-6px_rgba(10,11,26,.2)] ring-1 ring-[#2E86C2]/20 backdrop-blur-md">Threat intelligence built in</span>
       </p>
-      <div className="lg-fade lg-mask max-w-[33rem] overflow-hidden [animation-delay:.36s]">
-        <div className="lg-marq-chips flex w-max gap-2 py-0.5">
-          {[...CHIPS, ...CHIPS].map((c, i) => (
-            <span key={i} className="inline-flex items-center whitespace-nowrap rounded-xl border border-[#E2E8F0] bg-white px-3 py-1.5 text-[.8rem] font-medium text-[#334155]">{c}</span>
-          ))}
-        </div>
+      <div className="lg-mask relative mx-auto h-[42px] max-w-full overflow-hidden">
+        {live && (
+          <>
+            {/* WHITE side → blue chips with white text */}
+            <div className={clsx('absolute inset-0 flex items-center', clipT)} style={{ clipPath: whiteClip }}>
+              <MarqueeRow variant="onWhite" />
+            </div>
+            {/* BLUE side → white chips with dark text */}
+            <div className={clsx('absolute inset-0 flex items-center', clipT)} style={{ clipPath: blueClip }}>
+              <MarqueeRow variant="onBlue" />
+            </div>
+          </>
+        )}
       </div>
-      <div className="lg-fade flex items-center gap-3.5 text-[.82rem] font-medium text-[#475569] [animation-delay:.44s]">
-        <span><b className="font-semibold text-[#0A0B1A]">Outside-in</b> discovery</span>
-        <span className="h-3.5 w-px bg-[#CBD5E1]" />
-        <span>AI-native</span>
-        <span className="h-3.5 w-px bg-[#CBD5E1]" />
-        <span><b className="font-semibold text-[#0A0B1A]">Continuous</b> monitoring</span>
-      </div>
-      <p className="lg-fade m-0 mt-1 max-w-[26rem] text-[.98rem] font-medium text-[#334155] [animation-delay:.52s]">
-        Continuous assurance for your external attack surface.
-      </p>
-    </section>
+    </div>
   );
 }
 
-function LoginCard(props: {
+function MarqueeRow({ variant }: { variant: 'onWhite' | 'onBlue' }) {
+  const onWhite = variant === 'onWhite';
+  const chip = onWhite
+    ? 'border-[#6FB1DC] bg-[#2E86C2] shadow-[0_8px_20px_-10px_rgba(0,91,150,.45)]'
+    : 'border-white/70 bg-white/85 shadow-[0_8px_20px_-10px_rgba(10,11,26,.45)]';
+  return (
+    <div className="lg-marq-slow flex w-max gap-2 py-0.5">
+      {[...SOURCES, ...SOURCES].map(([n, d, dom], i) => (
+        <div key={i} className={clsx('flex items-center gap-2 whitespace-nowrap rounded-[11px] border py-1 pl-1 pr-3 backdrop-blur-md', chip)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={fav(dom)} alt="" className="h-[22px] w-[22px] rounded-[6px] bg-white p-0.5" />
+          <span className="flex flex-col text-left leading-tight">
+            <span className={clsx('text-[.68rem] font-semibold', onWhite ? 'text-white' : 'text-[#0A0B1A]')}>{n}</span>
+            <span className={clsx('text-[.56rem]', onWhite ? 'text-white/80' : 'text-[#475569]')}>{d}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The glassy, light double-slider. Two faces — Sign in and Register — sit
+// side by side inside one frosted card; the blue brand panel glides across to
+// swap which one is in front (the "swap" from the reference clip), kept in
+// Ava's own light + #005B96 palette rather than the dark glass of the video.
+function AuthSlider(props: {
+  mode: 'signin' | 'register';
+  onMode: (m: 'signin' | 'register') => void;
+  bgLive: boolean; intro: boolean;
+  showPw: boolean; onTogglePw: () => void;
+  email: string; password: string;
+  onEmail: (v: string) => void; onPassword: (v: string) => void;
+  onSubmit: (e: FormEvent) => void; onMicrosoft: () => void; pending: boolean;
+  error: string; info: string; passwordInvalid: boolean;
+  tenantFromQuery: boolean; tenantName: string | null; tenantSlug: string | null;
+  onSwitch: () => void; registrationOpen: boolean;
+}) {
+  const brandLeft = props.mode === 'register';
+  // Slower, eased glide so the frosted sweep reads like the reference clip.
+  const slide = 'transition-transform duration-[860ms] ease-[cubic-bezier(.72,.02,.24,1)]';
+  const brandSlide = 'transition-[transform,clip-path] duration-[860ms] ease-[cubic-bezier(.72,.02,.24,1)]';
+  // Diagonal seam: clip the blue panel's inner edge on an angle. The white form
+  // layer fills the whole screen behind it, so the cut always reveals clean
+  // white. Mirror the angle when the panel lives on the left (Register).
+  const brandClip = brandLeft
+    ? 'polygon(0 0, 100% 0, 84% 100%, 0 100%)'   // seam = right edge, strong diagonal
+    : 'polygon(0 0, 100% 0, 100% 100%, 16% 100%)'; // seam = left edge, strong diagonal
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-white">
+      {/* WHITE-SIDE DECOR — full-bleed BEHIND everything (z-0), so the brand's
+          diagonal cut reveals the exact same texture as the form side and there
+          is no distinct white strip at the seam. Large spinning radar on the
+          outer side + a soft blue light centred on the seam. */}
+      <FormRadar onLeft={!brandLeft} />
+      <div
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{ background: 'radial-gradient(58% 88% at 50% 42%, rgba(0,91,150,.14), rgba(0,91,150,.04) 40%, transparent 62%)' }}
+      />
+
+      {/* FORM card — centred in the white half; slides to the other half on toggle */}
+      <div className={clsx('absolute inset-y-0 left-0 z-[2] flex w-full flex-col justify-center overflow-hidden px-[clamp(1rem,3vw,2.5rem)] pb-24 pt-8 lg:w-1/2', slide, brandLeft ? 'lg:translate-x-full' : 'lg:translate-x-0')}>
+        <div className="relative mx-auto w-full max-w-[26rem]">
+          {/* mascot stands BEHIND the card (z-1) at the top-RIGHT corner, peeking
+              over it — waving hi from behind. */}
+          <div className="pointer-events-none absolute -top-11 right-5 z-[1] h-[80px] w-[68px]">
+            <div className="lg-bob-now h-full w-full">
+              <MascotFront variant="blue" className="h-full w-full" />
+            </div>
+          </div>
+          <div
+            key={props.mode}
+            style={{ background: brandLeft
+              ? 'linear-gradient(250deg, rgba(255,255,255,.74) 36%, rgba(201,225,247,.74) 100%)'
+              : 'linear-gradient(110deg, rgba(255,255,255,.74) 36%, rgba(201,225,247,.74) 100%)' }}
+            className="lg-swap relative z-[2] w-full overflow-hidden rounded-[24px] border border-white/70 px-[clamp(1.4rem,2.6vw,2rem)] py-[clamp(1rem,2.2vh,1.5rem)] shadow-[0_2px_4px_rgba(10,11,26,.04),0_30px_72px_-26px_rgba(0,91,150,.5)] ring-1 ring-inset ring-white/50 [backdrop-filter:blur(30px)_saturate(1.5)]"
+          >
+            {/* top glass sheen */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/80" />
+            {/* blue light spilling in from the seam side — gives the card depth */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ background: brandLeft
+                ? 'radial-gradient(90% 120% at 0% 50%, rgba(0,91,150,.16), transparent 58%)'
+                : 'radial-gradient(90% 120% at 100% 50%, rgba(0,91,150,.16), transparent 58%)' }}
+            />
+            <div className="relative">
+              {props.mode === 'signin'
+                ? <SignInForm {...props} />
+                : <RegisterIntro registrationOpen={props.registrationOpen} onSignIn={() => props.onMode('signin')} />}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* BRAND panel — the blue frosted-glass half that GLIDES across to swap
+          faces, cut on a diagonal at the seam. Hidden on mobile. */}
+      <div
+        style={{ clipPath: brandClip }}
+        className={clsx('absolute inset-y-0 left-0 z-[5] hidden w-1/2 lg:block', brandSlide, brandLeft ? 'lg:translate-x-0' : 'lg:translate-x-full')}
+      >
+        <BrandPanel mode={props.mode} onMode={props.onMode} />
+      </div>
+    </div>
+  );
+}
+
+function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m: 'signin' | 'register') => void; }) {
+  const toRegister = mode === 'signin';
+  return (
+    <div className="relative h-full w-full overflow-hidden text-white [backdrop-filter:blur(22px)_saturate(1.3)]">
+      {/* Ava-blue FROSTED glass — translucent enough that, as it glides across
+          the form on toggle, its backdrop-blur visibly frosts the words beneath
+          (the reference clip's glassy sweep), while still reading saturated. */}
+      <div className="absolute inset-0 [background:linear-gradient(150deg,rgba(60,151,214,.93)_0%,rgba(46,134,194,.94)_46%,rgba(26,99,153,.96)_100%)]" />
+      {/* soft light bloom top-left + radar echo so it reads as glass, not flat */}
+      <div className="lg-drift pointer-events-none absolute -right-[18%] top-1/2 h-[120%] w-[120%] -translate-y-1/2 opacity-45 [background:radial-gradient(circle_at_68%_38%,rgba(255,255,255,.22),transparent_52%)]" />
+      <div className="pointer-events-none absolute -left-[10%] -top-[10%] h-[60%] w-[70%] opacity-50 [background:radial-gradient(circle_at_30%_30%,rgba(255,255,255,.16),transparent_60%)]" />
+      {/* live status — always on the blue panel, so it stays legible */}
+      <div className="absolute right-[clamp(1.5rem,2.2vw,2.5rem)] top-[clamp(1.1rem,2.6vh,1.9rem)] z-20 inline-flex items-center gap-2 text-[.72rem] font-medium text-white/85">
+        <span className="h-[7px] w-[7px] rounded-full bg-[#5BE0C2] shadow-[0_0_0_3px_rgba(255,255,255,.18)]" />
+        Attack surface online
+      </div>
+
+      <div className="relative z-10 flex h-full flex-col justify-center gap-[clamp(.62rem,1.7vh,1.15rem)] px-[clamp(3rem,7.5vw,6.5rem)] pb-[clamp(3rem,9vh,5rem)]">
+        <div className="inline-flex items-center gap-2.5">
+          <LogoMark className="lg-logo-spin h-10 w-10 [filter:brightness(0)_invert(1)]" />
+          <span className="inline-flex items-center gap-2">
+            <span className="text-[2rem] font-extrabold tracking-[-.03em]">Ava</span>
+            <span className="rounded-[9px] bg-white px-2 py-0.5 text-[.8rem] font-bold tracking-[.09em] text-[#005B96]">AI</span>
+          </span>
+        </div>
+        <div className="inline-flex items-center gap-3">
+          <span className="h-px w-8 bg-white/60" />
+          <span className="text-[.7rem] font-semibold uppercase tracking-[.22em] text-white/80">AI-native cybersecurity assurance</span>
+        </div>
+        <h1 className="m-0 text-balance text-[clamp(1.6rem,2.1vw,2.3rem)] font-bold leading-[1.07] tracking-[-.03em] text-white">
+          Discover, validate, and <span className="underline decoration-white/35 decoration-2 underline-offset-[6px]">prove</span> your defenses.
+        </h1>
+        <p className="m-0 text-[clamp(1rem,1.25vw,1.2rem)] text-white/85">
+          Every exposure. <b className="font-semibold text-white">One view.</b>
+        </p>
+
+        <div className="lg-mask max-w-[28rem] overflow-hidden">
+          <div className="lg-marq-chips flex w-max gap-2 py-0.5">
+            {[...CHIPS, ...CHIPS].map((c, i) => (
+              <span key={i} className="inline-flex items-center whitespace-nowrap rounded-[11px] border border-white/35 bg-white/[0.18] px-3 py-1.5 text-[.76rem] font-semibold text-white">{c}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-1 flex items-center gap-3 text-[.78rem] font-medium text-white/80">
+          <span><b className="font-semibold text-white">Discover</b></span>
+          <span className="h-3.5 w-px bg-white/30" />
+          <span><b className="font-semibold text-white">Prioritize</b></span>
+          <span className="h-3.5 w-px bg-white/30" />
+          <span><b className="font-semibold text-white">Validate</b></span>
+          <span className="h-3.5 w-px bg-white/30" />
+          <span><b className="font-semibold text-white">Monitor</b></span>
+        </div>
+
+        {/* Swap CTA — the only control that moves the slider on desktop */}
+        <div key={mode} className="lg-swap mt-[clamp(.3rem,1.2vh,.85rem)] border-t border-white/20 pt-[clamp(.45rem,1.4vh,.95rem)]">
+          <p className="mb-1.5 text-[.82rem] text-white/75">
+            {toRegister ? 'New to Ava?' : 'Already have access?'}
+          </p>
+          <button
+            type="button"
+            onClick={() => onMode(toRegister ? 'register' : 'signin')}
+            className="inline-flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/10 px-5 py-2.5 text-[.88rem] font-semibold text-white backdrop-blur-sm transition hover:bg-white hover:text-[#005B96]"
+          >
+            {toRegister ? 'Register your organization' : 'Sign in'} <span aria-hidden>→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegisterIntro({ registrationOpen, onSignIn }: { registrationOpen: boolean; onSignIn: () => void; }) {
+  const POINTS = [
+    'Your own tenant-isolated Ava workspace',
+    'Outside-in discovery & inventory of your attack surface',
+    'Continuous vulnerability, CVE & exposure monitoring',
+  ];
+  return (
+    <div>
+      <div className="mb-[clamp(.4rem,1.3vh,.9rem)] inline-flex items-center gap-2 text-[.68rem] font-semibold uppercase tracking-[.14em] text-[#014A81]">
+        <Sparkles size={13} strokeWidth={2.2} className="text-[#005B96]" /> Get started
+      </div>
+      <h2 className="m-0 mb-1 text-[clamp(1.4rem,2.5vh,1.75rem)] font-bold tracking-[-.02em] [text-shadow:0_2px_22px_rgba(0,91,150,.26)]">Register your organization</h2>
+      <p className="m-0 mb-[clamp(.6rem,1.9vh,1.2rem)] text-[.9rem] text-[#64748B]">
+        Stand up your workspace and point Ava at your external attack surface.
+      </p>
+
+      <ul className="mb-[clamp(.7rem,2vh,1.3rem)] space-y-2.5">
+        {POINTS.map((p) => (
+          <li key={p} className="flex items-start gap-2.5 text-[.86rem] text-[#334155]">
+            <CheckCircle2 size={17} className="mt-px shrink-0 text-[#005B96]" />
+            <span className="leading-snug">{p}</span>
+          </li>
+        ))}
+      </ul>
+
+      {registrationOpen ? (
+        <Link
+          href="/register"
+          className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#2E86C2] py-[clamp(.55rem,1.7vh,.88rem)] text-[.98rem] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(46,134,194,.6)] transition hover:bg-[#2278B2]"
+        >
+          Continue to registration <span aria-hidden>→</span>
+        </Link>
+      ) : (
+        <div className="flex items-start gap-2.5 rounded-[14px] border border-[#DCE9F3] bg-[#EFF5FA] px-3.5 py-3 text-[#014A81]">
+          <Lock size={15} className="mt-0.5 shrink-0" />
+          <p className="text-[.8rem] leading-relaxed">
+            Registration is currently invite-only.{' '}
+            <a href="mailto:support@ava.ai?subject=Request%20access%20to%20Ava" className="font-semibold underline underline-offset-2">Contact support</a>{' '}
+            to request access for your organization.
+          </p>
+        </div>
+      )}
+
+      {/* Mobile-only toggle back to sign-in (desktop uses the brand panel). */}
+      <p className="mt-[clamp(.5rem,1.5vh,1rem)] text-center text-[.8rem] text-[#64748B] lg:hidden">
+        Already have access?{' '}
+        <button type="button" onClick={onSignIn} className="font-semibold text-[#005B96] underline-offset-2 hover:underline">Sign in</button>
+      </p>
+    </div>
+  );
+}
+
+function SignInForm(props: {
+  mode: 'signin' | 'register';
+  onMode: (m: 'signin' | 'register') => void;
   showPw: boolean; onTogglePw: () => void;
   email: string; password: string;
   onEmail: (v: string) => void; onPassword: (v: string) => void;
@@ -476,19 +671,16 @@ function LoginCard(props: {
   onSwitch: () => void; registrationOpen: boolean;
 }) {
   const input =
-    'w-full rounded-[14px] border border-[#E2E8F0] bg-white py-[clamp(.5rem,1.5vh,.78rem)] text-[.92rem] text-[#0A0B1A] outline-none transition ' +
-    'focus:border-[#005B96] focus:shadow-[0_0_0_4px_rgba(0,91,150,.14)]';
+    'w-full rounded-[14px] border border-white/80 bg-white/70 py-[clamp(.5rem,1.5vh,.78rem)] text-[.92rem] text-[#0A0B1A] outline-none transition-all duration-200 ' +
+    'hover:bg-white/90 focus:border-[#005B96] focus:bg-white focus:shadow-[0_0_0_4px_rgba(0,91,150,.16),0_12px_32px_-10px_rgba(0,91,150,.4)]';
   const invalid = 'border-[#FB7185] focus:border-[#F43F5E] focus:shadow-[0_0_0_4px_rgba(244,63,94,.14)]';
   return (
-    <div className="relative z-[2] w-full rounded-3xl border border-[rgba(10,11,26,.07)] bg-white px-8 py-[clamp(.8rem,2.2vh,1.6rem)] shadow-[0_1px_2px_rgba(10,11,26,.04),0_30px_60px_-30px_rgba(0,91,150,.28)]">
-      <div className="absolute left-3.5 top-3.5 h-3 w-3 border-l-[1.5px] border-t-[1.5px] border-[rgba(0,91,150,.28)]" />
-      <div className="absolute bottom-3.5 right-3.5 h-3 w-3 border-b-[1.5px] border-r-[1.5px] border-[rgba(0,91,150,.28)]" />
-
+    <div>
       <div className="mb-[clamp(.32rem,1.1vh,.7rem)] inline-flex items-center gap-2 text-[.68rem] font-semibold uppercase tracking-[.14em] text-[#014A81]">
         <Lock size={13} strokeWidth={2.2} className="text-[#005B96]" /> Secure sign-in
       </div>
-      <h2 className="m-0 mb-1 text-[clamp(1.38rem,2.6vh,1.7rem)] font-bold tracking-[-.02em]">Welcome back</h2>
-      <p className="m-0 mb-[clamp(.48rem,1.7vh,1.1rem)] text-[.9rem] text-[#64748B]">
+      <h2 className="m-0 mb-1 text-[clamp(1.4rem,2.5vh,1.75rem)] font-bold tracking-[-.02em] [text-shadow:0_2px_22px_rgba(0,91,150,.26)]">Welcome back</h2>
+      <p className="m-0 mb-[clamp(.35rem,1.2vh,.8rem)] text-[.9rem] text-[#64748B]">
         {props.tenantFromQuery ? (
           <>
             Sign in to <span className="font-semibold text-[#0A0B1A]">{props.tenantName || props.tenantSlug}</span>
@@ -517,16 +709,6 @@ function LoginCard(props: {
         </div>
       )}
 
-      <button type="button" onClick={props.onMicrosoft} className="flex w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#E2E8F0] bg-white px-4 py-[clamp(.48rem,1.4vh,.78rem)] text-[.92rem] font-medium transition hover:border-[#C7CBD4] hover:bg-[#FBFBFE]">
-        <MicrosoftLogo /> Sign in with Microsoft
-      </button>
-
-      <div className="my-[clamp(.38rem,1.4vh,.95rem)] flex items-center gap-3">
-        <span className="h-px flex-1 bg-[#E2E8F0]" />
-        <span className="text-[.66rem] font-semibold tracking-[.14em] text-[#94A3B8]">OR CONTINUE WITH EMAIL</span>
-        <span className="h-px flex-1 bg-[#E2E8F0]" />
-      </div>
-
       <form onSubmit={props.onSubmit}>
         <label htmlFor="email" className="mb-1 ml-0.5 block text-[.78rem] font-medium text-[#334155]">Email</label>
         <div className="relative mb-[clamp(.4rem,1.3vh,.85rem)]">
@@ -548,7 +730,7 @@ function LoginCard(props: {
           </p>
         )}
 
-        <button type="submit" disabled={props.pending} className="w-full rounded-[14px] bg-[#005B96] py-[clamp(.55rem,1.7vh,.88rem)] text-[.98rem] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(0,91,150,.6)] transition hover:bg-[#014A81] disabled:opacity-60">
+        <button type="submit" disabled={props.pending} className="w-full rounded-[14px] bg-[#2E86C2] py-[clamp(.55rem,1.7vh,.88rem)] text-[.98rem] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(46,134,194,.6)] transition hover:-translate-y-0.5 hover:bg-[#2278B2] hover:shadow-[0_14px_28px_-10px_rgba(46,134,194,.7)] disabled:translate-y-0 disabled:opacity-60">
           {props.pending ? 'Signing in…' : 'Sign in →'}
         </button>
       </form>
@@ -562,12 +744,11 @@ function LoginCard(props: {
         </p>
       )}
 
-      {props.registrationOpen && (
-        <p className="m-0 mt-[clamp(.35rem,1.1vh,.7rem)] text-center text-[.8rem] text-[#64748B]">
-          New organization?{' '}
-          <Link href="/register" className="font-semibold text-[#005B96] underline-offset-2 hover:underline">Register organization</Link>
-        </p>
-      )}
+      {/* Mobile-only toggle to Register (desktop uses the brand panel). */}
+      <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.8rem] text-[#64748B] lg:hidden">
+        New to Ava?{' '}
+        <button type="button" onClick={() => props.onMode('register')} className="font-semibold text-[#005B96] underline-offset-2 hover:underline">Register organization</button>
+      </p>
 
       <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.76rem] leading-[1.48] text-[#94A3B8]">
         By signing in you agree to our{' '}
@@ -653,6 +834,34 @@ function MicrosoftLogo() {
       <path fill="#f35325" d="M1 1h10v10H1z" /><path fill="#81bc06" d="M12 1h10v10H12z" />
       <path fill="#05a6f0" d="M1 12h10v10H1z" /><path fill="#ffba08" d="M12 12h10v10H12z" />
     </svg>
+  );
+}
+
+// Large radar on the OUTER side of the WHITE panel, SPINNING — the rings are
+// static, the conic sweep arm rotates around them.
+function FormRadar({ onLeft }: { onLeft: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className={clsx('absolute top-1/2 h-[min(104vh,920px)] w-[min(104vh,920px)] -translate-y-1/2', onLeft ? 'left-[-32%]' : 'right-[-32%]')}>
+        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full">
+          {[34, 60, 86, 99].map((r, i) => (
+            <circle key={r} cx="100" cy="100" r={r} fill="none" stroke={`rgba(0,91,150,${[0.12, 0.1, 0.08, 0.06][i]})`} strokeWidth="1" />
+          ))}
+          <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(0,91,150,.14)" strokeWidth="1" strokeDasharray="1.5 7" />
+          <line x1="3" y1="100" x2="197" y2="100" stroke="rgba(0,91,150,.07)" strokeWidth="1" />
+          <line x1="100" y1="3" x2="100" y2="197" stroke="rgba(0,91,150,.07)" strokeWidth="1" />
+          <circle cx="100" cy="100" r="2.5" fill="#005B96" />
+        </svg>
+        {/* spinning sweep arm */}
+        <div className="lg-sweep absolute inset-0 rounded-full [background:conic-gradient(from_0deg,rgba(0,91,150,.16),rgba(0,91,150,.04)_26%,rgba(0,91,150,0)_52%)]" />
+        <div className="lg-ping absolute left-[35%] top-[35%] h-[30%] w-[30%] rounded-full border-[4px] border-[rgba(0,91,150,.38)]" />
+        {/* blue radar dots (blips) — kept toward the OUTER edge so they land in
+            the visible margin, not hidden behind the card */}
+        {([['34%', '26%', '12px', '#005B96', '0s'], ['41%', '50%', '10px', '#3279A3', '.7s'], ['31%', '64%', '10px', '#005B96', '1.5s'], ['46%', '36%', '8px', '#3279A3', '2.3s'], ['38%', '78%', '8px', '#005B96', '3s'], ['44%', '18%', '7px', '#3279A3', '3.6s']] as const).map(([l, t, s, c, d], i) => (
+          <div key={i} className="lg-blip absolute rounded-full" style={{ left: l, top: t, width: s, height: s, background: c, boxShadow: `0 0 10px ${c}66`, animationDelay: d }} />
+        ))}
+      </div>
+    </div>
   );
 }
 

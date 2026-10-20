@@ -7,10 +7,11 @@
 // the datasets already registered server-side; it builds no new engine.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Table2, Download, Loader2, AlertCircle, Plus, X } from 'lucide-react';
+import { Table2, Download, Loader2, AlertCircle, Plus, X, BarChart3 } from 'lucide-react';
 import { MultiSelectDropdown } from '@/components/ui';
 import { reportingApi, type ReportDatasetMeta, type ReportFilter, type ReportFilterType } from '@/lib/api';
 import type { BuilderLoadRequest, BuilderSnapshot } from '@/lib/reportingExtrasApi';
+import ReportPreview, { type PreviewRequest } from './ReportPreview';
 
 const ACCENT = 'var(--color-base)';
 
@@ -109,6 +110,7 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
   const [format, setFormat] = useState<'csv' | 'xlsx' | 'pdf' | 'html'>('csv');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewRequest | null>(null);
 
   const meta = useMemo(() => datasets.find((d) => d.key === dataset), [datasets, dataset]);
 
@@ -176,6 +178,23 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
     // Only a new request should re-run this, not every catalog / state change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load?.nonce]);
+
+  // Populate the dashboard canvas whenever the active dataset changes, using the
+  // post-reset defaults (all columns, no filters) so a report is visible without a
+  // click. Column / filter / category edits refresh it via the "Update report" button.
+  useEffect(() => {
+    if (!meta) return;
+    setPreview({
+      dataset: meta.key,
+      label: DATASET_LABELS[meta.key] ?? labelize(meta.key),
+      columns: meta.fields.map((f) => meta.user_fields[f] ?? f),
+      filters: [],
+      logic: 'AND',
+      assetCategories:
+        meta.key === 'assets' || meta.key === 'sbp_inventory' ? assetCategories : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta?.key]);
 
   // The filters the backend will actually receive (blank values are dropped, numbers coerced).
   const filterPayload = useMemo<ReportFilter[]>(
@@ -258,35 +277,30 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
   };
 
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-11 w-11 flex-none items-center justify-center rounded-lg"
-          style={{ background: 'var(--color-base-soft)', color: ACCENT }}
-        >
-          <Table2 size={22} />
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      {/* ── Controls rail: dataset, columns, filters, format and actions ── */}
+      <aside className="w-full flex-none rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm lg:sticky lg:top-4 lg:w-[320px] lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto scrollbar-thin">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-lg"
+            style={{ background: 'var(--color-base-soft)', color: ACCENT }}
+          >
+            <Table2 size={18} />
+          </div>
+          <h2 className="text-[14px] font-semibold text-[var(--color-text)]">Report Builder</h2>
         </div>
-        <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-[var(--color-text)]">Custom Report Builder</h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-muted)]">
-            Pick a dataset, choose the columns and filters you want, then export to CSV or Excel.
-          </p>
-        </div>
-      </div>
 
-      {isLoading ? (
-        <div className="mt-5 flex items-center gap-2 text-sm text-[var(--color-muted)]">
-          <Loader2 size={15} className="animate-spin" /> Loading datasets…
-        </div>
-      ) : isError || !datasets.length ? (
-        <div className="mt-5 flex items-center gap-2 text-sm text-[var(--color-danger)]">
-          <AlertCircle size={15} /> Could not load the report catalog.
-        </div>
-      ) : (
-        <div className="mt-5 space-y-5">
-          {/* Dataset + columns */}
-          <div className="grid gap-4 sm:grid-cols-2">
+        {isLoading ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--color-muted)]">
+            <Loader2 size={15} className="animate-spin" /> Loading datasets…
+          </div>
+        ) : isError || !datasets.length ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--color-danger)]">
+            <AlertCircle size={15} /> Could not load the report catalog.
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {/* Dataset */}
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
                 Dataset
@@ -304,7 +318,8 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
               </select>
             </label>
 
-            <div className="block">
+            {/* Columns */}
+            <div>
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
                 Columns ({selectedCols.length}/{columnOptions.length})
               </span>
@@ -319,159 +334,195 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
                 triggerClassName="w-full"
               />
             </div>
-          </div>
 
-          {showScope && (
-            <div>
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-                Asset categories
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {ASSET_CATEGORY_OPTIONS.map((opt) => {
-                  const on = assetCategories.includes(opt.value);
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => toggleCategory(opt.value)}
-                      aria-pressed={on}
-                      style={on ? { borderColor: ACCENT, color: ACCENT, background: 'var(--color-base-soft)' } : undefined}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[13px] font-medium text-[var(--color-muted)] hover:bg-[var(--color-subtle)]"
-                    >
-                      <span
-                        className="inline-block h-3.5 w-3.5 rounded-[4px] border border-[var(--color-border)]"
-                        style={on ? { background: ACCENT, borderColor: ACCENT } : undefined}
-                      />
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <span className="mt-1.5 block text-[11px] text-[var(--color-muted)]">
-                Pick which discovery categories to include. Ad-hoc are transient pentest targets, not part of the inventory.
-              </span>
-            </div>
-          )}
-
-          {/* Filters */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-                Filters
-              </span>
-              <div className="flex items-center gap-2">
-                {filters.length > 1 && (
-                  <select
-                    value={logic}
-                    onChange={(e) => setLogic(e.target.value as 'AND' | 'OR')}
-                    className={selectCls}
-                    aria-label="Combine filters with AND or OR"
-                  >
-                    <option value="AND">Match all (AND)</option>
-                    <option value="OR">Match any (OR)</option>
-                  </select>
-                )}
-                <button
-                  onClick={addFilter}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-subtle)]"
-                >
-                  <Plus size={14} /> Add filter
-                </button>
-              </div>
-            </div>
-
-            {filters.length === 0 ? (
-              <p className="text-[13px] text-[var(--color-muted)]">
-                No filters — the report includes every row.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {filters.map((f) => {
-                  const type: ReportFilterType = meta?.filterable[f.col] ?? 'text';
-                  return (
-                    <div key={f.id} className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={f.col}
-                        onChange={(e) => patchFilter(f.id, { col: e.target.value })}
-                        className={selectCls}
-                      >
-                        {filterCols.map((c) => (
-                          <option key={c} value={c}>
-                            {labelize(c)}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={f.op}
-                        onChange={(e) => patchFilter(f.id, { op: e.target.value })}
-                        className={selectCls}
-                      >
-                        {OPS[type].map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
-                        value={f.value}
-                        onChange={(e) => patchFilter(f.id, { value: e.target.value })}
-                        placeholder="value"
-                        className={`${selectCls} min-w-0 flex-1`}
-                      />
+            {/* Asset categories */}
+            {showScope && (
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                  Asset categories
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {ASSET_CATEGORY_OPTIONS.map((opt) => {
+                    const on = assetCategories.includes(opt.value);
+                    return (
                       <button
-                        onClick={() => removeFilter(f.id)}
-                        className="flex-none rounded-lg p-1.5 text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)]"
-                        aria-label="Remove filter"
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleCategory(opt.value)}
+                        aria-pressed={on}
+                        style={on ? { borderColor: ACCENT, color: ACCENT, background: 'var(--color-base-soft)' } : undefined}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[12px] font-medium text-[var(--color-muted)] hover:bg-[var(--color-subtle)]"
                       >
-                        <X size={15} />
+                        <span
+                          className="inline-block h-3 w-3 rounded-[3px] border border-[var(--color-border)]"
+                          style={on ? { background: ACCENT, borderColor: ACCENT } : undefined}
+                        />
+                        {opt.label}
                       </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Footer: format + generate */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
-            <div className="inline-flex overflow-hidden rounded-lg border border-[var(--color-border)]">
-              {(['csv', 'xlsx', 'pdf', 'html'] as const).map((fmt) => (
+            {/* Filters */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                  Filters
+                </span>
                 <button
-                  key={fmt}
-                  onClick={() => setFormat(fmt)}
-                  className="px-3 py-1.5 text-sm font-medium"
-                  style={
-                    format === fmt
-                      ? { background: ACCENT, color: 'var(--color-on-base)' }
-                      : { color: 'var(--color-muted)' }
-                  }
+                  onClick={addFilter}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2 py-1 text-[13px] font-medium text-[var(--color-text)] hover:bg-[var(--color-subtle)]"
                 >
-                  {fmt.toUpperCase()}
+                  <Plus size={13} /> Add
                 </button>
-              ))}
+              </div>
+
+              {filters.length > 1 && (
+                <select
+                  value={logic}
+                  onChange={(e) => setLogic(e.target.value as 'AND' | 'OR')}
+                  className={`${selectCls} mb-2 w-full`}
+                  aria-label="Combine filters with AND or OR"
+                >
+                  <option value="AND">Match all (AND)</option>
+                  <option value="OR">Match any (OR)</option>
+                </select>
+              )}
+
+              {filters.length === 0 ? (
+                <p className="text-[12px] text-[var(--color-muted)]">
+                  No filters — every row is included.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filters.map((f) => {
+                    const type: ReportFilterType = meta?.filterable[f.col] ?? 'text';
+                    return (
+                      <div key={f.id} className="rounded-lg border border-[var(--color-border)] p-2">
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={f.col}
+                            onChange={(e) => patchFilter(f.id, { col: e.target.value })}
+                            className={`${selectCls} min-w-0 flex-1`}
+                          >
+                            {filterCols.map((c) => (
+                              <option key={c} value={c}>
+                                {labelize(c)}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => removeFilter(f.id)}
+                            className="flex-none rounded-lg p-1 text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)]"
+                            aria-label="Remove filter"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <select
+                            value={f.op}
+                            onChange={(e) => patchFilter(f.id, { op: e.target.value })}
+                            className={selectCls}
+                          >
+                            {OPS[type].map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
+                            value={f.value}
+                            onChange={(e) => patchFilter(f.id, { value: e.target.value })}
+                            placeholder="value"
+                            className={`${selectCls} min-w-0 flex-1`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            {/* Download format */}
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                Download format
+              </span>
+              <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-[var(--color-border)]">
+                {(['csv', 'xlsx', 'pdf', 'html'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    onClick={() => setFormat(fmt)}
+                    className="py-1.5 text-[13px] font-medium"
+                    style={
+                      format === fmt
+                        ? { background: ACCENT, color: 'var(--color-on-base)' }
+                        : { color: 'var(--color-muted)' }
+                    }
+                  >
+                    {fmt.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
               {err && (
-                <span className="inline-flex items-center gap-1 text-[13px] text-[var(--color-danger)]">
-                  <AlertCircle size={14} /> {err}
+                <span className="flex items-center gap-1 text-[12px] text-[var(--color-danger)]">
+                  <AlertCircle size={13} /> {err}
                 </span>
               )}
-              {footerExtras}
+              <button
+                onClick={() =>
+                  setPreview({
+                    dataset,
+                    label: DATASET_LABELS[dataset] ?? labelize(dataset),
+                    columns: selectedCols,
+                    filters: filterPayload,
+                    logic,
+                    assetCategories: showScope ? assetCategories : undefined,
+                  })
+                }
+                disabled={!selectedCols.length}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-subtle)] disabled:opacity-60"
+              >
+                <BarChart3 size={15} /> Update report
+              </button>
               <button
                 onClick={runExport}
                 disabled={busy || !selectedCols.length}
-                className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--color-on-base)] disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--color-on-base)] disabled:opacity-60"
                 style={{ background: ACCENT }}
               >
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                Generate report
+                Download {format.toUpperCase()}
               </button>
+              {footerExtras && <div className="flex flex-wrap gap-2 pt-1">{footerExtras}</div>}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </aside>
+
+      {/* ── Dashboard canvas: the visual report, front and centre ── */}
+      <section className="min-w-0 flex-1">
+        {preview && meta ? (
+          <ReportPreview req={preview} filterable={meta.filterable} onClose={() => setPreview(null)} />
+        ) : (
+          <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center">
+            <BarChart3 size={30} className="text-[var(--color-muted)]" />
+            <p className="mt-3 text-sm font-medium text-[var(--color-text)]">Your report dashboard appears here</p>
+            <p className="mt-1 text-[13px] text-[var(--color-muted)]">
+              Pick a dataset and filters on the left, then click <span className="font-medium">Update report</span>.
+            </p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

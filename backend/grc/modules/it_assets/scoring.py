@@ -376,6 +376,37 @@ def score_inventory(db, tids, now=None):
             for m in s.get("metrics", []):
                 m["score"] = None
 
+    # ── Rolled-up ASSET BASIS for the headline governance counts ──────────────
+    # One registrable (apex) domain = ONE managed asset (its subdomains fold in);
+    # internal assets stay flat. This is the basis the Performance dashboard and the
+    # register reconcile against, so "assets under management", PCI-scoped, owner and
+    # criticality coverage are all counted per asset — a domain's 200 subdomains are
+    # one asset, not 200. (The scored SECTION metrics above keep their per-host
+    # denominators; those feed the 0-100 score, not a displayed "X of Y" total.)
+    from .asset_rollup import is_external as _is_external, unit_key_for as _unit_key
+    _units: dict = {}
+    for a in assets:
+        u = _units.get(_unit_key(a))
+        if u is None:
+            u = {"owner": False, "assessed": False, "cde": False, "stale": True, "external": _is_external(a)}
+            _units[_unit_key(a)] = u
+        if has_owner(a):
+            u["owner"] = True
+        if a.id in assessed_ids:
+            u["assessed"] = True
+        if getattr(a, "cde_environment", None):
+            u["cde"] = True
+        if not stale(a):           # a domain is "stale" only if every one of its names is stale
+            u["stale"] = False
+    rolled_n = len(_units)
+    rolled_without_owner = sum(1 for u in _units.values() if not u["owner"])
+    rolled_unassessed = sum(1 for u in _units.values() if not u["assessed"])
+    rolled_cde = sum(1 for u in _units.values() if u["cde"])
+    rolled_stale = sum(1 for u in _units.values() if u["stale"])
+    rolled_inet_unassessed = sum(1 for u in _units.values() if u["external"] and not u["assessed"])
+    rolled_external = sum(1 for u in _units.values() if u["external"])
+    rolled_internal = rolled_n - rolled_external
+
     comps = [{"key": s["key"], "label": s["label"], "score": s["score"], "weight": s["weight"], "target": _target}
              for s in sections.values()]
     scored = [c for c in comps if c["score"] is not None]
@@ -389,17 +420,21 @@ def score_inventory(db, tids, now=None):
         # True when there is no inventory to score at all — the UI should show
         # "No assets yet", never a number.
         "no_data": N == 0,
-        "counts": {"assets": N, "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns), "cde_scoped": len(cde)},
+        # counts.assets is the ROLLED-UP managed-asset count (apex domain = 1 asset).
+        # `hosts` keeps the flat per-name count so a scanning/attack-surface card can
+        # still show "N domains · M hosts" without hiding the host figure.
+        "counts": {"assets": rolled_n, "hosts": N, "external": rolled_external, "internal": rolled_internal,
+                   "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns), "cde_scoped": rolled_cde},
         "performance": {"score": perf, "grade": grade, "components": comps},
         "fleet_cis": fleet_cis,
         "sections": sections,
         "attention_queue": {
-            "assets_without_owner": sum(1 for a in assets if not has_owner(a)),
-            "assets_unassessed": sum(1 for a in assets if a.id not in assessed_ids),
+            # Rolled to the same managed-asset basis as counts.assets (one apex = one asset).
+            "assets_without_owner": rolled_without_owner,
+            "assets_unassessed": rolled_unassessed,
             "open_critical_high_vulns": len(severe_open),
-            "stale_assets": sum(1 for a in assets if stale(a)),
-            "internet_facing_unassessed": sum(1 for a in inet if a.id not in assessed_ids),
-            "total": (sum(1 for a in assets if not has_owner(a)) + len(severe_open)
-                      + sum(1 for a in assets if stale(a))),
+            "stale_assets": rolled_stale,
+            "internet_facing_unassessed": rolled_inet_unassessed,
+            "total": rolled_without_owner + len(severe_open) + rolled_stale,
         },
     }

@@ -39,6 +39,10 @@ from grc.models import (
     Risk,
     RiskAssetLink,
 )
+from grc.modules.it_assets.asset_rollup import (
+    is_external as _rollup_is_external,
+    unit_key_for as _rollup_unit_key,
+)
 
 # ─── Tunables ───────────────────────────────────────────────────────────────
 
@@ -1345,6 +1349,16 @@ def compute_tenant_posture(
             "host_name": a.host_name,
             "asset_type": a.asset_type,
             "criticality": a.criticality,
+            # Classification signals so EVERY consumer can call the one canonical
+            # is_external() rule (external = internet-facing / EASM / outside-in) —
+            # `mode` alone mislabelled internet-facing web targets as internal.
+            "internet_facing": getattr(a, "internet_facing", None),
+            "is_internet_facing": getattr(a, "is_internet_facing", None),
+            "origin_source": getattr(a, "origin_source", None),
+            "last_seen_source": getattr(a, "last_seen_source", None),
+            "is_external": _rollup_is_external(a),
+            "owner_id": getattr(a, "owner_id", None) or getattr(a, "primary_owner_id", None),
+            "cde_environment": bool(getattr(a, "cde_environment", None)),
             "score": r["score"],
             "band": r["band"],
             "data_quality": r["data_quality"],
@@ -1400,15 +1414,50 @@ def compute_tenant_posture(
     for r in rows:
         band_counts[r["band"]["label"]] = band_counts.get(r["band"]["label"], 0) + 1
 
+    # ── Rolled-up ASSET BASIS for the summary counts ──────────────────────────
+    # One registrable (apex) domain = ONE managed asset (subdomains fold in),
+    # internal flat — the same basis the register and inventory overview use, so
+    # "N of M scored" and the band distribution on the Performance dashboard count
+    # assets, not subdomains. Each domain takes the WEAKEST (highest-risk) score /
+    # worst band among its names; `by_band` and the counts are over these units.
+    _BAND_RANK = {"severe": 4, "elevated": 3, "watch": 2, "contained": 1, "unknown": 0}
+    units: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        k = _rollup_unit_key(r)
+        u = units.get(k)
+        if u is None:
+            u = {"score": None, "band": "unknown", "external": bool(r.get("is_external"))}
+            units[k] = u
+        sc = r["score"]
+        if sc is not None and (u["score"] is None or sc > u["score"]):
+            u["score"] = sc
+        if _BAND_RANK.get(r["band"]["label"], 0) > _BAND_RANK.get(u["band"], 0):
+            u["band"] = r["band"]["label"]
+    rolled_band_counts = {"contained": 0, "watch": 0, "elevated": 0, "severe": 0, "unknown": 0}
+    for u in units.values():
+        rolled_band_counts[u["band"]] = rolled_band_counts.get(u["band"], 0) + 1
+    rolled_scored = sum(1 for u in units.values() if u["score"] is not None)
+    rolled_external = sum(1 for u in units.values() if u["external"])
+    _unit_scores = [u["score"] for u in units.values() if u["score"] is not None]
+    rolled_avg = round(sum(_unit_scores) / len(_unit_scores), 1) if _unit_scores else None
+
     return {
         "assets": rows,
         "summary": {
-            "asset_count": len(rows),
-            "scored_count": len(scored_rows),
-            "avg_score": avg_score,
-            "by_band": band_counts,
+            # Rolled-up managed-asset counts (apex domain = one asset). The flat
+            # per-host figures are kept under *_hosts so a host-level card can show both.
+            "asset_count": len(units),
+            "scored_count": rolled_scored,
+            "avg_score": rolled_avg,
+            "by_band": rolled_band_counts,
+            "external_count": rolled_external,
+            "internal_count": len(units) - rolled_external,
             "highest_score": highest_score,
             "highest_name": highest_name,
+            "asset_count_hosts": len(rows),
+            "scored_count_hosts": len(scored_rows),
+            "avg_score_hosts": avg_score,
+            "by_band_hosts": band_counts,
         },
         "weights": weights,
     }

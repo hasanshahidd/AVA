@@ -279,28 +279,22 @@ def _disp(a) -> str:
     return f"asset {getattr(a, 'id', '?')}"
 
 
-# Multi-label public suffixes so a.b.co.uk groups under b.co.uk, not co.uk. A small
-# curated set covers the common ones; a true eTLD+1 would need a public-suffix list.
-# ponytail: heuristic registrable domain; swap in a PSL (tldextract) only if sprawl
-# grouping is ever materially wrong for a tenant.
-_PUBLIC_SUFFIX_2 = {
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "net.uk", "ltd.uk", "plc.uk",
-    "com.au", "net.au", "org.au", "edu.au", "gov.au", "co.nz", "org.nz", "net.nz",
-    "co.za", "org.za", "com.br", "com.mx", "com.ar", "com.tr", "com.sg", "com.hk",
-    "com.cn", "com.tw", "co.jp", "co.kr", "co.in", "net.in", "org.in", "gov.in",
-    "com.pk", "net.pk", "org.pk", "gov.pk", "edu.pk", "co.id", "or.id", "go.id",
-    "com.my", "com.ph", "com.sa", "com.eg", "com.ng", "co.ke", "com.ua", "com.ru",
-}
+# Registrable-domain grouping is the SAME canonical rule the dashboards and the
+# Asset Register use — one registrable (apex) domain = one external asset — so
+# every "external" count reconciles. It lives in grc.modules.it_assets.asset_rollup;
+# this thin wrapper only keeps the "never return empty for a real name" contract
+# the roots counter below relies on (it is only ever called on an _is_fqdn name).
+from grc.modules.it_assets.asset_rollup import (
+    registrable_domain as _registrable_domain,
+    is_external as _canon_is_external,
+)
 
 
 def _registrable(name: str) -> str:
-    """Best-effort registrable domain (eTLD+1) for grouping the external surface."""
-    parts = [p for p in name.split(".") if p]
-    if len(parts) <= 2:
-        return name
-    if ".".join(parts[-2:]) in _PUBLIC_SUFFIX_2:
-        return ".".join(parts[-3:])
-    return ".".join(parts[-2:])
+    """Registrable domain (eTLD+1) for grouping the external surface, via the
+    shared canonical helper; falls back to the name itself for the rare input
+    the canonical rule can't group (keeps the roots counter total-preserving)."""
+    return _registrable_domain(name) or name
 
 
 def hosting(ep: Dict[str, Any]) -> str:
@@ -353,9 +347,9 @@ def probe_status(a, ports: Set[int] = frozenset()) -> str:
 
 
 def is_external(a) -> bool:
-    """The register's rule (InventoryRedesign.isExt) so Overview and register agree."""
-    return bool(getattr(a, "internet_facing", None) or getattr(a, "origin_source", None) == "easm"
-                or getattr(a, "last_seen_source", None) == "external")
+    """The register's rule so Overview and register agree — the ONE canonical
+    classifier (grc.modules.it_assets.asset_rollup.is_external)."""
+    return _canon_is_external(a)
 
 
 def fingerprint(a) -> Dict[str, Any]:
@@ -478,6 +472,8 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
             nm = _dns_name(a)
             if _is_fqdn(nm):                         # surface concentration: names per registrable domain
                 roots[_registrable(nm)] += 1
+            else:
+                ext["nonfqdn_units"] += 1            # a bare IP / single-label external host = its own unit
             ep = sbp._ep(a)
             h = hosting(ep) if ep else "Not yet probed"
             ext_host[h] += 1
@@ -651,6 +647,11 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
     out_ext["roots"] = {"distinct": len(roots), "named": sum(roots.values()),
                         "top": [{"label": k, "n": n} for k, n in roots.most_common(ROOTS_CAP)],
                         "more": max(0, len(roots) - ROOTS_CAP)}
+    # Canonical rolled-up external count: one registrable (apex) domain = ONE asset
+    # (subdomains folded in), plus any non-groupable external host (bare IP / single
+    # label) as its own unit. This is the number dashboards + the register reconcile
+    # against — NOT out_ext["total"], which is the flat per-name count.
+    out_ext["units"] = len(roots) + ext["nonfqdn_units"]
     def _os_rows() -> List[Dict[str, Any]]:
         """OS family → version drill-down, each version tagged with how many of its hosts
         are past vendor end-of-life (the obsolescence exposure that version detail is for)."""
@@ -756,6 +757,11 @@ def summarize(assets: Iterable[Any], cis_ids: Set[int], ports: Dict[int, Set[int
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "total": total,
+        # Reconciled, roll-up counts (one apex domain = one external asset). `total`
+        # above stays the flat per-row count for the composition breakdowns; these are
+        # the numbers the Performance dashboard + register headline reconcile against.
+        "rolled_external": out_ext["units"],
+        "rolled_total": out_int["total"] + out_ext["units"],
         "external": out_ext,
         "internal": out_int,
         "coverage": {"seen_30d": cov_seen, "owner": cov_owner, "cis": cov_cis},
@@ -898,6 +904,9 @@ if __name__ == "__main__":  # self-check on synthetic assets — no DB needed
     # ── surface concentration + named drill-down samples ──
     rt = out["external"]["roots"]
     assert rt["distinct"] == 1 and rt["named"] == 5 and rt["top"][0] == {"label": "example.com", "n": 5}
+    # Rolled-up external = 1 registrable domain (example.com, 5 names) + 1 bare-IP unit (203.0.113.9).
+    assert out["external"]["units"] == 2 and out["rolled_external"] == 2
+    assert out["rolled_total"] == out["internal"]["total"] + 2
     assert _registrable("a.b.co.uk") == "b.co.uk" and _registrable("x.example.com") == "example.com"
     # Named assets per class (modal key content): id for the detail link, sub = the sub-kind it groups under.
     assert by["Server"]["samples"][0] == {"id": 2, "name": "a2", "sub": "Windows Server 2012 R2", "crit": ""}

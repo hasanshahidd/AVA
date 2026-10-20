@@ -250,7 +250,7 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <div role="tablist" aria-label="Reports" className="flex flex-wrap gap-1 border-b border-[var(--color-border)]">
         {TABS.map((t) => {
           const active = tab === t.id;

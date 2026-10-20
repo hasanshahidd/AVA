@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search as SearchIcon, RefreshCw, SlidersHorizontal, Activity, ShieldAlert, Target, Layers } from 'lucide-react';
 import { riskPostureApi } from '@/lib/api';
+import { dnsName, externalUnitKey, isExternalAsset } from '@/lib/domains';
 import WeightsPanel from '../_weights-panel';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -39,6 +40,8 @@ const MUTED = '#64748B', FAINT = '#94A3B8', INK = '#0F172A';
 type AssetRow = {
   id: number; name: string; host_name?: string | null; asset_type?: string | null;
   mode?: string | null; criticality?: string | null;
+  internet_facing?: boolean | null; is_internet_facing?: boolean | null; origin_source?: string | null; last_seen_source?: string | null;
+  is_external?: boolean | null; owner_id?: number | null; cde_environment?: boolean | null;
   score: number | null; band: { label: string; description?: string };
   data_quality: number; known_dimensions: string[];
   contributions: Record<string, number>;
@@ -56,7 +59,7 @@ const DIM: Record<string, string> = {
   vuln: 'Vulnerabilities', cis: 'CIS hardening gap', cia: 'Business-impact value', ctrl: 'Control gap', risk: 'Linked risks',
   hygiene: 'Exposure hygiene', exploitability: 'Exploitability', exposure: 'Internet exposure', business: 'Business impact', subdomains: 'Subdomain exposure',
 };
-const isExternal = (a: AssetRow) => a.mode === 'easm' || /external|easm/i.test(a.asset_type || '');
+const isExternal = (a: AssetRow) => isExternalAsset(a);  // single source of truth (@/lib/domains)
 const titleCase = (s?: string | null) => (s || '').replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 const bandKey = (a: AssetRow): Band => toBand(a.band?.label, a.score);
 const isUnassessed = (c?: string | null) => !c || /not assessed/i.test(c);
@@ -116,6 +119,20 @@ export default function RiskPostureWorkspace() {
     const ext = assets.filter(isExternal);
     const int = assets.filter((a) => !isExternal(a));
     const avg = (rows: AssetRow[]) => { const s = rows.filter((a) => a.score != null); return s.length ? Math.round(s.reduce((t, a) => t + (a.score || 0), 0) / s.length) : null; };
+    // External assets roll up by registrable (apex) domain — ONE domain = one
+    // asset — so the count reconciles with the register and the mean isn't swamped
+    // by one domain's subdomains. Each apex takes the WEAKEST (highest-risk) score
+    // among its names (the register's domain rule), then we average those.
+    const extUnits = new Map<string, number | null>();
+    for (const a of ext) {
+      const k = externalUnitKey(a, dnsName(a));
+      const cur = extUnits.get(k);
+      if (a.score != null) extUnits.set(k, cur == null ? a.score : Math.max(cur, a.score));
+      else if (!extUnits.has(k)) extUnits.set(k, null);
+    }
+    const extUnitScores = Array.from(extUnits.values()).filter((v): v is number => v != null);
+    const extCount = extUnits.size;
+    const extAvgRolled = extUnitScores.length ? Math.round(extUnitScores.reduce((t, v) => t + v, 0) / extUnitScores.length) : null;
 
     // Driver decomposition — avg points per dimension, split by model (outside-in vs tunable-weight).
     const extDims = Array.from(new Set(ext.flatMap((a) => a.known_dimensions ?? [])));
@@ -156,7 +173,7 @@ export default function RiskPostureWorkspace() {
     const actFirst = scored.filter((a) => bandKey(a) === 'severe' || bandKey(a) === 'elevated').sort((a, b) => (b.score || 0) - (a.score || 0));
 
     return {
-      scored, ext, int, extAvg: avg(ext), intAvg: avg(int),
+      scored, ext, int, extAvg: extAvgRolled, intAvg: avg(int), extCount,
       intDrivers, extDrivers, topIntDriver: intDrivers[0] ?? null,
       cisN, vulnN, extScored, avgDQ,
       critNotAssessed, noControls, openVulns, unscored,
@@ -216,7 +233,7 @@ export default function RiskPostureWorkspace() {
               <>No asset has a risk score yet — connect telemetry or run a scan to measure posture across <Hl>{nfmt(total)}</Hl> assets.</>
             ) : (
               <>Mean asset risk is <Hl>{avg}</Hl>/100 (<BandWord k={avgBand} />) across <Hl>{nfmt(total)}</Hl> assets — <Hl>{nfmt(severe)}</Hl> severe, <Hl>{nfmt(elevated)}</Hl> elevated.
-                {' '}External <Hl>{nfmt(D.ext.length)}</Hl> avg <Hl>{D.extAvg ?? '—'}</Hl> · internal <Hl>{nfmt(D.int.length)}</Hl> avg <Hl>{D.intAvg ?? '—'}</Hl>.</>
+                {' '}External <Hl>{nfmt(D.extCount)}</Hl> avg <Hl>{D.extAvg ?? '—'}</Hl> · internal <Hl>{nfmt(D.int.length)}</Hl> avg <Hl>{D.intAvg ?? '—'}</Hl>.</>
             )}
           </p>
         </div>
@@ -267,7 +284,7 @@ export default function RiskPostureWorkspace() {
                 </div>
                 <div className="rounded-[10px] border border-[#E7EBF0] bg-[#F8FAFC] px-3 py-2">
                   <p className="m-0 text-[10.5px] font-semibold uppercase tracking-[.05em] text-[#6A54C9]">External</p>
-                  <p className="m-0 flex items-baseline gap-1.5"><b className="text-[19px] tabular-nums">{nfmt(D.ext.length)}</b><span className="text-[11px] text-[#64748B]">avg {D.extAvg ?? '—'}</span></p>
+                  <p className="m-0 flex items-baseline gap-1.5"><b className="text-[19px] tabular-nums">{nfmt(D.extCount)}</b><span className="text-[11px] text-[#64748B]">avg {D.extAvg ?? '—'}</span></p>
                   <p className="m-0 text-[10px] text-[#94A3B8]">outside-in</p>
                 </div>
               </div>
