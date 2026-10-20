@@ -303,8 +303,11 @@ def on_startup():
         try:
             from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
             from grc.modules.helpdesk_native.itsm_seed import _add_columns, seed_if_empty
+            # include_inactive=True: a tenant whose is_active is NULL (Python-side
+            # default never applied) must still be schema/data-healed — otherwise
+            # the boot heal silently processes 0 tenants.
             _n = 0
-            for _tid, _slug, _sess in iter_tenant_sessions():
+            for _tid, _slug, _sess in iter_tenant_sessions(include_inactive=True):
                 _n += 1
                 if _schema_on:
                     try:
