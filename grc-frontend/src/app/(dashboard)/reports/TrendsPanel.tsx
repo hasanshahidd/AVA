@@ -415,7 +415,10 @@ function MetricDetail({ card, days }: { card: TrendCard; days: number }) {
   return (
     <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+        {/* flex-1 min-w-0: without min-width:0 this flex item shrinks to its
+            longest word in a narrow card, wrapping the definition one word per
+            line. flex-1 lets it take the row's width so the text wraps normally. */}
+        <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-[var(--color-text)]">{card.label}</h3>
           <p className="mt-0.5 max-w-2xl text-[13px] text-[var(--color-muted)]">{card.definition}</p>
         </div>

@@ -33,12 +33,9 @@ export function fmtWhen(iso: string | null | undefined): string {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
-}
+// Date helpers live in ./dates (pure, unit-checked). Re-exported so existing
+// callers keep importing `fmtDate` from './shared'.
+export { fmtDate, parseServerDate } from './dates';
 
 /** Icon + title + description header with right-aligned actions, then the body. Matches the Report Builder card. */
 export function PanelShell({
