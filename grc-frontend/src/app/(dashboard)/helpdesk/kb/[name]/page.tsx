@@ -9,6 +9,8 @@
  */
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ArrowLeft, BookOpen, Eye } from "lucide-react";
 import { Chip, ErrorBanner, Loading, useHd } from "../../_ui";
 
@@ -55,10 +57,9 @@ export default function KbArticle() {
         </div>
         <Chip value={a.status || "Draft"} />
       </div>
-      <article
-        className="prose prose-sm max-w-none rounded-2xl border border-slate-200 bg-white p-6"
-        dangerouslySetInnerHTML={{ __html: a.content || "<p>No content yet.</p>" }}
-      />
+      <article className="prose prose-sm max-w-none rounded-2xl border border-slate-200 bg-white p-6">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{a.content || "_No content yet._"}</ReactMarkdown>
+      </article>
     </div>
   );
 }

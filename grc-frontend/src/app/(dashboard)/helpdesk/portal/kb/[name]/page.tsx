@@ -10,6 +10,8 @@
  */
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { ErrorBanner, Loading, useHd } from "../../../_ui";
 
@@ -47,10 +49,9 @@ export default function PortalKbArticle() {
         <h1 className="text-xl font-semibold text-[#0F172A]">{a.title || `Article ${name}`}</h1>
         {fmtDate(a.modified) && <p className="mt-1 text-xs text-slate-400">Updated {fmtDate(a.modified)}</p>}
       </div>
-      <article
-        className="prose prose-sm max-w-none rounded-2xl border border-[#EEF1F5] bg-white p-6"
-        dangerouslySetInnerHTML={{ __html: a.content || "<p>No content yet.</p>" }}
-      />
+      <article className="prose prose-sm max-w-none rounded-2xl border border-[#EEF1F5] bg-white p-6">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{a.content || "_No content yet._"}</ReactMarkdown>
+      </article>
       <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-[#F9FAFC] p-4">
         <span className="text-sm text-slate-600">Didn't solve it?</span>
         <Link href="/helpdesk/portal/report" className="text-sm font-medium text-[#005B96] hover:underline">Report an issue</Link>
