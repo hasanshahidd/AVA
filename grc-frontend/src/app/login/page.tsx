@@ -546,12 +546,6 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
       {/* soft light bloom top-left + radar echo so it reads as glass, not flat */}
       <div className="lg-drift pointer-events-none absolute -right-[18%] top-1/2 h-[120%] w-[120%] -translate-y-1/2 opacity-45 [background:radial-gradient(circle_at_68%_38%,rgba(255,255,255,.22),transparent_52%)]" />
       <div className="pointer-events-none absolute -left-[10%] -top-[10%] h-[60%] w-[70%] opacity-50 [background:radial-gradient(circle_at_30%_30%,rgba(255,255,255,.16),transparent_60%)]" />
-      {/* live status — always on the blue panel, so it stays legible */}
-      <div className="absolute right-[clamp(1.5rem,2.2vw,2.5rem)] top-[clamp(1.1rem,2.6vh,1.9rem)] z-20 inline-flex items-center gap-2 text-[.72rem] font-medium text-white/85">
-        <span className="h-[7px] w-[7px] rounded-full bg-[#5BE0C2] shadow-[0_0_0_3px_rgba(255,255,255,.18)]" />
-        Attack surface online
-      </div>
-
       <div className="relative z-10 flex h-full flex-col justify-center gap-[clamp(.62rem,1.7vh,1.15rem)] px-[clamp(3rem,7.5vw,6.5rem)] pb-[clamp(3rem,9vh,5rem)]">
         <div className="inline-flex items-center gap-2.5">
           <LogoMark className="lg-logo-spin h-10 w-10 [filter:brightness(0)_invert(1)]" />

@@ -10,16 +10,51 @@ export interface Kpi { label: string; value: string; tone?: 'danger' | 'warn' | 
 // falls back to its first badge-typed filterable columns.
 const BREAKDOWN_COLS: Record<string, string[]> = {
   vulnerabilities: ['severity', 'status', 'kev_flag'],
-  assets: ['origin_source', 'criticality', 'cde_environment'],
+  assets: ['internet_facing', 'criticality', 'asset_type', 'status', 'cde_environment'],
   cis_results: ['status'],
   helpdesk_tickets: ['status_category', 'agreement_status'],
 };
 
-/** Group-by columns for a dataset, limited to ones the catalog says can be filtered/grouped. */
+// A rich dashboard shows MANY breakdown cards at once (like the Vuln / Inventory
+// dashboards), so take the curated columns first then fill with any remaining
+// badge-typed (low-cardinality enum) columns the schema offers, up to this cap.
+const MAX_BREAKDOWNS = 6;
+
+/** Group-by columns for a dataset — curated first, then schema badge columns, capped. */
 export function breakdownColumns(dataset: string, filterable: Record<string, string>): string[] {
-  const wanted = (BREAKDOWN_COLS[dataset] ?? []).filter((c) => c in filterable);
-  if (wanted.length) return wanted;
-  return Object.keys(filterable).filter((c) => filterable[c] === 'badge').slice(0, 2);
+  const curated = (BREAKDOWN_COLS[dataset] ?? []).filter((c) => c in filterable);
+  const badges = Object.keys(filterable).filter((c) => filterable[c] === 'badge' && !curated.includes(c));
+  return [...curated, ...badges].slice(0, MAX_BREAKDOWNS);
+}
+
+// One-line C-level context under each breakdown card's title (matches the Vuln
+// dashboard cards). Unlisted columns fall back to a generic sentence.
+const COLUMN_BLURB: Record<string, string> = {
+  severity: 'How damaging each finding is if it were exploited.',
+  status: 'Where each item sits in its remediation lifecycle.',
+  kev_flag: 'Findings CISA confirms are being exploited in the wild.',
+  criticality: 'Business importance assigned to each asset.',
+  internet_facing: 'Whether each asset is reachable from the public internet (external vs internal).',
+  origin_source: 'How each asset entered the inventory — network scan vs external (EASM).',
+  cde_environment: 'Whether the asset sits in PCI cardholder-data scope.',
+  asset_type: 'The kind of asset — application, infrastructure, cloud, data…',
+  status_category: 'The help-desk stage each ticket is in.',
+  agreement_status: 'Whether tickets are within their SLA agreement.',
+  owner: 'Who each item is assigned to.',
+  owner_name: 'Who each item is assigned to.',
+  assignee: 'Who each item is assigned to.',
+  department: 'Which part of the organisation owns each item.',
+};
+export const columnBlurb = (col: string, noun: string): string =>
+  COLUMN_BLURB[col] ?? `Distribution of ${noun} by ${col.replace(/_/g, ' ')}.`;
+
+/** An honest 0-100 headline score where the dataset has one derivable from the counts
+ *  (CIS pass rate today); null for datasets with no natural score — never fabricated. */
+export function coverageScore(dataset: string, b: Breakdowns): number | null {
+  if (dataset !== 'cis_results') return null;
+  const pass = sum(b.status, (n) => n.startsWith('pass'));
+  const fail = sum(b.status, (n) => n.startsWith('fail'));
+  return pass + fail > 0 ? Math.round((pass / (pass + fail)) * 100) : null;
 }
 
 /** Make an aggregate group key readable: null → Unknown, booleans → Yes/No. */
@@ -47,12 +82,17 @@ function vulnKpis(total: number, b: Breakdowns): Kpi[] {
 }
 
 function assetKpis(total: number, b: Breakdowns): Kpi[] {
-  const external = sum(b.origin_source, is('easm'));
+  // External = internet-facing assets (the "By Internet Facing" breakdown). origin_source is
+  // NOT groupable server-side (aggregate returns skipped_group_by), so the old
+  // sum(b.origin_source, is('easm')) was always 0 — the bug that read "0 External / 249 Internal"
+  // while the By-Internet-Facing card showed Yes 247. yes() matches Yes/true/1 case-insensitively.
+  const yes = (n: string) => /^(yes|true|1)$/i.test(n);
+  const external = sum(b.internet_facing, yes);
   return [
     { label: 'Total assets', value: fmt(total) },
     { label: 'External', value: fmt(external) },
     { label: 'Internal', value: fmt(Math.max(0, total - external)) },
-    { label: 'PCI scope', value: fmt(sum(b.cde_environment, is('yes', 'true'))) },
+    { label: 'PCI scope', value: fmt(sum(b.cde_environment, yes)) },
   ];
 }
 
@@ -74,6 +114,16 @@ function genericKpis(total: number, b: Breakdowns, cols: string[], noun: string)
   const top = [...(b[cols[0]] ?? [])].sort((x, y) => y.value - x.value).slice(0, 3);
   return [{ label: `Total ${noun}`, value: fmt(total) }, ...top.map((s) => ({ label: s.name, value: fmt(s.value) }))];
 }
+
+// What one row of each dataset *is* — the noun on the "Total …" KPI and the
+// distribution cards' labels (e.g. "128 findings · by status"). Anything else → rows.
+const DATASET_NOUN: Record<string, string> = {
+  vulnerabilities: 'findings', assets: 'assets', cis_results: 'checks', discovery: 'devices',
+  software_inventory: 'software', pentest_findings: 'findings', pentest_scans: 'scans',
+  ctem_scopes: 'scopes', sbp_inventory: 'assets', helpdesk_tickets: 'tickets',
+  licenses: 'licenses', risk_posture: 'assets',
+};
+export const datasetNoun = (dataset: string): string => DATASET_NOUN[dataset] ?? 'rows';
 
 /** KPI cards for a dataset. `total` is the filtered row count; `b` maps column → grouped counts. */
 export function buildKpis(dataset: string, total: number, b: Breakdowns, cols: string[], noun = 'rows'): Kpi[] {

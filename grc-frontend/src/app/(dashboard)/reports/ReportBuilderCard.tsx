@@ -16,26 +16,25 @@ import ReportPreview, { type PreviewRequest } from './ReportPreview';
 const ACCENT = 'var(--color-base)';
 
 // Friendly labels for the server dataset keys (the catalog ships keys only).
+// Ava is CYBER-ONLY — these are the only datasets it reports on. The shared backend
+// may also expose GRC datasets (risks, controls, evidence, issues, tasks, vendors,
+// governance docs); AVA_DATASETS below hides everything not listed here so GRC data
+// can never leak into Ava's dataset picker.
 const DATASET_LABELS: Record<string, string> = {
   assets: 'Assets',
   vulnerabilities: 'Vulnerabilities',
-  risks: 'Risks',
-  internal_controls: 'Controls',
-  evidence: 'Evidence',
-  issues: 'Issues',
-  tasks: 'Tasks',
-  vendors: 'Vendors',
-  gov_documents: 'Governance Documents',
-  cis_results: 'CIS Benchmark Results',
-  helpdesk_tickets: 'Help Desk Tickets',
-  sbp_inventory: 'SBP Offsite IT-Asset Inventory',
   discovery: 'Discovered Devices',
-  pentest_findings: 'Pentest Findings',
   software_inventory: 'Software Inventory',
+  cis_results: 'CIS Benchmark Results',
+  risk_posture: 'Risk Posture',
+  pentest_findings: 'Pentest Findings',
   pentest_scans: 'Pentest Scans',
   ctem_scopes: 'CTEM Scopes',
-  risk_posture: 'Risk Posture',
+  sbp_inventory: 'SBP Offsite IT-Asset Inventory',
+  helpdesk_tickets: 'Help Desk Tickets',
+  licenses: 'Licenses',
 };
+const AVA_DATASETS = new Set(Object.keys(DATASET_LABELS));
 
 const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -90,7 +89,8 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
     queryFn: async () => (await reportingApi.datasets()).data.datasets,
   });
 
-  const datasets = useMemo<ReportDatasetMeta[]>(() => data ?? [], [data]);
+  // Cyber-only: hide any GRC datasets the shared backend might expose.
+  const datasets = useMemo<ReportDatasetMeta[]>(() => (data ?? []).filter((d) => AVA_DATASETS.has(d.key)), [data]);
 
   const [dataset, setDataset] = useState('');
   const ASSET_CATEGORY_OPTIONS: { value: string; label: string }[] = [
@@ -101,8 +101,6 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
     { value: 'adhoc', label: 'Ad-hoc (pentest)' },
   ];
   const [assetCategories, setAssetCategories] = useState<string[]>(['credential', 'uncredential', 'easm', 'pci']);
-  const toggleCategory = (v: string) =>
-    setAssetCategories((cur) => (cur.includes(v) ? cur.filter((c) => c !== v) : [...cur, v]));
   const showScope = dataset === 'assets' || dataset === 'sbp_inventory';
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [filters, setFilters] = useState<DraftFilter[]>([]);
@@ -111,6 +109,7 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewRequest | null>(null);
+  const previewNonce = useRef(0);  // bumped per "Update report" click so it always refetches
 
   const meta = useMemo(() => datasets.find((d) => d.key === dataset), [datasets, dataset]);
 
@@ -339,29 +338,17 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
             {showScope && (
               <div>
                 <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-                  Asset categories
+                  Asset categories ({assetCategories.length}/{ASSET_CATEGORY_OPTIONS.length})
                 </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {ASSET_CATEGORY_OPTIONS.map((opt) => {
-                    const on = assetCategories.includes(opt.value);
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => toggleCategory(opt.value)}
-                        aria-pressed={on}
-                        style={on ? { borderColor: ACCENT, color: ACCENT, background: 'var(--color-base-soft)' } : undefined}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-[12px] font-medium text-[var(--color-muted)] hover:bg-[var(--color-subtle)]"
-                      >
-                        <span
-                          className="inline-block h-3 w-3 rounded-[3px] border border-[var(--color-border)]"
-                          style={on ? { background: ACCENT, borderColor: ACCENT } : undefined}
-                        />
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                <MultiSelectDropdown
+                  title="Asset categories"
+                  triggerVariant="input"
+                  placeholder="Select categories…"
+                  items={ASSET_CATEGORY_OPTIONS}
+                  selectedValues={assetCategories}
+                  onApply={setAssetCategories}
+                  triggerClassName="w-full"
+                />
               </div>
             )}
 
@@ -487,6 +474,7 @@ export default function ReportBuilderCard({ load, onSnapshot, footerExtras }: Re
                     filters: filterPayload,
                     logic,
                     assetCategories: showScope ? assetCategories : undefined,
+                    nonce: ++previewNonce.current,
                   })
                 }
                 disabled={!selectedCols.length}

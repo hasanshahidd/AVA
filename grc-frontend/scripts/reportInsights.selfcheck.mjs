@@ -15,14 +15,20 @@ const cis = byLabel(buildKpis('cis_results', 10, { status: kv({ passed: 6, faile
 assert.equal(cis['Pass rate'], '75%');
 assert.equal(byLabel(buildKpis('cis_results', 0, { status: [] }, []))['Pass rate'], '—');
 
-const assets = byLabel(buildKpis('assets', 10, { origin_source: kv({ easm: 3, nessus: 7 }), cde_environment: kv({ Yes: 2, No: 8 }) }, []));
-assert.deepEqual([assets.External, assets.Internal, assets['PCI scope']], ['3', '7', '2']);
+// External = internet-facing (Yes); origin_source is not groupable server-side. PCI = cde Yes.
+const assets = byLabel(buildKpis('assets', 10, { internet_facing: kv({ Yes: 7, No: 3 }), cde_environment: kv({ Yes: 2, No: 8 }) }, []));
+assert.deepEqual([assets.External, assets.Internal, assets['PCI scope']], ['7', '3', '2']);
 
 const gen = buildKpis('helpdesk_tickets', 9, { s: kv({ Open: 5, Closed: 3, Hold: 1 }) }, ['s'], 'tickets');
 assert.deepEqual(gen.map((k) => k.label), ['Total tickets', 'Open', 'Closed', 'Hold']);
 
 assert.deepEqual(breakdownColumns('vulnerabilities', { severity: 'badge', status: 'badge' }), ['severity', 'status']);
-assert.deepEqual(breakdownColumns('risks', { a: 'text', b: 'badge', c: 'badge', d: 'badge' }), ['b', 'c']);
+// Curated first, then every remaining badge column (dense grid) — capped at 6.
+assert.deepEqual(breakdownColumns('risks', { a: 'text', b: 'badge', c: 'badge', d: 'badge' }), ['b', 'c', 'd']);
+assert.deepEqual(
+  breakdownColumns('x', { a: 'badge', b: 'badge', c: 'badge', d: 'badge', e: 'badge', f: 'badge', g: 'badge' }).length,
+  6,
+);
 assert.deepEqual([sliceName(null), sliceName(true), sliceName('x')], ['Unknown', 'Yes', 'x']);
 const many = topSlices(kv({ a: 5, b: 4, c: 3, d: 2, e: 1 }), 3);
 assert.deepEqual(many, [{ name: 'a', value: 5 }, { name: 'b', value: 4 }, { name: 'Other', value: 6 }]);
