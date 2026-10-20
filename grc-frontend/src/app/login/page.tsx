@@ -583,18 +583,22 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
           <span><b className="font-semibold text-white">Monitor</b></span>
         </div>
 
-        {/* Swap CTA — the only control that moves the slider on desktop */}
+        {/* Self-serve registration removed — new workspaces are provisioned by an
+            admin, so the brand panel just mentions that instead of a Register CTA. */}
         <div key={mode} className="lg-swap mt-[clamp(.3rem,1.2vh,.85rem)] border-t border-white/20 pt-[clamp(.45rem,1.4vh,.95rem)]">
-          <p className="mb-1.5 text-[.82rem] text-white/75">
-            {toRegister ? 'New to Ava?' : 'Already have access?'}
-          </p>
-          <button
-            type="button"
-            onClick={() => onMode(toRegister ? 'register' : 'signin')}
-            className="inline-flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/10 px-5 py-2.5 text-[.88rem] font-semibold text-white backdrop-blur-sm transition hover:bg-white hover:text-[#005B96]"
-          >
-            {toRegister ? 'Register your organization' : 'Sign in'} <span aria-hidden>→</span>
-          </button>
+          {toRegister ? (
+            <p className="text-[.82rem] leading-[1.5] text-white/75">
+              Need an Ava workspace? Contact your administrator to get set up.
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onMode('signin')}
+              className="inline-flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/10 px-5 py-2.5 text-[.88rem] font-semibold text-white backdrop-blur-sm transition hover:bg-white hover:text-[#005B96]"
+            >
+              Sign in <span aria-hidden>→</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -738,10 +742,9 @@ function SignInForm(props: {
         </p>
       )}
 
-      {/* Mobile-only toggle to Register (desktop uses the brand panel). */}
+      {/* Self-serve registration removed — mention admin provisioning instead. */}
       <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.8rem] text-[#64748B] lg:hidden">
-        New to Ava?{' '}
-        <button type="button" onClick={() => props.onMode('register')} className="font-semibold text-[#005B96] underline-offset-2 hover:underline">Register organization</button>
+        Need an Ava workspace? Contact your administrator.
       </p>
 
       <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.76rem] leading-[1.48] text-[#94A3B8]">
