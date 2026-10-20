@@ -32,7 +32,7 @@ from . import (  # noqa: F401 (assignment used by tickets)
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
     incident, problem, change, service_request, itsm_seed, request_templates,
     portal, attachments, catalogue_admin, cmdb_admin, cmdb_sync, governance_admin,
-    approvals,
+    approvals, relations,
 )
 from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
 
@@ -135,6 +135,10 @@ def ticket_detail(name: str, db: Session = Depends(get_db), _: bool = Depends(re
     t = tickets._get_ticket(db, tid, name)
     if t is not None:
         detail["approval"] = approvals.approval_detail(db, tid, t.id)
+        # ITIL cross-process links (Batch 4 linkage A), reverse-resolved so an
+        # incident shows its parent problem(s), a problem its incidents + changes,
+        # and a change its origin.
+        detail.update(relations.related_block(db, tid, t))
     return detail
 
 

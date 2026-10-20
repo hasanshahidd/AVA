@@ -71,8 +71,12 @@ _EXT_FIELDS = (
     "approval_state", "approved_by", "approved_at", "escalation_reason",
     "root_cause", "workaround", "known_error", "problem_resolution",
     "linked_incident_ids",
+    "origin_ticket_id", "origin_process",
     "request_category", "request_subcategory",
 )
+
+# §A (Batch 4) — origin_ticket_id is an int id (or None to unlink).
+_EXT_INT = ("origin_ticket_id",)
 
 
 def priority_name_from_matrix(impact: Optional[str], urgency: Optional[str]) -> Optional[str]:
@@ -141,6 +145,8 @@ def _extension_kwargs(payload: dict) -> dict:
         v = payload[f]
         if f == "known_error":
             out[f] = _as_bool(v)
+        elif f in _EXT_INT:
+            out[f] = int(v) if v not in (None, "") else None
         elif f == "linked_incident_ids":
             out[f] = json.dumps(v) if isinstance(v, (list, tuple)) else v
         elif f in _EXT_DATETIME:
@@ -182,6 +188,8 @@ def _process_fields(ticket: "HDTicket") -> dict:
         "known_error": bool(ticket.known_error),
         "problem_resolution": ticket.problem_resolution,
         "linked_incident_ids": _parse_linked_ids(ticket.linked_incident_ids),
+        "origin_ticket_id": ticket.origin_ticket_id,
+        "origin_process": ticket.origin_process,
         "request_category": ticket.request_category,
         "request_subcategory": ticket.request_subcategory,
         "support_group_code": ticket.support_group_code,

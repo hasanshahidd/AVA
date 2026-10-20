@@ -258,6 +258,13 @@ class HDTicket(Base):
     problem_resolution = Column(Text, nullable=True)
     # ponytail: JSON list of incident ids; add a link table only if reverse-lookup/perf ever matters.
     linked_incident_ids = Column(Text, nullable=True)      # JSON array of HDTicket ids, e.g. "[12,15]"
+    # ITIL cross-process origin (Batch 4 linkage A): a change's originating
+    # incident/problem. Soft self-link (plain Integer, no FK — like ava_asset_id)
+    # so reverse surfacing ("Problem #X -> its changes", "part of Problem #X") is a
+    # tenant-scoped query with no delete-order coupling. Incident<->Problem stays
+    # on linked_incident_ids above; one scalar parent is cleaner than a bridge here.
+    origin_ticket_id = Column(Integer, nullable=True, index=True)
+    origin_process = Column(String(20), nullable=True)     # 'incident' | 'problem'
     # service request
     request_category = Column(String(100), nullable=True)
     request_subcategory = Column(String(100), nullable=True)

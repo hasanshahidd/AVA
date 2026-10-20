@@ -197,6 +197,47 @@ class ScheduleBody(BaseModel):
     planned_end: Optional[datetime] = None
 
 
+class OriginBody(BaseModel):
+    # the incident/problem this change was raised from (Batch 4 linkage A)
+    origin_ticket_id: int
+
+
+def set_origin(db: Session, tid: int, cid: int, origin_ticket_id: Optional[int],
+               actor_email: Optional[str] = None) -> dict:
+    """Link (or, with None, unlink) the incident/problem a change originated from.
+    Validates both tickets are in THIS tenant, the target is an incident or
+    problem, and the change does not originate from itself; infers origin_process
+    from the target. Writes through Agent A's update_ticket."""
+    change = _get_change(db, tid, cid)
+    if not change:
+        return {"ok": False, "error": "not found"}
+    if (change.process or "") != "change":
+        raise HTTPException(status_code=400, detail="origin can only be set on a change")
+
+    if origin_ticket_id is None:
+        payload = {"origin_ticket_id": None, "origin_process": None}
+    else:
+        origin = (db.query(HDTicket)
+                  .filter(HDTicket.id == origin_ticket_id, HDTicket.tenant_id == tid)
+                  .first())
+        if origin is None:
+            raise HTTPException(status_code=400,
+                                detail="origin ticket does not exist in this tenant")
+        if origin.id == change.id:
+            raise HTTPException(status_code=400, detail="a change cannot originate from itself")
+        op = (origin.process or "incident")
+        if op not in ("incident", "problem"):
+            raise HTTPException(status_code=400,
+                                detail="a change can only originate from an incident or problem")
+        payload = {"origin_ticket_id": origin.id, "origin_process": op}
+
+    r = tickets.update_ticket(db, tid, cid, payload)
+    if r.get("ok"):
+        hd_audit(db, tenant_id=tid, actor_email=actor_email, action="change.set_origin",
+                 entity="change", entity_id=cid, after=payload)
+    return r
+
+
 @router.get("")
 def list_changes(db: Session = Depends(get_db), _: bool = Depends(require_processes_view)):
     return tickets.list_tickets(db, tenant_id(db), process="change")
@@ -271,6 +312,20 @@ def cancel_change(cid: int, db: Session = Depends(get_db),
     if r.get("ok"):
         _sync_terminal_status(db, tid, cid, "Cancelled")
     return r
+
+
+@router.post("/{cid}/link-origin")
+def link_origin(cid: int, body: OriginBody, db: Session = Depends(get_db),
+                current_user: GRCUser = Depends(require_auth),
+                _: bool = Depends(require_processes_manage)):
+    return set_origin(db, tenant_id(db), cid, body.origin_ticket_id, current_user.email)
+
+
+@router.post("/{cid}/unlink-origin")
+def unlink_origin(cid: int, db: Session = Depends(get_db),
+                  current_user: GRCUser = Depends(require_auth),
+                  _: bool = Depends(require_processes_manage)):
+    return set_origin(db, tenant_id(db), cid, None, current_user.email)
 
 
 if __name__ == "__main__":  # pure transition-map self-check, no DB

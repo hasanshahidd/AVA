@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/api";
 import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd } from "../../_ui";
 import { AffectedCiPicker, inventoryUrl } from "../../_ci";
 import { RichComposer, isEmptyHtml } from "../../RichText";
+import { RelatedTickets } from "./_related";
 
 const fmt = (v?: string | null) => (v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString() : "—");
 const doneRe = /replied|resolved|closed/i;
@@ -268,6 +269,7 @@ export default function TicketDetail() {
 
         <aside className="w-80 shrink-0 space-y-3 overflow-y-auto border-l border-slate-200 bg-white px-4 py-5">
           {data?.approval && <ApprovalPanel ap={data.approval} />}
+          <RelatedTickets name={t.name || name} process={t.process} related={data?.related} onChanged={reload} />
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Properties</h3>
           <PropRow label="Status">
             {statuses.length > 0 ? (

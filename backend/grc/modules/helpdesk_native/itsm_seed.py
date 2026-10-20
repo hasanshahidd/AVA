@@ -84,6 +84,9 @@ _ALTER_COLUMNS = [
     ("known_error", "BOOLEAN DEFAULT false"),
     ("problem_resolution", "TEXT"),
     ("linked_incident_ids", "TEXT"),
+    # Batch 4 linkage A — a change's originating incident/problem (soft self-link).
+    ("origin_ticket_id", "INTEGER"),
+    ("origin_process", "VARCHAR(20)"),
     ("request_category", "VARCHAR(100)"),
     ("request_subcategory", "VARCHAR(100)"),
 ]
@@ -563,7 +566,7 @@ def ensure_itsm_tables(db: Session) -> bool:
 
 def _ensure_itsm_indexes(db: Session) -> None:
     """Indexes `index=True` would have made on the new HDTicket link columns."""
-    for col in ("business_service_id", "ci_id", "incident_category_id"):
+    for col in ("business_service_id", "ci_id", "incident_category_id", "origin_ticket_id"):
         try:
             db.execute(text(
                 f"CREATE INDEX IF NOT EXISTS ix_grc_hd_ticket_{col} "

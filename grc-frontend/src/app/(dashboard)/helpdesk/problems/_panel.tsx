@@ -40,6 +40,11 @@ export function ProblemPanel({ problem, onClose, onChanged }: { problem: any; on
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Reverse surface (Batch 4 linkage A): the change(s) raised from this problem,
+  // read from the ticket detail's `related` block.
+  const detail = useHd<any>(`/helpdesk/tickets/${encodeURIComponent(problem.name)}`);
+  const relatedChanges: any[] = detail.data?.related?.changes || [];
+
   const id = encodeURIComponent(problem.name);
   const incList = incidents.data?.tickets || [];
   const byId = useMemo(() => {
@@ -142,6 +147,20 @@ export function ProblemPanel({ problem, onClose, onChanged }: { problem: any; on
             <Btn variant="ghost" icon={<Link2 size={14} />} onClick={link} disabled={busy || !pick}>Link</Btn>
           </div>
         </div>
+
+        {relatedChanges.length > 0 && (
+          <div>
+            <p className="mb-1 text-[11.5px] font-semibold text-[#475569]">Changes raised from this problem</p>
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {relatedChanges.map((c) => (
+                <li key={c.name} className="flex items-center gap-2 rounded-[9px] border border-[#E2E5EC] bg-white px-2.5 py-1.5 text-[12.5px]">
+                  <Link href={`/helpdesk/tickets/${c.name}`} className="font-mono text-[11px] text-[#005B96]">#{c.name}</Link>
+                  <span className="min-w-0 flex-1 truncate text-[#334155]">{c.subject || "(change)"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </Modal>
   );
