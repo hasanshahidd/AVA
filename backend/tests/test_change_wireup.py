@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import (
     HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
-    HDSLATarget, HDServiceLevelAgreement, HDTicketPriority, AuditLog, GRCUser,
+    HDSLATarget, HDServiceLevelAgreement, HDTicketPriority, HDTicketCI, AuditLog, GRCUser,
 )
 from grc.modules.helpdesk_native import change as change_mod
 
@@ -25,7 +25,7 @@ TENANT = 1
 def db():
     engine = create_engine("sqlite://")
     for m in (HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
-              HDSLATarget, HDServiceLevelAgreement, HDTicketPriority, AuditLog, GRCUser):
+              HDSLATarget, HDServiceLevelAgreement, HDTicketPriority, HDTicketCI, AuditLog, GRCUser):
         m.__table__.create(engine)
     s = sessionmaker(bind=engine)()
     yield s

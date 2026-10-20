@@ -22,7 +22,7 @@ from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
     HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
 )
-from grc.models import HDSLATarget, HDServiceLevelAgreement
+from grc.models import HDSLATarget, HDServiceLevelAgreement, HDTicketCI
 from grc.modules.helpdesk_native.tickets import (
     priority_from_matrix, transition_allowed, update, update_ticket,
 )
@@ -205,7 +205,8 @@ def test_update_ticket_recomputes_priority_on_reclassify(tdb):
 @pytest.fixture
 def adb():
     engine = create_engine("sqlite://")
-    for m in (HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix):
+    for m in (HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
+              HDTicketCI):
         m.__table__.create(engine)
     s = sessionmaker(bind=engine)()
     yield s

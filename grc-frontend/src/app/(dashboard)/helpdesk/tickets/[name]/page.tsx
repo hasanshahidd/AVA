@@ -9,6 +9,7 @@ import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, T
 import { AffectedCiPicker, inventoryUrl } from "../../_ci";
 import { RichComposer, isEmptyHtml } from "../../RichText";
 import { RelatedTickets } from "./_related";
+import { ImpactedCis } from "./_impacted";
 
 const fmt = (v?: string | null) => (v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString() : "—");
 const doneRe = /replied|resolved|closed/i;
@@ -320,6 +321,10 @@ export default function TicketDetail() {
             )}
             {t.ci?.security && <CiSecurity sec={t.ci.security} assetId={t.ci.ava_asset_id} />}
           </div>
+          {/* Impacted CIs (changes): the SET beyond the primary CI; unioned for CAB exposure. */}
+          {t.process === "change" && (
+            <ImpactedCis name={t.name || name} impacted={data?.impacted_cis} onChanged={reload} />
+          )}
           <div className="border-t border-slate-100 pt-1" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-slate-400">SLA{sla.policy ? ` · ${sla.policy}` : ""}</span>

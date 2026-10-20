@@ -720,3 +720,54 @@ class HDCABConfig(Base):
     __table_args__ = (
         Index("uq_hd_cab_config", "tenant_id", "item", unique=True),
     )
+
+
+# ----------------------------------------------------------------------------
+# BATCH 4 — ticket linkage bridges (impacted CIs, KB articles)
+# ----------------------------------------------------------------------------
+class HDTicketCI(Base):
+    """Batch 4 linkage B — the SET of CIs a ticket impacts, beyond its single
+    primary grc_hd_ticket.ci_id. A change usually touches more than one CI; the
+    CAB exposure check unions the primary ci_id with every CI here so a change is
+    escalated when ANY impacted CI is internet-facing / PCI. Tenant-scoped (the
+    bridge carries tenant_id so the add/remove/exposure queries filter on it
+    directly, same as the Batch 4 KB bridge)."""
+    __tablename__ = "grc_hd_ticket_ci"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                       nullable=False, index=True)
+    ci_id = Column(Integer, ForeignKey("grc_hd_ci.id", ondelete="CASCADE"),
+                   nullable=False, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    ci = relationship("HDConfigurationItem")
+
+    __table_args__ = (
+        Index("uq_hd_ticket_ci", "ticket_id", "ci_id", unique=True),
+    )
+
+
+class HDTicketKBLink(Base):
+    """Batch 4 linkage C — a KB article attached to a ticket (resolution /
+    suggested article). Bridge to grc_hd_article; tenant-scoped so link/unlink
+    queries filter on tenant_id. Idempotent via the unique (ticket_id,
+    article_id) pair."""
+    __tablename__ = "grc_hd_ticket_kb_link"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    ticket_id = Column(Integer, ForeignKey("grc_hd_ticket.id", ondelete="CASCADE"),
+                       nullable=False, index=True)
+    article_id = Column(Integer, ForeignKey("grc_hd_article.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    article = relationship("HDArticle")
+
+    __table_args__ = (
+        Index("uq_hd_ticket_kb_link", "ticket_id", "article_id", unique=True),
+    )

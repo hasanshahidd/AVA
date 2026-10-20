@@ -49,6 +49,8 @@ from ...models import (
     HDSupportGroupMap,
     HDTechnicalService,
     HDTicket,
+    HDTicketCI,
+    HDTicketKBLink,
     HDTicketPriority,
     HDTicketStatus,
     HDTicketTemplate,
@@ -147,6 +149,8 @@ _ITSM_MODELS = (
     HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
     HDIncidentCategory,
     HDSLATarget, HDProcessField, HDRaci, HDCABConfig, HDKPI,
+    HDTicketCI,  # Batch 4 linkage B — impacted-CI bridge
+    HDTicketKBLink,  # Batch 4 linkage C — ticket<->KB article bridge
 )
 
 # §A2 (v2) — the departments the request library is organized by, each mapped to

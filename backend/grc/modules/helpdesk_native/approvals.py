@@ -256,11 +256,14 @@ def requirements_for_change(db: Session, tid: int, ticket: HDTicket) -> Optional
         if rm is not None and rm.cab_required:
             needs = True
 
-    # A would-be-auto-approved change on an exposed CI escalates to CAB.
+    # A would-be-auto-approved change on an exposed CI escalates to CAB. The
+    # exposure is unioned over EVERY impacted CI (primary ci_id + the Batch 4
+    # grc_hd_ticket_ci bridge), so a change escalates when ANY impacted CI — or a
+    # CI contained under it — is internet-facing / PCI, even if the primary is not.
     escalation_reason = None
     if not needs:
-        from .cmdb_admin import ci_exposure_flags  # lazy: avoid import cycle
-        flags = ci_exposure_flags(db, tid, ticket.ci_id)
+        from . import ticket_cis  # lazy: avoid import cycle
+        flags = ticket_cis.impacted_exposure(db, tid, ticket)
         if flags and (flags["internet_facing"] or flags["pci"]):
             needs = True
             escalation_reason = _exposure_escalation_reason(flags)

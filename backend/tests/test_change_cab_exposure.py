@@ -15,7 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import (
     AuditLog, GRCUser, HDApproval, HDApprovalVote, HDChangeRiskMatrix, HDChangeType,
-    HDCIRelationship, HDCIRelationshipType, HDConfigurationItem, HDTicket,
+    HDCIRelationship, HDCIRelationshipType, HDConfigurationItem, HDTicket, HDTicketCI,
 )
 from grc.modules.helpdesk_native import change as change_mod
 
@@ -24,6 +24,7 @@ TENANT = 1
 TABLES = (
     HDTicket, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
     HDConfigurationItem, HDCIRelationshipType, HDCIRelationship, AuditLog, GRCUser,
+    HDTicketCI,  # Batch 4 linkage B — the CAB exposure check now unions the bridge CIs
 )
 
 
