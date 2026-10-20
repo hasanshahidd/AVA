@@ -311,6 +311,79 @@ def sync_ticket_statuses(db: Session, connection, *, limit: int = 500) -> Dict[s
     return counts
 
 
+def reflect_native_ticket_status(db: Session, tenant_id: int, ticket_name: str,
+                                 normalised_status: str) -> Dict[str, int]:
+    """Reflect a NATIVE Help Desk ticket's resolution onto the finding it was
+    pushed from — the event-driven equivalent of sync_ticket_statuses for the
+    native path, which has no connector to poll.
+
+    Called from the HD status-change chokepoint (helpdesk_native.tickets
+    _apply_status_change) with the ticket's name and the normalised status
+    ("resolved" when it enters Resolved, "reopened" when it leaves). The join is
+    VulnTicketLink.external_ticket_id == ticket.name on the native_helpdesk
+    connection (push_finding stores the created ticket's name as external_ticket_id).
+
+    Idempotent and non-fatal; never commits — it runs inside the caller's status
+    change transaction so the finding update is atomic with the resolve.
+    """
+    from ..models import VulnTicketLink, VulnRemediationPlan, IntegrationConnection
+    counts = {"synced": 0, "resolved": 0, "plans_advanced": 0, "reopened": 0}
+    try:
+        links = (db.query(VulnTicketLink)
+                 .join(IntegrationConnection, IntegrationConnection.id == VulnTicketLink.connection_id)
+                 .filter(VulnTicketLink.tenant_id == tenant_id,
+                         VulnTicketLink.external_ticket_id == str(ticket_name),
+                         IntegrationConnection.integration_type == "native_helpdesk")
+                 .all())
+    except Exception:
+        logger.exception("reflect_native_ticket_status: link lookup failed for ticket %s", ticket_name)
+        return counts
+
+    now = datetime.utcnow()
+    for link in links:
+        link.normalised_status = normalised_status
+        link.last_synced_at = now
+        link.updated_at = now
+        counts["synced"] += 1
+
+        if normalised_status in _ADVANCE_STATUSES:  # "resolved"
+            if link.resolved_at is None:
+                link.resolved_at = now
+                counts["resolved"] += 1
+            # Advance the linked remediation plan to `applied` ONCE — never to
+            # `verified` (that stays the scanner/retest's call), mirroring the
+            # connector-poll path in sync_ticket_statuses.
+            if link.plan_advanced_at is None:
+                plan = db.query(VulnRemediationPlan).filter(
+                    VulnRemediationPlan.vulnerability_id == link.vulnerability_id,
+                    VulnRemediationPlan.tenant_id == link.tenant_id,
+                ).first()
+                if plan and plan.status in ("recommended", "approved"):
+                    plan.status = "applied"
+                    plan.applied_at = plan.applied_at or now
+                    if hasattr(plan, "applied_by_name"):
+                        plan.applied_by_name = "Help Desk"  # invisible-engine rule
+                    link.plan_advanced_at = now
+                    counts["plans_advanced"] += 1
+                    _audit(db, link.tenant_id, link.connection_id, None,
+                           "itsm.plan_advanced_applied", link.id,
+                           {"vulnerability_id": link.vulnerability_id,
+                            "external_ticket_id": link.external_ticket_id,
+                            "note": "native Help Desk resolution → plan applied "
+                                    "(NOT verified; verification stays the scanner path)"})
+        elif normalised_status == "reopened":
+            # Ticket left Resolved → the finding is active again. Clear the link's
+            # resolution so it no longer reads as closed. Leave the plan's applied
+            # state alone — a reopen doesn't un-apply work that may genuinely have
+            # happened; verification is still the scanner's call.
+            if link.resolved_at is not None:
+                link.resolved_at = None
+                counts["reopened"] += 1
+
+    db.flush()
+    return counts
+
+
 def _audit(db, tenant_id, connection_id, user_id, action, resource_id, detail):
     try:
         from ..models import IntegrationAuditLog
