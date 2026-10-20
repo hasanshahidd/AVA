@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { registrableDomain, rollupCounts, isExternalAsset } from '@/lib/domains';
+import { registrableDomain, rollupCounts, rollupAssets, isExternalAsset } from '@/lib/domains';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
@@ -105,20 +105,26 @@ export default function InventoryRedesign(p: Props) {
     const roll = rollupCounts(assets, isExt, dnsName);
     const total = roll.total;
     const external = roll.external;
+    // Count every chip over the SAME rolled-up logical set as `total`, not the
+    // raw array — otherwise a chip ("Infrastructure 12") exceeds the folded
+    // total ("6") because subdomains are counted per-row while total folds them.
+    // `logical` = one row per logical asset, so each facet <= total and the chip
+    // count matches the rows the table shows when that filter is applied.
+    const logical = rollupAssets(assets, isExt, dnsName);
     return {
       total, external, internal: roll.internal,
-      critical: assets.filter((a) => critOf(a) === 'critical').length,
-      cde: assets.filter((a) => a.cde_environment).length,
-      internet: assets.filter((a) => a.internet_facing).length,
-      unowned: assets.filter((a) => !a.owner_name).length,
-      needcia: assets.filter((a) => !hasCia(a)).length,
-      stale: assets.filter(isStale).length,
-      scanned: assets.filter((a) => a.last_seen_at).length,
-      easmN: assets.filter((a) => modeOf(a) === 'easm').length,
-      credN: assets.filter((a) => modeOf(a) === 'credential').length,
-      uncredN: assets.filter((a) => modeOf(a) === 'uncredential').length,
-      byType: (k: string) => assets.filter((a) => typeKey(a) === k).length,
-      mix: { critical: assets.filter((a) => critOf(a) === 'critical').length, high: assets.filter((a) => critOf(a) === 'high').length, medium: assets.filter((a) => critOf(a) === 'medium').length, low: assets.filter((a) => critOf(a) === 'low').length },
+      critical: logical.filter((a) => critOf(a) === 'critical').length,
+      cde: logical.filter((a) => a.cde_environment).length,
+      internet: logical.filter((a) => a.internet_facing).length,
+      unowned: logical.filter((a) => !a.owner_name).length,
+      needcia: logical.filter((a) => !hasCia(a)).length,
+      stale: logical.filter(isStale).length,
+      scanned: logical.filter((a) => a.last_seen_at).length,
+      easmN: logical.filter((a) => modeOf(a) === 'easm').length,
+      credN: logical.filter((a) => modeOf(a) === 'credential').length,
+      uncredN: logical.filter((a) => modeOf(a) === 'uncredential').length,
+      byType: (k: string) => logical.filter((a) => typeKey(a) === k).length,
+      mix: { critical: logical.filter((a) => critOf(a) === 'critical').length, high: logical.filter((a) => critOf(a) === 'high').length, medium: logical.filter((a) => critOf(a) === 'medium').length, low: logical.filter((a) => critOf(a) === 'low').length },
     };
   }, [assets]);
 

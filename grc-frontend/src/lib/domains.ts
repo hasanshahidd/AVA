@@ -74,3 +74,32 @@ export function rollupCounts(
   units.forEach((n, k) => { if (n > 1 && !k.startsWith('id:')) subCounts.set(k, n - 1); });
   return { external: units.size, internal, total: units.size + internal, subCounts };
 }
+
+/**
+ * The LIST form of {@link rollupCounts}: one entry per logical asset — every
+ * internal asset, plus ONE representative per external apex (its subdomains
+ * folded away). `out.length === rollupCounts(...).total`. Use this (not the raw
+ * array) to compute register facet counts, so every filter chip counts the same
+ * rolled-up unit the register's total does — otherwise a chip ("Infrastructure
+ * 12") can exceed the folded total ("6"). The apex row itself is preferred as
+ * the representative when present, else the first subdomain seen.
+ */
+export function rollupAssets(
+  assets: any[],
+  isExt: (a: any) => boolean = isExternalAsset,
+  nameOf: (a: any) => string = dnsName,
+): any[] {
+  const repIdx = new Map<string, number>(); // apex key -> index in out
+  const out: any[] = [];
+  for (const a of assets || []) {
+    if (!isExt(a)) { out.push(a); continue; }
+    const k = externalUnitKey(a, nameOf(a));
+    const seen = repIdx.get(k);
+    if (seen === undefined) { repIdx.set(k, out.length); out.push(a); continue; }
+    // Already have a representative for this apex. Promote THIS row to the
+    // representative if it is the apex itself (keeps the register's apex row).
+    const name = nameOf(a);
+    if (name && name === registrableDomain(name)) out[seen] = a;
+  }
+  return out;
+}
