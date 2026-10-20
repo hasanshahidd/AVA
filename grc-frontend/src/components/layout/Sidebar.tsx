@@ -157,7 +157,10 @@ const navigation: NavEntry[] = [
         ],
       },
       {
-        name: 'Administration',
+        // 'Service Desk Admin' not 'Administration' — the global platform admin
+        // popover (bottom of the sidebar) is the real 'Administration'; two
+        // identically-labelled entries confused QA. This is the help-desk config.
+        name: 'Service Desk Admin',
         icon: Settings,
         items: [
           { name: 'Service Catalogue', href: '/helpdesk/admin/catalogue',  icon: Bookmark, requiredPermissions: ['helpdesk:settings:manage'] },

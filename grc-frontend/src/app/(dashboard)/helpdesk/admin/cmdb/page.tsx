@@ -663,7 +663,11 @@ function CisTab() {
           <div className="w-40">
             <Input type="number" min={0} value={svcFilter} onChange={(e) => setSvcFilter(e.target.value)} placeholder="Business service ID" aria-label="Filter by business service ID" />
           </div>
-          <span className="text-sm font-medium text-slate-600">{cis.length} item{cis.length === 1 ? "" : "s"}</span>
+          <span className="text-sm font-medium text-slate-600">
+            {flat
+              ? `${cis.length} item${cis.length === 1 ? "" : "s"}`
+              : `${cis.length} top-level · ${num(syncRes.data?.linked_ci_count ?? cis.length)} total CIs`}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <RefreshBtn onClick={reloadAll} loading={loading} />
