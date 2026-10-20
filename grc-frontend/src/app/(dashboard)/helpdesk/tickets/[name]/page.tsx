@@ -11,6 +11,7 @@ import { RichComposer, isEmptyHtml } from "../../RichText";
 import { RelatedTickets } from "./_related";
 import { ImpactedCis } from "./_impacted";
 import { Knowledge } from "./_knowledge";
+import { ChangeActions, ApprovalBadge } from "../../changes/_actions";
 
 // Backend created/creation are NAIVE UTC (datetime.utcnow(), no zone). new Date()
 // would read them as LOCAL → the date lands a day early west of UTC (QA: a ticket
@@ -273,6 +274,22 @@ export default function TicketDetail() {
         </div>
 
         <aside className="w-80 shrink-0 space-y-3 overflow-y-auto border-l border-slate-200 bg-white px-4 py-5">
+          {/* Change workflow: surface type/risk + the approval state and the
+              submit→CAB / approve / schedule actions on the detail itself, so a
+              change can be driven (and its CAB resolved from the risk matrix)
+              without going to the Changes list. ApprovalPanel below shows the
+              vote detail once an approval is open. */}
+          {t.process === "change" && (
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Change</span>
+                <ChangeActions change={data} onChanged={reload} />
+              </div>
+              <PropRow label="Change type"><span className="capitalize">{t.change_type || <span className="text-slate-300">—</span>}</span></PropRow>
+              <PropRow label="Risk"><span className="capitalize">{t.change_risk || <span className="text-slate-300">—</span>}</span></PropRow>
+              <PropRow label="Approval"><ApprovalBadge state={t.approval_state} /></PropRow>
+            </div>
+          )}
           {data?.approval && <ApprovalPanel ap={data.approval} />}
           <RelatedTickets name={t.name || name} process={t.process} related={data?.related} onChanged={reload} />
           <Knowledge name={t.name || name} kbLinks={data?.kb_links} onChanged={reload} />
