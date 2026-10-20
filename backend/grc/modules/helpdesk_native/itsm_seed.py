@@ -15,7 +15,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from ...models import (
@@ -678,15 +678,30 @@ def _ensure_departments(db: Session, tid: int) -> dict:
     out: dict = {}
     for short in _DEPARTMENTS:
         std_name, code = _DEPT_STD[short]
-        d = (db.query(HDDepartment)
-             .filter(HDDepartment.tenant_id == tid, HDDepartment.name == std_name)
-             .first())
-        if not d:
+        # Match an existing department by its standard name, its short/alias name,
+        # OR its code — so a pre-existing "Finance" or "HR" is REUSED and
+        # canonicalised, not duplicated as "Finance & Accounting" / "Human
+        # Resources" (QA found both existing side by side). Prefer a row already
+        # on the standard name/code; only rename an alias row when no standard-named
+        # row exists (so we never create a name collision).
+        aliases = {std_name.lower(), short.lower()}
+        matches = (db.query(HDDepartment)
+                   .filter(HDDepartment.tenant_id == tid,
+                           or_(func.lower(HDDepartment.name).in_(aliases),
+                               HDDepartment.code == code))
+                   .all())
+        d = next((m for m in matches if m.name == std_name or m.code == code),
+                 matches[0] if matches else None)
+        if d is None:
             d = HDDepartment(tenant_id=tid, name=std_name, code=code, enabled=True)
             db.add(d)
             db.flush()
-        elif not d.code:
-            d.code = code
+        else:
+            if not d.code:
+                d.code = code
+            if (d.name != std_name and d.name.lower() in aliases
+                    and not any(m.name == std_name for m in matches)):
+                d.name = std_name  # heal "Finance" -> "Finance & Accounting"
         out[short] = d.id
     db.commit()
     return out

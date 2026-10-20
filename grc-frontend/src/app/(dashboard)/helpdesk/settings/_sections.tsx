@@ -950,3 +950,73 @@ export function GeneralSection() {
     </Section>
   );
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMAIL  (consume existing /helpdesk/settings/email read + write)
+// ════════════════════════════════════════════════════════════════════════════
+const _EMAIL_FLAGS: [string, string][] = [
+  ["send_acknowledgement_email", "Send an acknowledgement email when a ticket is created"],
+  ["enable_reply_email_to_agent", "Notify the assigned agent by email when a reply is added"],
+  ["enable_reply_email_via_agent", "Let agents reply to a ticket straight from their email"],
+  ["enable_email_ticket_feedback", "Email a feedback request when a ticket is resolved"],
+  ["instantly_send_email", "Send emails immediately instead of queueing them"],
+  ["skip_email_workflow", "Turn the email workflow off entirely"],
+];
+const _EMAIL_TEMPLATES: [string, string, string][] = [
+  ["acknowledgement_email_content", "Acknowledgement email", "Sent to the requester when their ticket is created."],
+  ["reply_email_to_agent_content", "Reply notification to agent", "Sent to the assigned agent when a new reply lands."],
+  ["reply_via_agent_email_content", "Agent reply email", "The email a requester receives when an agent replies."],
+  ["feedback_email_content", "Feedback request email", "Sent after a ticket is resolved to collect feedback."],
+];
+
+export function EmailSection() {
+  const { data, loading, error, reload } = useHd<any>("/helpdesk/settings/email");
+  const [draft, setDraft] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // draft holds a flat {flag/column: value} overlay; fall back to the fetched row.
+  const flags = data?.flags ?? {};
+  const templates = data?.templates ?? {};
+  const val = (k: string) => (draft && k in draft ? draft[k] : flags[k] ?? templates[k]?.content ?? "");
+  const set = (patch: any) => setDraft({ ...(draft ?? {}), ...patch });
+
+  const save = async () => {
+    setBusy(true); setErr(null); setMsg(null);
+    const payload: any = {};
+    for (const [k] of _EMAIL_FLAGS) payload[k] = !!val(k);
+    payload.send_email_feedback_on_status_id = flags.send_email_feedback_on_status_id ?? null; // round-trip, not edited here
+    for (const [col] of _EMAIL_TEMPLATES) payload[col] = val(col) || null;
+    const r = await hdCall("post", "/helpdesk/settings/email", payload);
+    setBusy(false);
+    if (r.ok) { setMsg("Email settings saved."); setDraft(null); reload(); } else setErr(r.error || "Save failed.");
+  };
+
+  return (
+    <Section title="Email" description="How the Help Desk emails requesters and agents, and the wording it uses."
+      action={<Btn variant="primary" busy={busy} onClick={save}>Save changes</Btn>}>
+      {error && <ErrorBanner msg={error} />}
+      <FormError msg={err} />
+      {msg && <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-700">{msg}</div>}
+      {loading ? <Loading what="email settings" /> : (
+        <div className="flex max-w-2xl flex-col gap-4">
+          <Note>Delivery needs an outbound mail (SMTP) account configured for this workspace. Until one is, these choices are saved but no mail is sent.</Note>
+          <div className="flex flex-col gap-2.5 rounded-xl border border-[#E2E5EC] bg-white p-4">
+            {_EMAIL_FLAGS.map(([k, label]) => (
+              <Toggle key={k} checked={!!val(k)} onChange={(v) => set({ [k]: v })} label={label} />
+            ))}
+          </div>
+          <div className="flex flex-col gap-4 rounded-xl border border-[#E2E5EC] bg-white p-4">
+            {_EMAIL_TEMPLATES.map(([col, label, hint]) => (
+              <Field key={col} label={label} hint={hint}>
+                <Textarea rows={4} value={val(col) || ""} onChange={(e) => set({ [col]: e.target.value })}
+                  placeholder={templates[col]?.default || "Leave blank to use the built-in default wording."} />
+              </Field>
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}

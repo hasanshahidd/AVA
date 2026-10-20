@@ -1184,11 +1184,28 @@ def sync_status(db: Session = Depends(get_db), _: bool = Depends(require_setting
                 HDConfigurationItem.status == RETIRED)
         .count()
     )
+    # Installed-software CIs are per-host drill-down detail, not estate: split them
+    # out so the UI can headline the real CI estate instead of an inflated total
+    # (a 12-host estate otherwise reads as ~1,400 "total CIs", which is noise).
+    soft_type_id = (
+        db.query(HDCIType.id)
+        .filter(HDCIType.tenant_id == tid, HDCIType.code == CIT_SOFTWARE)
+        .scalar()
+    )
+    software = (
+        db.query(HDConfigurationItem)
+        .filter(HDConfigurationItem.tenant_id == tid,
+                HDConfigurationItem.ci_type_id == soft_type_id)
+        .count()
+        if soft_type_id else 0
+    )
     return {
         "last_run_at": iso(last.imported_at) if last else None,
         "last_summary": last.summary if last else None,
         "inventory_count": (last.summary or {}).get("inventory_count") if last else None,
         "linked_ci_count": linked,
+        "software_ci_count": software,
+        "estate_ci_count": linked - software,   # real CIs minus per-host software
         "retired_ci_count": retired,
     }
 

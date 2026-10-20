@@ -313,11 +313,12 @@ function buildAttrs(src: any): Record<string, any> {
   return out;
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
       <div className="text-[11px] font-medium text-slate-400">{label}</div>
       <div className="mt-0.5 text-lg font-semibold text-[var(--color-text)]">{value}</div>
+      {hint && <div className="mt-0.5 text-[10.5px] text-slate-400">{hint}</div>}
     </div>
   );
 }
@@ -370,7 +371,8 @@ function SyncStatusCard({ status, available, loading, onPreview, previewBusy, su
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Last sync" value={s.last_run_at ? timeAgo(s.last_run_at) : "Never"} />
           <Stat label="Inventory assets" value={num(s.inventory_count)} />
-          <Stat label="Linked CIs" value={num(s.linked_ci_count)} />
+          <Stat label="Configuration items" value={num(s.estate_ci_count ?? s.linked_ci_count)}
+            hint={s.software_ci_count ? `+ ${num(s.software_ci_count)} installed-software records (per host)` : undefined} />
           <Stat label="Retired" value={num(s.retired_ci_count)} />
         </div>
       ) : (
@@ -666,7 +668,8 @@ function CisTab() {
           <span className="text-sm font-medium text-slate-600">
             {flat
               ? `${cis.length} item${cis.length === 1 ? "" : "s"}`
-              : `${cis.length} top-level · ${num(syncRes.data?.linked_ci_count ?? cis.length)} total CIs`}
+              : `${cis.length} top-level · ${num(syncRes.data?.estate_ci_count ?? syncRes.data?.linked_ci_count ?? cis.length)} CIs${
+                  syncRes.data?.software_ci_count ? ` · ${num(syncRes.data.software_ci_count)} software records` : ""}`}
           </span>
         </div>
         <div className="flex items-center gap-2">

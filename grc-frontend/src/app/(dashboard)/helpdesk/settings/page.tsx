@@ -9,17 +9,18 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Settings, Building2, UserCog, CircleDot,
-  ListChecks, Tag, Flag, FileText, Timer, Star,
+  ListChecks, Tag, Flag, FileText, Timer, Star, Mail,
 } from "lucide-react";
 import { PageHeader } from "../_ui";
 import {
-  GeneralSection, AgentsSection, AgentStatusesSection,
+  GeneralSection, EmailSection, AgentsSection, AgentStatusesSection,
   DepartmentsSection, TicketTypesSection, TicketStatusesSection, PrioritiesSection,
   TemplatesSection, FeedbackSection, SlaSection,
 } from "./_sections";
 
 const TABS: { key: string; label: string; icon: any; render: () => JSX.Element }[] = [
   { key: "general", label: "General", icon: Settings, render: () => <GeneralSection /> },
+  { key: "email", label: "Email", icon: Mail, render: () => <EmailSection /> },
   { key: "agents", label: "Agents", icon: UserCog, render: () => <AgentsSection /> },
   { key: "agent-statuses", label: "Agent statuses", icon: CircleDot, render: () => <AgentStatusesSection /> },
   { key: "departments", label: "Departments", icon: Building2, render: () => <DepartmentsSection /> },
