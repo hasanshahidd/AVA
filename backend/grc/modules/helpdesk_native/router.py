@@ -32,7 +32,7 @@ from . import (  # noqa: F401 (assignment used by tickets)
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
     incident, problem, change, service_request, itsm_seed, request_templates,
     portal, attachments, catalogue_admin, cmdb_admin, cmdb_sync, governance_admin,
-    approvals, relations, ticket_cis,
+    approvals, relations, ticket_cis, ticket_kb,
 )
 from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
 
@@ -142,6 +142,8 @@ def ticket_detail(name: str, db: Session = Depends(get_db), _: bool = Depends(re
         # Batch 4 linkage B — the SET of CIs this ticket impacts (beyond its
         # primary `ci`); the change CAB check unions these for exposure.
         detail["impacted_cis"] = ticket_cis.list_impacted(db, tid, t)
+        # Batch 4 linkage C — KB articles attached to this ticket.
+        detail["kb_links"] = ticket_kb.list_links(db, tid, t)
     return detail
 
 
@@ -290,6 +292,7 @@ helpdesk_native_router.include_router(request_templates.router)             # /h
 helpdesk_native_router.include_router(portal.router)                        # /helpdesk/portal/* (end-user requester surface)
 helpdesk_native_router.include_router(attachments.router)                   # /helpdesk/tickets/{id}/attachments + download (persisted files)
 helpdesk_native_router.include_router(ticket_cis.router)                     # /helpdesk/tickets/{id}/impacted-cis (Batch 4 linkage B)
+helpdesk_native_router.include_router(ticket_kb.router)                      # /helpdesk/tickets/{id}/kb-links + kb-suggestions (Batch 4 linkage C)
 helpdesk_native_router.include_router(catalogue_admin.router)                # /helpdesk/admin/catalogue (service catalogue CRUD)
 helpdesk_native_router.include_router(cmdb_admin.router)                     # /helpdesk/admin/cmdb (CMDB CRUD + graph)
 helpdesk_native_router.include_router(cmdb_sync.router)                      # /helpdesk/admin/cmdb (inventory sync + sync-status + /cis/{id}/software)
