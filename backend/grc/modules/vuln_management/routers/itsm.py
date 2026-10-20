@@ -209,8 +209,15 @@ def list_itsm_tickets(
         VulnTicketLink.vulnerability_id == vuln_id,
         VulnTicketLink.tenant_id.in_(tenants),
     ).all()
+    # Flag native Help Desk links so the finding's own chip can scope to them
+    # (and not surface a ServiceNow link under a "HD #" label).
+    conn_type = dict(
+        db.query(IntegrationConnection.id, IntegrationConnection.integration_type)
+        .filter(IntegrationConnection.id.in_([l.connection_id for l in links] or [0])).all()
+    )
     return {"tickets": [{
         "connection_id": l.connection_id,
+        "is_native": conn_type.get(l.connection_id) == "native_helpdesk",
         "external_ticket_id": l.external_ticket_id,
         "normalised_status": l.normalised_status,
         "pushed_at": l.pushed_at.isoformat() if l.pushed_at else None,

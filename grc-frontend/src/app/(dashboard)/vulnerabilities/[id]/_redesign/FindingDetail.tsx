@@ -26,6 +26,7 @@ import apiClient, { vulnManagementApi, assetsApi, entityExtrasApi } from '@/lib/
 import { exploitMaturity } from '../_components/RiskAnalysisPanel';
 import RemediationPlanCard from '../_components/RemediationPlanCard';
 import ItsmPanel from '../_components/ItsmPanel';
+import HelpDeskLinkCard from '../_components/HelpDeskLinkCard';
 import { shortenVulnTitle, assessmentType } from '../../_workspace/lib';
 import { NotesPanel } from '@/components/shared/EntityExtras';
 import { KillChainList, exploitVerdict, EXPLOIT_VERDICT_LABEL, classLabel, type ExploitVerdictKey } from '../../../pentest/_evidence';
@@ -257,6 +258,9 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
             </div>
             {assignMut.isError && <div style={{ fontSize: 11, color: '#C2453F', marginTop: 6 }}>Could not assign — check your permissions.</div>}
           </RailCard>
+          {/* Reverse of "Create Help Desk ticket": surface the linked ticket + live
+              status here in the always-visible rail (renders nothing until linked). */}
+          <HelpDeskLinkCard vulnId={vulnId} />
           <RailCard title="Identity">
             <Row k="CWE" v={v.cwe_id || '—'} mono />
             <Row k="Severity" v={sm.label} />
