@@ -59,6 +59,16 @@ os.makedirs(uploads_dir, exist_ok=True)
 def on_startup():
     init_master_db()
     ensure_startup_seed_data()
+    # Help Desk ITSM boot heal (schema self-heal + data/governance/dept seed). MUST
+    # run here on the ROOT app: grc_app is mounted as a sub-app and Starlette does
+    # not fire startup events for mounted sub-apps, so grc/main.py's on_startup never
+    # executes in the web process. Never blocks startup.
+    try:
+        from grc.modules.helpdesk_native.itsm_seed import run_boot_heal
+        run_boot_heal()
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger("grc.main").warning("helpdesk boot heal invocation failed", exc_info=True)
     if os.getenv("DISABLE_EMBEDDED_WORKFLOW_RUNTIME", "").strip().lower() not in ("1", "true", "yes", "on"):
         start_workflow_engine_runtime()
 

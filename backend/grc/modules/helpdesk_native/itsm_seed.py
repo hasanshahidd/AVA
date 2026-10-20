@@ -1212,6 +1212,49 @@ def seed_if_empty(db: Session, tid: int) -> bool:
         return False
 
 
+def run_boot_heal() -> None:
+    """Per-tenant Help Desk boot heal, invoked from the ROOT app's startup.
+
+    This MUST be called from backend/main.py's on_startup, not grc/main.py's:
+    grc_app is MOUNTED as a sub-app and Starlette does not fire startup events for
+    mounted sub-apps, so grc/main.py's on_startup never runs in the web process.
+
+    Two independent, idempotent, fault-isolated concerns per tenant:
+      * schema self-heal (_add_columns) — gated by DISABLE_HELPDESK_SCHEMA_SYNC.
+      * data/governance/dept heal (seed_if_empty) — gated by DISABLE_HELPDESK_DATA_SEED.
+    include_inactive=True so a tenant whose is_active is NULL still heals. Never
+    raises — one tenant (or either concern) failing must not block startup."""
+    import os as _os
+    off = ("1", "true", "yes", "on")
+    schema_on = _os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in off
+    data_on = _os.getenv("DISABLE_HELPDESK_DATA_SEED", "").strip().lower() not in off
+    if not (schema_on or data_on):
+        logger.info("helpdesk boot heal: schema sync AND data seed both disabled by env; skipping")
+        return
+    try:
+        from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
+    except Exception:  # noqa: BLE001
+        logger.warning("helpdesk boot heal skipped (setup failed)", exc_info=True)
+        return
+    n = 0
+    for tid, slug, sess in iter_tenant_sessions(include_inactive=True):
+        n += 1
+        if schema_on:
+            try:
+                _add_columns(sess)
+            except Exception:  # noqa: BLE001
+                sess.rollback()
+                logger.warning("helpdesk schema sync failed tenant=%s", slug, exc_info=True)
+        if data_on:
+            try:
+                seed_if_empty(sess, tid)
+            except Exception:  # noqa: BLE001
+                sess.rollback()
+                logger.warning("helpdesk data seed failed tenant=%s", slug, exc_info=True)
+    logger.warning("helpdesk boot heal: processed %d tenant(s) (schema_sync=%s data_seed=%s)",
+                   n, schema_on, data_on)
+
+
 # ─── endpoint (Agent B mounts this router alongside the others) ──────────────
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk ITSM"])
 

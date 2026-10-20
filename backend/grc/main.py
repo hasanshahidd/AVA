@@ -277,60 +277,15 @@ app.include_router(admin_ai_usage_router)
 
 @app.on_event("startup")
 def on_startup():
-    # Explicit "grc.main" logger (NOT getLogger(__name__)) so these lines reach the
-    # app's "grc"-tree handler even if this module ever loads as __main__. The ENTER
-    # line is the probe: if it is absent from the web process's journal, on_startup
-    # is not running there and no in-startup heal ever will.
-    import logging as _logging
-    _log = _logging.getLogger("grc.main")
-    _log.warning("AVA on_startup: running — helpdesk boot heal begins")
-
     init_master_db()
 
-    # Help Desk ITSM boot heal, per tenant. TWO INDEPENDENT concerns, each with its
-    # own env opt-out (default on):
-    #   * schema self-heal (_add_columns) — idempotent ADD COLUMN / ensure-table so
-    #     the ORM's newer columns exist on older tenant DBs. Gated by
-    #     DISABLE_HELPDESK_SCHEMA_SYNC (some boxes disable it because the DDL is slow
-    #     or locking on boot).
-    #   * data heal (seed_if_empty) — seeds a fresh tenant and heals the governance
-    #     baseline + dedupes departments on every boot. Gated by its OWN
-    #     DISABLE_HELPDESK_DATA_SEED, NOT by the schema flag: disabling schema DDL
-    #     must not silently also disable data healing (that coupling is why the
-    #     dept/governance heal only ever ran when seed_if_empty was invoked by hand).
-    # Logs unconditionally (entered / tenant count / which ran) so a boot that heals
-    # nothing is diagnosable instead of silent.
-    _off = ("1", "true", "yes", "on")
-    _schema_on = os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in _off
-    _data_on = os.getenv("DISABLE_HELPDESK_DATA_SEED", "").strip().lower() not in _off
-    if not (_schema_on or _data_on):
-        _log.info("helpdesk boot heal: schema sync AND data seed both disabled by env; skipping")
-    else:
-        try:
-            from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
-            from grc.modules.helpdesk_native.itsm_seed import _add_columns, seed_if_empty
-            # include_inactive=True: a tenant whose is_active is NULL (Python-side
-            # default never applied) must still be schema/data-healed — otherwise
-            # the boot heal silently processes 0 tenants.
-            _n = 0
-            for _tid, _slug, _sess in iter_tenant_sessions(include_inactive=True):
-                _n += 1
-                if _schema_on:
-                    try:
-                        _add_columns(_sess)        # schema self-heal (columns + ITSM tables)
-                    except Exception:  # noqa: BLE001
-                        _sess.rollback()
-                        _log.warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
-                if _data_on:
-                    try:
-                        seed_if_empty(_sess, _tid)  # data seed / baseline heal (own clean-session rollback)
-                    except Exception:  # noqa: BLE001
-                        _sess.rollback()
-                        _log.warning("helpdesk data seed failed tenant=%s", _slug, exc_info=True)
-            _log.warning("helpdesk boot heal: processed %d tenant(s) (schema_sync=%s data_seed=%s)",
-                         _n, _schema_on, _data_on)
-        except Exception:  # noqa: BLE001
-            _log.warning("helpdesk boot heal skipped (setup failed)", exc_info=True)
+    # NOTE: the Help Desk ITSM boot heal (schema self-heal + data/governance/dept
+    # seed) is NOT here. grc_app is MOUNTED as a sub-app under backend/main.py and
+    # Starlette does not fire startup events for mounted sub-apps, so this whole
+    # handler never runs in the web process. The heal now runs from the ROOT app's
+    # startup via itsm_seed.run_boot_heal(). (The other startup work below has the
+    # same caveat — it only runs where this handler is invoked directly, e.g. tests
+    # or a non-mounted launch.)
 
     # Ava: compliance schema self-heal removed along with the compliance module.
 
