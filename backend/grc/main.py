@@ -287,13 +287,14 @@ def on_startup():
         import logging as _logging
         try:
             from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
-            from grc.modules.helpdesk_native.itsm_seed import _add_columns
+            from grc.modules.helpdesk_native.itsm_seed import _add_columns, seed_if_empty
             for _tid, _slug, _sess in iter_tenant_sessions():
                 try:
-                    _add_columns(_sess)
+                    _add_columns(_sess)            # schema self-heal (columns + ITSM tables)
+                    seed_if_empty(_sess, _tid)     # data seed for an empty/fresh tenant (no-op once seeded)
                 except Exception:  # noqa: BLE001
                     _sess.rollback()
-                    _logging.getLogger(__name__).warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
+                    _logging.getLogger(__name__).warning("helpdesk schema/data sync failed tenant=%s", _slug, exc_info=True)
         except Exception:  # noqa: BLE001
             _logging.getLogger(__name__).warning("helpdesk schema sync skipped", exc_info=True)
 

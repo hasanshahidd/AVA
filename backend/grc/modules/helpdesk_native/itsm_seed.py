@@ -973,6 +973,40 @@ def seed_itsm(db: Session, tid: int) -> dict:
     }
 
 
+def seed_if_empty(db: Session, tid: int) -> bool:
+    """Boot-time DATA seed. The boot path self-heals the schema (_add_columns) but
+    historically NOT the data, so a freshly-deployed tenant had empty admin areas
+    (Service Catalogue / priorities / statuses / types / SLAs / departments) until
+    someone manually POSTed /helpdesk/itsm/seed — which nobody does on a new box.
+    This seeds the full standard reference set for a tenant whose catalogue is
+    still empty, so a fresh deploy/tenant is never an empty Help Desk. Guarded on
+    emptiness so established tenants aren't re-seeded / SLA-recomputed every boot.
+    Idempotent + non-fatal (mirrors _add_columns' boot contract).
+
+    NOTE: this seeds what seed_itsm owns (catalogue + ticket master data + roles).
+    CMDB CIs/CI-types come from the inventory->CMDB sync (needs real assets), and
+    governance/feedback/KB are admin-configured — none of those are seeded here."""
+    try:
+        db.rollback()  # start clean — a prior boot step may have left an aborted txn
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        already = db.query(HDServiceCategory).filter(
+            HDServiceCategory.tenant_id == tid).first() is not None
+        if already:
+            return False
+        seed_itsm(db, tid)
+        logger.info("itsm_seed: boot-seeded standard ITSM data for empty tenant %s", tid)
+        return True
+    except Exception:  # noqa: BLE001 — never block boot
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        logger.error("itsm_seed: boot data-seed FAILED for tenant %s", tid, exc_info=True)
+        return False
+
+
 # ─── endpoint (Agent B mounts this router alongside the others) ──────────────
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk ITSM"])
 
