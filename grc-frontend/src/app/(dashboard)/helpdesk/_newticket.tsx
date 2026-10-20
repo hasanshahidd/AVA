@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { Chip, PRIORITY_CHIP, useHd } from "./_ui";
 import { Modal, Field, Input, Textarea, Select, Btn, FormError, hdCall } from "./_admin";
+import { AffectedCiPicker, type CiLite } from "./_ci";
 
 type Dept = { id: number; name: string; enabled: boolean };
 type Agent = { email?: string | null; name?: string | null; agent_name?: string | null };
@@ -121,6 +122,7 @@ export function NewTicketDialog({
   const tpls = useHd<{ templates: Tpl[] }>("/helpdesk/request-templates");
   const agentsRes = useHd<{ agents: Agent[] }>("/helpdesk/agents");
   const teamsRes = useHd<{ teams: Team[] }>("/helpdesk/teams");
+  const sgRes = useHd<{ support_groups: { code: string; name: string; mapped: boolean }[] }>("/helpdesk/support-groups");
 
   const [process, setProcess] = useState<Process>("incident");
   const [departmentId, setDepartmentId] = useState("");
@@ -131,6 +133,10 @@ export function NewTicketDialog({
   // assignment (optional — unassigned routes by department)
   const [assignee, setAssignee] = useState("");
   const [team, setTeam] = useState("");
+  const [supportGroup, setSupportGroup] = useState("");
+
+  // affected CI (optional — agents set it at triage; requesters don't pick CIs)
+  const [ci, setCi] = useState<CiLite | null>(null);
 
   // shared (incident + service_request)
   const [impact, setImpact] = useState("");
@@ -214,7 +220,7 @@ export function NewTicketDialog({
   const reset = () => {
     setProcess("incident");
     setDepartmentId(""); setSubject(""); setDescription(""); setContact("");
-    setAssignee(""); setTeam("");
+    setAssignee(""); setTeam(""); setSupportGroup(""); setCi(null);
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
     setRootCause("");
@@ -239,6 +245,8 @@ export function NewTicketDialog({
     if (contact.trim()) payload.contact = contact.trim();
     if (assignee) payload.assigned_agent = assignee; // explicit assignee (wins over auto-assign)
     if (team) payload.team = team;
+    if (supportGroup) payload.support_group_code = supportGroup; // routes to the group's mapped team
+    if (ci) payload.ci_id = ci.id; // affected configuration item
 
     if (process === "incident" || process === "service_request") {
       if (impact) payload.impact = impact;
@@ -525,6 +533,11 @@ export function NewTicketDialog({
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's going on? Steps, context, impact…" />
         </Field>
 
+        {/* Affected CI — optional; agents link the configuration item this ticket is about. */}
+        <Field label="Affected CI" hint="Optional — the configuration item this ticket is about. Drives exposure-aware change governance.">
+          <AffectedCiPicker value={ci} onChange={setCi} />
+        </Field>
+
         {/* §2e assignment — optional; unassigned routes by department. */}
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Field label="Assignee" hint="Optional — leave blank to auto-route by department.">
@@ -542,6 +555,14 @@ export function NewTicketDialog({
               <option value="">{teamList.length ? "— Select —" : "No teams configured"}</option>
               {teamList.map((tm) => (
                 <option key={tm.id} value={tm.name}>{tm.team_name || tm.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Support group" hint="Optional — routes to the group's mapped team (Governance → Support groups).">
+            <Select value={supportGroup} onChange={(e) => setSupportGroup(e.target.value)}>
+              <option value="">— Select —</option>
+              {(sgRes.data?.support_groups || []).map((g) => (
+                <option key={g.code} value={g.code}>{g.name}{g.mapped ? "" : " (unmapped)"}</option>
               ))}
             </Select>
           </Field>

@@ -14,11 +14,13 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from ...models import (
     Base,
+    GRCUser,
+    HDAgent,
     HDApproval,
     HDApprovalVote,
     HDBusinessService,
@@ -53,9 +55,10 @@ from ...models import (
     HDTicketType,
     Role,
     RolePermission,
+    UserRole,
     get_db,
 )
-from . import sla
+from . import agent_status, sla
 from .common import require_edit, tenant_id
 
 logger = logging.getLogger(__name__)
@@ -75,6 +78,7 @@ _ALTER_COLUMNS = [
     ("approval_state", "VARCHAR(20)"),
     ("approved_by", "VARCHAR(255)"),
     ("approved_at", "TIMESTAMP"),
+    ("escalation_reason", "TEXT"),
     ("root_cause", "TEXT"),
     ("workaround", "TEXT"),
     ("known_error", "BOOLEAN DEFAULT false"),
@@ -110,6 +114,7 @@ _TICKET_ITSM_ALTER_COLUMNS = [
     ("ci_id", "INTEGER REFERENCES grc_hd_ci(id)"),
     ("request_item_id", "INTEGER REFERENCES grc_hd_request_item(id)"),
     ("incident_category_id", "INTEGER REFERENCES grc_hd_incident_category(id)"),
+    ("support_group_code", "VARCHAR(40)"),
 ]
 _PRIORITY_ALTER_COLUMNS = [
     ("code", "VARCHAR(10)"),
@@ -141,9 +146,23 @@ _ITSM_MODELS = (
     HDSLATarget, HDProcessField, HDRaci, HDCABConfig, HDKPI,
 )
 
-# §A2 (v2) — the standard departments the request library is organized by.
-_DEPARTMENTS = ["IT", "Sales", "Finance", "HR", "Facilities",
-                "Operations", "Legal", "Marketing", "Security"]
+# §A2 (v2) — the departments the request library is organized by, each mapped to
+# its STANDARD department (full name + code). The request-library keys use short
+# names ("IT", "Finance", …) but the standard seeded departments use full names
+# ("Information Technology", "Finance & Accounting", …); mapping here keeps both
+# resolving to the SAME department instead of creating uncoded duplicates.
+_DEPT_STD = {
+    "IT": ("Information Technology", "IT"),
+    "Sales": ("Sales", "SAL"),
+    "Finance": ("Finance & Accounting", "FIN"),
+    "HR": ("Human Resources", "HR"),
+    "Facilities": ("Facilities", "FAC"),
+    "Operations": ("Operations", "OPS"),
+    "Legal": ("Legal & Compliance", "LEG"),
+    "Marketing": ("Marketing", "MKT"),
+    "Security": ("Security", "SEC"),
+}
+_DEPARTMENTS = list(_DEPT_STD)
 
 # §A2 (v2) — the predefined request/problem library, by department. Each entry:
 # (title, process, category, subcategory, impact, urgency, icon, description).
@@ -455,6 +474,24 @@ _SLA_DEFS = [
 _SERVICE_DAYS = [{"workday": d, "start_time": "09:00:00", "end_time": "17:00:00"}
                  for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]]
 
+# §3.6b ADDITIVE SLA-TARGET BACKFILL — baseline response/resolution clocks.
+# The owner's ingested SLA sheet (grc_hd_sla_target) leaves response/resolution
+# blank on several non-incident tiers (service_request 'Standard' has no
+# resolution, every change tier has no resolution, change 'Emergency' has no
+# response). A NULL resolution means the ITSM clock has no resolution_by at all,
+# so those tickets showed no due date. This fills ONLY the NULL columns with a
+# conservative per-process baseline so every process has a working resolution
+# clock; the owner refines real tiers via the admin SLA-targets CRUD
+# (governance_admin). Business-minutes. Idempotent: a column already set is never
+# overwritten, so it never clobbers the workbook or an admin edit.
+_ITSM_SLA_FALLBACK_MINUTES = {
+    "incident":        (240, 1440),
+    "service_request": (240, 2400),
+    "change":          (960, 7200),
+    "problem":         (480, 43200),
+}
+_ITSM_SLA_FALLBACK_DEFAULT = (240, 1440)
+
 # §3 backfill: existing tickets → process from ticket_type.name; else incident.
 _TYPE_TO_PROCESS = {"Change": "change", "Problem": "problem",
                     "Service Request": "service_request"}
@@ -481,6 +518,7 @@ _HD_ROLES = {
             "helpdesk:processes:manage",
             "helpdesk:kb:view",
             "helpdesk:kb:author",
+            "helpdesk:requests:create",
             "helpdesk:requests:view_own",
             "helpdesk:settings:view",
         ],
@@ -600,17 +638,24 @@ def ensure_attachment_table(db: Session) -> bool:
 
 
 def _ensure_departments(db: Session, tid: int) -> dict:
-    """§A2 — ensure the 5 standard departments exist (enabled); return {name: id}."""
+    """§A2 — ensure the request-library departments exist under their STANDARD
+    name + code (enabled); return {short_name: id}. Resolving through _DEPT_STD
+    means "IT" finds the existing "Information Technology" instead of creating an
+    uncoded duplicate. A department found without a code gets its standard code
+    stamped (heals pre-existing uncoded strays)."""
     out: dict = {}
-    for name in _DEPARTMENTS:
+    for short in _DEPARTMENTS:
+        std_name, code = _DEPT_STD[short]
         d = (db.query(HDDepartment)
-             .filter(HDDepartment.tenant_id == tid, HDDepartment.name == name)
+             .filter(HDDepartment.tenant_id == tid, HDDepartment.name == std_name)
              .first())
         if not d:
-            d = HDDepartment(tenant_id=tid, name=name, enabled=True)
+            d = HDDepartment(tenant_id=tid, name=std_name, code=code, enabled=True)
             db.add(d)
             db.flush()
-        out[name] = d.id
+        elif not d.code:
+            d.code = code
+        out[short] = d.id
     db.commit()
     return out
 
@@ -622,12 +667,17 @@ def seed_request_templates(db: Session, tid: int) -> int:
                 db.query(HDDepartment).filter(HDDepartment.tenant_id == tid).all()}
     created = 0
     for dept_name, entries in _REQUEST_TEMPLATES.items():
-        did = dept_ids.get(dept_name)
+        # resolve the library's short name to the STANDARD department (see _DEPT_STD)
+        std_name = _DEPT_STD.get(dept_name, (dept_name, None))[0]
+        did = dept_ids.get(std_name)
         for title, process, category, subcategory, impact, urgency, icon, desc in entries:
+            # idempotency keyed on template_name ALONE — that's the actual unique
+            # constraint (uq_hd_ticket_template_name, tenant+name); keying on
+            # name+department_id let a re-resolved department re-insert the name and
+            # hit the constraint (500).
             exists = (db.query(HDTicketTemplate)
                       .filter(HDTicketTemplate.tenant_id == tid,
-                              HDTicketTemplate.template_name == title,
-                              HDTicketTemplate.department_id == did)
+                              HDTicketTemplate.template_name == title)
                       .first())
             if exists:
                 continue
@@ -715,6 +765,29 @@ def _ensure_slas(db: Session, tid: int, pri_ids: dict) -> list:
     return created
 
 
+def backfill_sla_target_resolutions(db: Session, tid: int) -> dict:
+    """§3.6b — fill NULL response/resolution_minutes on ingested HDSLATarget rows
+    so every process's tickets get a resolution clock (see
+    _ITSM_SLA_FALLBACK_MINUTES). Only NULL columns are filled; existing values
+    are preserved, so re-running (or a later workbook re-import / admin edit) is
+    safe. Returns the count of rows touched."""
+    filled = 0
+    for r in db.query(HDSLATarget).filter(HDSLATarget.tenant_id == tid).all():
+        resp_d, reso_d = _ITSM_SLA_FALLBACK_MINUTES.get(
+            (r.process or "").lower(), _ITSM_SLA_FALLBACK_DEFAULT)
+        changed = False
+        if r.response_minutes is None:
+            r.response_minutes = resp_d
+            changed = True
+        if r.resolution_minutes is None:
+            r.resolution_minutes = reso_d
+            changed = True
+        if changed:
+            filled += 1
+    db.commit()
+    return {"filled": filled}
+
+
 def backfill_process(db: Session, tid: int) -> dict:
     """§3 — set `process` on existing tickets from ticket_type.name
     (Change→change, Problem→problem, Service Request→service_request, else
@@ -785,6 +858,52 @@ def seed_hd_roles(db: Session, tid: int) -> list:
     return out
 
 
+# Agents = holders of the purpose-built "Help Desk Agent" console role ONLY.
+# Deliberately NOT "Administrator": that role is also held by sample/synthetic
+# identity-governance users (e.g. *.iga-sailpoint.sample) and admins who aren't
+# support staff, so registering it would pull demo accounts into the assign list.
+# To make someone assignable, grant them the Help Desk Agent role, then re-seed.
+_AGENT_ROLE_NAMES = ("Help Desk Agent",)
+
+
+def ensure_agents_from_roles(db: Session, tid: int) -> dict:
+    """Register every REAL user who holds a console role (Help Desk Agent /
+    Administrator) as an HDAgent, so the assign dropdown is populated and tickets
+    can actually be routed. Idempotent — skips users already registered, invents
+    no fake agents (derived purely from the tenant's real role grants). Granting
+    the Agent role in AVA RBAC does not itself create the HDAgent record, so this
+    keeps the two in sync."""
+    users = (
+        db.query(GRCUser)
+        .join(UserRole, UserRole.user_id == GRCUser.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(UserRole.tenant_id == tid,
+                Role.name.in_(_AGENT_ROLE_NAMES),
+                GRCUser.is_active.is_(True))
+        .all()
+    )
+    by_email = {u.email: u for u in users if u.email}
+    if not by_email:
+        return {"created": 0, "agents": []}
+    existing = {a.user for a in db.query(HDAgent).filter(HDAgent.tenant_id == tid).all()}
+    # availability is nullable; list_agents falls back to "Active" when unset, so a
+    # tenant with no HD Agent Status catalog configured still gets usable agents.
+    try:
+        default_avail = agent_status.get_default_agent_status(db, tid)
+    except Exception:  # noqa: BLE001 — no default configured yet; leave it unset
+        default_avail = None
+    created = 0
+    for email in sorted(set(by_email) - existing):
+        u = by_email[email]
+        db.add(HDAgent(tenant_id=tid, user=email,
+                       agent_name=(u.display_name or email),
+                       is_active=True, availability=default_avail,
+                       availability_changed_on=func.now()))
+        created += 1
+    db.commit()
+    return {"created": created, "agents": sorted(by_email)}
+
+
 def seed_itsm(db: Session, tid: int) -> dict:
     """§3 — idempotent ITSM seed. Order matters: columns exist before backfill,
     priorities exist before the SLAs reference them, and the SLA backfill runs
@@ -798,10 +917,14 @@ def seed_itsm(db: Session, tid: int) -> dict:
     depts = _ensure_departments(db, tid)
     templates_created = seed_request_templates(db, tid)
     backfill = backfill_process(db, tid)
+    sla_targets_filled = backfill_sla_target_resolutions(db, tid)  # §3.6b
     sla_backfill = recompute_all_slas(db, tid)
     hd_roles = seed_hd_roles(db, tid)
+    agents = ensure_agents_from_roles(db, tid)  # populate the assign dropdown
     return {
         "ok": True,
+        "agents_registered": agents["created"],
+        "agents": agents["agents"],
         "columns_processed": columns,
         "attachment_table": attachment_table,
         "priorities": list(pri_ids),
@@ -813,6 +936,7 @@ def seed_itsm(db: Session, tid: int) -> dict:
         "departments": list(depts),
         "templates_created": templates_created,
         "backfilled": backfill["updated"],
+        "sla_targets_filled": sla_targets_filled["filled"],
         "slas_recomputed": sla_backfill["recomputed"],
         "hd_roles": [r["name"] for r in hd_roles],
     }

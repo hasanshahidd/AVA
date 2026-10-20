@@ -25,6 +25,9 @@ from ...models import (
     HDPriorityMatrix,
     HDStateTransition,
     HDTicketType,
+    HDBusinessService,
+    HDConfigurationItem,
+    HDSupportGroupMap,
     Team,
     HDAgent,
     HDSettings,
@@ -36,7 +39,7 @@ from ...models import (
     get_db,
 )
 from ...routers.auth_router import require_auth
-from . import sla, assignment
+from . import sla, assignment, cmdb_admin
 from .common import (
     iso, ticket_row, ticket_detail, tenant_id, require_edit,
     require_tickets_assign, require_tickets_delete,
@@ -65,7 +68,7 @@ _EXT_FIELDS = (
     "impact", "urgency",
     "change_type", "change_risk", "planned_start", "planned_end",
     "implementation_plan", "backout_plan",
-    "approval_state", "approved_by", "approved_at",
+    "approval_state", "approved_by", "approved_at", "escalation_reason",
     "root_cause", "workaround", "known_error", "problem_resolution",
     "linked_incident_ids",
     "request_category", "request_subcategory",
@@ -173,6 +176,7 @@ def _process_fields(ticket: "HDTicket") -> dict:
         "approval_state": ticket.approval_state,
         "approved_by": ticket.approved_by,
         "approved_at": iso(ticket.approved_at),
+        "escalation_reason": ticket.escalation_reason,
         "root_cause": ticket.root_cause,
         "workaround": ticket.workaround,
         "known_error": bool(ticket.known_error),
@@ -180,6 +184,64 @@ def _process_fields(ticket: "HDTicket") -> dict:
         "linked_incident_ids": _parse_linked_ids(ticket.linked_incident_ids),
         "request_category": ticket.request_category,
         "request_subcategory": ticket.request_subcategory,
+        "support_group_code": ticket.support_group_code,
+    }
+
+
+# ─── affected-CI linkage (phase-2 §1–§2) ─────────────────────────────────────
+def _validate_ci(db: Session, tid: int, ci_id: int) -> HDConfigurationItem:
+    """The CI must exist in THIS tenant and not be retired, else 400 (§1)."""
+    ci = (
+        db.query(HDConfigurationItem)
+        .filter(HDConfigurationItem.id == ci_id, HDConfigurationItem.tenant_id == tid)
+        .first()
+    )
+    if ci is None:
+        raise HTTPException(status_code=400, detail=f"CI {ci_id} does not exist in this tenant")
+    if (ci.status or "").strip().lower() == "retired":
+        raise HTTPException(status_code=400, detail=f"CI {ci_id} is retired and cannot be linked")
+    return ci
+
+
+def _validate_bs(db: Session, tid: int, bs_id: int) -> None:
+    """A business service linked explicitly must belong to this tenant (400)."""
+    bs = (
+        db.query(HDBusinessService)
+        .filter(HDBusinessService.id == bs_id, HDBusinessService.tenant_id == tid)
+        .first()
+    )
+    if bs is None:
+        raise HTTPException(status_code=400,
+                            detail=f"business service {bs_id} does not exist in this tenant")
+
+
+def _ci_bs_maps(db: Session, tid: int, rows: list) -> tuple[dict, dict]:
+    """Batch-load the CI + business-service objects referenced by `rows` (no N+1)."""
+    ci_ids = {t.ci_id for t in rows if t.ci_id}
+    bs_ids = {t.business_service_id for t in rows if t.business_service_id}
+    ci_map: dict = {}
+    if ci_ids:
+        for c in (db.query(HDConfigurationItem)
+                  .filter(HDConfigurationItem.tenant_id == tid,
+                          HDConfigurationItem.id.in_(ci_ids)).all()):
+            ci_map[c.id] = c
+    bs_map: dict = {}
+    if bs_ids:
+        for b in (db.query(HDBusinessService)
+                  .filter(HDBusinessService.tenant_id == tid,
+                          HDBusinessService.id.in_(bs_ids)).all()):
+            bs_map[b.id] = b
+    return ci_map, bs_map
+
+
+def _ci_link_fields(ticket: "HDTicket", ci_map: dict, bs_map: dict) -> dict:
+    """The `ci` + `business_service` objects a ticket row/detail carries (§2).
+    `ci` reuses cmdb_admin.ci_ticket_ref so exposure/pci/… match GET /cis."""
+    ci = ci_map.get(ticket.ci_id) if ticket.ci_id else None
+    bs = bs_map.get(ticket.business_service_id) if ticket.business_service_id else None
+    return {
+        "ci": cmdb_admin.ci_ticket_ref(ci) if ci else None,
+        "business_service": ({"id": bs.id, "name": bs.name} if bs else None),
     }
 
 
@@ -222,22 +284,31 @@ def _status_by_label(db: Session, tid: int, label: str) -> Optional[HDTicketStat
     )
 
 
-def _default_open_status(db: Session, tid: int) -> Optional[HDTicketStatus]:
-    """Settings default is "Open" (spec §3.1/§5); fall back to any enabled
-    Open-category status ordered by `order`."""
+def _default_open_status(db: Session, tid: int,
+                         process: Optional[str] = None) -> Optional[HDTicketStatus]:
+    """The entry (Open) status for a brand-new ticket. Statuses are per-process:
+    change/service_request carry their own order-0 entry ("Draft"/"Submitted"),
+    while incident/problem start their own list at order 1 and share the order-0
+    "New" (process "shared"). So the entry status is the lowest-order enabled Open
+    status among {this process, "shared"}, preferring the process-specific one on a
+    tie. Passing no process (or a settings "Open" label) keeps the old behaviour.
+    (Without the process filter every service_request/incident defaulted to a
+    change's "Draft" — whichever order-0 row the DB happened to return first.)"""
+    base = db.query(HDTicketStatus).filter(
+        HDTicketStatus.tenant_id == tid,
+        HDTicketStatus.category == "Open",
+        HDTicketStatus.enabled == True,  # noqa: E712
+    )
+    if process:
+        rows = base.filter(HDTicketStatus.process.in_([process, "shared"])).all()
+        if rows:
+            rows.sort(key=lambda s: (s.order if s.order is not None else 9999,
+                                     0 if s.process == process else 1))
+            return rows[0]
     s = _status_by_label(db, tid, "Open")
     if s:
         return s
-    return (
-        db.query(HDTicketStatus)
-        .filter(
-            HDTicketStatus.tenant_id == tid,
-            HDTicketStatus.category == "Open",
-            HDTicketStatus.enabled == True,  # noqa: E712
-        )
-        .order_by(HDTicketStatus.order.asc())
-        .first()
-    )
+    return base.order_by(HDTicketStatus.order.asc()).first()
 
 
 # ─── lifecycle (spec §3.1) ───────────────────────────────────────────────────
@@ -279,11 +350,54 @@ def transition_allowed(db: Session, tid: int, ticket, new_status) -> tuple[bool,
                    HDStateTransition.to_status_id == new_status.id)
            .first())
     if row is None:
-        return False, (f"illegal transition: a {process} cannot move to "
+        return False, (f"illegal transition: this {process} cannot move to "
                        f"'{new_status.label_agent}' from its current state")
     if row.guard == "approved" and (getattr(ticket, "approval_state", None) or "") != "approved":
         return False, f"moving to '{new_status.label_agent}' requires approval first"
     return True, None
+
+
+def _auto_advance_on_assign(db: Session, tid: int, ticket: HDTicket) -> None:
+    """ITSM: taking ownership of an un-worked ticket advances it from its entry
+    status to the next working status, where the seeded state machine allows it
+    (incident New→Assigned, problem New→Investigation). Scoped tightly:
+
+      * only from the process ENTRY status (so re-assigning a ticket already in
+        progress never moves it),
+      * only to the lowest-order *Open* status reachable by a seeded transition
+        (so a would-be jump into a Paused/Resolved state — e.g. a service_request
+        at 'Submitted', whose only forward hop is the Paused 'Pending Approval' —
+        is left alone and the approval gate still runs),
+      * skipped for 'change', whose lifecycle is driven by submit/CAB, not
+        assignment,
+      * always re-checked through transition_allowed (respects the state machine +
+        any guard='approved').
+    """
+    process = ticket.process or "incident"
+    if process == "change":
+        return
+    cur = ticket.status
+    if cur is None:
+        return
+    entry = _default_open_status(db, tid, process)
+    if entry is None or cur.id != entry.id:
+        return
+    nxt = (
+        db.query(HDTicketStatus)
+        .join(HDStateTransition, HDStateTransition.to_status_id == HDTicketStatus.id)
+        .filter(HDStateTransition.tenant_id == tid,
+                HDStateTransition.process == process,
+                HDStateTransition.from_status_id == cur.id,
+                HDTicketStatus.tenant_id == tid,
+                HDTicketStatus.category == "Open")
+        .order_by(HDTicketStatus.order.asc())
+        .first()
+    )
+    if nxt is None:
+        return
+    ok, _ = transition_allowed(db, tid, ticket, nxt)
+    if ok:
+        _apply_status_change(db, tid, ticket, nxt)
 
 
 def _activity(db: Session, tid: int, ticket: HDTicket, action: str) -> None:
@@ -347,7 +461,9 @@ def list_tickets(db: Session, tid: int, status: Optional[str] = None,
     if raised_by:
         query = query.filter(func.lower(HDTicket.raised_by) == raised_by.lower())
     rows = query.order_by(HDTicket.updated_at.desc()).all()
-    out = [{**ticket_row(t), **_process_fields(t)} for t in rows]
+    ci_map, bs_map = _ci_bs_maps(db, tid, rows)
+    out = [{**ticket_row(t), **_process_fields(t), **_ci_link_fields(t, ci_map, bs_map)}
+           for t in rows]
     if process:
         out = [r for r in out if (r.get("process") or "incident") == process]
     if status:
@@ -409,9 +525,11 @@ def get_detail(db: Session, tid: int, name: str) -> dict:
     ticket = _get_ticket(db, tid, name)
     if not ticket:
         return {"ticket": None, "conversation": []}
+    ci_map, bs_map = _ci_bs_maps(db, tid, [ticket])
     return {
         "ticket": {**ticket_detail(ticket, sla.compute_sla_block(db, ticket)),
-                   **_process_fields(ticket)},
+                   **_process_fields(ticket),
+                   **_ci_link_fields(ticket, ci_map, bs_map)},
         "conversation": _conversation(db, tid, ticket),
     }
 
@@ -448,6 +566,18 @@ def meta(db: Session, tid: int) -> dict:
 
 
 # ─── writes ────────────────────────────────────────────────────────────────
+def _support_group_team(db: Session, tid: int, code: Optional[str]) -> Optional[int]:
+    """The AVA team a support group (GRP-*) routes to, from Governance → Support
+    groups (HDSupportGroupMap.team_id). None when unset/unmapped — mirrors
+    resolve_department_team so an unmapped group just leaves routing unchanged."""
+    if not code:
+        return None
+    row = (db.query(HDSupportGroupMap)
+           .filter(HDSupportGroupMap.tenant_id == tid, HDSupportGroupMap.code == code)
+           .first())
+    return row.team_id if row else None
+
+
 def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str] = None) -> dict:
     """§0/§5/§2 create. Defaults status to the open status when unset; priority is
     taken from payload or derived from the impact/urgency matrix. `process`
@@ -459,7 +589,7 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
 
     status_id = payload.get("status_id")
     if not status_id:
-        s = _default_open_status(db, tid)
+        s = _default_open_status(db, tid, process)
         status_id = s.id if s else None
         status_cat = s.category if s else None
     else:
@@ -476,6 +606,25 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
     if process == "change" and not ext.get("approval_state"):
         ext["approval_state"] = "draft"  # §2: change tickets start in draft
 
+    # §1: affected CI (agent-set at triage). Validate it belongs to this tenant and
+    # is not retired; inherit the CI's business service when the ticket has none.
+    ci_id = payload.get("ci_id")
+    business_service_id = payload.get("business_service_id")
+    if ci_id is not None:
+        ci = _validate_ci(db, tid, ci_id)
+        if ci.business_service_id and not business_service_id:
+            business_service_id = ci.business_service_id
+    if business_service_id is not None:
+        _validate_bs(db, tid, business_service_id)
+
+    # §A7 support-group routing: a ticket tagged with a support group (GRP-*) routes
+    # to that group's mapped AVA team when no team was set explicitly — the
+    # support-group mirror of department→team routing.
+    support_group_code = (payload.get("support_group_code") or "").strip() or None
+    agent_group_id = payload.get("agent_group_id")
+    if not agent_group_id and support_group_code:
+        agent_group_id = _support_group_team(db, tid, support_group_code)
+
     ticket = HDTicket(
         tenant_id=tid,
         subject=payload.get("subject") or "(no subject)",
@@ -485,11 +634,14 @@ def create_ticket(db: Session, tid: int, payload: dict, raised_by: Optional[str]
         status_category=status_cat,
         priority_id=priority_id,
         ticket_type_id=payload.get("ticket_type_id"),
-        agent_group_id=payload.get("agent_group_id"),
+        agent_group_id=agent_group_id,
+        support_group_code=support_group_code,
         department_id=payload.get("department_id"),  # AVA net-new intake department
         customer_id=payload.get("customer_id"),
         contact=payload.get("contact"),
         assigned_agent=payload.get("assigned_agent"),  # §1c explicit assignee at create
+        ci_id=ci_id,
+        business_service_id=business_service_id,
         process=process,
         **ext,
     )
@@ -605,6 +757,8 @@ def update(db: Session, tid: int, name: str, payload: dict,
         "ticket_type": ticket.ticket_type.name if ticket.ticket_type else None,
         "status": ticket.status.label_agent if ticket.status else None,
         "agent_group": ticket.team.name if ticket.team else None,
+        "ci_id": ticket.ci_id,
+        "business_service_id": ticket.business_service_id,
     }
 
     # flow #2: validate a status change (if any) BEFORE mutating anything, so an
@@ -643,12 +797,47 @@ def update(db: Session, tid: int, name: str, payload: dict,
         if team:
             ticket.agent_group_id = team.id
             assignment.remove_if_not_in_team(db, ticket)
+
+    # §1: affected CI / business service. Membership check (not truthy) so an
+    # explicit null clears — the /update route passes exclude_unset, so a value the
+    # client actually sent as null reaches here as a present key with value None.
+    if "ci_id" in payload:
+        new_ci_id = payload["ci_id"]
+        if new_ci_id is None:
+            ticket.ci_id = None
+        else:
+            ci = _validate_ci(db, tid, new_ci_id)
+            ticket.ci_id = ci.id
+            if (ci.business_service_id and not ticket.business_service_id
+                    and "business_service_id" not in payload):
+                ticket.business_service_id = ci.business_service_id
+    if "business_service_id" in payload:
+        bs_id = payload["business_service_id"]
+        if bs_id is None:
+            ticket.business_service_id = None
+        else:
+            _validate_bs(db, tid, bs_id)
+            ticket.business_service_id = bs_id
+
+    # §A7 support group: setting it routes to the group's mapped team when the agent
+    # didn't pick a team in this same edit (explicit null clears the group).
+    if "support_group_code" in payload:
+        code = (payload["support_group_code"] or "").strip() or None
+        ticket.support_group_code = code
+        if code and not payload.get("agent_group"):
+            team_id = _support_group_team(db, tid, code)
+            if team_id:
+                ticket.agent_group_id = team_id
+
     if pending_status is not None:
         _apply_status_change(db, tid, ticket, pending_status)
 
     db.commit()
     _changed = {k: payload[k] for k in ("priority", "ticket_type", "status", "agent_group")
                 if payload.get(k)}
+    for k in ("ci_id", "business_service_id"):
+        if k in payload:
+            _changed[k] = payload[k]
     if _changed:
         hd_audit(
             db, tenant_id=tid, actor_email=actor_email,
@@ -700,6 +889,8 @@ def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optiona
     if t:
         assignment.remove_if_not_in_team(db, ticket)
         _activity(db, tid, ticket, f"moved to team {team}")
+    if agent:  # taking ownership advances New→Assigned where the machine allows it
+        _auto_advance_on_assign(db, tid, ticket)
     db.commit()
     hd_audit(
         db, tenant_id=tid, actor_email=actor_email,
@@ -744,7 +935,7 @@ def _default_open_status_for(db: Session, tid: int, ticket: HDTicket) -> Optiona
         s = _status_by_id(db, tid, st.default_ticket_status_id)
         if s:
             return s
-    return _default_open_status(db, tid)
+    return _default_open_status(db, tid, ticket.process)
 
 
 def _reopen_status(db: Session, tid: int, ticket: HDTicket) -> Optional[HDTicketStatus]:
@@ -868,6 +1059,7 @@ def assign_ticket_to_agent(db: Session, tid: int, name: str,
     old_agent = ticket.assigned_agent
     ticket.assigned_agent = agent
     _activity(db, tid, ticket, f"assigned to {agent}")
+    _auto_advance_on_assign(db, tid, ticket)  # New→Assigned on taking ownership
     db.commit()
     hd_audit(
         db, tenant_id=tid, actor_email=current_user_email,

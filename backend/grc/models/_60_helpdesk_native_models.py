@@ -173,6 +173,7 @@ class HDTicket(Base):
     ticket_type_id = Column(Integer, ForeignKey("grc_hd_ticket_type.id"), nullable=True)
     agent_group_id = Column(Integer, ForeignKey("grc_teams.id"), nullable=True)  # "Team" — AVA Administration team (grc_teams), managed in one place
     department_id = Column(Integer, ForeignKey("grc_hd_department.id"), nullable=True, index=True)  # AVA net-new: intake department
+    support_group_code = Column(String(40), nullable=True)  # ITIL support group (GRP-*); routes to its mapped AVA team (HDSupportGroupMap)
     template_id = Column(Integer, ForeignKey("grc_hd_ticket_template.id"), nullable=True)
     # Native equivalent of Frappe core `_assign` (JSON list), flattened to the
     # single assignee the Help Desk UI exposes as `agent` (A15 assign endpoint).
@@ -244,6 +245,12 @@ class HDTicket(Base):
     approval_state = Column(String(20), nullable=True)     # draft|pending_approval|approved|rejected|scheduled|in_progress|review|closed|cancelled
     approved_by = Column(String(255), nullable=True)       # agent email
     approved_at = Column(DateTime, nullable=True)
+    # Why a would-be-auto-approved (Standard) change was escalated to CAB — set by
+    # the exposure-aware governance rule (approvals.requirements_for_change) when the
+    # change's CI or a descendant is internet-facing / PCI. Lives on the ticket (like
+    # approval_state/approved_by above) so change list/detail rows expose it with no
+    # join; create_all can't add it to existing tenant DBs, so itsm_seed ALTERs it in.
+    escalation_reason = Column(Text, nullable=True)
     # problem
     root_cause = Column(Text, nullable=True)
     workaround = Column(Text, nullable=True)

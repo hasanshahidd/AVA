@@ -14,6 +14,7 @@ import Link from "next/link";
 import { MessageSquareText, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "../../_ui";
 import { Field, Input, Textarea, Select, Btn, FormError, hdCall } from "../../_admin";
+import { AssetPicker, type PickedAsset } from "../_asset_picker";
 
 const URGENCY = [
   { value: "low", label: "Whenever — it's not blocking me" },
@@ -26,6 +27,7 @@ export default function ReportIssue() {
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState("medium");
+  const [asset, setAsset] = useState<PickedAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [doneId, setDoneId] = useState<string | null>(null);
@@ -37,6 +39,12 @@ export default function ReportIssue() {
       subject: subject.trim(),
       description: description.trim() || null,
       urgency,
+      // Give the priority matrix an impact (end users don't rate impact, so we
+      // mirror urgency) so reported incidents get a real priority, and tag a
+      // category so they don't land uncategorised.
+      impact: urgency,
+      request_category: "Incident",
+      ...(asset ? { ci_id: asset.id } : {}),
     });
     setBusy(false);
     if (!r.ok || !r.data?.name) { setErr(r.error || "Sorry — we couldn't submit that. Please try again."); return; }
@@ -58,7 +66,7 @@ export default function ReportIssue() {
           <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(doneId)}`}>
             <Btn variant="primary">View my request</Btn>
           </Link>
-          <Btn variant="ghost" onClick={() => { setDoneId(null); setSubject(""); setDescription(""); setUrgency("medium"); }}>
+          <Btn variant="ghost" onClick={() => { setDoneId(null); setSubject(""); setDescription(""); setUrgency("medium"); setAsset(null); }}>
             Report another
           </Btn>
         </div>
@@ -87,6 +95,9 @@ export default function ReportIssue() {
             <Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
               {URGENCY.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </Select>
+          </Field>
+          <Field label="Which asset is this about?" hint="Optional — if it's a specific device or system, link it so we have the details.">
+            <AssetPicker value={asset} onChange={setAsset} />
           </Field>
           <div className="flex items-center justify-end gap-2 pt-1">
             <Link href="/helpdesk/portal/my-requests"><Btn variant="ghost">Cancel</Btn></Link>

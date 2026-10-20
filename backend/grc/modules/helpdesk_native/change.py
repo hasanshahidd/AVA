@@ -61,6 +61,28 @@ def _get_change(db: Session, tid: int, cid: int) -> Optional[HDTicket]:
     )
 
 
+def _sync_terminal_status(db: Session, tid: int, cid: int, label: str) -> None:
+    """Move a change's TICKET status to its terminal label (Closed/Cancelled) and
+    close the SLA clock. A change's authoritative lifecycle is `approval_state`; its
+    ticket-status track is disjoint (it may sit at 'Approved', not in the change
+    status chain), so there's no seeded transition into 'Closed' — we set it
+    directly and recompute the SLA here, which stamps the resolution. Idempotent."""
+    ticket = _get_change(db, tid, cid)
+    st = tickets._status_by_label(db, tid, label)
+    if not ticket or not st or ticket.status_id == st.id:
+        return
+    old_cat = ticket.status_category
+    ticket.status_id = st.id
+    ticket.status_category = st.category
+    if st.category == tickets.RESOLVED and ticket.resolution_date is None:
+        ticket.resolution_date = datetime.utcnow()
+    try:
+        sla.recompute(db, ticket, prev_status_category=old_cat)
+    except Exception:  # noqa: BLE001 — SLA close must never block the state change
+        pass
+    db.commit()
+
+
 def _apply(db: Session, tid: int, cid: int, action: str,
            extra: Optional[dict] = None, actor_email: Optional[str] = None) -> dict:
     """Fetch, guard the transition (400 if illegal), write the new approval_state
@@ -119,6 +141,11 @@ def submit_and_route(db: Session, tid: int, cid: int, actor_email: Optional[str]
                                  required_quorum=req["required_quorum"],
                                  required_role_codes=req["required_role_codes"],
                                  opened_by=actor_email)
+    # phase-2 §4: when the CAB was forced by CI exposure, record WHY on the change
+    # itself so the change list/detail + UI read it with no extra join.
+    escalation_reason = req.get("escalation_reason")
+    if escalation_reason:
+        change.escalation_reason = escalation_reason
     try:
         sla.recompute(db, change, prev_status_category=change.status_category)
     except Exception:  # noqa: BLE001 — SLA pause must never block opening the CAB
@@ -126,9 +153,11 @@ def submit_and_route(db: Session, tid: int, cid: int, actor_email: Optional[str]
     db.commit()
     hd_audit(db, tenant_id=tid, actor_email=actor_email, action="change.cab_opened",
              entity="change", entity_id=cid,
-             after={"kind": ap.kind, "required_quorum": ap.required_quorum})
+             after={"kind": ap.kind, "required_quorum": ap.required_quorum,
+                    "escalation_reason": escalation_reason})
     return {"ok": True, "approval_state": "pending_approval", "cab": True,
-            "approval_id": ap.id, "required_quorum": ap.required_quorum}
+            "approval_id": ap.id, "required_quorum": ap.required_quorum,
+            "escalation_reason": escalation_reason}
 
 
 def vote(db: Session, tid: int, cid: int, actor_email: Optional[str], decision: str,
@@ -229,7 +258,7 @@ def complete_change(cid: int, db: Session = Depends(get_db),
     tid = tenant_id(db)
     r = _apply(db, tid, cid, "complete", actor_email=current_user.email)
     if r.get("ok"):
-        tickets.update(db, tid, str(cid), {"status": "Closed"}, actor_email=current_user.email)
+        _sync_terminal_status(db, tid, cid, "Closed")
     return r
 
 
@@ -237,7 +266,11 @@ def complete_change(cid: int, db: Session = Depends(get_db),
 def cancel_change(cid: int, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth),
                   _: bool = Depends(require_processes_manage)):
-    return _apply(db, tenant_id(db), cid, "cancel", actor_email=current_user.email)
+    tid = tenant_id(db)
+    r = _apply(db, tid, cid, "cancel", actor_email=current_user.email)
+    if r.get("ok"):
+        _sync_terminal_status(db, tid, cid, "Cancelled")
+    return r
 
 
 if __name__ == "__main__":  # pure transition-map self-check, no DB

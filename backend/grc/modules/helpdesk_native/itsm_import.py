@@ -430,6 +430,14 @@ def _apply_request_items(ctx: _Ctx) -> None:
         })
 
 
+# Sample CIs + their CI->CI relationships (workbook sheets 'sample_cis' /
+# 'sample_ci_relationships') are ILLUSTRATIVE ONLY. Real configuration items come
+# from AVA asset discovery, not the workbook, so they are not seeded by default.
+# The CI *types*, *attributes* and *relationship types* are the standard CMDB
+# scaffolding and are always seeded. Flip to True only to load the demo CIs.
+SEED_SAMPLE_CIS = False
+
+
 def _apply_cmdb(ctx: _Ctx) -> None:
     # --- CI types (two-pass: parents may be declared after children)
     # DROPPED-BY-DESIGN: the sheet's flat 'Category' label (Service/Hardware/
@@ -479,6 +487,10 @@ def _apply_cmdb(ctx: _Ctx) -> None:
             ctx.bad("ci_relationship_types", code, "code/name", None, "missing code or name"); continue
         ctx.coded("ci_relationship_types", HDCIRelationshipType, code,
                   {"name": _trunc(name, 140), "inverse_name": _trunc(_g(r, "inverse_name"), 140)})
+    # Sample CI instances + their relationships are illustrative only — skip them
+    # unless explicitly enabled; real CIs are populated from AVA asset discovery.
+    if not SEED_SAMPLE_CIS:
+        return
     # --- CIs. A relationship whose TARGET is a business service (REL-REALISES,
     # 'CI realises a service') cannot be a CI->CI edge, so it is carried as the
     # CI's business_service_id.

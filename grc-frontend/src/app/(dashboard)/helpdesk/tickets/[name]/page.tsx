@@ -3,9 +3,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, Activity, Mail, Paperclip, Download } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, ShieldCheck, Activity, Mail, Paperclip, Download, ExternalLink } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd } from "../../_ui";
+import { AffectedCiPicker, inventoryUrl } from "../../_ci";
 import { RichComposer, isEmptyHtml } from "../../RichText";
 
 const fmt = (v?: string | null) => (v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString() : "—");
@@ -92,8 +93,14 @@ export default function TicketDetail() {
 
   const resetDraft = () => { setDraft(""); setCc(""); setBcc(""); setShowCc(false); setComposerKey((k) => k + 1); };
   const act = async (path: string, body: any, ok: string) => {
-    try { await apiClient.post(`${base}/${path}`, body); setNote(ok); reload(); return true; }
-    catch { setNote("Action isn't available yet — the engine connector may be read-only."); return false; }
+    try {
+      const res = await apiClient.post(`${base}/${path}`, body);
+      // The ticket action endpoints return HTTP 200 with {ok:false, error} on a
+      // LOGICAL rejection (e.g. an illegal status transition) — they don't throw.
+      // Surface the backend reason and don't claim success / don't reload.
+      if (res?.data?.ok === false) { setNote(res.data.error || "That action couldn't be completed."); return false; }
+      setNote(ok); reload(); return true;
+    } catch { setNote("Action isn't available yet — the engine connector may be read-only."); return false; }
   };
   const send = async () => {
     const isComment = tab === "comment";
@@ -260,6 +267,7 @@ export default function TicketDetail() {
         </div>
 
         <aside className="w-80 shrink-0 space-y-3 overflow-y-auto border-l border-slate-200 bg-white px-4 py-5">
+          {data?.approval && <ApprovalPanel ap={data.approval} />}
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Properties</h3>
           <PropRow label="Status">
             {statuses.length > 0 ? (
@@ -290,6 +298,25 @@ export default function TicketDetail() {
           <PropRow label="Assignee">{t.agent ? <span className="inline-flex items-center gap-1.5"><Avatar name={t.agent} size={20} />{t.agent}</span> : <span className="text-slate-300">Unassigned</span>}</PropRow>
           <PropRow label="Customer">{t.customer || "—"}</PropRow>
           <PropRow label="Contact">{t.contact || t.raised_by || "—"}</PropRow>
+          {/* Affected CI — agents link/change/clear the configuration item this ticket is about. */}
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-slate-400">Affected CI</div>
+            <AffectedCiPicker
+              value={t.ci || null}
+              onChange={(ci) => act("update", { ci_id: ci?.id ?? null }, ci ? "Affected CI updated." : "Affected CI cleared.")}
+            />
+            {t.ci && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]">
+                <Link href="/helpdesk/admin/cmdb" className="inline-flex items-center gap-1 font-medium text-[var(--color-base)] hover:underline"><ExternalLink size={12} /> Open in CMDB</Link>
+                {t.ci.managed_by_inventory && inventoryUrl(t.ci) && (
+                  <Link href={inventoryUrl(t.ci) as string} className="inline-flex items-center gap-1 font-medium text-[var(--color-base)] hover:underline"><ExternalLink size={12} /> Open in inventory</Link>
+                )}
+              </div>
+            )}
+            {t.business_service?.name && (
+              <div className="mt-1.5 text-[11.5px] text-slate-500">Business service: <span className="font-medium text-slate-700">{t.business_service.name}</span></div>
+            )}
+          </div>
           <div className="border-t border-slate-100 pt-1" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-slate-400">SLA{sla.policy ? ` · ${sla.policy}` : ""}</span>
@@ -313,6 +340,68 @@ export default function TicketDetail() {
           )}
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** CAB / approval read surface on the ticket detail (flow #4): state, quorum
+ * progress, the required CAB roles and every vote cast — so an agent sees the
+ * board's decision, not just the Approve/Reject buttons. Hidden when the ticket
+ * has no approval (data.approval === null). */
+function ApprovalPanel({ ap }: { ap: any }) {
+  const state = String(ap?.state || "pending").toLowerCase();
+  const q = ap?.required_quorum || 1;
+  const approved = ap?.approve_count || 0;
+  const rejected = ap?.reject_count || 0;
+  const votes: any[] = Array.isArray(ap?.votes) ? ap.votes : [];
+  const roles: string[] = Array.isArray(ap?.required_role_codes) ? ap.required_role_codes : [];
+  const STATE: Record<string, string> = {
+    pending: "bg-amber-50 text-amber-700",
+    approved: "bg-emerald-50 text-emerald-700",
+    rejected: "bg-rose-50 text-rose-600",
+  };
+  const DEC: Record<string, string> = {
+    approve: "text-emerald-600", reject: "text-rose-600", abstain: "text-slate-400",
+  };
+  const kindLabel = ap?.kind === "ecab" ? "Emergency CAB" : ap?.kind === "cab" ? "CAB approval" : "Approval";
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <ShieldCheck size={13} /> {kindLabel}
+        </span>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATE[state] || "bg-slate-100 text-slate-600"}`}>
+          {state.replace(/_/g, " ")}
+        </span>
+      </div>
+      <div className="mb-2">
+        <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+          <span>Approvals</span>
+          <span className="font-medium">{approved} of {q}{rejected ? ` · ${rejected} rejected` : ""}</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, (approved / q) * 100)}%` }} />
+        </div>
+      </div>
+      {roles.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {roles.map((r) => (
+            <span key={r} className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">{r}</span>
+          ))}
+        </div>
+      )}
+      {votes.length === 0 ? (
+        <p className="text-[11.5px] text-slate-400">No votes yet.</p>
+      ) : (
+        <ul className="space-y-1">
+          {votes.map((v, i) => (
+            <li key={i} className="flex items-center justify-between gap-2 text-[11.5px]">
+              <span className="min-w-0 truncate text-slate-600">{v.approver}{v.role ? ` · ${v.role}` : ""}</span>
+              <span className={`shrink-0 font-semibold ${DEC[(v.decision || "").toLowerCase()] || "text-slate-400"}`}>{v.decision}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

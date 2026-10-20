@@ -11,7 +11,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquareText, Paperclip, Download } from "lucide-react";
+import { ArrowLeft, Send, MessageSquareText, Paperclip, Download, Server, Users, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Chip, ErrorBanner, Loading, SlaBadge, TimelineItem, useHd } from "../../../_ui";
 
@@ -118,7 +118,15 @@ export default function MyRequestDetail() {
             We'll respond by <SlaBadge due={t.response_by} /> <span className="text-slate-300">·</span> raised {fmt(t.created || t.creation)}
           </p>
         )}
+        {(t.ci?.name || t.team) && (
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[#64748B]">
+            {t.ci?.name && <span className="inline-flex items-center gap-1.5"><Server size={13} className="text-slate-400" /> {t.ci.name}</span>}
+            {t.team && <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-slate-400" /> {t.team}</span>}
+          </div>
+        )}
       </div>
+
+      {data?.approval && <ApprovalBanner ap={data.approval} />}
 
       {note && <div className="rounded-md bg-slate-50 px-3 py-1.5 text-xs text-slate-500">{note}</div>}
 
@@ -174,6 +182,24 @@ export default function MyRequestDetail() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Requester-facing approval status for their own request (they can't vote — SoD). */
+function ApprovalBanner({ ap }: { ap: any }) {
+  const state = String(ap?.state || "pending").toLowerCase();
+  const q = ap?.required_quorum || 1;
+  const n = ap?.approve_count || 0;
+  const MAP: Record<string, { cls: string; label: string }> = {
+    pending: { cls: "border-amber-200 bg-amber-50 text-amber-800", label: `Waiting for approval — ${n} of ${q} approved` },
+    approved: { cls: "border-emerald-200 bg-emerald-50 text-emerald-700", label: "Approved — on its way to the team" },
+    rejected: { cls: "border-rose-200 bg-rose-50 text-rose-700", label: "Not approved" },
+  };
+  const m = MAP[state] || MAP.pending;
+  return (
+    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] ${m.cls}`}>
+      <ShieldCheck size={14} className="shrink-0" /> {m.label}
     </div>
   );
 }

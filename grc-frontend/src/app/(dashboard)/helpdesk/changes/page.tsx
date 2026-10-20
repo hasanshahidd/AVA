@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { GitPullRequest, Inbox, Search } from "lucide-react";
+import { GitPullRequest, Inbox, Search, ShieldAlert } from "lucide-react";
 import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
 import { ApprovalBadge, ChangeActions } from "./_actions";
 
@@ -71,6 +71,11 @@ export default function HelpDeskChanges() {
                 <Link href={`/helpdesk/tickets/${encodeURIComponent(t.name)}`} className="font-medium text-[#0F172A] hover:text-[#005B96]">
                   {t.subject || "(no subject)"}
                 </Link>
+                {t.escalation_reason && (
+                  <div className="mt-1 inline-flex max-w-xs items-start gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    <ShieldAlert size={12} className="mt-0.5 shrink-0" /> {t.escalation_reason}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-2.5"><ApprovalBadge state={t.approval_state} /></td>
               <td className="px-4 py-2.5 text-[12.5px] capitalize text-[#475569]">{t.change_type || "—"}</td>

@@ -132,9 +132,12 @@ const navigation: NavEntry[] = [
     // helpdesk:tickets:view; the three requester items need only the end-user
     // perms, so a requester-only user sees JUST those three, an agent the console.
     items: [
-      // Three sub-dropdowns for the three Help Desk audiences. ALL are admin-visible
-      // now FOR TESTING (settings-gated); split back by role later — the End-user
-      // Portal items become requester-only again.
+      // Three sub-dropdowns for the three Help Desk audiences, gated by role:
+      //   Agent Console  → helpdesk:tickets:view  (agents + admin)
+      //   Administration → helpdesk:settings:manage (admin / settings role)
+      //   End-user Portal→ helpdesk:requests:*     (requesters; agents too when
+      //                    their role carries it; admin via isAdmin superset)
+      // Admin sees all three (isAdmin short-circuit in hasPermission).
       {
         name: 'Agent Console',
         icon: LayoutDashboard,
@@ -151,7 +154,6 @@ const navigation: NavEntry[] = [
           { name: 'Contacts',         href: '/helpdesk/contacts',   icon: Contact,         requiredPermissions: ['helpdesk:tickets:view'] },
           { name: 'Knowledge Base',   href: '/helpdesk/kb',         icon: BookOpen,        requiredPermissions: ['helpdesk:tickets:view'] },
           { name: 'Canned Responses', href: '/helpdesk/canned',     icon: MessageSquareText, requiredPermissions: ['helpdesk:tickets:view'] },
-          { name: 'Settings',         href: '/helpdesk/settings',   icon: Settings,        requiredPermissions: ['helpdesk:tickets:view'] },
         ],
       },
       {
@@ -161,17 +163,18 @@ const navigation: NavEntry[] = [
           { name: 'Service Catalogue', href: '/helpdesk/admin/catalogue',  icon: Bookmark, requiredPermissions: ['helpdesk:settings:manage'] },
           { name: 'CMDB',              href: '/helpdesk/admin/cmdb',        icon: Server,   requiredPermissions: ['helpdesk:settings:manage'] },
           { name: 'Governance',        href: '/helpdesk/admin/governance',  icon: Shield,   requiredPermissions: ['helpdesk:settings:manage'] },
+          { name: 'Settings',          href: '/helpdesk/settings',          icon: Settings, requiredPermissions: ['helpdesk:settings:manage'] },
         ],
       },
       {
         name: 'End-user Portal',
         icon: ClipboardCheck,
         items: [
-          { name: 'Request something', href: '/helpdesk/portal/request',     icon: ClipboardCheck,    requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'My Requests',       href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'My Approvals',      href: '/helpdesk/portal/my-approvals', icon: ShieldCheck,      requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'Report an issue',   href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:settings:manage'] },
-          { name: 'Help / Knowledge Base', href: '/helpdesk/portal/kb',      icon: BookOpen,          requiredPermissions: ['helpdesk:settings:manage'] },
+          { name: 'Request something', href: '/helpdesk/portal/request',     icon: ClipboardCheck,    requiredPermissions: ['helpdesk:requests:create', 'helpdesk:requests:view_own'] },
+          { name: 'My Requests',       href: '/helpdesk/portal/my-requests', icon: ListTodo,          requiredPermissions: ['helpdesk:requests:view_own', 'helpdesk:requests:create'] },
+          { name: 'My Approvals',      href: '/helpdesk/portal/my-approvals', icon: ShieldCheck,      requiredPermissions: ['helpdesk:requests:view_own', 'helpdesk:requests:create'] },
+          { name: 'Report an issue',   href: '/helpdesk/portal/report',      icon: MessageSquareText, requiredPermissions: ['helpdesk:requests:create', 'helpdesk:requests:view_own'] },
+          { name: 'Help / Knowledge Base', href: '/helpdesk/portal/kb',      icon: BookOpen,          requiredPermissions: ['helpdesk:requests:view_own', 'helpdesk:requests:create'] },
         ],
       },
     ],

@@ -3,33 +3,29 @@
 /**
  * Requester portal — "Request something".
  *
- * Guided 4-step wizard for service requests (new laptop, software, access…):
- *   1. pick a category   2. pick a request item   3. fill in the details
- *   4. review & submit.
+ * Guided 5-step wizard for service requests (new laptop, software, access…):
+ *   1. pick a category   2. pick a business service   3. pick a request item
+ *   4. fill in the details   5. review & submit.
+ * This mirrors the real catalogue hierarchy (Category → Business service →
+ * Request item); technical services stay internal and are never shown here.
  * Submits POST /helpdesk/portal/requests with process="service_request"; the
- * backend derives priority/SLA and routes to the right team. On success we offer
- * a link to the new request in My Requests.
+ * backend derives priority/SLA and routes to the right team.
  *
  * Catalogue source (end-user safe):
- *   1. GET /helpdesk/portal/catalogue  — PLACEHOLDER, not in portal.py yet. When
- *      the backend adds it, the wizard picks it up automatically (see shape below).
- *   2. fallback: GET /helpdesk/portal/templates — the predefined request library
- *      that already exists, filtered to service requests.
- *
- * Expected /helpdesk/portal/catalogue shape:
- *   { categories: [{id,name,description?}],
- *     services:   [{id,name,category_id?}],
- *     requests:   [{id,code?,name,description?,category?,category_id?,business_service?,
- *                   business_service_id?,approval_required?,sla_hours?,cost?,department_id?,
- *                   default_impact?,default_urgency?,
- *                   fields?: [{key,label,type?: text|textarea|select|number|date|checkbox,
- *                              required?,hint?,options?: string[]}]}] }
+ *   1. GET /helpdesk/portal/catalogue — { categories:[{id,name,description?}],
+ *      services:[{id,name,category_id,description?}],
+ *      requests:[{id,code?,name,description?,category_id,business_service_id,
+ *                 approval_required?,sla_hours?,cost?,fields?}] }
+ *   2. fallback: GET /helpdesk/portal/templates — the predefined request library.
+ * When a category has only one business service (or ungrouped items), the service
+ * step auto-advances so the user never sees a pointless one-option page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, CheckCircle2, ArrowLeft, ArrowRight, Check, Search, FolderOpen, Inbox, BookOpen, ShieldCheck, Clock } from "lucide-react";
+import { ClipboardList, CheckCircle2, ArrowLeft, ArrowRight, Check, Search, FolderOpen, Layers, Inbox, BookOpen, ShieldCheck, Clock } from "lucide-react";
 import { Empty, Loading, PageHeader, useHd } from "../../_ui";
 import { Field, Input, Textarea, Select, Btn, FormError, hdCall } from "../../_admin";
+import { AssetPicker, type PickedAsset } from "../_asset_picker";
 
 type FieldDef = { key: string; label: string; type: string; required: boolean; hint?: string; options: string[] };
 type Item = {
@@ -37,7 +33,9 @@ type Item = {
   requestItemId: number | null;
   name: string;
   description: string;
+  categoryKey: string;
   category: string;
+  serviceKey: string;
   service: string;
   approvalRequired: boolean;
   slaHours: number | null;
@@ -50,8 +48,10 @@ type Item = {
   defaultDescription: string;
   fields: FieldDef[];
 };
+type Group = { key: string; name: string; description: string; count: number };
 
-const STEPS = ["Category", "Request", "Details", "Review"];
+const STEPS = ["Category", "Service", "Request", "Details", "Review"];
+const GENERAL = "__general";
 
 const URGENCY = [
   { value: "low", label: "Whenever — it's not blocking me" },
@@ -79,16 +79,23 @@ function normalise(cat: any, tpl: any): Item[] {
   const reqs: any[] = Array.isArray(cat?.requests) ? cat.requests : [];
   if (reqs.length > 0) {
     const cats: any[] = Array.isArray(cat?.categories) ? cat.categories : [];
+    const svcs: any[] = Array.isArray(cat?.services) ? cat.services : [];
     return reqs.map((r: any) => {
+      const categoryId = typeof r.category_id === "number" ? r.category_id : null;
+      const serviceId = typeof r.business_service_id === "number" ? r.business_service_id : null;
       const catName =
-        r.category || cats.find((c: any) => c.id === r.category_id)?.name || "General";
+        r.category || cats.find((c: any) => c.id === categoryId)?.name || "General";
+      const svcName =
+        r.business_service || svcs.find((s: any) => s.id === serviceId)?.name || "";
       return {
         key: `item-${r.id ?? r.code ?? r.name}`,
         requestItemId: typeof r.id === "number" ? r.id : null,
         name: String(r.name || r.code || "Request"),
         description: String(r.description || ""),
+        categoryKey: categoryId != null ? `c${categoryId}` : `n:${catName}`,
         category: String(catName),
-        service: String(r.business_service || ""),
+        serviceKey: serviceId != null ? `s${serviceId}` : (svcName ? `n:${svcName}` : GENERAL),
+        service: String(svcName),
         approvalRequired: !!r.approval_required,
         slaHours: typeof r.sla_hours === "number" ? r.sla_hours : null,
         cost: typeof r.cost === "number" ? r.cost : null,
@@ -96,62 +103,94 @@ function normalise(cat: any, tpl: any): Item[] {
         impact: String(r.default_impact || "low"),
         urgency: String(r.default_urgency || "medium"),
         requestCategory: String(catName),
-        requestSubcategory: "",
+        requestSubcategory: String(svcName),
         defaultDescription: "",
         fields: toFields(r.fields),
       };
     });
   }
-  // Fallback: the request library that portal.py already exposes.
+  // Fallback: the request library that portal.py already exposes (no service layer).
   const all: any[] = Array.isArray(tpl?.templates) ? tpl.templates : [];
   const svc = all.filter((t: any) => (t.process || "") === "service_request");
-  return (svc.length > 0 ? svc : all).map((t: any) => ({
-    key: `tpl-${t.id}`,
-    requestItemId: null,
-    name: String(t.template_name || t.default_subject || "Request"),
-    description: String(t.default_description || ""),
-    category: String(t.default_category || t.department || "General"),
-    service: String(t.default_subcategory || ""),
-    approvalRequired: false,
-    slaHours: null,
-    cost: null,
-    departmentId: typeof t.department_id === "number" ? t.department_id : null,
-    impact: String(t.default_impact || "low"),
-    urgency: String(t.default_urgency || "medium"),
-    requestCategory: String(t.default_category || ""),
-    requestSubcategory: String(t.default_subcategory || ""),
-    defaultDescription: String(t.default_description || ""),
-    fields: [],
-  }));
+  return (svc.length > 0 ? svc : all).map((t: any) => {
+    const catName = String(t.default_category || t.department || "General");
+    const svcName = String(t.default_subcategory || "");
+    return {
+      key: `tpl-${t.id}`,
+      requestItemId: null,
+      name: String(t.template_name || t.default_subject || "Request"),
+      description: String(t.default_description || ""),
+      categoryKey: `n:${catName}`,
+      category: catName,
+      serviceKey: svcName ? `n:${svcName}` : GENERAL,
+      service: svcName,
+      approvalRequired: false,
+      slaHours: null,
+      cost: null,
+      departmentId: typeof t.department_id === "number" ? t.department_id : null,
+      impact: String(t.default_impact || "low"),
+      urgency: String(t.default_urgency || "medium"),
+      requestCategory: catName,
+      requestSubcategory: svcName,
+      defaultDescription: String(t.default_description || ""),
+      fields: [],
+    };
+  });
 }
 
 // ── page ────────────────────────────────────────────────────────────────────
 export default function RequestSomething() {
-  const cat = useHd<any>("/helpdesk/portal/catalogue"); // placeholder endpoint
+  const cat = useHd<any>("/helpdesk/portal/catalogue");
   const tpl = useHd<any>("/helpdesk/portal/templates");
   const kb = useHd<{ articles: any[] }>("/helpdesk/portal/kb");
 
   const items = useMemo(() => normalise(cat.data, tpl.data), [cat.data, tpl.data]);
-  const categories = useMemo(() => {
-    const m = new Map<string, number>();
-    items.forEach((i) => m.set(i.category, (m.get(i.category) || 0) + 1));
-    const descs = new Map<string, string>();
+
+  const catMeta = useMemo(() => {
+    const m = new Map<string, string>();
     (Array.isArray(cat.data?.categories) ? cat.data.categories : []).forEach((c: any) => {
-      if (c?.name) descs.set(String(c.name), String(c.description || ""));
+      if (c?.id != null) m.set(`c${c.id}`, String(c.description || ""));
     });
-    return Array.from(m.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, count]) => ({ name, count, description: descs.get(name) || "" }));
-  }, [items, cat.data]);
+    return m;
+  }, [cat.data]);
+  const svcMeta = useMemo(() => {
+    const m = new Map<string, string>();
+    (Array.isArray(cat.data?.services) ? cat.data.services : []).forEach((s: any) => {
+      if (s?.id != null) m.set(`s${s.id}`, String(s.description || ""));
+    });
+    return m;
+  }, [cat.data]);
+
+  const categories = useMemo<Group[]>(() => {
+    const m = new Map<string, Group>();
+    items.forEach((i) => {
+      const e = m.get(i.categoryKey) || { key: i.categoryKey, name: i.category, description: catMeta.get(i.categoryKey) || "", count: 0 };
+      e.count++; m.set(i.categoryKey, e);
+    });
+    return Array.from(m.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, catMeta]);
+
+  const servicesFor = (categoryKey: string | null): Group[] => {
+    if (!categoryKey) return [];
+    const m = new Map<string, Group>();
+    items.filter((i) => i.categoryKey === categoryKey).forEach((i) => {
+      const e = m.get(i.serviceKey) || { key: i.serviceKey, name: i.service || "General", description: svcMeta.get(i.serviceKey) || "", count: 0 };
+      e.count++; m.set(i.serviceKey, e);
+    });
+    return Array.from(m.values()).sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   const [step, setStep] = useState(0);
-  const [category, setCategory] = useState<string | null>(null);
-  const [service, setService] = useState("");
+  const [categoryKey, setCategoryKey] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [serviceKey, setServiceKey] = useState<string | null>(null);
+  const [serviceName, setServiceName] = useState("");
   const [search, setSearch] = useState("");
   const [item, setItem] = useState<Item | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [urgency, setUrgency] = useState("medium");
+  const [asset, setAsset] = useState<PickedAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [doneId, setDoneId] = useState<string | null>(null);
@@ -159,19 +198,16 @@ export default function RequestSomething() {
 
   const loading = cat.loading || tpl.loading;
 
-  const inCategory = useMemo(() => items.filter((i) => i.category === category), [items, category]);
-  const services = useMemo(
-    () => Array.from(new Set(inCategory.map((i) => i.service).filter(Boolean))).sort(),
-    [inCategory],
-  );
+  const services = useMemo(() => servicesFor(categoryKey), [items, categoryKey, svcMeta]);
   const visible = useMemo(() => {
     const s = search.trim().toLowerCase();
-    return inCategory.filter(
+    return items.filter(
       (i) =>
-        (!service || i.service === service) &&
+        i.categoryKey === categoryKey &&
+        i.serviceKey === serviceKey &&
         (!s || [i.name, i.description].some((v) => (v || "").toLowerCase().includes(s))),
     );
-  }, [inCategory, service, search]);
+  }, [items, categoryKey, serviceKey, search]);
 
   // KB suggestions: published articles whose title shares a word with the chosen request.
   const suggestions = useMemo(() => {
@@ -185,18 +221,31 @@ export default function RequestSomething() {
       .slice(0, 3);
   }, [item, kb.data]);
 
-  const pickCategory = (name: string) => {
-    setCategory(name); setService(""); setSearch(""); setItem(null); setErr(null);
-    setStep(1);
+  const pickCategory = (c: Group) => {
+    setCategoryKey(c.key); setCategoryName(c.name);
+    setServiceKey(null); setServiceName(""); setSearch(""); setItem(null); setErr(null);
+    const svcs = servicesFor(c.key);
+    if (svcs.length === 1) {
+      // only one service (or just ungrouped items) → skip the service page
+      setServiceKey(svcs[0].key); setServiceName(svcs[0].name === "General" ? "" : svcs[0].name);
+      setStep(2);
+    } else {
+      setStep(1);
+    }
+  };
+  const pickService = (s: Group) => {
+    setServiceKey(s.key); setServiceName(s.name === "General" ? "" : s.name);
+    setSearch(""); setItem(null); setErr(null); setStep(2);
   };
   const pickItem = (i: Item) => {
     setItem(i); setAnswers({}); setNotes(""); setUrgency(i.urgency || "medium"); setErr(null);
   };
 
   const validate = (s: number): string | null => {
-    if (s === 0 && !category) return "Please choose a category.";
-    if (s === 1 && !item) return "Please choose what you'd like to request.";
-    if (s === 2 && item) {
+    if (s === 0 && !categoryKey) return "Please choose a category.";
+    if (s === 1 && !serviceKey) return "Please choose a service.";
+    if (s === 2 && !item) return "Please choose what you'd like to request.";
+    if (s === 3 && item) {
       for (const f of item.fields) {
         if (f.required && f.type !== "checkbox" && !(answers[f.key] || "").trim()) {
           return `Please fill in “${f.label}”.`;
@@ -210,9 +259,17 @@ export default function RequestSomething() {
     if (v) { setErr(v); return; }
     setErr(null); setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
-  const back = () => { setErr(null); setStep((s) => Math.max(s - 1, 0)); };
-  // Completed steps in the indicator (and "Change" links on the review) jump straight back.
-  const jump = (i: number) => { if (i < step) { setErr(null); setStep(i); } };
+  const back = () => {
+    setErr(null);
+    // if the service step was auto-skipped (single service), skip it going back too
+    if (step === 2 && services.length === 1) { setStep(0); return; }
+    setStep((s) => Math.max(s - 1, 0));
+  };
+  const jump = (i: number) => {
+    if (i >= step) return;
+    if (i === 1 && services.length === 1) { setErr(null); setStep(0); return; }
+    setErr(null); setStep(i);
+  };
 
   // Bring the top of the wizard into view whenever the step changes (not on first paint).
   const topRef = useRef<HTMLDivElement | null>(null);
@@ -232,13 +289,11 @@ export default function RequestSomething() {
 
   const submit = async () => {
     if (!item) return;
-    for (let s = 0; s < 3; s++) {
+    for (let s = 0; s < 4; s++) {
       const v = validate(s);
       if (v) { setErr(v); setStep(s); return; }
     }
     setBusy(true); setErr(null);
-    // Answers are also folded into the description so nothing is lost even if
-    // the backend ignores the structured `fields` payload.
     const description = [notes.trim() || item.defaultDescription, ...answerLines()].filter(Boolean).join("\n");
     const body: Record<string, unknown> = {
       subject: item.name,
@@ -252,6 +307,7 @@ export default function RequestSomething() {
     };
     if (item.departmentId != null) body.department_id = item.departmentId;
     if (item.requestItemId != null) body.request_item_id = item.requestItemId;
+    if (asset) body.ci_id = asset.id;
     const r = await hdCall("post", "/helpdesk/portal/requests", body);
     setBusy(false);
     if (!r.ok || !r.data?.name) { setErr(r.error || "Sorry — we couldn't submit that. Please try again."); return; }
@@ -260,8 +316,8 @@ export default function RequestSomething() {
   };
 
   const reset = () => {
-    setDoneId(null); setStep(0); setCategory(null); setService(""); setSearch("");
-    setItem(null); setAnswers({}); setNotes(""); setUrgency("medium"); setErr(null); setNeedsApproval(false);
+    setDoneId(null); setStep(0); setCategoryKey(null); setCategoryName(""); setServiceKey(null); setServiceName("");
+    setSearch(""); setItem(null); setAnswers({}); setNotes(""); setUrgency("medium"); setAsset(null); setErr(null); setNeedsApproval(false);
   };
 
   if (doneId) {
@@ -350,46 +406,57 @@ export default function RequestSomething() {
             {/* STEP 1 — category */}
             {step === 0 && (
               <div className="flex flex-col gap-4">
-                <StepHead title="What kind of request is it?" hint="Choose a category and we'll show you what's available." />
+                <StepHead title="What kind of request is it?" hint="Choose a category and we'll show you the services in it." />
                 <div className="grid gap-3 sm:grid-cols-2">
                   {categories.map((c) => {
-                    const sel = category === c.name;
+                    const sel = categoryKey === c.key;
                     return (
-                      <button
-                        key={c.name}
-                        type="button"
-                        onClick={() => pickCategory(c.name)}
-                        className={`group flex items-center gap-3.5 rounded-xl border p-4 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
-                          sel ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-200 bg-white hover:border-[#005B96]/40"
-                        }`}
-                      >
-                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#005B96]/10 text-[#005B96] transition group-hover:bg-[#005B96] group-hover:text-white">
-                          <FolderOpen size={20} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-semibold text-[#0F172A]">{c.name}</span>
-                          <span className="mt-0.5 block text-xs text-slate-500">
-                            {c.description || `${c.count} ${c.count === 1 ? "option" : "options"}`}
-                          </span>
-                          {c.description && (
-                            <span className="mt-1 block text-[11px] text-[#94A3B8]">
-                              {c.count} {c.count === 1 ? "option" : "options"}
-                            </span>
-                          )}
-                        </span>
-                        <ArrowRight size={16} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#005B96]" />
-                      </button>
+                      <SelectCard
+                        key={c.key}
+                        icon={<FolderOpen size={20} />}
+                        title={c.name}
+                        description={c.description}
+                        meta={`${c.count} ${c.count === 1 ? "item" : "items"}`}
+                        selected={sel}
+                        onClick={() => pickCategory(c)}
+                      />
                     );
                   })}
                 </div>
               </div>
             )}
 
-            {/* STEP 2 — request item */}
+            {/* STEP 2 — business service */}
             {step === 1 && (
               <div className="flex flex-col gap-4">
                 <StepHead
-                  title={`What would you like in “${category}”?`}
+                  title={`Which service in “${categoryName}”?`}
+                  hint="Pick the service your request is about — you'll choose the exact item next."
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {services.map((s) => {
+                    const sel = serviceKey === s.key;
+                    return (
+                      <SelectCard
+                        key={s.key}
+                        icon={<Layers size={20} />}
+                        title={s.name}
+                        description={s.description}
+                        meta={`${s.count} ${s.count === 1 ? "item" : "items"}`}
+                        selected={sel}
+                        onClick={() => pickService(s)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3 — request item */}
+            {step === 2 && (
+              <div className="flex flex-col gap-4">
+                <StepHead
+                  title={serviceName ? `What would you like in “${serviceName}”?` : `What would you like in “${categoryName}”?`}
                   hint="Pick the one that fits best — you'll add the details next."
                 />
                 <div className="relative">
@@ -397,35 +464,13 @@ export default function RequestSomething() {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search this category…"
-                    aria-label="Search this category"
+                    placeholder="Search…"
+                    aria-label="Search request items"
                     className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none placeholder:text-[#94A3B8] focus:border-[#005B96] focus:ring-2 focus:ring-[#005B96]/15"
                   />
                 </div>
-                {services.length > 1 && (
-                  <div role="group" aria-label="Filter by service" className="flex flex-wrap items-center gap-1.5">
-                    {["", ...services].map((s) => {
-                      const on = service === s;
-                      return (
-                        <button
-                          key={s || "__all"}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => setService(s)}
-                          className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
-                            on
-                              ? "border-[#005B96] bg-[#005B96] text-white"
-                              : "border-slate-200 bg-white text-slate-600 hover:border-[#005B96]/40 hover:text-[#005B96]"
-                          }`}
-                        >
-                          {s || "All services"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
                 {visible.length === 0 ? (
-                  <Empty icon={Inbox} title="No matching requests" hint="Try a different search or category." />
+                  <Empty icon={Inbox} title="No matching requests" hint="Try a different search or go back a step." />
                 ) : (
                   <>
                     <div className="text-xs text-[#94A3B8]">
@@ -458,7 +503,6 @@ export default function RequestSomething() {
                               <span className="mt-1 line-clamp-3 block text-xs text-slate-500">{i.description}</span>
                             )}
                             <span className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                              {i.service && <span className="rounded-full bg-slate-100 px-2 py-0.5">{i.service}</span>}
                               {i.approvalRequired && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
                                   <ShieldCheck size={11} /> Needs approval
@@ -479,8 +523,8 @@ export default function RequestSomething() {
               </div>
             )}
 
-            {/* STEP 3 — details */}
-            {step === 2 && item && (
+            {/* STEP 4 — details */}
+            {step === 3 && item && (
               <div className="flex flex-col gap-5">
                 <StepHead title="A few details" hint="Just what we need to get this done for you." />
 
@@ -493,6 +537,7 @@ export default function RequestSomething() {
                     {item.description && <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                       <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">{item.category}</span>
+                      {item.service && <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-slate-200">{item.service}</span>}
                       {item.approvalRequired && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
                           <ShieldCheck size={11} /> Needs approval
@@ -567,6 +612,10 @@ export default function RequestSomething() {
                     />
                   </Field>
 
+                  <Field label="Is this about one of your assets?" hint="Optional — link the device or system so the team has its details.">
+                    <AssetPicker value={asset} onChange={setAsset} />
+                  </Field>
+
                   <div>
                     <span id="request-urgency-label" className="mb-1.5 block text-[11.5px] font-semibold text-[#475569]">
                       How soon do you need it?
@@ -601,24 +650,25 @@ export default function RequestSomething() {
               </div>
             )}
 
-            {/* STEP 4 — review */}
-            {step === 3 && item && (
+            {/* STEP 5 — review */}
+            {step === 4 && item && (
               <div className="flex flex-col gap-4">
                 <StepHead title="Review your request" hint="Check everything looks right, then submit." />
                 <dl className="divide-y divide-[#EEF1F5] overflow-hidden rounded-xl border border-[#EEF1F5] text-sm">
                   <ReviewRow label="Category" value={item.category} onEdit={() => jump(0)} />
-                  <ReviewRow label="Request" value={item.name} onEdit={() => jump(1)} />
-                  {item.service && <ReviewRow label="Service" value={item.service} />}
+                  {item.service && <ReviewRow label="Service" value={item.service} onEdit={() => jump(1)} />}
+                  <ReviewRow label="Request" value={item.name} onEdit={() => jump(2)} />
+                  {asset && <ReviewRow label="Asset" value={asset.name} onEdit={() => jump(3)} />}
                   {item.fields.map((f) => (
                     <ReviewRow
                       key={f.key}
                       label={f.label}
                       value={f.type === "checkbox" ? (answers[f.key] === "yes" ? "Yes" : "No") : answers[f.key] || "—"}
-                      onEdit={() => jump(2)}
+                      onEdit={() => jump(3)}
                     />
                   ))}
-                  <ReviewRow label="Details" value={notes.trim() || "—"} onEdit={() => jump(2)} />
-                  <ReviewRow label="Urgency" value={urgencyLabel(urgency)} onEdit={() => jump(2)} />
+                  <ReviewRow label="Details" value={notes.trim() || "—"} onEdit={() => jump(3)} />
+                  <ReviewRow label="Urgency" value={urgencyLabel(urgency)} onEdit={() => jump(3)} />
                 </dl>
                 {item.approvalRequired && (
                   <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
@@ -668,6 +718,31 @@ const URGENCY_DOT: Record<string, string> = {
   medium: "bg-amber-400",
   high: "bg-red-500",
 };
+
+/** A pick-one card used for both the category step and the service step. */
+function SelectCard({ icon, title, description, meta, selected, onClick }: {
+  icon: React.ReactNode; title: string; description?: string; meta?: string; selected: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex items-center gap-3.5 rounded-xl border p-4 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005B96]/40 ${
+        selected ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-200 bg-white hover:border-[#005B96]/40"
+      }`}
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#005B96]/10 text-[#005B96] transition group-hover:bg-[#005B96] group-hover:text-white">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-[#0F172A]">{title}</span>
+        {description && <span className="mt-0.5 block text-xs text-slate-500 line-clamp-2">{description}</span>}
+        {meta && <span className="mt-1 block text-[11px] text-[#94A3B8]">{meta}</span>}
+      </span>
+      <ArrowRight size={16} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#005B96]" />
+    </button>
+  );
+}
 
 function StepHead({ title, hint }: { title: string; hint?: string }) {
   return (

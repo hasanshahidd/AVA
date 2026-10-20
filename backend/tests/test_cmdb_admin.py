@@ -204,6 +204,88 @@ def test_ci_retire_sets_status_row_present(db):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# inventory-sync surface: top_level tri-state + managed-CI guards
+# ═══════════════════════════════════════════════════════════════════════════
+def _managed(db, code, name, **kw):
+    attrs = kw.pop("attributes", {"ava": {"kind": "host", "asset_id": 1}})
+    return _ci(db, code=code, name=name, attributes=attrs, **kw)
+
+
+def test_cis_top_level_tristate_and_parent_child(db):
+    cit = _ci_type(db, code="CIT-WEBSVC", name="Web Service")
+    domain = _ci(db, code="AVA-DOM-ex.com", name="ex.com", ci_type_id=cit.id,
+                 attributes={"ava": {"kind": "domain"}})
+    endpoint = _ci(db, code="AVA-2", name="www.ex.com", ci_type_id=cit.id,
+                   attributes={"ava": {"kind": "endpoint"}})
+    rt = _rel_type(db, code="REL-CONTAINS", name="Contains")
+    m.create_relationship(m.RelationshipCreate(source_ci_id=domain.id, target_ci_id=endpoint.id,
+                                                rel_type_id=rt.id), db=db, _=True)
+
+    roots = m.list_cis(ci_type_id=None, business_service_id=None, top_level=True, db=db, _=True)["cis"]
+    assert {c["code"] for c in roots} == {"AVA-DOM-ex.com"}
+    assert roots[0]["child_count"] == 1
+    assert roots[0]["parent_ci_id"] is None
+    assert roots[0]["ci_kind"] == "domain"
+
+    children = m.list_cis(ci_type_id=None, business_service_id=None, top_level=False, db=db, _=True)["cis"]
+    assert {c["code"] for c in children} == {"AVA-2"}
+    assert children[0]["parent_ci_id"] == domain.id
+    assert children[0]["ci_kind"] == "endpoint"
+
+    both = m.list_cis(ci_type_id=None, business_service_id=None, db=db, _=True)["cis"]
+    assert len(both) == 2
+
+
+def test_patch_managed_ci_blocks_owned_fields(db):
+    cit = _ci_type(db, code="CIT-SERVER", name="Server")
+    svc = HDBusinessService(tenant_id=TENANT, code="SVC-1", name="Email")
+    db.add(svc)
+    db.commit()
+    ci = _managed(db, "AVA-1", "HOST-1", ci_type_id=cit.id, status="in_use",
+                  attributes={"ava": {"kind": "host", "asset_id": 1}, "hostname": "h1"})
+
+    # changing an inventory-owned field → 409
+    with pytest.raises(HTTPException) as exc:
+        m.update_ci(ci.id, m.CIUpdate(name="renamed"), db=db, _=True)
+    assert exc.value.status_code == 409
+
+    # identical value passes (no-op)
+    m.update_ci(ci.id, m.CIUpdate(name="HOST-1"), db=db, _=True)
+
+    # business_service_id stays editable
+    m.update_ci(ci.id, m.CIUpdate(business_service_id=svc.id), db=db, _=True)
+    db.refresh(ci)
+    assert ci.business_service_id == svc.id
+
+    # attributes patch preserves the stored ava mirror, ignoring client-sent ava
+    m.update_ci(ci.id, m.CIUpdate(attributes={"note": "x", "ava": {"kind": "HIJACK"}}),
+                db=db, _=True)
+    db.refresh(ci)
+    assert ci.attributes["ava"]["kind"] == "host"   # not overwritten
+    assert ci.attributes["note"] == "x"
+
+
+def test_patch_unmanaged_ci_unrestricted(db):
+    ci = _ci(db, code="CI-M", name="manual", status="in_use")  # no ava
+    m.update_ci(ci.id, m.CIUpdate(name="renamed", status="retired"), db=db, _=True)
+    db.refresh(ci)
+    assert ci.name == "renamed"
+    assert ci.status == "retired"
+
+
+def test_retire_managed_ci_blocked_manual_ok(db):
+    managed = _managed(db, "AVA-9", "HOST-9")
+    with pytest.raises(HTTPException) as exc:
+        m.retire_ci(managed.id, db=db, _=True)
+    assert exc.value.status_code == 409
+
+    manual = _ci(db, code="CI-MAN", name="manual-ci")
+    m.retire_ci(manual.id, db=db, _=True)
+    db.refresh(manual)
+    assert manual.status == "retired"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # relationships (+ relationship types) + graph
 # ═══════════════════════════════════════════════════════════════════════════
 def test_relationship_add_idempotent_unlink(db):

@@ -8,7 +8,7 @@
  *   schedule body: {planned_start, planned_end}
  */
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ShieldAlert } from "lucide-react";
 import { Modal, Field, Input, Btn, FormError, hdCall } from "../_admin";
 
 // approval_state → the transitions allowed from it (mirrors change.py's map).
@@ -50,6 +50,7 @@ export function ChangeActions({ change, onChanged }: { change: any; onChanged: (
   const [busy, setBusy] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null); // e.g. "CAB required: …" after submit
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,10 +66,13 @@ export function ChangeActions({ change, onChanged }: { change: any; onChanged: (
   const canCancel = !TERMINAL.has(state);
 
   const run = async (action: string) => {
-    setOpen(false); setBusy(true); setErr(null);
+    setOpen(false); setBusy(true); setErr(null); setNotice(null);
     const r = await hdCall("post", `/helpdesk/changes/${id}/${action}`);
     setBusy(false);
     if (!r.ok) { setErr(r.error || `Could not ${action} this change.`); return; }
+    // The backend escalates an exposure-sensitive Standard change to CAB on submit.
+    const reason = r.data?.escalation_reason;
+    if (reason) setNotice(reason);  // reason already reads "CAB required: …"
     onChanged();
   };
 
@@ -101,6 +105,11 @@ export function ChangeActions({ change, onChanged }: { change: any; onChanged: (
         </div>
       )}
       {err && <p className="absolute right-0 mt-1 whitespace-nowrap text-[11px] text-rose-600">{err}</p>}
+      {notice && (
+        <div className="absolute right-0 z-10 mt-1 inline-flex max-w-xs items-start gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-left text-[11px] font-medium text-amber-800 shadow-sm">
+          <ShieldAlert size={12} className="mt-0.5 shrink-0" /> {notice}
+        </div>
+      )}
       {scheduling && (
         <ScheduleModal
           change={change}

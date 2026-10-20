@@ -25,13 +25,14 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import GRCUser, Team, get_db
+from ...models import GRCUser, HDSupportGroupMap, Team, get_db
 from ...routers.auth_router import require_auth
 from . import (  # noqa: F401 (assignment used by tickets)
     tickets, sla, assignment, people, kb, replies, dashboard,
     masters, agent_status, contacts, tags, views, settings, analytics, department, mail,
     incident, problem, change, service_request, itsm_seed, request_templates,
-    portal, attachments, catalogue_admin, cmdb_admin, governance_admin,
+    portal, attachments, catalogue_admin, cmdb_admin, cmdb_sync, governance_admin,
+    approvals,
 )
 from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
 
@@ -56,6 +57,11 @@ class TicketUpdate(BaseModel):
     ticket_type: Optional[str] = None
     status: Optional[str] = None
     agent_group: Optional[str] = None
+    # §1 affected-CI linkage (agents set/clear it at triage). Explicit null clears,
+    # so the route below dumps with exclude_unset (not exclude_none) to preserve it.
+    ci_id: Optional[int] = None
+    business_service_id: Optional[int] = None
+    support_group_code: Optional[str] = None
 
 
 class AssignBody(BaseModel):
@@ -76,6 +82,20 @@ class TicketCreate(BaseModel):
     department_id: Optional[int] = None    # AVA net-new: multi-department intake
     assigned_agent: Optional[str] = None   # §1c explicit assignee at create (agent email)
     team: Optional[str] = None             # explicit Team (by name) picked in the form
+    # ITSM §0/§2: let the agent console raise ANY process (not just the default
+    # incident) and type it. process is set-once; impact/urgency feed the priority
+    # matrix; change_type/change_risk drive the CAB-vs-auto-approve routing
+    # (approvals.requirements_for_change). create_ticket already honours all of
+    # these via _extension_kwargs — they were just not reachable from this form.
+    process: Optional[str] = None
+    impact: Optional[str] = None
+    urgency: Optional[str] = None
+    change_type: Optional[str] = None
+    change_risk: Optional[str] = None
+    # §1 affected-CI linkage set at create (agent triage; requesters don't pick CIs)
+    ci_id: Optional[int] = None
+    business_service_id: Optional[int] = None
+    support_group_code: Optional[str] = None  # ITIL support group → routes to its mapped team
 
 
 class SavedReplyBody(BaseModel):
@@ -108,7 +128,14 @@ def meta(db: Session = Depends(get_db), _: bool = Depends(require_view)):
 
 @router.get("/tickets/{name}")
 def ticket_detail(name: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
-    return tickets.get_detail(db, tenant_id(db), name)
+    tid = tenant_id(db)
+    detail = tickets.get_detail(db, tid, name)
+    # Agent CAB read surface (flow #4): attach the approval + vote tally so the
+    # detail view can show quorum progress / who voted, not just the buttons.
+    t = tickets._get_ticket(db, tid, name)
+    if t is not None:
+        detail["approval"] = approvals.approval_detail(db, tid, t.id)
+    return detail
 
 
 @router.post("/tickets")
@@ -146,7 +173,7 @@ def reply_ticket(name: str, body: ReplyBody, db: Session = Depends(get_db),
 @router.post("/tickets/{name}/update")
 def update_ticket(name: str, body: TicketUpdate, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_edit)):
-    return tickets.update(db, tenant_id(db), name, body.model_dump(exclude_none=True),
+    return tickets.update(db, tenant_id(db), name, body.model_dump(exclude_unset=True),
                           actor_email=current_user.email)
 
 
@@ -165,6 +192,18 @@ def agents(db: Session = Depends(get_db), _: bool = Depends(require_view)):
 @router.get("/teams")
 def teams(db: Session = Depends(get_db), _: bool = Depends(require_view)):
     return people.list_teams(db, tenant_id(db))
+
+
+@router.get("/support-groups")
+def support_groups(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+    """Light list for the ticket-form support-group picker: code, name, and whether
+    the group is mapped to a team (Governance → Support groups owns the mapping)."""
+    tid = tenant_id(db)
+    rows = (db.query(HDSupportGroupMap)
+            .filter(HDSupportGroupMap.tenant_id == tid)
+            .order_by(HDSupportGroupMap.code.asc()).all())
+    return {"support_groups": [
+        {"code": g.code, "name": g.name, "mapped": g.team_id is not None} for g in rows]}
 
 
 @router.get("/customers")
@@ -245,4 +284,5 @@ helpdesk_native_router.include_router(portal.router)                        # /h
 helpdesk_native_router.include_router(attachments.router)                   # /helpdesk/tickets/{id}/attachments + download (persisted files)
 helpdesk_native_router.include_router(catalogue_admin.router)                # /helpdesk/admin/catalogue (service catalogue CRUD)
 helpdesk_native_router.include_router(cmdb_admin.router)                     # /helpdesk/admin/cmdb (CMDB CRUD + graph)
+helpdesk_native_router.include_router(cmdb_sync.router)                      # /helpdesk/admin/cmdb (inventory sync + sync-status + /cis/{id}/software)
 helpdesk_native_router.include_router(governance_admin.router)               # /helpdesk/admin/governance (priority/SLA/change/CAB/transitions/categories/org)

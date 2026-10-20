@@ -6,18 +6,19 @@
  * Items waiting on THIS user's sign-off (service-request approvals and CAB
  * votes). Approve / Reject with an optional comment.
  *
- * Backend (PLACEHOLDER — not in portal.py yet; scoped server-side to the
- * signed-in approver, never trusting a client-supplied identity):
+ * Backend (live in portal.py; scoped server-side to the signed-in approver,
+ * never trusting a client-supplied identity):
  *   GET  /helpdesk/portal/my-approvals
  *        -> { approvals: [{ id, kind: "request"|"cab"|"ecab", ticket_name, subject,
  *                           requested_by?, opened_at?, required_quorum?, approve_count?,
- *                           description?, risk?, cost? }] }
+ *                           description?, process?, ci?, risk?, cost? }] }
+ *        Context (description/ci/risk/cost) is included so the approver can decide
+ *        WITHOUT opening the requester-owned ticket (which is own-ticket gated).
  *   POST /helpdesk/portal/approvals/{id}/vote   body { decision: "approve"|"reject", comment? }
  *        -> updated approval (wraps approvals.cast_vote with approver = current user)
  */
 import { useState } from "react";
-import Link from "next/link";
-import { ShieldCheck, ThumbsUp, ThumbsDown, Clock, User, CheckCircle2, X } from "lucide-react";
+import { ShieldCheck, ThumbsUp, ThumbsDown, Clock, User, CheckCircle2, X, Server } from "lucide-react";
 import { Avatar, Chip, ErrorBanner, Loading, PageHeader, RefreshBtn, timeAgo, useHd } from "../../_ui";
 import { Btn, Modal, Field, Textarea, FormError, hdCall } from "../../_admin";
 
@@ -145,14 +146,18 @@ export default function MyApprovals() {
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Cost: {String(a.cost)}</span>
                       )}
                     </div>
-                    <Link
-                      href={`/helpdesk/portal/my-requests/${encodeURIComponent(String(a.ticket_name))}`}
-                      className="mt-1.5 block text-[15px] font-semibold text-[#0F172A] hover:text-[#005B96] focus-visible:outline-none focus-visible:underline"
-                    >
+                    {/* Not a link: the request detail is owner-gated and an approver
+                        is never the raiser (SoD), so the context is shown inline instead. */}
+                    <div className="mt-1.5 text-[15px] font-semibold text-[#0F172A]">
                       {a.subject || "(no subject)"}
-                    </Link>
+                    </div>
                     {a.description && (
-                      <p className="mt-1 line-clamp-2 text-[13px] text-slate-500">{a.description}</p>
+                      <p className="mt-1 line-clamp-3 text-[13px] text-slate-500">{a.description}</p>
+                    )}
+                    {a.ci?.name && (
+                      <p className="mt-1 inline-flex items-center gap-1.5 text-[12px] text-[#64748B]">
+                        <Server size={12} className="text-slate-400" /> {a.ci.name}
+                      </p>
                     )}
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-[#64748B]">
                       {a.requested_by && (

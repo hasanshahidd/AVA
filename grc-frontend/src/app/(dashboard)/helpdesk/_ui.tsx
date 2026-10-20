@@ -35,9 +35,21 @@ export function Chip({ value, map = STATUS_CHIP }: { value?: string | null; map?
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[key(value)] || "bg-slate-100 text-slate-600"}`}>{value}</span>;
 }
 
+/**
+ * Parse an API timestamp as UTC. The backend emits naive UTC ISO strings with
+ * no zone (e.g. "2026-10-19T09:12:03.123"); `new Date()` would read those as the
+ * browser's LOCAL time, so a just-now sync shows hours off. Append "Z" when the
+ * string carries no explicit zone (no trailing Z and no ±hh:mm offset).
+ */
+export function utcDate(iso?: string | null): Date {
+  if (!iso) return new Date(NaN);
+  const s = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(s);
+}
+
 export function timeAgo(iso?: string | null): string {
   if (!iso) return "—";
-  const t = new Date(iso).getTime();
+  const t = utcDate(iso).getTime();
   if (isNaN(t)) return "—";
   const d = (Date.now() - t) / 1000;
   if (d < 60) return "just now";
@@ -139,7 +151,7 @@ export const Loading = ({ what }: { what: string }) => <div className="py-20 tex
 /** SLA indicator: countdown to a due date, red when breached. */
 export function slaState(due?: string | null, done?: boolean): { label: string; cls: string } {
   if (!due) return { label: "—", cls: "text-slate-300" };
-  const t = new Date(due).getTime();
+  const t = utcDate(due).getTime();
   if (isNaN(t)) return { label: "—", cls: "text-slate-300" };
   if (done) return { label: "Met", cls: "text-emerald-600" };
   const m = Math.round((t - Date.now()) / 60000);
@@ -178,7 +190,7 @@ export function TimelineItem({ m }: { m: { type?: string; sender?: string; conte
   }
   const internal = /comment|note/i.test(m.type || "");
   const sent = /sent/i.test(m.type || "");
-  const d = m.date && !isNaN(new Date(m.date).getTime()) ? new Date(m.date).toLocaleString() : "";
+  const d = m.date && !isNaN(utcDate(m.date).getTime()) ? utcDate(m.date).toLocaleString() : "";
   const box = internal ? "border-amber-200 bg-amber-50" : sent ? "border-indigo-100 bg-indigo-50/60" : "border-slate-200 bg-white";
   return (
     <div className="flex gap-3">

@@ -449,15 +449,46 @@ def compute_sla_block(db: Session, ticket) -> dict:
 # (Business-hours-window math stays the Frappe engine's job when a policy exists.)
 
 def _itsm_target(db: Session, ticket):
-    """The ingested SLA target matching this ticket's process + priority, or None."""
+    """The ingested SLA target that drives this ticket's clock, or None.
+
+    Matching is robust to the ingested sheet's shape. The bug it fixes: only the
+    incident rows are keyed by priority_code (P1–P5); the service_request / change
+    / problem rows are keyed by process-specific labels with a NULL priority_code,
+    so a priority-code-only match stranded every non-incident ticket — the ticket
+    carried a real priority (code P1–P5) that no row's NULL code equalled, so
+    `_itsm_target` returned None and the ticket got no response/resolution due
+    date (portal: "As soon as we can"). Resolution order:
+      1. exact priority_code                    — incident P1–P5 (unchanged);
+      2. priority_label == the ticket priority's name/level — e.g. a problem
+         ticket with priority 'High' matches the problem 'High' tier;
+      3. per-process default — the first row that carries a resolution clock,
+         else the lowest-sort_order row — so a process whose rows are not
+         priority-keyed (service_request 'Standard', change 'Normal') still gets
+         its baseline tier instead of nothing.
+    """
     process = (ticket.process or "incident").lower()
+    rows = (db.query(HDSLATarget)
+            .filter(HDSLATarget.tenant_id == ticket.tenant_id,
+                    func.lower(HDSLATarget.process) == process)
+            .order_by(HDSLATarget.sort_order.asc().nullslast(),
+                      HDSLATarget.id.asc())
+            .all())
+    if not rows:
+        return None
     code = ticket.priority.code if ticket.priority else None
-    q = (db.query(HDSLATarget)
-         .filter(HDSLATarget.tenant_id == ticket.tenant_id,
-                 func.lower(HDSLATarget.process) == process))
     if code:
-        return q.filter(HDSLATarget.priority_code == code).first()
-    return q.first()
+        for r in rows:
+            if r.priority_code == code:
+                return r
+    if ticket.priority:
+        labels = {v.lower() for v in (ticket.priority.name, ticket.priority.level) if v}
+        for r in rows:
+            if r.priority_label and r.priority_label.lower() in labels:
+                return r
+    for r in rows:
+        if r.resolution_minutes:
+            return r
+    return rows[0]
 
 
 def _itsm_agreement_status(ticket, now: datetime) -> None:

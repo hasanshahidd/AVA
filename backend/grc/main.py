@@ -279,6 +279,24 @@ app.include_router(admin_ai_usage_router)
 def on_startup():
     init_master_db()
 
+    # Help Desk ITSM schema self-heal: the ORM selects columns (process, ci_id,
+    # escalation_reason, …) that older tenant DBs lack, so ticket reads would 500
+    # until someone ran POST /helpdesk/itsm/seed. Idempotent ADD COLUMN IF NOT
+    # EXISTS per tenant; one tenant failing never blocks startup or the others.
+    if os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in ("1", "true", "yes", "on"):
+        import logging as _logging
+        try:
+            from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
+            from grc.modules.helpdesk_native.itsm_seed import _add_columns
+            for _tid, _slug, _sess in iter_tenant_sessions():
+                try:
+                    _add_columns(_sess)
+                except Exception:  # noqa: BLE001
+                    _sess.rollback()
+                    _logging.getLogger(__name__).warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
+        except Exception:  # noqa: BLE001
+            _logging.getLogger(__name__).warning("helpdesk schema sync skipped", exc_info=True)
+
     # Ava: compliance schema self-heal removed along with the compliance module.
 
     _disable_embedded = os.getenv("DISABLE_EMBEDDED_WORKFLOW_RUNTIME", "").strip().lower()

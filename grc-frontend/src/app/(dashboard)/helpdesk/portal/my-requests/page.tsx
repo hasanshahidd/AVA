@@ -58,6 +58,9 @@ export default function MyRequests() {
                   <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(t.name)}`} className="font-medium text-[#0F172A] hover:text-[#005B96]">
                     {t.subject || "(no subject)"}
                   </Link>
+                  {t.ci?.name && (
+                    <span className="mt-0.5 block text-[11px] text-[#94A3B8]">Asset: {t.ci.name}</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5"><Chip value={friendly(t.status)} /></td>
                 <td className="px-4 py-2.5">

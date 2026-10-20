@@ -52,6 +52,16 @@ def db():
     s.close()
 
 
+@pytest.fixture
+def seed_sample_cis(monkeypatch):
+    """Opt in to the workbook's illustrative sample_cis / sample_ci_relationships.
+    They are OFF by default (demo data must not flow into the CMDB — see
+    test_sample_cis_blocked_by_default); the tests that exercise the CI
+    graph/relationship import logic flip the flag on explicitly."""
+    import grc.modules.helpdesk_native.itsm_import as mod
+    monkeypatch.setattr(mod, "SEED_SAMPLE_CIS", True)
+
+
 def counts(db):
     return {m.__tablename__: db.query(m).count() for m in CATALOGUE}
 
@@ -204,7 +214,7 @@ def small_bundle():
 
 
 # --- (a) idempotency ----------------------------------------------------------------
-def test_reimport_same_bundle_is_idempotent(db):
+def test_reimport_same_bundle_is_idempotent(db, seed_sample_cis):
     b = small_bundle()
     first = import_bundle(db, TENANT, b, "u@x.com")
     assert first.status == "applied" and first.imported_at is not None
@@ -237,7 +247,7 @@ def test_changed_row_updates_in_place_and_restamps(db):
     assert db.query(HDBusinessService).count() == 2
 
 
-def test_every_upserted_row_is_stamped_with_its_batch(db):
+def test_every_upserted_row_is_stamped_with_its_batch(db, seed_sample_cis):
     batch = import_bundle(db, TENANT, small_bundle())
     for m in CATALOGUE:
         if not hasattr(m, "source_batch_id") or m in (HDTicketPriority, HDTicketStatus):
@@ -265,7 +275,7 @@ def test_dangling_ref_fails_closed_and_commits_nothing(db):
     assert any(e["ref"] == "SVC-9999" and e["entity"] == "request_items" for e in errs)
 
 
-def test_collects_every_dangling_ref_not_just_the_first(db):
+def test_collects_every_dangling_ref_not_just_the_first(db, seed_sample_cis):
     b = small_bundle()
     b["entities"]["technical_services"][0]["supports_business_service_id"] = "SVC-0001, SVC-8888"
     b["entities"]["sample_ci_relationships"].append(
@@ -315,7 +325,7 @@ def test_many_to_many_dependencies_explode(db):
     assert db.query(HDServiceDependency).count() == 3
 
 
-def test_ci_graph_and_service_realisation(db):
+def test_ci_graph_and_service_realisation(db, seed_sample_cis):
     import_bundle(db, TENANT, small_bundle())
     # CI->CI edge persisted; CI->service (REALISES) carried on the CI, not as an edge
     assert db.query(HDCIRelationship).count() == 1
@@ -326,6 +336,23 @@ def test_ci_graph_and_service_realisation(db):
     assert db.get(HDCIType, vm.parent_id).code == "CIT-SERVER"
     attr = db.query(HDCIAttribute).filter_by(ci_type_id=vm.id).one()
     assert attr.datatype == "enum" and attr.required is True and attr.options == ["Windows", "Linux"]
+
+
+def test_sample_cis_blocked_by_default(db):
+    """Owner fix / regression lock: the workbook's sample_cis + sample_ci_relationships
+    are DEMO data and must NOT flow into the CMDB under the default
+    (SEED_SAMPLE_CIS=False). Real CIs come from AVA inventory sync, not the workbook.
+    The CI *types*, *attributes* and *relationship types* ARE standard CMDB
+    scaffolding and must still be seeded."""
+    batch = import_bundle(db, TENANT, small_bundle())
+    assert batch.status == "applied"
+    # no demo CI instances or CI<->CI relationships leaked in
+    assert db.query(HDConfigurationItem).count() == 0
+    assert db.query(HDCIRelationship).count() == 0
+    # standard CMDB scaffolding still present
+    assert db.query(HDCIType).count() == 2
+    assert db.query(HDCIAttribute).count() == 1
+    assert db.query(HDCIRelationshipType).count() == 2
 
 
 # --- (d) priorities -------------------------------------------------------------------
