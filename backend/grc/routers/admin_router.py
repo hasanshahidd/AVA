@@ -941,16 +941,29 @@ def list_roles(
 
     result = []
     for role in roles:
+        # Connector discovery once wrote a connected database's OWN roles
+        # (pg_read_all_settings, pg_stat_scan_tables, 'DB Superuser', …) into
+        # grc_roles tagged 'Imported from connector'. Those are Postgres roles,
+        # not assignable app RBAC roles — keep them out of the role picker.
+        if (role.description or "").strip() == "Imported from connector":
+            continue
+
         perms = tenant_db.query(Permission).join(RolePermission).filter(
             RolePermission.role_id == role.id
         ).all()
         user_count = tenant_db.query(UserRole).filter(UserRole.role_id == role.id).count()
-        
+
+        # The Administrator role bypasses per-permission checks (grants *:*:*), so it
+        # legitimately holds zero RolePermission rows. Flag it so the UI shows "full
+        # access" instead of a misleading "0 permissions".
+        bypasses_all = bool(role.is_system_role) and role.name == "Administrator"
+
         result.append({
             "id": role.id,
             "name": role.name,
             "description": role.description,
             "is_system_role": role.is_system_role,
+            "bypasses_all": bypasses_all,
             "user_count": user_count,
             "permissions": [p.name for p in perms],
             "created_at": role.created_at.isoformat() if role.created_at else None
