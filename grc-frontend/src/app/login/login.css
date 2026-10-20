@@ -16,6 +16,10 @@
 @keyframes lgGlow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
 /* transform-only (animating `left` re-layouts every frame — the stutter) */
 @keyframes lgBeam { 0% { transform: translateX(-130px); } 100% { transform: translateX(82rem); } }
+/* content cross-fade when the glass panels swap Sign in ↔ Register */
+@keyframes lgSwap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* slow drift for the brand-panel radar echo */
+@keyframes lgDrift { 0%, 100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-10px,0); } }
 
 .lg-fade { opacity: 0; animation: lgFadeUp .7s ease both; }
 .lg-logo-spin { transform-origin: center; animation: lgSweep 5s linear infinite; }
@@ -25,6 +29,8 @@
 .lg-marq-slow { animation: lgMarq 40s linear infinite; }
 .lg-marq-chips { animation: lgMarq 24s linear infinite; }
 .lg-glow { animation: lgGlow 7s ease-in-out infinite; }
+.lg-swap { animation: lgSwap .5s ease both; }
+.lg-drift { animation: lgDrift 9s ease-in-out infinite; }
 .lg-beam { animation: lgBeam 6.5s linear infinite; }
 .lg-mask { -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); }
 .lg-blip { transform-box: fill-box; transform-origin: center; animation: lgBlip 3.2s ease-in-out infinite; }

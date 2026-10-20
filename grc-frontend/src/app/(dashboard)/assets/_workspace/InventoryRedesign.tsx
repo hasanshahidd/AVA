@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { registrableDomain } from '@/lib/domains';
+import { registrableDomain, rollupCounts, isExternalAsset } from '@/lib/domains';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
@@ -37,7 +37,7 @@ interface Props {
   hideHead?: boolean;
 }
 
-const isExt = (a: ITAsset) => !!(a.internet_facing || a.origin_source === 'easm' || a.last_seen_source === 'external');
+const isExt = (a: ITAsset) => isExternalAsset(a);  // single source of truth (@/lib/domains)
 const hasCia = (a: ITAsset) => !!(a.confidentiality_rating && a.integrity_rating && a.availability_rating);
 const isStale = (a: ITAsset) => (a.last_seen_at ? (Date.now() - new Date(a.last_seen_at).getTime()) / 864e5 > 30 : false);
 const critOf = (a: ITAsset) => (a.criticality || '').toLowerCase();
@@ -98,10 +98,15 @@ export default function InventoryRedesign(p: Props) {
   const openVulns: number = ov.data?.counts?.open_vulnerabilities ?? 0;
 
   const c = useMemo(() => {
-    const total = assets.length;
-    const external = assets.filter(isExt).length;
+    // Canonical roll-up: one registrable (apex) domain = ONE external asset
+    // (subdomains folded in), internal assets flat — the shared rule every
+    // dashboard uses, so these headline counts reconcile with them. `total` is
+    // the rolled-up estate size; the flat per-row count still drives the table.
+    const roll = rollupCounts(assets, isExt, dnsName);
+    const total = roll.total;
+    const external = roll.external;
     return {
-      total, external, internal: total - external,
+      total, external, internal: roll.internal,
       critical: assets.filter((a) => critOf(a) === 'critical').length,
       cde: assets.filter((a) => a.cde_environment).length,
       internet: assets.filter((a) => a.internet_facing).length,
@@ -304,7 +309,9 @@ export default function InventoryRedesign(p: Props) {
               )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '1px solid var(--bd2)' }}>
                 <h3 style={{ fontSize: 13.5 }}>Asset Register</h3>
-                <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}><b className="num" style={{ color: 'var(--sec)' }}>{rows.length}</b> shown · {c.total} total</span>
+                {/* "shown" counts collapsed register units (an apex + its nested subs = one),
+                    so it reconciles with the rolled-up total — not the flat child-row count. */}
+                <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}><b className="num" style={{ color: 'var(--sec)' }}>{orderedRows.filter((r) => !childApexOf.has(r.id)).length}</b> shown · {c.total} total</span>
               </div>
               <div style={{ overflow: 'auto', maxHeight: '58vh' }}>
                 {mode === 'uncredential' ? (

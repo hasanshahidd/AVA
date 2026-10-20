@@ -86,7 +86,12 @@ export default function AssetsPage() {
   const { data: assets, isLoading, error } = useQuery({
     queryKey: ['assets'],
     queryFn: async () => {
-      const response = await assetsApi.getAll();
+      // Load the WHOLE register, not the backend's default first page (limit=100).
+      // The register rolls external subdomains up under their apex and shows a
+      // "N subs" badge + a total; capped at 100 rows it under-counted both (e.g.
+      // superior.edu.pk read ~90 subs instead of 234, total read "100"). A large
+      // explicit limit returns every managed asset so the roll-up is accurate.
+      const response = await assetsApi.getAll({ limit: 100000 });
       return response.data;
     },
   });

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Bot, Building2, ClipboardCheck, Globe, KeyRound, Radar, Target } from 'lucide-react';
 import type { LicenseSummary } from '@/lib/api';
+import { rollupCounts, isExternalAsset as canonIsExternal } from '@/lib/domains';
 import { AgeMatrix, BarList, PartLegend, StackBar, type BarRow, type Part } from './charts';
 import {
   BAND, Card, Empty, Eyebrow, Figure, GRADE, Loading, Pill, SEV, SEV_ORDER, Skel, T, Unavailable,
@@ -36,6 +37,9 @@ export type ExecSummary = {
 };
 export type RiskAsset = {
   id: number; name: string; host_name?: string | null; asset_type?: string | null; mode?: string | null;
+  // Classification signals (from the risk payload) so isExternalAsset reads the real rule.
+  internet_facing?: boolean | null; is_internet_facing?: boolean | null; origin_source?: string | null; last_seen_source?: string | null;
+  is_external?: boolean | null; owner_id?: number | null; cde_environment?: boolean | null;
   score: number | null; band: { label: string; description?: string }; known_dimensions?: string[]; contributions?: Record<string, number>;
 };
 export type RiskDash = {
@@ -65,7 +69,9 @@ export type Devices = {
 export type Ctem = { scopes?: { id: number; name: string; assets: number; findings: number; dangerous: number; cycleOpen: boolean; cycleNo: number; cycleDay: number | null }[] };
 
 export const AGES = ['0-7 days', '8-30 days', '31-90 days', '90+ days'];
-export const isExternalAsset = (a: RiskAsset) => a.mode === 'easm' || /external|easm/i.test(a.asset_type || '');
+// Single source of truth — delegates to @/lib/domains (internet-facing / EASM /
+// outside-in). Re-exported here so existing importers (dashboard page) are unchanged.
+export const isExternalAsset = (a: RiskAsset) => canonIsExternal(a);
 const sevParts = (by: Record<Sev, number>, keepZero = true): Part[] =>
   SEV_ORDER.map((s) => ({ key: s, label: SEV[s].label, n: by?.[s] ?? 0, c: SEV[s].c })).filter((p) => keepZero || p.n > 0);
 
@@ -403,12 +409,16 @@ export function RiskDrivers({ risk }: { risk: Qs<RiskDash> }) {
   else {
     const ext = d.assets.filter(isExternalAsset);
     const int = d.assets.filter((a) => !isExternalAsset(a));
+    // Count badges use the canonical roll-up (one apex domain = one external
+    // asset) so they reconcile with the register + the risk gauge; the driver
+    // bars still read per measured asset (they are averages, not counts).
+    const roll = rollupCounts(d.assets, isExternalAsset);
     const extDims = Array.from(new Set(ext.flatMap((a) => a.known_dimensions ?? [])));
     const intDims = Object.keys(d.weights ?? {}).length ? Object.keys(d.weights ?? {}) : Array.from(new Set(int.flatMap((a) => a.known_dimensions ?? [])));
     const weights = Object.entries(d.weights ?? {}).sort((a, b) => b[1] - a[1]).map(([k, w]) => `${DIM[k] ?? k} ${Math.round(w * 100)}%`).join(' · ');
     const groups = [
-      { key: 'ext' as const, label: 'External assets', count: ext.length, rows: drivers(ext, extDims), note: 'outside-in model', tip: 'Fixed outside-in scoring model for internet-facing assets' },
-      { key: 'int' as const, label: 'Internal assets', count: int.length, rows: drivers(int, intDims), note: 'tunable weights', tip: weights ? `Tunable weights: ${weights}` : undefined },
+      { key: 'ext' as const, label: 'External assets', count: roll.external, rows: drivers(ext, extDims), note: 'outside-in model', tip: 'Fixed outside-in scoring model for internet-facing assets' },
+      { key: 'int' as const, label: 'Internal assets', count: roll.internal, rows: drivers(int, intDims), note: 'tunable weights', tip: weights ? `Tunable weights: ${weights}` : undefined },
     ].filter((g) => g.rows.length && (g.key === 'ext' ? ext.length : int.length));
     const max = Math.max(1, ...groups.flatMap((g) => g.rows.map((r) => r.n ?? 0)));
     body = (

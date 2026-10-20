@@ -1,6 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import AuthGuard from '@/components/AuthGuard';
+import RouteGuard from '@/components/RouteGuard';
 import IdleLogout from '@/components/IdleLogout';
 import NavProgress from '@/components/layout/NavProgress';
 import { GuideProvider, GuidePanel } from '@/components/guide';
@@ -23,7 +24,7 @@ export default function DashboardLayout({
                 main's overflow clip and stretch the DOCUMENT — a second scrollbar plus a
                 white void under the shell. */}
             <main className="relative flex-1 overflow-auto bg-[var(--color-subtle)] p-4 lg:p-5 scrollbar-thin">
-              {children}
+              <RouteGuard>{children}</RouteGuard>
             </main>
           </div>
           {/* Idle-timeout sentinel — reads the tenant's policy and logs the

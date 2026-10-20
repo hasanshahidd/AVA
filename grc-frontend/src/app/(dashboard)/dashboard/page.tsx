@@ -28,6 +28,7 @@ import {
   AttackSurface, CisCompliance, CtemProgramme, InventoryHealth, LicenseCompliance, PenTest, RiskDrivers, TopAssets, VulnExposure, busyOf, isExternalAsset,
   type AssetsDash, type CisOverview, type Ctem, type Devices, type Easm, type ExecSummary, type Inventory, type Qs, type RiskDash,
 } from './_components/lenses';
+import { dnsName, externalUnitKey } from '@/lib/domains';
 
 type Trends = {
   buckets?: (string | { date: string })[];
@@ -302,9 +303,25 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
       const k = xs.filter((a) => a.score != null);
       return k.length ? k.reduce((t, a) => t + (a.score as number), 0) / k.length : null;
     };
-    const ext = d.assets.filter(isExternalAsset), int = d.assets.filter((a) => !isExternalAsset(a));
+    const int = d.assets.filter((a) => !isExternalAsset(a));
+    // External assets roll up by registrable (apex) domain — ONE domain = one
+    // asset — so the count matches the register and a domain's 200 subdomains
+    // don't dominate the mean. Per the register's domain rule the apex takes the
+    // WEAKEST (highest-risk) score among its names; we then average those.
+    const extUnits = new Map<string, number | null>();
+    let extHosts = 0;
+    for (const a of d.assets) {
+      if (!isExternalAsset(a)) continue;
+      extHosts += 1;
+      const k = externalUnitKey(a, dnsName(a));
+      const cur = extUnits.get(k);
+      if (a.score != null) extUnits.set(k, cur == null ? a.score : Math.max(cur, a.score as number));
+      else if (!extUnits.has(k)) extUnits.set(k, null);
+    }
+    const extScores = Array.from(extUnits.values()).filter((v): v is number => v != null);
+    const extAvg = extScores.length ? extScores.reduce((t, v) => t + v, 0) / extScores.length : null;
     const top = d.assets.filter((a) => a.score != null).sort((a, b) => (b.score as number) - (a.score as number)).slice(0, 4);
-    return { ext: ext.length, extAvg: avg(ext), int: int.length, intAvg: avg(int), top };
+    return { ext: extUnits.size, extHosts, extAvg, int: int.length, intAvg: avg(int), top };
   }, [d]);
   const band: Band = toBand(null, s?.avg_score);
   const tone = BAND[band];
@@ -333,7 +350,7 @@ function PostureHero({ risk, assetsN }: { risk: Qs<RiskDash>; assetsN: number | 
         <div className="mt-1 flex items-center gap-2"><Pill tone={tone} /><span className="text-[11.5px] text-[#64748B]">{tone.desc}</span></div>
         {x && (
           <p className="m-0 mt-2 text-center text-[11px] leading-[1.5] text-[#64748B]">
-            External {nfmt(x.ext)} · avg {x.extAvg == null ? '—' : x.extAvg.toFixed(1)}<br />Internal {nfmt(x.int)} · avg {x.intAvg == null ? '—' : x.intAvg.toFixed(1)}
+            External {nfmt(x.ext)}{x.extHosts > x.ext ? ` · ${nfmt(x.extHosts)} hosts` : ''} · avg {x.extAvg == null ? '—' : x.extAvg.toFixed(1)}<br />Internal {nfmt(x.int)} · avg {x.intAvg == null ? '—' : x.intAvg.toFixed(1)}
           </p>
         )}
       </div>

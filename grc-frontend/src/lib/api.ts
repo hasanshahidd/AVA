@@ -3324,6 +3324,20 @@ export const reportingApi = {
     format: 'csv' | 'xlsx' | 'pdf' | 'html';
     asset_categories?: string[];
   }) => apiClient.post('/reporting/export', body, { responseType: 'blob' }),
+  /** Preview rows (first page) + the exact filtered total, through the same engine as export. */
+  query: (body: {
+    dataset: string; filters?: ReportFilter[]; logic?: 'AND' | 'OR'; limit?: number;
+    asset_categories?: string[];
+  }) => apiClient.post<{ rows: Record<string, unknown>[]; total: number }>('/reporting/query', body),
+  /** Grouped row counts over the whole filtered set (not just the preview page). */
+  countBy: (body: {
+    dataset: string; group_by: string[]; filters?: ReportFilter[]; logic?: 'AND' | 'OR';
+    asset_categories?: string[];
+  }) =>
+    apiClient.post<{ rows: Record<string, unknown>[]; warnings?: { skipped_group_by?: string[] } }>(
+      '/reporting/aggregate',
+      { ...body, measures: [{ id: 'n', fn: 'count' }] },
+    ),
 };
 
 export const enrichedDashboardApi = {
