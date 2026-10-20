@@ -36,7 +36,7 @@ from ...models import (
     HDServiceLevelAgreement,
     HDSettings,
 )
-from .common import tenant_id, require_view, require_settings_manage
+from .common import tenant_id, require_view, require_masterdata_view, require_settings_manage
 
 router = APIRouter()
 
@@ -195,7 +195,7 @@ def _validate_status_update(db: Session, tid: int, row: HDTicketStatus, data: di
 
 
 @router.get("/ticket-statuses")
-def list_ticket_statuses(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_ticket_statuses(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDTicketStatus)
@@ -282,7 +282,7 @@ def _get_type(db: Session, tid: int, tyid: int) -> HDTicketType:
 
 
 @router.get("/ticket-types")
-def list_ticket_types(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_ticket_types(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDTicketType)
@@ -320,7 +320,7 @@ def _get_priority(db: Session, tid: int, pid: int) -> HDTicketPriority:
 
 
 @router.get("/priorities")
-def list_priorities(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_priorities(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDTicketPriority)
@@ -489,7 +489,7 @@ def _replace_fields(db: Session, row: HDTicketTemplate, fields: List[TemplateFie
 
 
 @router.get("/ticket-templates")
-def list_ticket_templates(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_ticket_templates(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDTicketTemplate)
@@ -595,7 +595,7 @@ def _validate_rating(rating) -> None:
 
 
 @router.get("/feedback-options")
-def list_feedback_options(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_feedback_options(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDTicketFeedbackOption)

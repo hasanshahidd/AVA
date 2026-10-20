@@ -14,10 +14,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import Depends
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from ...models import GRCUser, Tenant
+from ...models import GRCUser, Tenant, get_db
 from ...routers.auth_router import require_auth, require_tenant_permission
 
 # RBAC — mirror the app's "<area>:<resource>:<action>" permission convention.
@@ -51,6 +51,38 @@ require_processes_view = require_tenant_permission("helpdesk:processes:view")
 require_tickets_assign = require_tenant_permission("helpdesk:tickets:assign")
 require_tickets_delete = require_tenant_permission("helpdesk:tickets:delete")
 require_tickets_create = require_tenant_permission("helpdesk:tickets:create")
+
+
+# Master-data reads (priorities, statuses, types, agents, teams, departments,
+# SLA, templates, feedback) are needed BOTH by an agent filling a ticket form
+# (tickets:view) AND by a settings-admin configuring the desk (settings:view).
+# A settings-only admin has no tickets:view, so gating these as tickets:view
+# locked it out of the very config it owns (the FE then showed the misleading
+# "engine not connected" error). Accept EITHER permission. This does NOT open
+# the ticket queue — /tickets and ticket detail keep require_view.
+def _require_any(*perms: str):
+    checkers = [require_tenant_permission(p) for p in perms]
+
+    def dep(
+        request: Request,
+        token: Optional[str] = Cookie(None, alias="grc_auth_token"),
+        authorization: Optional[str] = Header(None, alias="Authorization"),
+        db: Session = Depends(get_db),
+    ) -> bool:
+        last: Optional[HTTPException] = None
+        for check in checkers:
+            try:
+                return check(request=request, token=token, authorization=authorization, db=db)
+            except HTTPException as exc:
+                if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                    raise  # auth/idle failure, not a permission miss — surface it
+                last = exc
+        raise last or HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    return dep
+
+
+require_masterdata_view = _require_any("helpdesk:tickets:view", "helpdesk:settings:view")
 
 
 def current_user_email(user: GRCUser = Depends(require_auth)) -> str:

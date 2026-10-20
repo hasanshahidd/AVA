@@ -34,7 +34,7 @@ from . import (  # noqa: F401 (assignment used by tickets)
     portal, attachments, catalogue_admin, cmdb_admin, cmdb_sync, governance_admin,
     approvals, relations, ticket_cis, ticket_kb,
 )
-from .common import tenant_id, require_view, require_edit, require_tickets_assign, require_kb_author
+from .common import tenant_id, require_view, require_masterdata_view, require_edit, require_tickets_assign, require_kb_author
 
 router = APIRouter(prefix="/helpdesk", tags=["Help Desk (native)"])
 
@@ -194,17 +194,17 @@ def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
 
 # ─── people (stubs) ────────────────────────────────────────────────────────
 @router.get("/agents")
-def agents(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def agents(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     return people.list_agents(db, tenant_id(db))
 
 
 @router.get("/teams")
-def teams(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def teams(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     return people.list_teams(db, tenant_id(db))
 
 
 @router.get("/support-groups")
-def support_groups(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def support_groups(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     """Light list for the ticket-form support-group picker: code, name, and whether
     the group is mapped to a team (Governance → Support groups owns the mapping)."""
     tid = tenant_id(db)

@@ -137,9 +137,14 @@ export function useHd<T = any>(path: string) {
     try {
       const res = await apiClient.get(path);
       setData((res.data ?? null) as T | null);
-    } catch {
+    } catch (e: any) {
       setData(null);
-      setError("Couldn't load this data — the Help Desk engine may not be connected yet.");
+      const code = e?.response?.status;
+      setError(
+        code === 401 || code === 403
+          ? "You don't have permission to view this. Ask an administrator to grant access."
+          : "Couldn't load this data — the Help Desk engine may not be connected yet.",
+      );
     } finally { setLoading(false); }
   }, [path]);
   useEffect(() => { load(); }, [load]);

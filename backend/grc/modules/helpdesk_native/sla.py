@@ -36,7 +36,7 @@ from ...models import (
     HDTicketPriority,
     get_db,
 )
-from .common import iso, require_view, tenant_id
+from .common import iso, require_view, require_masterdata_view, tenant_id
 try:  # Agent-1 adds this to common.py; resolves at runtime, fallback pre-merge
     from .common import require_settings_manage
 except ImportError:  # pragma: no cover
@@ -1355,12 +1355,12 @@ config_router = APIRouter()
 
 
 @config_router.get("/sla")
-def list_sla_ep(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_sla_ep(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     return list_sla(db, tenant_id(db))
 
 
 @config_router.get("/sla/{name}")
-def get_sla_ep(name: str, db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def get_sla_ep(name: str, db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     return get_sla_config(db, tenant_id(db), name)
 
 
@@ -1377,13 +1377,13 @@ def update_sla_ep(name: str, body: SLAConfigIn, db: Session = Depends(get_db),
 
 
 @config_router.get("/holiday-lists")
-def list_holiday_lists_ep(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_holiday_lists_ep(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     return list_holiday_lists(db, tenant_id(db))
 
 
 @config_router.get("/holiday-lists/{name}")
 def get_holiday_list_ep(name: str, db: Session = Depends(get_db),
-                        _: bool = Depends(require_view)):
+                        _: bool = Depends(require_masterdata_view)):
     return get_holiday_list(db, tenant_id(db), name)
 
 

@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import HDDepartment, Team, HDTicketType, get_db
-from .common import require_settings_manage, require_view, tenant_id
+from .common import require_settings_manage, require_view, require_masterdata_view, tenant_id
 
 router = APIRouter(prefix="/helpdesk/departments", tags=["Help Desk (native)"])
 
@@ -77,7 +77,7 @@ def resolve_department_team(db: Session, tid: int, department_id: Optional[int])
 
 
 @router.get("")
-def list_departments(db: Session = Depends(get_db), _: bool = Depends(require_view)):
+def list_departments(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
     tid = tenant_id(db)
     rows = (
         db.query(HDDepartment)
