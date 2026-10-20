@@ -277,6 +277,14 @@ app.include_router(admin_ai_usage_router)
 
 @app.on_event("startup")
 def on_startup():
+    # Explicit "grc.main" logger (NOT getLogger(__name__)) so these lines reach the
+    # app's "grc"-tree handler even if this module ever loads as __main__. The ENTER
+    # line is the probe: if it is absent from the web process's journal, on_startup
+    # is not running there and no in-startup heal ever will.
+    import logging as _logging
+    _log = _logging.getLogger("grc.main")
+    _log.warning("AVA on_startup: running — helpdesk boot heal begins")
+
     init_master_db()
 
     # Help Desk ITSM boot heal, per tenant. TWO INDEPENDENT concerns, each with its
@@ -292,8 +300,6 @@ def on_startup():
     #     dept/governance heal only ever ran when seed_if_empty was invoked by hand).
     # Logs unconditionally (entered / tenant count / which ran) so a boot that heals
     # nothing is diagnosable instead of silent.
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
     _off = ("1", "true", "yes", "on")
     _schema_on = os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in _off
     _data_on = os.getenv("DISABLE_HELPDESK_DATA_SEED", "").strip().lower() not in _off
@@ -321,8 +327,8 @@ def on_startup():
                     except Exception:  # noqa: BLE001
                         _sess.rollback()
                         _log.warning("helpdesk data seed failed tenant=%s", _slug, exc_info=True)
-            _log.info("helpdesk boot heal: processed %d tenant(s) (schema_sync=%s data_seed=%s)",
-                      _n, _schema_on, _data_on)
+            _log.warning("helpdesk boot heal: processed %d tenant(s) (schema_sync=%s data_seed=%s)",
+                         _n, _schema_on, _data_on)
         except Exception:  # noqa: BLE001
             _log.warning("helpdesk boot heal skipped (setup failed)", exc_info=True)
 
