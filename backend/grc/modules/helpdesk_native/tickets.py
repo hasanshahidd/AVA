@@ -454,6 +454,20 @@ def _apply_status_change(db: Session, tid: int, ticket: HDTicket, new_status: HD
         except Exception:  # noqa: BLE001 — mail must never break the status change
             logger.warning("helpdesk.mail feedback hook failed", exc_info=True)
 
+        # Cross-module status sync: reflect a resolve/reopen into any vulnerability
+        # finding whose pushed ticket is this one (external_ticket_id == ticket.name).
+        # "resolved" advances the finding's remediation plan; "reopened" reactivates
+        # it. The vuln-side fn only flushes (no commit), so it's atomic with this
+        # status change. Lazy + non-fatal (never break the status change).
+        norm = ("resolved" if new_status.category == RESOLVED
+                else "reopened" if old_cat == RESOLVED else None)
+        if norm and ticket.name:
+            try:
+                from grc.services import itsm_service
+                itsm_service.reflect_native_ticket_status(db, tid, ticket.name, norm)
+            except Exception:  # noqa: BLE001
+                logger.warning("helpdesk: vuln link reflect failed (non-fatal)", exc_info=True)
+
 
 # ─── reads ───────────────────────────────────────────────────────────────────
 def list_tickets(db: Session, tid: int, status: Optional[str] = None,
