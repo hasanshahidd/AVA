@@ -559,17 +559,35 @@ def ensure_itsm_tables(db: Session) -> bool:
     tenant DB. New tenant DBs get them from Base.metadata.create_all; this is the
     idempotent equivalent for DBs that pre-date the models (checkfirst => no-op
     when a table already exists). Non-fatal on failure, like the other ensures."""
+    # Boot-path hardening: a prior boot step can leave the incoming session in an
+    # aborted txn. The old code committed first, which then RAISED on the aborted
+    # txn and was swallowed as a warning — so create_all never ran and all 27 ITSM
+    # tables were silently missing, while the later ALTERs (separate, post-rollback)
+    # still succeeded (columns present, tables absent). Rollback (always safe) to
+    # clear the txn, then run DDL on a FRESH isolated connection.
     try:
-        db.commit()  # release any open txn before DDL on a separate connection
-        Base.metadata.create_all(
-            bind=db.get_bind(),
-            tables=[m.__table__ for m in _ITSM_MODELS],
-            checkfirst=True,
-        )
-        return True
-    except Exception:  # noqa: BLE001 — a pre-existing/variant table is non-fatal
         db.rollback()
-        logger.warning("itsm_seed: ITSM foundation table create skipped", exc_info=True)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        bind = db.get_bind()
+        engine = bind.engine if hasattr(bind, "engine") else bind
+        with engine.begin() as conn:
+            Base.metadata.create_all(
+                bind=conn,
+                tables=[m.__table__ for m in _ITSM_MODELS],
+                checkfirst=True,
+            )
+        return True
+    except Exception:  # noqa: BLE001 — non-fatal to boot, but a real problem: log loud
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        logger.error(
+            "itsm_seed: ITSM foundation table create FAILED — grc_hd_* ITSM tables "
+            "(bridges/ci_type/business_service/change/problem) may be MISSING on this "
+            "tenant DB; run ensure_itsm_tables standalone to repair", exc_info=True)
         return False
 
 
