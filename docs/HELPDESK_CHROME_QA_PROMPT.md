@@ -38,16 +38,32 @@ Act as an ordinary employee with no agent rights:
 - Track a ticket, reply to an agent, self-serve via the Knowledge Base (does search/deflection surface the right articles?), approve a request where you're the approver, and leave feedback after resolution.
 - Probe isolation: try to reach agent/admin/cyber URLs directly and confirm you're blocked (both the screen and the data behind it).
 
-## Area 4 — Reporting  *(owned by the reporting / GRC session — fill this section)*
+## Area 4 — Reporting & Dashboards
 
-Reporting is a separate module owned by the reporting session. It must be exercised in depth:
-- Open **every** report and dashboard reachable from the Help Desk and the wider platform (ticket reports, the executive dashboard, trends, and each module's own report).
-- **Download each module's report in every format it offers** (PDF / CSV / XLSX / etc.) and actually open the downloaded file — check the **formatting and layout render correctly** (headers, columns, alignment, charts, page breaks, no CSS-mangled one-word-per-line text, no truncation).
-- Check the **trends** views: that the series are populated, the ranges are right, and the data isn't stale.
-- Check **cross-report number consistency** (the same ticket/asset counts agree across overview, tabs, dashboards and the exported files) and that nothing is cyber-only when it should include the Help Desk.
-- Report any contradiction, stale figure, broken export, or formatting defect.
+Act as a client validating reporting. Set things up yourself, use your judgment, report what works, what's confusing, and anything that 500s, mismatches, or renders wrong. Open the file/screen and check — don't assume.
 
-*(Reporting/GRC session: replace this section with the precise report surfaces, the export formats to check per module, and the known count-consistency checks — inventory 12-vs-6-vs-516, exec-dashboard scope, trends staleness, the report date bug.)*
+**A. Report Builder (/reports → Builder)**
+1. Builder = left controls rail + dashboard canvas on the right. Pick dataset "Help Desk Tickets" — canvas should auto-populate.
+2. Group by status, then priority, process, team, department (one at a time) — each renders a breakdown card (share %, counts). Apply a filter (status=Open), click Update, confirm canvas + counts refresh. Switch a card to Top-N, then Donut/Bars.
+3. Switch dataset to Assets, then Vulnerabilities, Discovered Devices, CIS, Pentest Findings — each loads its own columns/breakdowns.
+4. Confirm GRC datasets (risks, controls, evidence, vendors) do NOT appear in the dataset dropdown (Ava is cyber-only). Report any that do.
+
+**B. Exports — every format**
+For a built report (try it on Help Desk Tickets AND Assets AND Vulnerabilities): download CSV, XLSX, PDF, HTML. For EACH file, open it and verify: headers + columns correct and respecting your selected columns/filters; numbers match the screen; PDF/HTML layout renders — no text wrapping one word per line, no truncated columns, charts/tables intact, sane page breaks; no empty/garbled/failed download. Report any format that fails or looks wrong.
+
+**C. Dashboards & count consistency**
+Open the Inventory module and the exec/Performance dashboard and reconcile asset numbers across surfaces. These are DIFFERENT scopes BY DESIGN — verify each is internally consistent, not that they're all equal:
+- Inventory register total vs its left-nav filter chips: every chip (Infrastructure, Internet-facing, Unowned, Needs-CIA, EASM…) must be ≤ the register total and match the rows shown when clicked. A chip exceeding the total is a bug (recently fixed — confirm it's gone).
+- Inventory Overview shows a broader estate number (includes EASM/active) — a different scope than the managed register; confirm it reads sensibly, not that it equals the register.
+- Discovery shows raw scanned hosts (hundreds) — a separate pre-adoption view, expected to be much larger. Not a contradiction.
+- Exec/Performance dashboard: KPI tiles fill the row, gauges/grades render, MultiSelect filters (asset category, PCI scope) change the data. Confirm it's cyber-only — NO Help Desk ticket KPIs on it (by design); report any that appear. It scores only assessed assets, so its asset count may be lower than inventory — that's expected.
+
+**D. Saved, Scheduled, Trends**
+- Save a report, reload, confirm it returns with its config and the correct "Updated <today>" (a save made today must show today, not yesterday — recently fixed, confirm).
+- Open a saved report's Trends view: "As of <date>" should render a correct, readable date and the metric definitions should wrap normally (not one word per line — recently fixed, confirm). If trend data is several days stale, flag it (the daily snapshot may not be running).
+- Create a schedule (timed email is dormant until SMTP/celery — it should save, not necessarily send).
+
+Report anything that 500s, mismatches a source module, exports wrong, or is confusing to set up.
 
 ## Rules
 

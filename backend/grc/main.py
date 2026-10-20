@@ -279,35 +279,49 @@ app.include_router(admin_ai_usage_router)
 def on_startup():
     init_master_db()
 
-    # Help Desk ITSM schema self-heal: the ORM selects columns (process, ci_id,
-    # escalation_reason, …) that older tenant DBs lack, so ticket reads would 500
-    # until someone ran POST /helpdesk/itsm/seed. Idempotent ADD COLUMN IF NOT
-    # EXISTS per tenant; one tenant failing never blocks startup or the others.
-    if os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in ("1", "true", "yes", "on"):
-        import logging as _logging
+    # Help Desk ITSM boot heal, per tenant. TWO INDEPENDENT concerns, each with its
+    # own env opt-out (default on):
+    #   * schema self-heal (_add_columns) — idempotent ADD COLUMN / ensure-table so
+    #     the ORM's newer columns exist on older tenant DBs. Gated by
+    #     DISABLE_HELPDESK_SCHEMA_SYNC (some boxes disable it because the DDL is slow
+    #     or locking on boot).
+    #   * data heal (seed_if_empty) — seeds a fresh tenant and heals the governance
+    #     baseline + dedupes departments on every boot. Gated by its OWN
+    #     DISABLE_HELPDESK_DATA_SEED, NOT by the schema flag: disabling schema DDL
+    #     must not silently also disable data healing (that coupling is why the
+    #     dept/governance heal only ever ran when seed_if_empty was invoked by hand).
+    # Logs unconditionally (entered / tenant count / which ran) so a boot that heals
+    # nothing is diagnosable instead of silent.
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    _off = ("1", "true", "yes", "on")
+    _schema_on = os.getenv("DISABLE_HELPDESK_SCHEMA_SYNC", "").strip().lower() not in _off
+    _data_on = os.getenv("DISABLE_HELPDESK_DATA_SEED", "").strip().lower() not in _off
+    if not (_schema_on or _data_on):
+        _log.info("helpdesk boot heal: schema sync AND data seed both disabled by env; skipping")
+    else:
         try:
             from grc.modules.workflow_engine.services.trigger_dispatcher import iter_tenant_sessions
             from grc.modules.helpdesk_native.itsm_seed import _add_columns, seed_if_empty
+            _n = 0
             for _tid, _slug, _sess in iter_tenant_sessions():
-                # Schema sync and data seed are INDEPENDENT: a failure in the
-                # column/table self-heal must not skip the data seed (which heals
-                # the governance baseline + dedupes departments and starts clean
-                # with its own rollback). Sharing one try/except previously meant a
-                # throwing _add_columns silently swallowed the seed, so on some
-                # boxes every heal only ever landed when seed_if_empty was run by
-                # hand.
-                try:
-                    _add_columns(_sess)            # schema self-heal (columns + ITSM tables)
-                except Exception:  # noqa: BLE001
-                    _sess.rollback()
-                    _logging.getLogger(__name__).warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
-                try:
-                    seed_if_empty(_sess, _tid)     # data seed / baseline heal (own clean-session rollback)
-                except Exception:  # noqa: BLE001
-                    _sess.rollback()
-                    _logging.getLogger(__name__).warning("helpdesk data seed failed tenant=%s", _slug, exc_info=True)
+                _n += 1
+                if _schema_on:
+                    try:
+                        _add_columns(_sess)        # schema self-heal (columns + ITSM tables)
+                    except Exception:  # noqa: BLE001
+                        _sess.rollback()
+                        _log.warning("helpdesk schema sync failed tenant=%s", _slug, exc_info=True)
+                if _data_on:
+                    try:
+                        seed_if_empty(_sess, _tid)  # data seed / baseline heal (own clean-session rollback)
+                    except Exception:  # noqa: BLE001
+                        _sess.rollback()
+                        _log.warning("helpdesk data seed failed tenant=%s", _slug, exc_info=True)
+            _log.info("helpdesk boot heal: processed %d tenant(s) (schema_sync=%s data_seed=%s)",
+                      _n, _schema_on, _data_on)
         except Exception:  # noqa: BLE001
-            _logging.getLogger(__name__).warning("helpdesk schema sync skipped", exc_info=True)
+            _log.warning("helpdesk boot heal skipped (setup failed)", exc_info=True)
 
     # Ava: compliance schema self-heal removed along with the compliance module.
 
