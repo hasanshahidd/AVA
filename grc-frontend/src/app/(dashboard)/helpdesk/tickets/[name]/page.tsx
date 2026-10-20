@@ -316,6 +316,7 @@ export default function TicketDetail() {
             {t.business_service?.name && (
               <div className="mt-1.5 text-[11.5px] text-slate-500">Business service: <span className="font-medium text-slate-700">{t.business_service.name}</span></div>
             )}
+            {t.ci?.security && <CiSecurity sec={t.ci.security} assetId={t.ci.ava_asset_id} />}
           </div>
           <div className="border-t border-slate-100 pt-1" />
           <div className="flex items-center justify-between">
@@ -402,6 +403,52 @@ function ApprovalPanel({ ap }: { ap: any }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Help Desk ↔ Ava-security linkage: the affected asset's OWN open-vuln / risk
+ * snapshot (read-only, mirrored by the CMDB sync). Hidden when the CI carries no
+ * security snapshot. Deep-links into the asset's risk/vuln view. */
+function CiSecurity({ sec, assetId }: { sec: any; assetId?: number | null }) {
+  const open = Number(sec?.open) || 0;
+  const risk = sec?.risk_score;
+  const last = sec?.last_finding_at;
+  const lastFmt = last && !isNaN(new Date(last).getTime()) ? new Date(last).toLocaleDateString() : null;
+  const SEV: [string, string][] = [
+    ["critical", "bg-red-100 text-red-700"],
+    ["high", "bg-orange-100 text-orange-700"],
+    ["medium", "bg-amber-100 text-amber-800"],
+    ["low", "bg-sky-100 text-sky-700"],
+  ];
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <ShieldAlert size={12} /> Asset security
+        </span>
+        {typeof risk === "number" && (
+          <span className="shrink-0 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">Risk {risk}</span>
+        )}
+      </div>
+      {open === 0 ? (
+        <p className="text-[11.5px] text-emerald-600">No open vulnerabilities.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-1">
+          {SEV.map(([k, cls]) => (Number(sec?.[k]) > 0
+            ? <span key={k} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>{sec[k]} {k}</span>
+            : null))}
+          <span className="text-[11px] text-slate-500">· {open} open</span>
+        </div>
+      )}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+        {lastFmt && <span className="text-slate-400">Last finding {lastFmt}</span>}
+        {assetId != null && (
+          <Link href={`/risk-posture/asset/${assetId}`} className="inline-flex items-center gap-1 font-medium text-[var(--color-base)] hover:underline">
+            <ExternalLink size={11} /> View risk &amp; vulns
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

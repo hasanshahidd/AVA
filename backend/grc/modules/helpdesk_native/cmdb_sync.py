@@ -29,6 +29,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ...models import (
@@ -298,9 +299,98 @@ def _software_key(entry: dict, idx: int) -> str:
     return str(k)
 
 
-def _ava_mirror(asset, category: str, synced_at: str) -> Dict[str, Any]:
+_SEV_KEYS = ("critical", "high", "medium", "low", "info")
+
+
+def _asset_security_summaries(db: Session, tid: int, asset_ids: List[int]) -> Dict[int, dict]:
+    """Per-asset OPEN-vulnerability + risk snapshot for the ava mirror — the
+    Help Desk ↔ Ava-security linkage (so a ticket's CI can show the asset's real
+    exposure/vuln/risk story, spec: ticket→asset security).
+
+    STRICTLY READ-ONLY over the security side: reuses the canonical
+    ``VulnerabilityAssetLink`` ↔ ``Vulnerability`` join and the register's own
+    ``_LIST_CLOSED_STATUSES`` (so "open" means exactly what the vuln register
+    means) plus the latest ``AssetRiskAssessment.risk_score``. Batched (two
+    grouped queries, no N+1). Best-effort: ANY failure (module/table absent on a
+    branch, schema drift) yields {} so a CMDB sync is never blocked by the
+    security modules. Keyed asset_id -> {open, <severity counts>, risk_score,
+    last_finding_at}."""
+    if not asset_ids:
+        return {}
+    out: Dict[int, dict] = {}
+    try:
+        from ...models import Vulnerability, VulnerabilityAssetLink, AssetRiskAssessment
+        from ..vuln_management.routers.vulnerabilities import _LIST_CLOSED_STATUSES
+        closed = [s.lower() for s in _LIST_CLOSED_STATUSES]
+
+        def _blank() -> dict:
+            d = {"open": 0, "risk_score": None, "last_finding_at": None}
+            d.update({k: 0 for k in _SEV_KEYS})
+            return d
+
+        # Open findings per asset × severity + newest finding timestamp (1 query).
+        rows = (
+            db.query(
+                VulnerabilityAssetLink.asset_id,
+                func.lower(Vulnerability.severity),
+                func.count(func.distinct(Vulnerability.id)),
+                func.max(Vulnerability.discovered_at),
+            )
+            .join(Vulnerability, Vulnerability.id == VulnerabilityAssetLink.vulnerability_id)
+            .filter(
+                VulnerabilityAssetLink.asset_id.in_(asset_ids),
+                Vulnerability.tenant_id == tid,
+                func.lower(func.coalesce(Vulnerability.status, "open")).notin_(closed),
+            )
+            .group_by(VulnerabilityAssetLink.asset_id, func.lower(Vulnerability.severity))
+            .all()
+        )
+        for aid, sev, cnt, last_at in rows:
+            s = out.setdefault(aid, _blank())
+            cnt = int(cnt or 0)
+            s["open"] += cnt
+            sev = (sev or "").strip().lower()
+            if sev in _SEV_KEYS:
+                s[sev] += cnt
+            iso_last = last_at.isoformat() if last_at else None
+            if iso_last and (s["last_finding_at"] is None or iso_last > s["last_finding_at"]):
+                s["last_finding_at"] = iso_last
+
+        # Latest risk score per asset (1 query over the newest assessment date).
+        try:
+            latest = (
+                db.query(
+                    AssetRiskAssessment.asset_id,
+                    func.max(AssetRiskAssessment.assessment_date).label("latest"),
+                )
+                .filter(AssetRiskAssessment.asset_id.in_(asset_ids))
+                .group_by(AssetRiskAssessment.asset_id)
+                .subquery()
+            )
+            for aid, score in (
+                db.query(AssetRiskAssessment.asset_id, AssetRiskAssessment.risk_score)
+                .join(
+                    latest,
+                    (AssetRiskAssessment.asset_id == latest.c.asset_id)
+                    & (AssetRiskAssessment.assessment_date == latest.c.latest),
+                )
+                .all()
+            ):
+                out.setdefault(aid, _blank())["risk_score"] = (
+                    round(float(score), 1) if score is not None else None
+                )
+        except Exception:  # noqa: BLE001 — risk score is optional; findings still count
+            pass
+    except Exception:  # noqa: BLE001 — security modules are optional; never block a sync
+        return {}
+    return out
+
+
+def _ava_mirror(asset, category: str, synced_at: str, security: Optional[dict] = None) -> Dict[str, Any]:
     """The full ``attributes.ava`` mirror (spec §3). Sync owns this key and
-    overwrites it each run."""
+    overwrites it each run. ``security`` is the read-only open-vuln/risk snapshot
+    from ``_asset_security_summaries`` (None when the asset has no findings or the
+    security modules are unavailable)."""
     credentialed = category == "credential"
     internet_facing = bool(
         getattr(asset, "is_internet_facing", None) or getattr(asset, "internet_facing", None)
@@ -351,6 +441,8 @@ def _ava_mirror(asset, category: str, synced_at: str) -> Dict[str, Any]:
             "data_classification": getattr(asset, "data_classification", None),
         },
         "security_posture": getattr(asset, "security_posture", None),
+        # Read-only open-vuln / risk snapshot (Help Desk ↔ Ava-security linkage).
+        "security": security,
         # platform_properties (full services/DIMM/firmware dump) is deliberately
         # NOT mirrored: nothing renders it, and it bloated every /cis row into
         # multi-MB payloads that stalled the affected-CI picker. Kind is kept —
@@ -456,6 +548,11 @@ def sync_inventory_to_cmdb(
     summary["inventory_count"] = len(assets)
     assets_by_id = {a.id: a for a in assets}
 
+    # Read-only Ava-security snapshot per asset (open vulns / risk) for the ava
+    # mirror, so a ticket's CI can show the asset's real exposure/vuln/risk story.
+    # Batched + best-effort; never blocks a sync (see helper docstring).
+    security_by_asset = _asset_security_summaries(db, tid, list(assets_by_id))
+
     # ── 2. CI-type code → row map (ensure CIT-SOFTWARE) ──────────────────────
     ci_types = {t.code: t for t in db.query(HDCIType).filter(HDCIType.tenant_id == tid).all()}
     soft_type = ci_types.get(CIT_SOFTWARE)
@@ -557,7 +654,8 @@ def sync_inventory_to_cmdb(
         base_attrs: Dict[str, Any] = {}
         if existing is not None and isinstance(existing.attributes, dict):
             base_attrs = dict(existing.attributes)
-        base_attrs["ava"] = _ava_mirror(asset, category, synced_iso)
+        base_attrs["ava"] = _ava_mirror(asset, category, synced_iso,
+                                        security=security_by_asset.get(asset.id))
         base_attrs["ava"]["kind"] = kind
         if domain_block is not None:
             base_attrs["ava"]["domain"] = domain_block

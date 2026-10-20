@@ -422,7 +422,7 @@ def _inventory_derived(c: HDConfigurationItem) -> dict:
         return {
             "source_category": None, "exposure": None, "credentialed": None,
             "pci": None, "internet_facing": None, "managed_by_inventory": False,
-            "ci_kind": None,
+            "ci_kind": None, "security": None,
         }
     src = ava.get("source") if isinstance(ava.get("source"), dict) else {}
     net = ava.get("network") if isinstance(ava.get("network"), dict) else {}
@@ -436,6 +436,8 @@ def _inventory_derived(c: HDConfigurationItem) -> dict:
         "internet_facing": internet_facing,
         "managed_by_inventory": True,
         "ci_kind": ava.get("kind"),
+        # Read-only open-vuln/risk snapshot the sync mirrored (may be None).
+        "security": ava.get("security") if isinstance(ava.get("security"), dict) else None,
     }
 
 
@@ -455,6 +457,7 @@ def ci_ticket_ref(c: HDConfigurationItem) -> dict:
         "internet_facing": d["internet_facing"],
         "managed_by_inventory": d["managed_by_inventory"],
         "ava_asset_id": c.ava_asset_id,
+        "security": d["security"],
     }
 
 
