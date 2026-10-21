@@ -40,7 +40,9 @@ function utcDate(iso: string | null): string | null {
 export default function HelpDeskLinkCard({ vulnId }: { vulnId: number }) {
   const { data } = useQuery({
     queryKey: ['itsm-tickets', vulnId],
-    queryFn: async () => (await apiClient.get(`/vulnerabilities/${vulnId}/itsm-tickets`)).data as { tickets: Ticket[] },
+    // Must carry the /vuln-management module prefix like every other vuln API call
+    // (the bare /vulnerabilities path 404s, so the card silently rendered nothing).
+    queryFn: async () => (await apiClient.get(`/vuln-management/vulnerabilities/${vulnId}/itsm-tickets`)).data as { tickets: Ticket[] },
     staleTime: 30_000,
   });
   const tickets = (data?.tickets ?? []).filter((t) => t.is_native && t.external_ticket_id);
