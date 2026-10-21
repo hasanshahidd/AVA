@@ -498,7 +498,7 @@ export default function RiskPostureWorkspace() {
           <div className="flex flex-1 flex-col">
             <Insight>
               {D.avgDQ != null
-                ? <>The risk picture is <Hl>{D.avgDQ}%</Hl> complete on average. Hardening is measured on <Hl>{nfmt(D.cisN)}</Hl> of {nfmt(D.int.length)} internal assets; vulnerability data on <Hl>{nfmt(D.vulnN)}</Hl> of {nfmt(hosts)}.</>
+                ? <>The risk picture is <Hl>{D.avgDQ}%</Hl> complete on average. Hardening is measured on <Hl>{nfmt(D.cisN)}</Hl> of {nfmt(D.int.length)} internal assets; vulnerability data on <Hl>{nfmt(D.vulnN)}</Hl> of {nfmt(total)}.</>
                 : <>Nothing is scored yet — connect telemetry or run a scan to start measuring coverage.</>}
             </Insight>
             <div className="flex flex-1 flex-col justify-between gap-2.5 py-1">
