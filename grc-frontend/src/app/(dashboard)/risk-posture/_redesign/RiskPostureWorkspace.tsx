@@ -182,6 +182,12 @@ export default function RiskPostureWorkspace() {
   }, [assets, weights]);
 
   const total = summary?.asset_count ?? 0;
+  // `total` is the rolled MANAGED-asset count (apex domain = one asset, same basis
+  // as the register); `hosts` is the flat host count the drill-down lists show. They
+  // differ when external domains fold subdomains in, so label the host figure to
+  // keep "6 assets" and a 12-host list from reading like a contradiction.
+  const hosts = assets.length;
+  const hostNote = hosts !== total ? ` (${nfmt(hosts)} hosts)` : '';
 
   const recalc = () => {
     qc.invalidateQueries({ queryKey: ['risk-posture.dashboard'] });
@@ -230,9 +236,9 @@ export default function RiskPostureWorkspace() {
           <Eyebrow>Executive summary</Eyebrow>
           <p className="m-0 mt-0.5 text-[13.5px] leading-[1.5]">
             {avg == null ? (
-              <>No asset has a risk score yet — connect telemetry or run a scan to measure posture across <Hl>{nfmt(total)}</Hl> assets.</>
+              <>No asset has a risk score yet — connect telemetry or run a scan to measure posture across <Hl>{nfmt(total)}</Hl> assets{hostNote}.</>
             ) : (
-              <>Mean asset risk is <Hl>{avg}</Hl>/100 (<BandWord k={avgBand} />) across <Hl>{nfmt(total)}</Hl> assets — <Hl>{nfmt(severe)}</Hl> severe, <Hl>{nfmt(elevated)}</Hl> elevated.
+              <>Mean asset risk is <Hl>{avg}</Hl>/100 (<BandWord k={avgBand} />) across <Hl>{nfmt(total)}</Hl> assets{hostNote} — <Hl>{nfmt(severe)}</Hl> severe, <Hl>{nfmt(elevated)}</Hl> elevated.
                 {' '}External <Hl>{nfmt(D.extCount)}</Hl> avg <Hl>{D.extAvg ?? '—'}</Hl> · internal <Hl>{nfmt(D.int.length)}</Hl> avg <Hl>{D.intAvg ?? '—'}</Hl>.</>
             )}
           </p>
@@ -349,7 +355,7 @@ export default function RiskPostureWorkspace() {
         </Card>
 
         {/* Row 2B — Risk concentration (searchable ranked list of all assets) */}
-        <Card title="Risk concentration" sub="Every asset ranked by score · open the breakdown">
+        <Card title="Risk concentration" sub="Every host ranked by score · open the breakdown">
           <div className="relative mb-2.5">
             <SearchIcon aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-[#94A3B8]" />
             <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search assets…"
@@ -492,13 +498,13 @@ export default function RiskPostureWorkspace() {
           <div className="flex flex-1 flex-col">
             <Insight>
               {D.avgDQ != null
-                ? <>The risk picture is <Hl>{D.avgDQ}%</Hl> complete on average. Hardening is measured on <Hl>{nfmt(D.cisN)}</Hl> of {nfmt(D.int.length)} internal assets; vulnerability data on <Hl>{nfmt(D.vulnN)}</Hl> of {nfmt(total)}.</>
+                ? <>The risk picture is <Hl>{D.avgDQ}%</Hl> complete on average. Hardening is measured on <Hl>{nfmt(D.cisN)}</Hl> of {nfmt(D.int.length)} internal assets; vulnerability data on <Hl>{nfmt(D.vulnN)}</Hl> of {nfmt(hosts)}.</>
                 : <>Nothing is scored yet — connect telemetry or run a scan to start measuring coverage.</>}
             </Insight>
             <div className="flex flex-1 flex-col justify-between gap-2.5 py-1">
               <CoverageBar label="CIS hardening scanned" n={D.cisN} d={D.int.length} />
               <CoverageBar label="Vulnerability data linked" n={D.vulnN} d={total} />
-              <CoverageBar label="External assets graded" n={D.extScored} d={D.ext.length} />
+              <CoverageBar label="External hosts graded" n={D.extScored} d={D.ext.length} />
             </div>
             <div className="flex flex-wrap gap-1.5 pt-3">
               <GapPill n={D.critNotAssessed} label="criticality not assessed" tone="warn" />
