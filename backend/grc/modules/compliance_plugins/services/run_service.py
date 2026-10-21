@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import socket
 from datetime import datetime
 from typing import Optional
 
@@ -27,6 +28,20 @@ from ..runners.registry import RunnerResult
 from .credentials import resolve_credentials_for_connection
 
 logger = logging.getLogger(__name__)
+
+
+def _host_resolves(host: str) -> bool:
+    """True if `host` is an IP or a DNS-resolvable name. An unresolvable discovery
+    hostname (DigitalOcean droplet name etc.) returns False so the caller can fall
+    back to the asset's reachable IP. Self-check: _host_resolves('127.0.0.1') is True."""
+    h = (host or "").strip()
+    if not h:
+        return False
+    try:
+        socket.getaddrinfo(h, None)
+        return True
+    except Exception:  # noqa: BLE001 — any resolution failure means "use the IP instead"
+        return False
 
 
 def _resolve_host_family(asset: Optional[ITAsset]) -> Optional[str]:
@@ -208,6 +223,15 @@ def execute_plugin(
         return run
 
     credentials = resolve_credentials_for_connection(connection) if connection else {}
+    # The SSH host comes from the connection's console_url, which is often a
+    # discovery hostname (e.g. a DigitalOcean droplet name like
+    # "ubuntu-s-...-tor1-01") that doesn't resolve from the scanner — oscap-ssh
+    # then fails EVERY rule with "Could not resolve hostname". Fall back to the
+    # asset's IP (reachable) when the credential host won't resolve.
+    _ssh_host = credentials.get("ssh_host")
+    _tgt_asset = run_asset or asset
+    if _ssh_host and _tgt_asset and getattr(_tgt_asset, "ip_address", None) and not _host_resolves(_ssh_host):
+        credentials = {**credentials, "ssh_host": _tgt_asset.ip_address}
     # Manual (attestation) rules carry no executable check — the operator's
     # pass/fail/N-A decision is injected onto the check_definition so the
     # `manual` runner can turn it into a result through the same pipeline.
