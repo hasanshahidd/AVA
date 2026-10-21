@@ -55,7 +55,7 @@ type Roots = { distinct: number; named: number; top: Named[]; more: number };
 type Cls = { label: string; n: number; gap: boolean; subtypes: Sub[]; samples?: Sample[]; seen_30d: number; owner: number; cis: number | null; crit: Crit; eol: Eol | null };
 type Side = { total: number; classes: Cls[]; facets: Record<string, number>; verification?: Sub[]; hosting?: Sub[]; roots?: Roots; os?: Sub[] };
 type Estate = {
-  total: number; external: Side; internal: Side; unidentified: number;
+  total: number; rolled_total?: number; rolled_external?: number; external: Side; internal: Side; unidentified: number;
   coverage: { seen_30d: number; owner: number; cis: number }; eol: Eol; lifecycle: Named[];
   governance?: { criticality: Crit; environment: Named[]; data_classification: Named[] };
   provenance?: { origin: Named[]; managed: number; discovered: number; baseline: number };
@@ -298,16 +298,19 @@ function EstateHeader({ estate, inv, devices, stamp, className }: { estate: Q<Es
   const tone = GRADE_TONE[p?.grade ?? ''] ?? SEV.info;
   const cells: { key: string; label: string; href: string; loading: boolean; value: ReactNode; sub: ReactNode }[] = [
     { key: 'estate', label: 'Asset estate', href: REG, loading: estate.isLoading,
-      value: d ? nfmt(d.total) : '—', sub: d ? <><Dot c={EXT_C} />{nfmt(d.external.total)} external<Dot c={INT_C} />{nfmt(d.internal.total)} internal</> : 'unavailable' },
+      // Headline is the rolled managed-asset count (apex domain = one asset, the
+      // Register / Risk Posture basis); hosts shown alongside so "6 assets" and a
+      // 12-host estate never read as a contradiction.
+      value: d ? nfmt(d.rolled_total ?? d.total) : '—', sub: d ? <>{nfmt(d.total)} hosts<Dot c={EXT_C} />{nfmt(d.rolled_external ?? d.external.total)} external<Dot c={INT_C} />{nfmt(d.internal.total)} internal</> : 'unavailable' },
     { key: 'health', label: 'Inventory health', href: '/risk-posture', loading: inv.isLoading,
       value: p?.score != null ? <span className="inline-flex items-baseline gap-2">{p.score.toFixed(1)}<span className="text-[12px] font-medium text-[#64748B]">/ 100</span><Pill tone={tone}>{tone.label}</Pill></span> : '—',
       sub: p?.score != null ? 'target 85 · see Risk posture' : inv.data ? 'not scored yet' : 'unavailable' },
     { key: 'onboarded', label: 'Onboarded from discovery', href: '/asset-discovery', loading: devices.isLoading,
       value: devs.length ? `${pctOf(onboarded, devs.length)}%` : '—', sub: devices.data ? (devs.length ? `${nfmt(onboarded)} of ${nfmt(devs.length)} discovered` : 'nothing discovered yet') : 'unavailable' },
     { key: 'seen', label: 'Seen in last 30 days', href: `${REG}&view=stale`, loading: estate.isLoading,
-      value: d?.total ? share(d.coverage.seen_30d, d.total) || '0%' : '—', sub: d ? `${nfmt(d.coverage.seen_30d)} of ${nfmt(d.total)} assets` : 'unavailable' },
+      value: d?.total ? share(d.coverage.seen_30d, d.total) || '0%' : '—', sub: d ? `${nfmt(d.coverage.seen_30d)} of ${nfmt(d.total)} hosts` : 'unavailable' },
     { key: 'owner', label: 'Owner assigned', href: `${REG}&view=unowned`, loading: estate.isLoading,
-      value: d?.total ? share(d.coverage.owner, d.total) || '0%' : '—', sub: d ? `${nfmt(d.coverage.owner)} of ${nfmt(d.total)} assets` : 'unavailable' },
+      value: d?.total ? share(d.coverage.owner, d.total) || '0%' : '—', sub: d ? `${nfmt(d.coverage.owner)} of ${nfmt(d.total)} hosts` : 'unavailable' },
     { key: 'life', label: 'In active service', href: REG, loading: estate.isLoading,
       value: d?.total ? share(active, d.total) || '0%' : '—', sub: d ? `${nfmt(active)} active · ${nfmt(d.total - active)} other states` : 'unavailable' },
   ];

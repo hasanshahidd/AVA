@@ -182,11 +182,22 @@ def vendor_samples(db: Session, tenant_ids: List[int]) -> List[dict]:
 
 
 def asset_samples(db: Session, tenant_ids: List[int]) -> List[dict]:
-    """Total assets + high-value count — matches the asset dashboard."""
+    """Managed assets + high-value count — the SAME basis as the register / risk
+    posture, so the trend reconciles with the inventory headcount instead of
+    counting raw rows. Two corrections vs the old `len(rows)`: (1) exclude ad-hoc
+    pentest targets (same predicate as the register / estate_overview), and
+    (2) roll external subdomains under their apex domain (apex = one asset) with the
+    canonical `unit_key_for`. Raw rows counted 40; the inventory shows 6."""
     from ..models import ITAsset
-    rows = db.query(ITAsset).filter(ITAsset.tenant_id.in_(tenant_ids)).all()
+    from ..modules.it_assets.asset_rollup import unit_key_for
+    rows = db.query(ITAsset).filter(
+        ITAsset.tenant_id.in_(tenant_ids),
+        func.coalesce(ITAsset.status, "") != "adhoc",
+        func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc",
+    ).all()
+    total = len({unit_key_for(a) for a in rows})  # rolled managed-asset count
     high = sum(1 for a in rows if (a.criticality or "").lower() in ("high", "critical"))
-    return _compact([_s("assets_total", len(rows)), _s("assets_high_value", high)])
+    return _compact([_s("assets_total", total), _s("assets_high_value", high)])
 
 
 def governance_samples(db: Session, tenant_ids: List[int]) -> List[dict]:
