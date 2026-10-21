@@ -460,7 +460,11 @@ export default function CompliancePanel({ asset }: { asset: any }) {
     // posture, so the % is identical on both pages.
     const evaluated = passed + failed;
     const passRate = evaluated ? Math.round((passed / evaluated) * 100) : 0;
-    return { passed, failed, errored, scanned, passRate };
+    // Did the scan actually run on the host, or did it bypass? A real run yields
+    // pass/fail verdicts; a scan that never connected leaves every rule errored.
+    const executed = evaluated > 0;
+    const bypassed = scanned > 0 && evaluated === 0 && errored > 0;
+    return { passed, failed, errored, scanned, passRate, evaluated, executed, bypassed };
   }, [latestByPlugin, previewQuery.data]);
 
   // One session per Scan-all invocation — runs within 5 min of each other.
@@ -735,6 +739,18 @@ export default function CompliancePanel({ asset }: { asset: any }) {
             <b className="text-[12.5px] font-semibold">
               {bench.title}{' '}
               {bench.version && <span className={MONO + ' font-medium text-[#8A95A1]'}>{bench.version}</span>}
+              {scanStats.executed && (
+                <span
+                  className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#E7F5EE] border border-[#CFE9DC] px-2 py-[1px] text-[10px] font-semibold text-[#1F7A54] align-middle"
+                  title={`Scan executed on the host — ${scanStats.evaluated} rules returned a real pass/fail verdict.${scanStats.errored > 0 ? ` ${scanStats.errored} rule(s) returned "error": OpenSCAP itself could not evaluate those checks on this host (not a connection failure) — often privileged checks (sshd -T, auditd) when the SSH user lacks sudo.` : ''}`}
+                >✓ Executed</span>
+              )}
+              {scanStats.bypassed && (
+                <span
+                  className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#FBEAEA] border border-[#F1D3D0] px-2 py-[1px] text-[10px] font-semibold text-[#B23A3A] align-middle"
+                  title={`Scan did NOT execute — all ${scanStats.errored} rules errored, meaning the scanner never ran the checks on the host (SSH connect/auth/host-key failed). Fix the connection, then rescan.`}
+                >⚠ Not executed</span>
+              )}
             </b>
             <div className="text-[11px] text-[#8A95A1] mt-0.5">
               {scored ? (

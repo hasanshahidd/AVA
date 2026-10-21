@@ -103,7 +103,7 @@ export default function ConnectionsPage() {
   const canDelete = hasPermission('integrations:connections:delete');
 
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedType, setSelectedType] = useState('nexpose');
+  const [selectedType, setSelectedType] = useState('nessus');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [detailConn, setDetailConn] = useState<Connection | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; success?: boolean; message?: string } | null>(null);
@@ -246,7 +246,7 @@ export default function ConnectionsPage() {
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const integrationType = (form.get('integration_type') as string) || 'nexpose';
+    const integrationType = (form.get('integration_type') as string) || 'nessus';
     createMutation.mutate({
       connection_name: form.get('connection_name') as string,
       integration_type: integrationType,
@@ -315,8 +315,8 @@ export default function ConnectionsPage() {
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
-                <option value="nexpose">Rapid7 Nexpose / InsightVM</option>
                 <option value="nessus">Tenable Nessus</option>
+                <option value="nexpose">Rapid7 Nexpose / InsightVM</option>
               </select>
             </div>
             <div>
