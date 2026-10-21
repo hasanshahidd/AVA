@@ -350,14 +350,18 @@ _FLEET_LANE_BY_TARGET = {
 
 
 def _fleet_lane(asset):
-    """The AI-Pentest fleet-lane key for an asset (external | internal-host | internal-ad |
-    cloud | code | container), via pentest._classify_asset. vulns=[] is safe: vulns only split
-    web-vs-host-external, which both map to 'external', so the fleet key is unaffected. Lazy
-    import avoids a circular import at module load. Never raises."""
+    """The AI-Pentest CANONICAL lane key for an asset — web | windows | linux | network | ad | cloud |
+    k8s | repo | database — via pentest._lane_for_target, THE 9-lane resolver the pentest launcher filters
+    on (so an asset renders under its real lane, e.g. a Linux host under the Linux lane). An asset carries
+    no affected_url, so the resolver cannot web-detect it the way it does a finding; catch the web
+    asset_type here so a web asset lands on the web lane, not network. Lazy import avoids a circular
+    import at module load. Never raises."""
     try:
-        from grc.modules.pentest.service import _classify_asset
-        target_type, _ = _classify_asset(asset, [])
-        return _FLEET_LANE_BY_TARGET.get(target_type)
+        from grc.modules.pentest.service import _lane_for_target
+        at = (getattr(asset, "asset_type", "") or "").lower()
+        if at in ("web", "website", "url", "webapp"):
+            return "web"
+        return _lane_for_target(asset)
     except Exception:
         return None
 
