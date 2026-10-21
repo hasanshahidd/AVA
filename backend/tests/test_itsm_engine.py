@@ -20,11 +20,12 @@ from types import SimpleNamespace
 
 from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
-    HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
+    HDTicketActivity, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
 )
 from grc.models import HDSLATarget, HDServiceLevelAgreement, HDTicketCI
 from grc.modules.helpdesk_native.tickets import (
     priority_from_matrix, transition_allowed, update, update_ticket,
+    _apply_status_change,
 )
 from grc.modules.helpdesk_native import approvals, sla
 
@@ -387,3 +388,35 @@ def test_sla_no_target_clears_fields(sladb):
     sladb.add(t); sladb.commit()
     sla.recompute(sladb, t)
     assert t.response_by is None and t.resolution_by is None
+
+
+# ── regression: the resolve/reopen → vuln-link reflect path ──────────────────
+# _apply_status_change referenced ticket.name to reflect status into linked vuln
+# findings, but HDTicket has no `name` column — it threw AttributeError on EVERY
+# native resolve/reopen (a P0). The 24 engine tests missed it because none crossed
+# into/out of Resolved category, so `norm` was None and the bad access was never
+# reached. This test drives a real Open→Resolved transition and asserts the reflect
+# call fires with str(ticket.id) — not a non-existent attribute — and never raises.
+def test_resolve_transition_reflects_by_ticket_id_not_name(monkeypatch):
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDTicketStatus, HDTicketActivity):
+        m.__table__.create(engine)
+    db = sessionmaker(bind=engine)()
+    open_s = HDTicketStatus(tenant_id=TENANT, label_agent="Open", category="Open")
+    res_s = HDTicketStatus(tenant_id=TENANT, label_agent="Resolved", category="Resolved")
+    db.add_all([open_s, res_s]); db.flush()
+    t = HDTicket(tenant_id=TENANT, subject="x", process="incident",
+                 status_id=open_s.id, status_category="Open")
+    db.add(t); db.flush()
+
+    # Isolate the reflect path: no-op the SLA recompute, capture the reflect call.
+    monkeypatch.setattr("grc.modules.helpdesk_native.sla.recompute", lambda *a, **k: None)
+    import grc.services.itsm_service as itsm_service
+    captured = {}
+    monkeypatch.setattr(itsm_service, "reflect_native_ticket_status",
+                        lambda db, tid, ext, norm: captured.update(ext=ext, norm=norm))
+
+    _apply_status_change(db, TENANT, t, res_s)  # must NOT raise
+
+    assert t.status_category == "Resolved"
+    assert captured == {"ext": str(t.id), "norm": "resolved"}
