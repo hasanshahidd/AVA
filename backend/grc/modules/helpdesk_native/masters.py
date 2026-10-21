@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from ...models import (
     get_db,
+    HDChangeType,
     HDTicketStatus,
     HDTicketType,
     HDTicketPriority,
@@ -335,6 +336,27 @@ def list_priorities(db: Session = Depends(get_db), _: bool = Depends(require_mas
         "description": p.description,
         "disabled": bool(p.disabled),
     } for p in rows]}
+
+
+@router.get("/change-types")
+def list_change_types_for_form(db: Session = Depends(get_db), _: bool = Depends(require_masterdata_view)):
+    """The tenant's governance change types (Standard/Normal/Major/Emergency + any
+    custom), for the New-ticket Change form. Creator-accessible (master-data view),
+    unlike the settings-gated /helpdesk/admin/governance/change-types admin screen —
+    so the dropdown is sourced from grc_hd_change_type instead of a hardcoded list."""
+    tid = tenant_id(db)
+    rows = (
+        db.query(HDChangeType)
+        .filter(HDChangeType.tenant_id == tid)
+        .order_by(HDChangeType.code.asc())
+        .all()
+    )
+    return {"change_types": [{
+        "code": c.code,
+        "name": c.name,
+        "requires_cab": bool(c.requires_cab),
+        "auto_approve": bool(c.auto_approve),
+    } for c in rows]}
 
 
 @router.post("/priorities")

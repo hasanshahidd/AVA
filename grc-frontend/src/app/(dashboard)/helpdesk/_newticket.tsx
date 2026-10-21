@@ -125,6 +125,13 @@ export function NewTicketDialog({
   const sgRes = useHd<{ support_groups: { code: string; name: string; mapped: boolean }[] }>("/helpdesk/support-groups");
   // Customers list — {name: "<id>", customer_name}. The picker sends customer_id = Number(name).
   const customersRes = useHd<{ customers: { name: string; customer_name?: string | null }[] }>("/helpdesk/customers");
+  // Governance change types (grc_hd_change_type) for the Change form — sourced from
+  // the tenant's seeded/configured types, not a hardcoded list (so "Major" + any
+  // custom type appear). Falls back to the ITIL defaults if the read is empty.
+  const changeTypesRes = useHd<{ change_types: { code: string; name: string }[] }>("/helpdesk/change-types");
+  const changeTypes = (changeTypesRes.data?.change_types?.length
+    ? changeTypesRes.data.change_types
+    : [{ code: "standard", name: "Standard" }, { code: "normal", name: "Normal" }, { code: "emergency", name: "Emergency" }]);
 
   const [process, setProcess] = useState<Process>("incident");
   const [departmentId, setDepartmentId] = useState("");
@@ -507,9 +514,7 @@ export function NewTicketDialog({
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <Field label="Change type">
                 <Select value={changeType} onChange={(e) => setChangeType(e.target.value)}>
-                  <option value="standard">Standard</option>
-                  <option value="normal">Normal</option>
-                  <option value="emergency">Emergency</option>
+                  {changeTypes.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
                 </Select>
               </Field>
               <Field label="Risk">
