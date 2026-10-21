@@ -311,6 +311,30 @@ def sync_ticket_statuses(db: Session, connection, *, limit: int = 500) -> Dict[s
     return counts
 
 
+def native_ticket_origins(db: Session, tenant_id: int, ticket_ids) -> Dict[str, int]:
+    """Reverse lookup for the Help Desk tickets list: {external_ticket_id:
+    vulnerability_id} for native-helpdesk tickets that were raised from a
+    vulnerability finding. Read-only, batched, non-fatal — so the HD list can label
+    a ticket's origin ('Vulnerability finding') and deep-link to the finding. Same
+    join + native-connection filter as reflect_native_ticket_status (so a ServiceNow
+    link never counts)."""
+    from ..models import VulnTicketLink, IntegrationConnection
+    ids = [str(x) for x in ticket_ids if x is not None]
+    if not ids:
+        return {}
+    try:
+        rows = (db.query(VulnTicketLink.external_ticket_id, VulnTicketLink.vulnerability_id)
+                .join(IntegrationConnection, IntegrationConnection.id == VulnTicketLink.connection_id)
+                .filter(VulnTicketLink.tenant_id == tenant_id,
+                        VulnTicketLink.external_ticket_id.in_(ids),
+                        IntegrationConnection.integration_type == "native_helpdesk")
+                .all())
+    except Exception:  # noqa: BLE001
+        logger.exception("native_ticket_origins: lookup failed")
+        return {}
+    return {ext: vid for ext, vid in rows if ext}
+
+
 def reflect_native_ticket_status(db: Session, tenant_id: int, ticket_name: str,
                                  normalised_status: str) -> Dict[str, int]:
     """Reflect a NATIVE Help Desk ticket's resolution onto the finding it was

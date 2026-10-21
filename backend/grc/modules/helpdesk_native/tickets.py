@@ -25,6 +25,7 @@ from ...models import (
     HDPriorityMatrix,
     HDStateTransition,
     HDTicketType,
+    HDDepartment,
     HDBusinessService,
     HDConfigurationItem,
     HDSupportGroupMap,
@@ -471,6 +472,43 @@ def _apply_status_change(db: Session, tid: int, ticket: HDTicket, new_status: HD
 
 
 # ─── reads ───────────────────────────────────────────────────────────────────
+def _origin_fields(db: Session, tid: int, rows: list) -> dict:
+    """Per-ticket {str(id): {department, source, source_kind, source_finding_id}} so
+    the list + detail can show WHERE a ticket came from (Hasan's ask). Batched +
+    non-fatal. Source precedence: a vulnerability finding (via VulnTicketLink) →
+    another ticket it was raised from (origin_process #id) → its intake department →
+    the portal."""
+    dept_ids = {t.department_id for t in rows if t.department_id}
+    dept_names = (
+        {d.id: d.name for d in db.query(HDDepartment).filter(HDDepartment.id.in_(dept_ids)).all()}
+        if dept_ids else {}
+    )
+    origins: dict = {}
+    try:
+        from grc.services import itsm_service
+        origins = itsm_service.native_ticket_origins(db, tid, [str(t.id) for t in rows])
+    except Exception:  # noqa: BLE001 — origin labelling must never break the list
+        logger.warning("helpdesk: ticket origin lookup failed (non-fatal)", exc_info=True)
+    out: dict = {}
+    for t in rows:
+        dept = dept_names.get(t.department_id)
+        vid = origins.get(str(t.id))
+        if vid:
+            src, kind, fid = "Vulnerability finding", "vulnerability", vid
+        elif t.origin_ticket_id and t.origin_process:
+            src = f"{(t.origin_process or '').replace('_', ' ').title()} #{t.origin_ticket_id}"
+            kind, fid = "linked", None
+        elif dept:
+            src, kind, fid = dept, "department", None
+        elif t.raised_by:
+            src, kind, fid = "Portal", "portal", None
+        else:
+            src, kind, fid = None, None, None
+        out[str(t.id)] = {"department": dept, "source": src,
+                          "source_kind": kind, "source_finding_id": fid}
+    return out
+
+
 def list_tickets(db: Session, tid: int, status: Optional[str] = None,
                  q: Optional[str] = None, process: Optional[str] = None,
                  raised_by: Optional[str] = None, **filters) -> dict:
@@ -485,7 +523,9 @@ def list_tickets(db: Session, tid: int, status: Optional[str] = None,
         query = query.filter(func.lower(HDTicket.raised_by) == raised_by.lower())
     rows = query.order_by(HDTicket.updated_at.desc()).all()
     ci_map, bs_map = _ci_bs_maps(db, tid, rows)
-    out = [{**ticket_row(t), **_process_fields(t), **_ci_link_fields(t, ci_map, bs_map)}
+    origin = _origin_fields(db, tid, rows)
+    out = [{**ticket_row(t), **_process_fields(t), **_ci_link_fields(t, ci_map, bs_map),
+            **origin.get(str(t.id), {})}
            for t in rows]
     if process:
         out = [r for r in out if (r.get("process") or "incident") == process]
@@ -549,10 +589,12 @@ def get_detail(db: Session, tid: int, name: str) -> dict:
     if not ticket:
         return {"ticket": None, "conversation": []}
     ci_map, bs_map = _ci_bs_maps(db, tid, [ticket])
+    origin = _origin_fields(db, tid, [ticket])
     return {
         "ticket": {**ticket_detail(ticket, sla.compute_sla_block(db, ticket)),
                    **_process_fields(ticket),
-                   **_ci_link_fields(ticket, ci_map, bs_map)},
+                   **_ci_link_fields(ticket, ci_map, bs_map),
+                   **origin.get(str(ticket.id), {})},
         "conversation": _conversation(db, tid, ticket),
     }
 

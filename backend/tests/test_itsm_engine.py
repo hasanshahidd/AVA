@@ -21,6 +21,7 @@ from types import SimpleNamespace
 from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
     HDTicketActivity, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
+    HDDepartment,
 )
 from grc.models import HDSLATarget, HDServiceLevelAgreement, HDTicketCI
 from grc.modules.helpdesk_native.tickets import (
@@ -420,3 +421,32 @@ def test_resolve_transition_reflects_by_ticket_id_not_name(monkeypatch):
 
     assert t.status_category == "Resolved"
     assert captured == {"ext": str(t.id), "norm": "resolved"}
+
+
+# ── ticket origin/source labelling (the Tickets-list "where did it come from") ──
+def test_origin_fields_source_precedence(monkeypatch):
+    from grc.modules.helpdesk_native.tickets import _origin_fields
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDDepartment):
+        m.__table__.create(engine)
+    db = sessionmaker(bind=engine)()
+    dep = HDDepartment(tenant_id=TENANT, name="Finance & Accounting", code="FIN", enabled=True)
+    db.add(dep); db.flush()
+    tv = HDTicket(tenant_id=TENANT, subject="v", process="incident", department_id=dep.id)   # vuln-raised
+    td = HDTicket(tenant_id=TENANT, subject="d", process="incident", department_id=dep.id)   # dept intake
+    tl = HDTicket(tenant_id=TENANT, subject="l", process="change",
+                  origin_ticket_id=5, origin_process="problem")                               # raised from a ticket
+    tp = HDTicket(tenant_id=TENANT, subject="p", process="incident", raised_by="user@x")      # portal
+    db.add_all([tv, td, tl, tp]); db.flush()
+    # Only tv is linked to a finding; vuln origin must win over its department.
+    monkeypatch.setattr("grc.services.itsm_service.native_ticket_origins",
+                        lambda db, tid, ids: {str(tv.id): 423})
+
+    out = _origin_fields(db, TENANT, [tv, td, tl, tp])
+
+    assert out[str(tv.id)]["source_kind"] == "vulnerability"
+    assert out[str(tv.id)]["source_finding_id"] == 423
+    assert out[str(td.id)]["source_kind"] == "department"
+    assert out[str(td.id)]["department"] == "Finance & Accounting"
+    assert out[str(tl.id)]["source"] == "Problem #5" and out[str(tl.id)]["source_kind"] == "linked"
+    assert out[str(tp.id)]["source_kind"] == "portal"

@@ -319,6 +319,14 @@ export default function TicketDetail() {
               </select>
             ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
           </PropRow>
+          <PropRow label="Department">{t.department || <span className="text-slate-300">—</span>}</PropRow>
+          <PropRow label="Source">
+            {t.source_kind === "vulnerability" && t.source_finding_id ? (
+              <Link href={`/vulnerabilities/${encodeURIComponent(String(t.source_finding_id))}`} className="font-medium text-[var(--color-base)] hover:underline">
+                {t.source || "Vulnerability finding"}
+              </Link>
+            ) : (t.source || <span className="text-slate-300">—</span>)}
+          </PropRow>
           <PropRow label="Team">{t.team || <span className="text-slate-300">Unassigned</span>}</PropRow>
           <PropRow label="Assignee">{t.agent ? <span className="inline-flex items-center gap-1.5"><Avatar name={t.agent} size={20} />{t.agent}</span> : <span className="text-slate-300">Unassigned</span>}</PropRow>
           <PropRow label="Customer">{t.customer || "—"}</PropRow>

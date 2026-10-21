@@ -19,6 +19,24 @@ import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, Table, ti
 import { NewBtn } from "../_admin";
 import { NewTicketDialog } from "../_newticket";
 
+const PROCESS_LABEL: Record<string, string> = {
+  incident: "Incident", change: "Change", service_request: "Service Request", problem: "Problem",
+};
+
+/** "Where did this ticket come from" cell: a finding deep-links to the vuln; other
+ *  origins (a parent ticket, a department, the portal) render as plain text. */
+function SourceCell({ t }: { t: any }) {
+  if (t.source_kind === "vulnerability" && t.source_finding_id) {
+    return (
+      <Link href={`/vulnerabilities/${encodeURIComponent(String(t.source_finding_id))}`}
+        className="font-medium text-[#005B96] hover:underline">
+        {t.source || "Vulnerability finding"}
+      </Link>
+    );
+  }
+  return <span className="text-[#475569]">{t.source || <span className="text-[#CBD5E1]">—</span>}</span>;
+}
+
 export default function HelpDeskTickets() {
   const { data, loading, error, reload } = useHd<{ tickets: any[] }>("/helpdesk/tickets");
   const [q, setQ] = useState("");
@@ -66,7 +84,7 @@ export default function HelpDeskTickets() {
           hint={q ? "Try a different term." : "Create your first ticket with the New ticket button."}
         />
       ) : (
-        <Table head={["#", "Subject", "Status", "Priority", "Team", "Assignee", "Created"]}>
+        <Table head={["#", "Subject", "Type", "Source", "Department", "Status", "Priority", "Team", "Assignee", "Created"]}>
           {filtered.map((t) => (
             <tr key={t.name} className="hover:bg-[#F9FAFC]">
               <td className="px-4 py-2.5 font-mono text-[11px] text-[#94A3B8]">
@@ -79,6 +97,9 @@ export default function HelpDeskTickets() {
                   {t.subject || "(no subject)"}
                 </Link>
               </td>
+              <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{PROCESS_LABEL[t.process] || "Incident"}</td>
+              <td className="px-4 py-2.5 text-[12.5px]"><SourceCell t={t} /></td>
+              <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.department || <span className="text-[#CBD5E1]">—</span>}</td>
               <td className="px-4 py-2.5"><Chip value={t.status} /></td>
               <td className="px-4 py-2.5"><Chip value={t.priority} map={PRIORITY_CHIP} /></td>
               <td className="px-4 py-2.5 text-[12.5px] text-[#475569]">{t.team || "—"}</td>
