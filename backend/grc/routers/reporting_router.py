@@ -103,20 +103,25 @@ SERVER_DATASETS: Dict[str, DatasetSpec] = {
     "vulnerabilities": DatasetSpec(
         Vulnerability,
         permissions=["vulnerabilities:vulnerability_register:*"],
+        # `source` distinguishes scan findings (nessus/… or null) from pentest
+        # findings (`ai-pentest:<lane>`, vuln_id `AIPT-*`). The export is all-findings
+        # while the register is open-only on managed hosts, so surfacing + filtering
+        # `source` is how an auditor reconciles the two populations in one dataset.
         fields=[
             "id", "vuln_id", "title", "severity", "cvss_score", "cve_id", "cwe_id",
-            "kev_flag", "epss_score", "status", "affected_host", "affected_component",
+            "kev_flag", "epss_score", "status", "source", "affected_host", "affected_component",
             "assigned_to", "due_date", "discovered_at", "resolved_at",
         ],
         search=["title", "vuln_id", "cve_id", "affected_host", "affected_component"],
         sortable=[
             "id", "vuln_id", "title", "severity", "cvss_score", "cve_id", "cwe_id", "status",
-            "kev_flag", "due_date", "discovered_at", "resolved_at", "affected_host",
+            "source", "kev_flag", "due_date", "discovered_at", "resolved_at", "affected_host",
             "affected_component", "assigned_to",
         ],
         filterable={
             "severity": "badge", "status": "badge", "cve_id": "text", "cvss_score": "number",
             "kev_flag": "badge", "due_date": "date", "discovered_at": "date", "title": "text",
+            "source": "text",
             # FE vuln-aligned keys (Asset / Owner / Detected) + the rest of the
             # register's identity/classification columns.
             "affected_host": "text", "assigned_to": "number", "resolved_at": "date",
