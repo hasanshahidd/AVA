@@ -822,7 +822,10 @@ export default function AssetDetailPage() {
 
   // Surface (agentless) assets carry no deep telemetry — the Overview shows the
   // sweep facts + an honest "requires credentials" gate instead of blank cards.
-  const isSurface = (asset?.scan_depth ?? (asset?.discovery_state === 'unmanaged' ? 'surface' : 'credentialed')) === 'surface';
+  // EASM/outside-only hosts are excluded: they DO carry rich outside-in probe
+  // telemetry (DNS/TLS/HTTP/email + health breakdown), rendered by the design's
+  // own A.external path — the surface card would hide all of it.
+  const isSurface = !outsideOnly && (asset?.scan_depth ?? (asset?.discovery_state === 'unmanaged' ? 'surface' : 'credentialed')) === 'surface';
   const surfaceFacts = isSurface && asset ? {
     ip: asset.ip_address || null,
     mac: asset.primary_mac || null,
@@ -834,7 +837,7 @@ export default function AssetDetailPage() {
 
   return (
     <>
-      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => setShowEditModal(true)} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onRunSurfacePentest={isSurface ? () => router.push(`/pentest?new=run&asset=${assetId}`) : undefined} onDelete={() => setShowDeleteConfirm(true)}>
+      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => setShowEditModal(true)} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onRunSurfacePentest={(isSurface || outsideOnly) ? () => router.push(`/pentest?new=run&asset=${assetId}`) : undefined} onDelete={() => setShowDeleteConfirm(true)}>
             {activeTab === 'overview' && (
               <>
                 {/* External (EASM) assets: scanning-scope authorization sits above

@@ -131,8 +131,22 @@ def _run_oscap(host: Optional[str], creds: Dict[str, Any],
     try:
         cmd = _build_command(host, creds, datastream, profile, results_path)
         env = dict(os.environ)
-        # For remote password auth, oscap-ssh honours SSHPASS via sshpass; we
-        # only pass it when a password was supplied (key auth needs nothing).
+        if not _is_local_target(host):
+            # oscap-ssh shells out to system ssh/scp. Trust-on-first-use
+            # (accept-new) is the right model for a scanner hitting freshly
+            # registered assets: add an unseen host key, still reject a changed
+            # one. ssh_accept_unknown_hosts opts out of even that check.
+            # shortcut: TOFU not pinned keys — honour ssh_known_hosts if an
+            # asset's SSH identity must be verified up front.
+            strict = "no" if creds.get("ssh_accept_unknown_hosts") else "accept-new"
+            env["SSH_ADDITIONAL_OPTIONS"] = f"-o StrictHostKeyChecking={strict}"
+            # Password auth: oscap-ssh opens one -M master connection that
+            # authenticates once (then reuses the control socket), so a single
+            # sshpass -e feed covers the whole run. Skip when a key is supplied.
+            pw = creds.get("ssh_password")
+            if pw and not creds.get("ssh_private_key"):
+                cmd = ["sshpass", "-e", *cmd]
+                env["SSHPASS"] = pw
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=900, env=env,
         )
