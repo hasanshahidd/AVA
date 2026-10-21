@@ -224,6 +224,7 @@ export default function InventoryOverview() {
       <LifecycleCard q={estateQ} className="xl:col-span-6" />
       <ProvenanceCard q={estateQ} className="xl:col-span-6" />
       <ObsolescenceCard q={estateQ} className="xl:col-span-6" />
+      <ScanCoverageCard estate={estateQ} inv={invQ} className="xl:col-span-12" />
       {/* ScaleCard spans full width: with SecurityCard removed, 9 half-cards would leave a
           half-empty final row — a full-width fleet-summary strip fills it cleanly instead. */}
       <ScaleCard q={estateQ} className="xl:col-span-12" />
@@ -281,6 +282,54 @@ function body<X>(q: Q<X>, what: string, render: (d: X) => ReactNode, rows = 6): 
   if (q.isLoading) return <Loading rows={rows} />;
   if (!q.data) return <Unavailable what={what} />;
   return render(q.data);
+}
+
+/* ---------- 0) "What we scan" — the static scan-category menu + honest run state ----------
+   Tenant-agnostic on purpose: every tenant (incl. a brand-new one) sees the same capabilities.
+   Run state is derived ONLY from what this page already loads; a category with no signal here
+   reads "Not run yet" — never a guessed "Run". `signal` names the one source that can prove a run. */
+type ScanCat = { label: string; href?: string; signal?: 'cis' | 'vuln' };
+const SCAN_MENU: { domain: string; cats: ScanCat[] }[] = [
+  { domain: 'Compliance', cats: [{ label: 'CIS Benchmark', href: '/assets?tab=cis', signal: 'cis' }] },
+  { domain: 'Vulnerability', cats: [{ label: 'Network / host vulnerability scan (Nessus / Nexpose)', href: '/vulnerabilities', signal: 'vuln' }] },
+  { domain: 'Application & repo security', cats: ['CI/CD', 'SAST (source code)', 'SCA (dependencies)', 'Secrets', 'IaC / config', 'Mobile'].map((label) => ({ label, href: '/pentest' })) },
+  { domain: 'Infrastructure', cats: ['Cloud', 'Kubernetes', 'Database', 'Storage', 'Virtualization', 'Network', 'Host'].map((label) => ({ label, href: '/pentest' })) },
+];
+/** Self-check: missing data -> false, so a fresh tenant shows every category "Not run yet".
+    Vulnerability only has the open critical/high count in scope, so 0 can't prove a run -> "Not run yet". */
+function scanRan(signal: ScanCat['signal'], estate?: Estate | null, inv?: InvOverview | null): boolean {
+  if (signal === 'cis') return (estate?.coverage?.cis ?? 0) > 0 || (inv?.fleet_cis?.scanned ?? 0) > 0;
+  if (signal === 'vuln') return (inv?.attention_queue?.open_critical_high_vulns ?? 0) > 0;
+  return false;
+}
+const RAN_TONE: Tone = { label: 'Run', c: T.success, ink: T.success, bg: '#E7F5EE' };
+const NOT_RAN_TONE: Tone = { label: 'Not run yet', c: GREY, ink: '#475569', bg: '#F1F5F9' };
+function ScanCoverageCard({ estate, inv, className }: { estate: Q<Estate>; inv: Q<InvOverview>; className: string }) {
+  const loading = estate.isLoading || inv.isLoading;
+  return (
+    <Box title="What we scan" sub="Every scan Ava can run — and whether it has run on this estate" icon={<Radar size={14} />} accent={T.base} className={className}>
+      {loading ? <Loading rows={4} /> : (
+        <div className="grid grid-cols-1 gap-x-7 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
+          {SCAN_MENU.map((g) => (
+            <div key={g.domain} className="min-w-0">
+              <Eyebrow>{g.domain}</Eyebrow>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {g.cats.map((c) => {
+                  const tone = scanRan(c.signal, estate.data, inv.data) ? RAN_TONE : NOT_RAN_TONE;
+                  return (
+                    <li key={c.label} className="flex min-w-0 items-center justify-between gap-2 text-[12.5px] text-[#334155]">
+                      {c.href ? <Go href={c.href} className="min-w-0 truncate font-medium text-[#005B96] hover:text-[#014A81]">{c.label}</Go> : <span className="min-w-0 truncate">{c.label}</span>}
+                      <Pill tone={tone} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </Box>
+  );
 }
 
 /* ---------- 1) Estate header ---------- */
