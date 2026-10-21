@@ -21,6 +21,12 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
+const SCANNER_LABELS: Record<string, string> = {
+  nessus: 'Tenable Nessus',
+  tenable: 'Tenable Nessus',
+  nexpose: 'Rapid7 Nexpose',
+};
+
 interface Connection {
   id: number;
   connection_name: string;
@@ -116,7 +122,9 @@ export default function ConnectionsPage() {
 
   const { data: connectionsData, isLoading, isError } = useQuery({
     queryKey: ['connections'],
-    queryFn: () => integrationsApi.listConnections(),
+    // Scanners only: this table also holds the native help desk (ticketing),
+    // dropped Frappe, and discovery/WinRM credential rows, which aren't scanners.
+    queryFn: () => integrationsApi.listConnections({ scanners_only: true }),
     // While a background sync is in flight, refetch so we notice it landing.
     refetchInterval: syncingId != null ? 2500 : false,
   });
@@ -475,7 +483,7 @@ export default function ConnectionsPage() {
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Configuration</h3>
                 <dl className="space-y-2">
                   {([
-                    ['Scanner Type', detailConn.integration_type === 'nessus' ? 'Tenable Nessus' : 'Rapid7 Nexpose'],
+                    ['Scanner Type', SCANNER_LABELS[detailConn.integration_type] ?? detailConn.integration_type],
                     ['Console URL', `${detailConn.console_url}:${detailConn.console_port}`],
                     ['Credential Prefix', detailConn.credential_env_prefix],
                     ['Auth Method', detailConn.auth_method || '—'],
@@ -585,7 +593,7 @@ export default function ConnectionsPage() {
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                       conn.integration_type === 'nessus' ? 'bg-primary-50 text-primary-700' : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {conn.integration_type === 'nessus' ? 'Tenable Nessus' : 'Rapid7 Nexpose'}
+                      {SCANNER_LABELS[conn.integration_type] ?? conn.integration_type}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5 truncate">{conn.console_url}:{conn.console_port}</p>

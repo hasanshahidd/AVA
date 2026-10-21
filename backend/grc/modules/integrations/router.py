@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integrations", tags=["Integrations"])
 
+SCANNER_TYPES = ("nessus", "tenable", "nexpose")
+
 
 class ConnectionCreate(BaseModel):
     connection_name: str = Field(..., min_length=1, max_length=200)
@@ -113,11 +115,17 @@ def list_connections(
     _perm: bool = Depends(require_tenant_permission("admin:integrations:view")),
     integration_type: Optional[str] = None,
     is_active: Optional[bool] = None,
+    scanners_only: bool = False,
 ):
     tenant_id = get_user_primary_tenant(current_user, db)
     query = db.query(IntegrationConnection).filter(
         IntegrationConnection.tenant_id == tenant_id,
     )
+    if scanners_only:
+        # This table holds every connector kind (native help desk/ticketing, dropped
+        # Frappe, discovery/WinRM creds, siem, ...). Wizard/onboarding rows can even
+        # carry the default vuln_scanner category, so match on scanner adapter type.
+        query = query.filter(IntegrationConnection.integration_type.in_(SCANNER_TYPES))
     if integration_type:
         query = query.filter(IntegrationConnection.integration_type == integration_type)
     if is_active is not None:
