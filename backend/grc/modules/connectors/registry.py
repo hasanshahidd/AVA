@@ -106,13 +106,28 @@ def _bootstrap() -> None:
     provider_modules = [
         # Ticketing — vuln ticketing
         "grc.modules.connectors.providers.servicenow",
-        "grc.modules.connectors.providers.frappe_helpdesk",
+        "grc.modules.connectors.providers.bmc_remedy",
+        "grc.modules.connectors.providers.halo_itsm",
         # SIEM — exploitation-signal pulls
         "grc.modules.connectors.providers.splunk",
         "grc.modules.connectors.providers.wazuh",
         "grc.modules.connectors.providers.qradar",
+        # Endpoint / EDR — detection pulls
+        "grc.modules.connectors.providers.crowdstrike",
+        "grc.modules.connectors.providers.sentinelone",
+        "grc.modules.connectors.providers.defender",
+        # Identity — sign-in / audit telemetry pulls
+        "grc.modules.connectors.providers.okta",
+        "grc.modules.connectors.providers.entra",
         # Pen-test — exploit feed
         "grc.modules.connectors.providers.metasploit",
+        "grc.modules.connectors.providers.core_impact",
+        # Collaboration — meeting/notification targets
+        "grc.modules.connectors.providers.msteams",
+        "grc.modules.connectors.providers.office365",
+        "grc.modules.connectors.providers.zoom",
+        # Transcription — meeting transcripts
+        "grc.modules.connectors.providers.fireflies",
         # EASM passive sources — pull-only; read by the asset_discovery collector.
         "grc.modules.connectors.providers.shodan",
         "grc.modules.connectors.providers.censys",

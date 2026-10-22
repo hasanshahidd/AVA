@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plug, Plus, RefreshCw, CheckCircle, AlertCircle, Loader2, X, ExternalLink,
-  Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2,
+  Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2, Mic, Cpu, Fingerprint, Globe,
 } from 'lucide-react';
 import { connectorsApi, type ConnectorProviderMeta, type ConnectorRow } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -13,11 +13,15 @@ import { useToast } from '@/components/ui/ToastProvider';
 const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; description: string; }> = {
   ticketing:  { label: 'Ticketing',     icon: Ticket,         description: 'Push vulnerabilities and exceptions to your ITSM. Two-way status sync.' },
   siem:       { label: 'SIEM',          icon: Activity,       description: 'Pull active-exploitation signals to enrich vulnerability priority.' },
+  edr:        { label: 'Endpoint / EDR', icon: Cpu,           description: 'Pull endpoint detections and host posture to enrich vulnerability priority.' },
+  identity:   { label: 'Identity',      icon: Fingerprint,    description: 'Pull sign-in and audit telemetry from your IdP to flag risky identity activity.' },
   pentest:    { label: 'Pen-test',      icon: ShieldAlert,    description: 'Pull confirmed exploit sessions to boost vulnerability priority.' },
   collab:     { label: 'Collaboration', icon: MessageSquare,  description: 'Post alerts and findings to your team channels.' },
+  transcribe: { label: 'Transcription', icon: Mic,            description: 'Pull meeting transcripts to auto-create committee meeting minutes.' },
+  easm_source:{ label: 'EASM Sources',  icon: Globe,          description: 'Passive external attack-surface intel — enrich asset discovery with internet-exposure data.' },
 };
 
-const CATEGORY_ORDER = ['ticketing', 'siem', 'pentest', 'collab'] as const;
+const CATEGORY_ORDER = ['ticketing', 'siem', 'edr', 'identity', 'pentest', 'collab', 'transcribe', 'easm_source'] as const;
 
 export default function ConnectorsAdminPage() {
   const [openSetupFor, setOpenSetupFor] = useState<ConnectorProviderMeta | null>(null);
@@ -57,6 +61,9 @@ export default function ConnectorsAdminPage() {
             Wire ServiceNow, Splunk, MS Teams and more. Credentials are encrypted at rest;
             OAuth2 connectors authorise per-tenant through their vendor's consent screen.
           </p>
+          <a href="/connectors" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
+            Browse the full integration catalogue (Cloud, Identity, Endpoint, HR…) <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
         {catalog && !catalog.encryption_enabled && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
