@@ -39,6 +39,7 @@ def _generate_audit_description(
     resource_id: Optional[int],
     path: str,
     request_payload: Optional[dict],
+    field_changes: Optional[list] = None,
 ) -> str:
     """Return a plain-English summary of an audit log action."""
     payload = request_payload or {}
@@ -67,10 +68,44 @@ def _generate_audit_description(
         "teams": "team", "roles": "role", "departments": "department",
         "password-policy": "password policy", "organization": "organization",
     }
-    rt = RT.get(resource_type, resource_type.replace("_", " ") if resource_type else "record")
+    rt = RT.get(resource_type, resource_type.replace("_", " ").replace("-", " ") if resource_type else "record")
     id_part = f" #{resource_id}" if resource_id else ""
     nm = _name()
     nm_part = f' "{nm}"' if nm else ""
+
+    # Human-friendly labels for changed fields (from the ORM field-diff capture).
+    _FRIENDLY_FIELDS = {
+        "last_login": "last login", "display_name": "name", "is_active": "active status",
+        "assigned_to": "assignee", "due_date": "due date", "cde_environment": "PCI scope",
+    }
+    _NOISE_FIELDS = {"id", "tenant_id", "created_at", "updated_at",
+                     "created_on", "updated_on", "modified_at"}
+
+    def _friendly(k: str) -> str:
+        return _FRIENDLY_FIELDS.get(k, k.replace("_", " "))
+
+    def _entity_name() -> Optional[str]:
+        """Pull the record's display name from the captured field diff (so
+        updates/deletes can name the record even when the request body didn't)."""
+        for ent in (field_changes or []):
+            fields = ent.get("fields") or {}
+            for k in ("name", "title", "display_name", "username", "email", "label"):
+                if k in fields:
+                    v = fields[k].get("new") or fields[k].get("old")
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+        return None
+
+    def _changed_labels() -> list:
+        out: list = []
+        for ent in (field_changes or []):
+            for k in (ent.get("fields") or {}):
+                if k in _NOISE_FIELDS or k.endswith("_id"):
+                    continue
+                lbl = _friendly(k)
+                if lbl not in out:
+                    out.append(lbl)
+        return out
 
     # Gap analysis
     if "gap-analysis" in path_lower or "gap_analysis" in path_lower:
@@ -132,17 +167,20 @@ def _generate_audit_description(
         status_val = payload.get("status")
         if isinstance(status_val, str):
             return f'Updated {rt}{id_part} status to "{status_val}"'
-        if nm:
-            return f'Updated {rt} "{nm}"'
-        return f"Updated {rt}{id_part}"
+        ename = nm or _entity_name()
+        target = f'{rt} "{ename}"' if ename else f"{rt}{id_part}"
+        changed = _changed_labels()
+        suffix = f" — changed {', '.join(changed[:4])}" if changed else ""
+        return f"Updated {target}{suffix}"
 
     if action == "delete":
-        if nm:
-            return f'Deleted {rt} "{nm}"'
+        ename = nm or _entity_name()
+        if ename:
+            return f'Deleted {rt} "{ename}"'
         return f"Deleted {rt}{id_part}"
 
     if action == "read":
-        return f"Viewed {rt} #{resource_id}" if resource_id else f"Viewed {rt} list"
+        return f"Viewed {rt} #{resource_id}" if resource_id else f"Viewed {rt}"
 
     if action.endswith("_failed"):
         base = action.replace("_failed", "")
@@ -1183,6 +1221,7 @@ def list_audit_logs(
             resource_id=log.resource_id,
             path=changes.get("path", ""),
             request_payload=changes.get("request"),
+            field_changes=changes.get("field_changes"),
         )
 
         result.append({

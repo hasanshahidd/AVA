@@ -218,17 +218,9 @@ function deriveModuleContext(log: AuditLogEntry): { module: string; submodule: s
  * extra "in Governance" hint would be noise).
  */
 function enrichDescription(log: AuditLogEntry): string {
-  const base = log.description || `${titleCase(log.action || 'action')} on ${log.resource_type || 'record'}`;
-  const ctx = deriveModuleContext(log);
-  const moduleLabel = ctx.submodule || ctx.module;
-  if (!moduleLabel || moduleLabel === 'System') return base;
-  const lower = base.toLowerCase();
-  if (lower.includes(moduleLabel.toLowerCase())) return base;
-  // Some backend phrasings already say "in <module>" — don't double up.
-  if (/\bin\s+\w/.test(lower) && (lower.includes('module') || lower.includes('framework') || lower.includes('document'))) {
-    return base;
-  }
-  return `${base} — in ${moduleLabel}`;
+  // The MODULE column already shows the module, so we no longer append
+  // "— in <module>" here — it was pure duplication that made rows read poorly.
+  return log.description || `${titleCase(log.action || 'action')} on ${log.resource_type || 'record'}`;
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
