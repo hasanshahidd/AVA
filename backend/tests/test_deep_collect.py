@@ -95,3 +95,48 @@ def test_executor_runs_deep_collect_after_resolve():
 
 def test_deep_collect_is_bounded_per_run():
     assert isinstance(dc.MAX_DEEP_COLLECT_PER_RUN, int) and dc.MAX_DEEP_COLLECT_PER_RUN > 0
+
+
+def test_wmi_collect_stays_windows_and_reads_defender(monkeypatch):
+    """transport='wmi' is Windows over DCOM: no SSH/Linux path may run, the OS
+    comes from the WMI caption (healing the old 'linux' mislabel), and the WMI
+    security read feeds the posture. Rows are shaped like impacket's — CIM
+    booleans arrive as the STRINGS 'True'/'False'."""
+    import re
+    from grc.models import ITAsset
+    from grc.modules.compliance_plugins.services import agentless_inventory as ai, os_detector
+
+    # The WMI EDR map must stay the PowerShell probe's $known map.
+    ps = re.search(r"\$known = @\{(.*?)\}", ai._WIN_DEEP_PS).group(1)
+    assert ai._EDR_SERVICES == dict(re.findall(r"'([^']+)'='([^']+)'", ps))
+
+    linux = []
+    monkeypatch.setattr(os_detector, "detect_linux", lambda c: linux.append("os") or ("linux", None, None))
+    monkeypatch.setattr(ai, "collect_linux_deep", lambda c: linux.append("deep") or {})
+    monkeypatch.setattr(dc, "decrypt_secret", lambda s: "pw")
+    monkeypatch.setattr(ai, "collect_windows_wmi", lambda c: ([], {"os_version": "Microsoft Windows 11 Pro"}))
+    rows = {"MSFT_MpComputerStatus": [{"AntivirusEnabled": "True", "RealTimeProtectionEnabled": "False"}],
+            "AntiVirusProduct": [{"displayName": "Windows Defender", "productState": 0x61100},
+                                 {"displayName": "Old AV", "productState": 0x60110}],
+            "Win32_Service": [{"Name": "Sense", "State": "Stopped"}]}
+    q = lambda ns, wql: next(v for k, v in rows.items() if k in wql)  # noqa: E731
+    monkeypatch.setattr(ai, "collect_windows_wmi_deep", lambda c: ai._wmi_security_sections(q))
+
+    class P:
+        username = "svc"; domain = None; secret_encrypted = "x"
+
+    class DB:
+        add = flush = lambda self, *a: None
+        def query(self, *a): raise RuntimeError("no db")  # connection registration is best-effort
+
+    a = ITAsset(ip_address="10.0.0.7", os_family="linux", os_normalized="linux")
+    dc.collect_host(DB(), a, P(), "wmi")
+
+    assert linux == []
+    assert (a.os_family, a.os_normalized, a.os_edition) == ("windows", "windows-11", "Pro")
+    d = a.platform_properties["defender"]["data"]
+    assert d["antivirus_enabled"] is True and d["realtime_protection"] is False
+    av = a.platform_properties["security_products"]["data"]["antivirus"]
+    assert [(x["enabled"], x["up_to_date"]) for x in av] == [(True, True), (False, False)]
+    assert a.security_posture["antivirus_products"] == ["Windows Defender"]
+    assert a.security_posture["edr_stopped"] == ["Microsoft Defender for Endpoint"]

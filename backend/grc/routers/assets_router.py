@@ -3722,7 +3722,7 @@ def get_detected_software(
     if posture is None and inventory:
         try:
             from ..modules.compliance_plugins.services.security_classifier import summarize_posture
-            posture = summarize_posture(inventory)
+            posture = summarize_posture(inventory, asset.platform_properties)
         except Exception:
             posture = None
     return {

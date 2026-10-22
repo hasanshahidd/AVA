@@ -79,6 +79,29 @@ def test_products_are_deduplicated():
     assert p["antivirus_products"] == ["McAfee Endpoint Security"]
 
 
+def test_deep_scan_security_read_feeds_the_posture():
+    # Asset 296's real shape: Defender on (OS component, not in the software
+    # list), MDE sensor installed but its Sense service stopped.
+    def pp(edr, av=({"name": "Windows Defender", "enabled": True},), defender=True):
+        return {"defender": {"status": "discovered", "data": {"antivirus_enabled": defender}},
+                "security_products": {"status": "discovered", "data": {"antivirus": list(av), "edr_xdr": edr}}}
+    mde_stopped = [{"product": "Microsoft Defender for Endpoint", "service": "Sense", "running": False}]
+    p = summarize_posture([sw("Google Chrome")], pp(mde_stopped))
+    assert p["has_antivirus"] and p["antivirus_products"] == ["Windows Defender"]
+    assert not p["has_edr"] and p["edr_stopped"] == ["Microsoft Defender for Endpoint"]
+    assert p["endpoint_protected"] and p["software_total"] == 1
+    # Defender enabled but no SecurityCenter2 entry (Windows Server) → still AV.
+    assert summarize_posture([], pp([], av=()))["antivirus_products"] == ["Microsoft Defender Antivirus"]
+    # A disabled AV and Defender off → nothing.
+    assert not summarize_posture([], pp([], av=({"name": "Sophos", "enabled": False},), defender=False))["has_antivirus"]
+    # Stopped EDR overrides the software-list hit for the SAME product...
+    cs = [{"product": "CrowdStrike Falcon", "service": "CSFalconService", "running": False}]
+    assert not summarize_posture([sw("CrowdStrike Windows Sensor")], pp(cs))["has_edr"]
+    # ...running counts; an EDR the deep scan doesn't know still counts via software.
+    assert summarize_posture([], pp([dict(cs[0], running=True)]))["edr_products"] == ["CrowdStrike Falcon"]
+    assert summarize_posture([sw("Huntress Agent")], pp(mde_stopped))["edr_products"] == ["Huntress Agent"]
+
+
 class _Asset:
     detected_software_json = None
     security_posture = None
