@@ -8,15 +8,16 @@ import UsersManagementPage from './users/page';
 import RolesManagementPage from './roles/page';
 import TeamsAdminPage from './teams/page';
 import DepartmentsAdminPage from './departments/page';
+import AuditLogsPage from './audit-logs/page';
 import PasswordPolicyPage from './password-policy/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
 import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'identity' | 'password-policy' | 'integrations';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'identity' | 'password-policy' | 'integrations' | 'audit';
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
   'company','users','roles','teams','departments','identity','password-policy',
-  'integrations',
+  'integrations','audit',
 ]);
 
 export default function AdminPage() {
@@ -44,6 +45,8 @@ export default function AdminPage() {
     { id: 'password-policy', label: 'Password Policy', icon: Lock },
     // Vulnerability scanner consoles — Rapid7 Nexpose / Tenable Nessus ingest.
     { id: 'integrations', label: 'Vulnerability Scanners', icon: Server },
+    // Tenant-scoped activity trail — who did what, when (audit_log middleware).
+    { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
 
   return (
@@ -84,6 +87,7 @@ export default function AdminPage() {
         {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'password-policy' && <PasswordPolicyPage />}
         {activeTab === 'integrations' && <IntegrationsConnectionsPage />}
+        {activeTab === 'audit' && <AuditLogsPage />}
       </div>
       </div>
     </div>

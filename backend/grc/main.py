@@ -7,6 +7,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from .models import init_master_db
 from .audit_logger import should_audit_request, parse_request_payload, write_audit_log
+from . import audit_capture  # noqa: F401 — registers the before_flush field-diff listener at startup
 from .routers import (
     auth_router,
     tenants_router,
@@ -129,6 +130,15 @@ async def audit_log_middleware(request: Request, call_next):
     import json as _json
     from starlette.concurrency import iterate_in_threadpool
     started_at = time.time()
+
+    # Start ORM-level before/after field-diff capture for this request. The
+    # before_flush listener (audit_capture) accumulates column changes on a
+    # request-scoped ContextVar; write_audit_log folds them into the one row.
+    try:
+        from .audit_capture import begin_capture
+        request.state._audit_capture_token = begin_capture()
+    except Exception:
+        request.state._audit_capture_token = None
 
     request_payload = None
     if request.method.upper() not in {"GET", "DELETE", "HEAD", "OPTIONS"}:

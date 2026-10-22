@@ -94,6 +94,11 @@ _MODULE_SUB_ENTITY_PREFIXES = {
     "issue-management",
     "criticality-assessments",
     "auditor-portal",
+    # Admin routes are all /admin/<entity>/[id]/... (teams, users, roles,
+    # departments, password-policy, …). Without this they'd bucket under a
+    # generic "admin" resource_type and lose the record id; treating admin as
+    # a sub-entity module captures the real entity + id instead.
+    "admin",
 }
 
 # Map module path slugs → canonical resource type names
@@ -547,6 +552,19 @@ def write_audit_log(
             # HTTP status code. Only populated when middleware passed it in.
             if response_error is not None:
                 details["response_error"] = _sanitize_value(response_error)
+
+            # Field-level before/after diffs captured automatically at the ORM
+            # layer (audit_capture.before_flush) for every create/update/delete
+            # this request made. Folded into this single row so the UI can show
+            # "field: old → new" without writing a second audit row.
+            try:
+                from .audit_capture import end_capture
+                token = getattr(getattr(request, "state", None), "_audit_capture_token", None)
+                field_changes = end_capture(token)
+                if field_changes:
+                    details["field_changes"] = _sanitize_value(field_changes)
+            except Exception:
+                pass
 
             log = AuditLog(
                 tenant_id=tenant_id,

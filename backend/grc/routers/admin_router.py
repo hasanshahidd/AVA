@@ -62,6 +62,10 @@ def _generate_audit_description(
         "documents": "document", "assets": "asset", "users": "user",
         "integrations": "integration", "workflow": "workflow",
         "system": "system", "chatbot": "chat",
+        # Admin sub-entities — singular labels so rows read "Deleted team #2"
+        # rather than "Deleted teams #2".
+        "teams": "team", "roles": "role", "departments": "department",
+        "password-policy": "password policy", "organization": "organization",
     }
     rt = RT.get(resource_type, resource_type.replace("_", " ") if resource_type else "record")
     id_part = f" #{resource_id}" if resource_id else ""

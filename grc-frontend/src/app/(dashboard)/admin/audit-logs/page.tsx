@@ -552,6 +552,53 @@ export default function AuditLogsPage() {
               </div>
             </section>
 
+            {/* Field-level before/after diff, captured automatically at the ORM
+                layer for every create/update/delete the request made. New shape
+                is a list of entities; older pilot rows stored a flat field map. */}
+            {(() => {
+              type FieldMap = Record<string, { old: unknown; new: unknown }>;
+              type Entity = { entity?: string; op?: string; pk?: unknown; fields: FieldMap };
+              const raw = selectedLog.details?.field_changes as Entity[] | FieldMap | undefined;
+              if (!raw) return null;
+              // Normalize: array = new shape; plain {field:{old,new}} = old pilot row.
+              const entities: Entity[] = Array.isArray(raw)
+                ? raw
+                : [{ fields: raw }];
+              const nonEmpty = entities.filter((e) => e.fields && Object.keys(e.fields).length > 0);
+              if (nonEmpty.length === 0) return null;
+              const show = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : String(v));
+              const opColor: Record<string, string> = {
+                create: 'text-emerald-700', update: 'text-slate-600', delete: 'text-rose-700',
+              };
+              return (
+                <section>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Changes</p>
+                  <div className="space-y-2">
+                    {nonEmpty.map((e, i) => (
+                      <div key={`${e.entity ?? 'record'}-${String(e.pk ?? i)}`} className="bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                        {(e.entity || e.op) && (
+                          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 text-[11px]">
+                            {e.op && <span className={`font-semibold uppercase tracking-wide ${opColor[e.op] ?? 'text-slate-500'}`}>{e.op}</span>}
+                            {e.entity && <span className="font-mono text-slate-500">{e.entity}{e.pk != null ? ` #${String(e.pk)}` : ''}</span>}
+                          </div>
+                        )}
+                        <div className="divide-y divide-slate-100">
+                          {Object.entries(e.fields).map(([field, v]) => (
+                            <div key={field} className="flex items-center gap-2 px-3 py-2 text-xs">
+                              <span className="font-mono text-slate-500 w-32 shrink-0 truncate">{field}</span>
+                              <span className="text-rose-600 line-through break-all">{show(v?.old)}</span>
+                              <span className="text-slate-400">→</span>
+                              <span className="text-emerald-700 font-medium break-all">{show(v?.new)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* Payload */}
             {hasPayload && (
               <section>
