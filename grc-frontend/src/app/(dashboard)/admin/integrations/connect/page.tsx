@@ -315,7 +315,7 @@ export default function ConnectWizardPage({
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Connect your first server</h1>
             <p className="text-slate-600">
-              Ava needs at least one connected server to scan against. Pick a platform — we&apos;ll generate a one-liner that sets up everything for you.
+              CAIVA needs at least one connected server to scan against. Pick a platform — we&apos;ll generate a one-liner that sets up everything for you.
             </p>
           </div>
         )}
@@ -333,7 +333,7 @@ export default function ConnectWizardPage({
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-slate-900">One device at a time</h3>
                   <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    Each connection pairs ONE credential (username + password) with ONE target host. Ava encrypts the password with your tenant&apos;s Fernet key and only uses it at scan time.
+                    Each connection pairs ONE credential (username + password) with ONE target host. CAIVA encrypts the password with your tenant&apos;s Fernet key and only uses it at scan time.
                   </p>
                   <p className="mt-2 text-xs text-slate-600">
                     <strong>Got assets in IT Assets already?</strong>{' '}
@@ -956,7 +956,7 @@ function DoAccountForm({ token, onCancel }: { token: string; onCancel: () => voi
       <div className="bg-white rounded-xl shadow-md p-8 border-2 border-emerald-300 text-center">
         <div className="text-5xl mb-3">✅</div>
         <h2 className="text-2xl font-bold text-slate-900 mb-2">DigitalOcean Account Connected!</h2>
-        <p className="text-slate-600 mb-4">Ava discovered your account resources (droplets, volumes, VPCs, databases, Kubernetes…). Open the asset to see them.</p>
+        <p className="text-slate-600 mb-4">CAIVA discovered your account resources (droplets, volumes, VPCs, databases, Kubernetes…). Open the asset to see them.</p>
         <button onClick={() => window.location.href = '/assets'}
           className="mt-3 px-5 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700">
           Go to inventory →
@@ -1137,7 +1137,7 @@ function AwsForm({ token, onCancel }: { token: string; onCancel: () => void }) {
       <div className="bg-white rounded-xl shadow-md p-8 border-2 border-emerald-300 text-center">
         <div className="text-5xl mb-3">✅</div>
         <h2 className="text-2xl font-bold text-slate-900 mb-2">AWS Account Connected!</h2>
-        <p className="text-slate-600 mb-4">Ava can now run read-only CIS AWS Foundations scans against this account.</p>
+        <p className="text-slate-600 mb-4">CAIVA can now run read-only CIS AWS Foundations scans against this account.</p>
         <div className="text-xs text-slate-400">Reloading…</div>
         <button
           onClick={() => window.location.href = '/asset-discovery'}
@@ -1156,7 +1156,7 @@ function AwsForm({ token, onCancel }: { token: string; onCancel: () => void }) {
         <div>
           <h2 className="font-semibold text-slate-900">Connect AWS Account</h2>
           <p className="text-xs text-slate-600">
-            Paste an IAM <strong>ReadOnlyAccess</strong> key. Ava never modifies your AWS — only reads config for scanning.
+            Paste an IAM <strong>ReadOnlyAccess</strong> key. CAIVA never modifies your AWS — only reads config for scanning.
           </p>
         </div>
       </div>

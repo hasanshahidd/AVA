@@ -21,7 +21,7 @@ const RANGES = [
   { days: 365, label: '1 year' },
 ];
 
-// Ava is cyber-only: the metric catalog is shared with GRC, so hide the GRC-only modules
+// CAIVA is cyber-only: the metric catalog is shared with GRC, so hide the GRC-only modules
 // (their snapshots are meaningless here). Edit this set to show more.
 const GRC_ONLY_MODULES = new Set(['risk', 'compliance', 'controls', 'evidence', 'vendors', 'governance']);
 

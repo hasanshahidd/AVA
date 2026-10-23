@@ -87,7 +87,7 @@ export default function ScanFlowsPage() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-slate-900">Client runs their own scanner?</div>
-          <div className="text-xs text-slate-500">Connect it with a URL + API keys and pull their findings into Ava — no scanning from our side.</div>
+          <div className="text-xs text-slate-500">Connect it with a URL + API keys and pull their findings into CAIVA — no scanning from our side.</div>
         </div>
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-700 group-hover:gap-2.5 transition-all flex-none">
           Connect scanner <ArrowRight size={15} />

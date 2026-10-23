@@ -18,8 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata = {
-  title: 'Ava',
-  description: 'Ava — AI-native cybersecurity assurance for your external attack surface',
+  title: 'CAIVA.IO',
+  description: 'CAIVA.IO — Centralized Asset Inventory and Visibility Assurance',
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },

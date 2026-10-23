@@ -697,7 +697,7 @@ export default function ConnectionsPage() {
                     <span className="text-xs leading-relaxed">
                       <span className="font-medium text-slate-800">Push decisions to scanner (two-way sync)</span>
                       <span className="block text-slate-500 mt-0.5">
-                        When a finding is marked false positive or granted an exception in Ava, mirror that
+                        When a finding is marked false positive or granted an exception in CAIVA, mirror that
                         decision in the scanner (e.g. a host-scoped Nessus plugin rule). Actions the scanner&apos;s API
                         can&apos;t represent are recorded as skipped with the reason. Auto-close on verified re-scan is
                         always on and doesn&apos;t modify the scanner.

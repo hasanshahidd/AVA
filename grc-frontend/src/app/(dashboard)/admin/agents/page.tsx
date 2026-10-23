@@ -310,8 +310,8 @@ export default function AgentsAdminPage() {
           <div className="p-4 border border-primary-200 rounded-lg bg-primary-50">
             <div className="text-xs font-semibold text-primary-800 mb-2">When to use a collector vs server-side agentless?</div>
             <ul className="text-[11px] text-slate-700 space-y-1.5 list-disc list-inside">
-              <li><strong>Use the collector</strong> when the bank's firewall blocks inbound from Ava — collector dials OUT, then dials IN to the targets it can already reach.</li>
-              <li><strong>Use agentless</strong> when Ava can reach the targets directly (cloud-hosted backend + targets with public IPs / VPN).</li>
+              <li><strong>Use the collector</strong> when the bank's firewall blocks inbound from CAIVA — collector dials OUT, then dials IN to the targets it can already reach.</li>
+              <li><strong>Use agentless</strong> when CAIVA can reach the targets directly (cloud-hosted backend + targets with public IPs / VPN).</li>
               <li>Both paths reuse the same Connect Wizard credentials. Switching is a one-line config change.</li>
             </ul>
           </div>
@@ -344,7 +344,7 @@ export default function AgentsAdminPage() {
                     <EmptyState
                       icon="🤖"
                       title="No agents installed yet"
-                      description="Install a collector agent to push CIS scan results back to Ava — useful when WinRM/SSH inbound is blocked or for endpoints behind NAT."
+                      description="Install a collector agent to push CIS scan results back to CAIVA — useful when WinRM/SSH inbound is blocked or for endpoints behind NAT."
                       primaryAction={{ label: '🪄 Setup Wizard', onClick: () => { setWizardPrefill(null); setShowWizard(true); } }}
                       secondaryAction={{ label: 'Use Agentless instead', href: '/admin/discover' }}
                     />

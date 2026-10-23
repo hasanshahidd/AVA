@@ -350,7 +350,7 @@ export default function LicensesPage() {
     else if (entQ.isError) body = loadError('Entitlements', () => entQ.refetch());
     else if (!entitlements.length) body = (
       <EmptyBlock icon={<KeyRound size={18} />} title="No entitlements recorded yet"
-        body="Record the software licenses you own — quantity, terms, cost and expiry — or import them from a license sheet. Ava then compares them with what credentialed scans found installed, and flags unlicensed software, over-deployment and upcoming renewals."
+        body="Record the software licenses you own — quantity, terms, cost and expiry — or import them from a license sheet. CAIVA then compares them with what credentialed scans found installed, and flags unlicensed software, over-deployment and upcoming renewals."
         action={canCreate ? (
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button type="button" className={BTN_PRIMARY} onClick={openCreate}><Plus size={14} aria-hidden />Add your first entitlement</button>

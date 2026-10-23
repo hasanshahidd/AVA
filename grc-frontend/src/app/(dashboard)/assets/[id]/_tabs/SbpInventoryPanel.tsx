@@ -46,7 +46,7 @@ const filledVal = (v: any) => v !== '' && v !== null && v !== undefined;
 function Badge({ kind }: { kind: 'auto' | 'edited' }) {
   const auto = kind === 'auto';
   return (
-    <span title={auto ? "Auto-filled by Ava from this asset's scans and vendor feeds" : 'Changed by an analyst — overrides the auto value'}
+    <span title={auto ? "Auto-filled by CAIVA from this asset's scans and vendor feeds" : 'Changed by an analyst — overrides the auto value'}
       className="flex-none rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
       style={auto ? { background: '#EEF0FF', color: IND } : { background: '#FEF3C7', color: '#92400E' }}>
       {auto ? 'auto' : 'edited'}

@@ -453,7 +453,7 @@ function MarqueeRow({ variant }: { variant: 'onWhite' | 'onBlue' }) {
 // The glassy, light double-slider. Two faces — Sign in and Register — sit
 // side by side inside one frosted card; the blue brand panel glides across to
 // swap which one is in front (the "swap" from the reference clip), kept in
-// Ava's own light + #005B96 palette rather than the dark glass of the video.
+// CAIVA's own light + #005B96 palette rather than the dark glass of the video.
 function AuthSlider(props: {
   mode: 'signin' | 'register';
   onMode: (m: 'signin' | 'register') => void;
@@ -539,7 +539,7 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
   const toRegister = mode === 'signin';
   return (
     <div className="relative h-full w-full overflow-hidden text-white [backdrop-filter:blur(22px)_saturate(1.3)]">
-      {/* Ava-blue FROSTED glass — translucent enough that, as it glides across
+      {/* CAIVA-blue FROSTED glass — translucent enough that, as it glides across
           the form on toggle, its backdrop-blur visibly frosts the words beneath
           (the reference clip's glassy sweep), while still reading saturated. */}
       <div className="absolute inset-0 [background:linear-gradient(150deg,rgba(60,151,214,.93)_0%,rgba(46,134,194,.94)_46%,rgba(26,99,153,.96)_100%)]" />
@@ -550,13 +550,13 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
         <div className="inline-flex items-center gap-2.5">
           <LogoMark className="lg-logo-spin h-10 w-10 [filter:brightness(0)_invert(1)]" />
           <span className="inline-flex items-center gap-2">
-            <span className="text-[2rem] font-extrabold tracking-[-.03em]">Ava</span>
+            <span className="text-[2rem] font-extrabold tracking-[-.03em]">CAIVA</span>
             <span className="rounded-[9px] bg-white px-2 py-0.5 text-[.8rem] font-bold tracking-[.09em] text-[#005B96]">AI</span>
           </span>
         </div>
         <div className="inline-flex items-center gap-3">
           <span className="h-px w-8 bg-white/60" />
-          <span className="text-[.7rem] font-semibold uppercase tracking-[.22em] text-white/80">AI-native cybersecurity assurance</span>
+          <span className="text-[.7rem] font-semibold uppercase tracking-[.22em] text-white/80">Centralized Asset Inventory and Visibility Assurance</span>
         </div>
         <h1 className="m-0 text-balance text-[clamp(1.6rem,2.1vw,2.3rem)] font-bold leading-[1.07] tracking-[-.03em] text-white">
           Discover, validate, and <span className="underline decoration-white/35 decoration-2 underline-offset-[6px]">prove</span> your defenses.
@@ -588,7 +588,7 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
         <div key={mode} className="lg-swap mt-[clamp(.3rem,1.2vh,.85rem)] border-t border-white/20 pt-[clamp(.45rem,1.4vh,.95rem)]">
           {toRegister ? (
             <p className="text-[.82rem] leading-[1.5] text-white/75">
-              Need an Ava workspace? Contact your administrator to get set up.
+              Need an CAIVA workspace? Contact your administrator to get set up.
             </p>
           ) : (
             <button
@@ -607,7 +607,7 @@ function BrandPanel({ mode, onMode }: { mode: 'signin' | 'register'; onMode: (m:
 
 function RegisterIntro({ registrationOpen, onSignIn }: { registrationOpen: boolean; onSignIn: () => void; }) {
   const POINTS = [
-    'Your own tenant-isolated Ava workspace',
+    'Your own tenant-isolated CAIVA workspace',
     'Outside-in discovery & inventory of your attack surface',
     'Continuous vulnerability, CVE & exposure monitoring',
   ];
@@ -618,7 +618,7 @@ function RegisterIntro({ registrationOpen, onSignIn }: { registrationOpen: boole
       </div>
       <h2 className="m-0 mb-1 text-[clamp(1.4rem,2.5vh,1.75rem)] font-bold tracking-[-.02em] [text-shadow:0_2px_22px_rgba(0,91,150,.26)]">Register your organization</h2>
       <p className="m-0 mb-[clamp(.6rem,1.9vh,1.2rem)] text-[.9rem] text-[#64748B]">
-        Stand up your workspace and point Ava at your external attack surface.
+        Stand up your workspace and point CAIVA at your external attack surface.
       </p>
 
       <ul className="mb-[clamp(.7rem,2vh,1.3rem)] space-y-2.5">
@@ -686,7 +686,7 @@ function SignInForm(props: {
             <button type="button" onClick={props.onSwitch} className="font-semibold text-[#005B96] underline-offset-2 hover:underline">Switch</button>
           </>
         ) : (
-          'Sign in to your Ava workspace.'
+          'Sign in to your CAIVA workspace.'
         )}
       </p>
 
@@ -744,7 +744,7 @@ function SignInForm(props: {
 
       {/* Self-serve registration removed — mention admin provisioning instead. */}
       <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.8rem] text-[#64748B] lg:hidden">
-        Need an Ava workspace? Contact your administrator.
+        Need an CAIVA workspace? Contact your administrator.
       </p>
 
       <p className="m-0 mt-[clamp(.4rem,1.3vh,.9rem)] text-center text-[.76rem] leading-[1.48] text-[#94A3B8]">
@@ -800,7 +800,7 @@ function IntroCurtain() {
         <div className="-mt-2.5 h-[26px] w-[120px] rounded-full shadow-[0_14px_28px_-6px_rgba(1,25,58,.55)] [background:radial-gradient(ellipse_at_50%_38%,rgba(255,255,255,.34),rgba(255,255,255,.05)_62%,transparent_74%)]" />
       </div>
       <div className="inline-flex items-center gap-2 text-[2.5rem] font-extrabold tracking-[-.03em] text-white">
-        Ava <span className="rounded-lg bg-white px-2 py-1 text-[.92rem] font-bold tracking-[.08em] text-[#005B96]">AI</span>
+        CAIVA <span className="rounded-lg bg-white px-2 py-1 text-[.92rem] font-bold tracking-[.08em] text-[#005B96]">AI</span>
       </div>
       <div className="text-[.72rem] font-semibold uppercase tracking-[.24em] text-white/70">Scanning IT assets · Continuous assurance</div>
       {/* blue pusher anchored to the panel's left edge — rides the panel as it slides off */}

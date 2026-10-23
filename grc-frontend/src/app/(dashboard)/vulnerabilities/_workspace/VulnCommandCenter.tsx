@@ -9,7 +9,7 @@
  * almost NO signal in others (KEV, EPSS, public-exploit, SLA on-time, MTTR —
  * threat-intel enrichment hasn't run). Every panel leads with a populated number
  * turned into a business "so what" (exposure, blast radius, what to fix first and
- * why), then renders it with a premium Ava-themed chart — a recharts donut for
+ * why), then renders it with a premium CAIVA-themed chart — a recharts donut for
  * severity, gradient tracked bars for priority & finding-type, a heat grid for
  * severity×criticality, a treemap for host blast-radius, a segmented pipeline for
  * the remediation lifecycle. The empty-now-but-real-later signals fold into ONE
@@ -22,8 +22,8 @@
  *     the client can't cheaply derive (criticality×severity matrix, per-asset
  *     summed priority, de-branded finding-type families).
  *
- * Ava tokens only: #005B96 accent, light theme, grey canvas + white cards,
- * Poppins (inherited), soft shadows. Recharts marks are themed to the Ava
+ * CAIVA tokens only: #005B96 accent, light theme, grey canvas + white cards,
+ * Poppins (inherited), soft shadows. Recharts marks are themed to the CAIVA
  * palette (severity semantics / accent), never a default multicolour ramp.
  * Distinct from the Performance dashboard (risk gauge + lenses) and the Asset
  * Inventory Overview. The shell <main> is the scroller — the root stays
@@ -44,7 +44,7 @@ import {
 import { vulnManagementApi } from '@/lib/api';
 import { shortenVulnTitle, deBrandDomain, type Vulnerability } from './lib';
 
-// ── Ava palette (literal, matching the workspace) ──
+// ── CAIVA palette (literal, matching the workspace) ──
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA';
 // MUTED/FAINT darkened from #8A95A1/#AEB8C2 → legible on white (≈5.3:1 / ≈3.7:1,
 // was ≈3.1:1 / ≈2.0:1) while keeping the hierarchy INK > SEC > MUTED > FAINT.
@@ -67,7 +67,7 @@ const SEV_ORDER: SevKey[] = ['critical', 'high', 'medium', 'low', 'info'];
 const SEV_RANK: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
 const EXPOSED_TONE = '#7A5AC9';
 
-// Status — Ava-mapped (not a stock multicolour ramp).
+// Status — CAIVA-mapped (not a stock multicolour ramp).
 const STATUS: Record<string, { c: string; label: string }> = {
   open: { c: '#C2453F', label: 'Open' },
   in_progress: { c: '#E0AF33', label: 'In progress' },
@@ -777,7 +777,7 @@ function MiniStat({ label, value, tone }: { label: string; value: number | strin
 }
 function HeatRow({ r, max }: { r: { asset_criticality: string; critical: number; high: number; medium: number; low: number; info: number }; max: number }) {
   const cells = [r.critical, r.high, r.medium, r.low, r.info];
-  // Pure Ava blue, light → deep brand #005B96. Same no-murky-middle rule as the treemap:
+  // Pure CAIVA blue, light → deep brand #005B96. Same no-murky-middle rule as the treemap:
   // the old #2E77AB (lum .167) got white text yet looked grey-blue → "white on light grey".
   // Replaced with #1766A0 (lum .12 → clearly deep, white text reads cleanly).
   const ramp = ['#EAF2F9', '#CBE0F0', '#9FC4E4', '#5E9BCE', '#1766A0', '#005B96'];

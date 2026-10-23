@@ -1,4 +1,4 @@
-/* Ava login — keyframes + animation classes (scoped by lg- prefix) */
+/* CAIVA login — keyframes + animation classes (scoped by lg- prefix) */
 @keyframes lgFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes lgSweep { to { transform: rotate(360deg); } }
 @keyframes lgScan { 0% { transform: translateX(-22%); } 100% { transform: translateX(22%); } }

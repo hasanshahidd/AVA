@@ -536,7 +536,7 @@ export function LicenseCompliance({ q }: { q: Qs<LicenseSummary> }) {
   else if (!s.tracked_products) body = (
     <Empty icon={<KeyRound size={16} />}
       title={s.unlicensed_count ? `${plural(s.unlicensed_count, 'installed copy', 'installed copies')} ${s.unlicensed_count === 1 ? 'has' : 'have'} no license on record` : 'No licenses tracked yet'}
-      body="Record the software licenses you own and Ava compares them with what scans found installed — surfacing unlicensed software, over-deployment and upcoming renewals."
+      body="Record the software licenses you own and CAIVA compares them with what scans found installed — surfacing unlicensed software, over-deployment and upcoming renewals."
       href="/licenses" cta="Add entitlements" />
   );
   else {

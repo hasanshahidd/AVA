@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Admin → Departments. Manages the Help-Desk service-desk departments from Ava
+ * Admin → Departments. Manages the Help-Desk service-desk departments from CAIVA
  * Administration (owner wants them managed here AND visible in Help Desk — both
  * surfaces read the same endpoints, so they stay in sync). grc_hd_department
  * stays the authoritative table owned by the native Help Desk engine; this page

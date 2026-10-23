@@ -82,7 +82,7 @@ function ReportCardShell({
 function SbpReportCard() {
   const { data: assets, isLoading } = useQuery({
     queryKey: ['sbp-report-assets'],
-    // ponytail: limit 2000 covers any realistic Ava tenant; bump if one ever exceeds it.
+    // ponytail: limit 2000 covers any realistic CAIVA tenant; bump if one ever exceeds it.
     queryFn: async () => (await assetsApi.getAll({ limit: 2000 })).data,
   });
 

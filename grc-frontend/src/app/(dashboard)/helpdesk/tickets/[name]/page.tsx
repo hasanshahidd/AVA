@@ -449,7 +449,7 @@ function ApprovalPanel({ ap }: { ap: any }) {
   );
 }
 
-/** Help Desk ↔ Ava-security linkage: the affected asset's OWN open-vuln / risk
+/** Help Desk ↔ CAIVA-security linkage: the affected asset's OWN open-vuln / risk
  * snapshot (read-only, mirrored by the CMDB sync). Hidden when the CI carries no
  * security snapshot. Deep-links into the asset's risk/vuln view. */
 function CiSecurity({ sec, assetId }: { sec: any; assetId?: number | null }) {

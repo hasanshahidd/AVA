@@ -307,7 +307,7 @@ const NOT_RAN_TONE: Tone = { label: 'Not run yet', c: GREY, ink: '#475569', bg: 
 function ScanCoverageCard({ estate, inv, className }: { estate: Q<Estate>; inv: Q<InvOverview>; className: string }) {
   const loading = estate.isLoading || inv.isLoading;
   return (
-    <Box title="What we scan" sub="Every scan Ava can run — and whether it has run on this estate" icon={<Radar size={14} />} accent={T.base} className={className}>
+    <Box title="What we scan" sub="Every scan CAIVA can run — and whether it has run on this estate" icon={<Radar size={14} />} accent={T.base} className={className}>
       {loading ? <Loading rows={4} /> : (
         <div className="grid grid-cols-1 gap-x-7 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
           {SCAN_MENU.map((g) => (

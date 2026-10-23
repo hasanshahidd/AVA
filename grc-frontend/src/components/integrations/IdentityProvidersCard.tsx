@@ -361,7 +361,7 @@ export function IdentityProvidersCard() {
               <>
                 <div className="rounded-md bg-blue-50/60 border border-blue-200 p-3 text-xs text-blue-800 space-y-1">
                   <p className="font-medium">How this works</p>
-                  <p>Click <strong>Connect</strong> below. You'll be redirected to Microsoft to sign in as a directory admin and consent to the Ava application. After approval, your Microsoft directory ID is bound to this organization.</p>
+                  <p>Click <strong>Connect</strong> below. You'll be redirected to Microsoft to sign in as a directory admin and consent to the CAIVA application. After approval, your Microsoft directory ID is bound to this organization.</p>
                 </div>
                 <button
                   type="button"

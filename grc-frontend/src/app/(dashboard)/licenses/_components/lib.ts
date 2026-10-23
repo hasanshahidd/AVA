@@ -48,7 +48,7 @@ export const LICENSE_METRICS: Option[] = [
   { value: 'usage', label: 'Usage-based' },
 ];
 
-/** What each metric means in licensing terms (a definition, not a claim about how Ava counts). */
+/** What each metric means in licensing terms (a definition, not a claim about how CAIVA counts). */
 export const METRIC_HINT: Record<string, string> = {
   per_device: 'Counted per device the software is installed on.',
   per_user_named: 'Counted per named user, however many devices they use.',

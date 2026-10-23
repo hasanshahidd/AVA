@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Ava — Performance: the executive (C-level) view across every cyber module.
+ * CAIVA — Performance: the executive (C-level) view across every cyber module.
  *
  * Answers, above the fold: how exposed are we, how bad, where, and is it improving.
  * Module lenses below (vulnerabilities, attack surface, inventory, pentest, risk,

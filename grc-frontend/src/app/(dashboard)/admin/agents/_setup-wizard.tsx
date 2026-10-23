@@ -568,7 +568,7 @@ export default function SetupWizard({ open, onClose, discoveryPrefill }: SetupWi
               <div className="border border-slate-200 rounded-lg overflow-hidden mb-3">
                 <div className="bg-slate-50 px-3 py-2 border-b border-slate-200">
                   <div className="text-xs font-semibold text-slate-900">Mass-deploy in 3 manual steps + 1 automatic</div>
-                  <div className="text-[11px] text-slate-500">Ava can't push to your PCs directly — your Windows AD does that. Set it up once, then it's hands-free.</div>
+                  <div className="text-[11px] text-slate-500">CAIVA can't push to your PCs directly — your Windows AD does that. Set it up once, then it's hands-free.</div>
                 </div>
                 <div className="divide-y divide-slate-100">
                   <div className="flex items-start gap-2.5 px-3 py-2">
@@ -630,10 +630,10 @@ export default function SetupWizard({ open, onClose, discoveryPrefill }: SetupWi
                 <p className="mt-2 pl-4 leading-relaxed">
                   <strong>Group Policy Objects (GPO)</strong> are a feature of Microsoft Active
                   Directory — they let one AD admin push settings (or run scripts) on every
-                  PC that joins the domain. Ava is a SaaS, so it can't reach into
+                  PC that joins the domain. CAIVA is a SaaS, so it can't reach into
                   your bank's network and install anything on PCs directly. We give you the
                   installer + the script + the tokens; your AD admin wires those into GPO
-                  once. After that AD handles the "push" — no Ava-side action
+                  once. After that AD handles the "push" — no CAIVA-side action
                   needed when new PCs join.
                 </p>
               </details>

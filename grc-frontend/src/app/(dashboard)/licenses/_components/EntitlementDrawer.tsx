@@ -114,7 +114,7 @@ export function EntitlementDrawer({
   const title = readOnly ? 'Entitlement' : editing ? 'Edit entitlement' : 'Add entitlement';
   const subtitle = editing
     ? [entitlement?.publisher, entitlement?.product].filter(Boolean).join(' · ')
-    : 'Record a license you own. Ava compares it with the software found installed.';
+    : 'Record a license you own. CAIVA compares it with the software found installed.';
 
   const footer = (
     <div className="flex items-center gap-2">
@@ -185,7 +185,7 @@ export function EntitlementDrawer({
             {METRIC_HINT[form.license_metric] ?? 'How the vendor counts what you consume.'}
             {UNMEASURED_METRICS.includes(form.license_metric) && (
               <span className="mt-1 block font-medium text-[#92400E]">
-                Installed-software scans can&rsquo;t count this metric, so Ava records the entitlement but can&rsquo;t compute a compliance position for it.
+                Installed-software scans can&rsquo;t count this metric, so CAIVA records the entitlement but can&rsquo;t compute a compliance position for it.
               </span>
             )}
           </p>

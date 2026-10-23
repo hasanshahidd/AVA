@@ -16,10 +16,10 @@ import ReportPreview, { type PreviewRequest } from './ReportPreview';
 const ACCENT = 'var(--color-base)';
 
 // Friendly labels for the server dataset keys (the catalog ships keys only).
-// Ava is CYBER-ONLY — these are the only datasets it reports on. The shared backend
+// CAIVA is CYBER-ONLY — these are the only datasets it reports on. The shared backend
 // may also expose GRC datasets (risks, controls, evidence, issues, tasks, vendors,
 // governance docs); AVA_DATASETS below hides everything not listed here so GRC data
-// can never leak into Ava's dataset picker.
+// can never leak into CAIVA's dataset picker.
 const DATASET_LABELS: Record<string, string> = {
   assets: 'Assets',
   vulnerabilities: 'Vulnerabilities',

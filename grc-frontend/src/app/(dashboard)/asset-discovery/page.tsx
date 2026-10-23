@@ -2331,7 +2331,7 @@ function DiscoveredQueue({ seg, setSeg, counts }: {
           <table className="data-table">
             <thead><tr>
               <th style={{ width: 34 }}><input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(selectableIds))} /></th>
-              <th>Device</th><th>IP</th><th title="Hardware address — the one identifier that does not change when the IP or name changes. Ava recognises an existing asset by this.">MAC</th><th>Type</th><th title="Which login doors answered at the last scan — checked automatically for every device">Login methods</th><th>Discovered by</th><th>Last seen</th><th>Status</th><th></th>
+              <th>Device</th><th>IP</th><th title="Hardware address — the one identifier that does not change when the IP or name changes. CAIVA recognises an existing asset by this.">MAC</th><th>Type</th><th title="Which login doors answered at the last scan — checked automatically for every device">Login methods</th><th>Discovered by</th><th>Last seen</th><th>Status</th><th></th>
             </tr></thead>
             <tbody>
               {shown.map((d) => {

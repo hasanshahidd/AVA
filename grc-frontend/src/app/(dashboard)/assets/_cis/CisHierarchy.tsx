@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 // Self-contained port of /compliance-plugins/library/page.tsx into a reusable,
 // prop-less component for the IT Asset Inventory area. Same data layer, same
-// lazy section/rule fetch-on-expand — only the skin changes to Ava's light
+// lazy section/rule fetch-on-expand — only the skin changes to CAIVA's light
 // cyber palette (brand accent var(--color-base) = #005B96, via the .inv2 tokens
 // in inventory-redesign.css that the compliance-overview page already uses).
 //

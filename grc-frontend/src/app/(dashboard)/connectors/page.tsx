@@ -1,6 +1,6 @@
 'use client';
 
-// Integration catalogue — the 40 providers Ava can collect compliance evidence
+// Integration catalogue — the 40 providers CAIVA can collect compliance evidence
 // from. Display-only: nothing is connected until the Phase 2 sync backend lands,
 // so every card reads "Not connected" and shows its collection scope, never a
 // fabricated sync time (see connector-catalogue.ts). Deep-linked with
@@ -36,7 +36,7 @@ function Catalogue() {
       <header>
         <h2 className="text-xl font-semibold text-slate-900">Integration catalogue</h2>
         <p className="text-sm text-slate-500 mt-1">
-          {CONNECTORS.length} providers Ava can collect compliance evidence from. Connection and
+          {CONNECTORS.length} providers CAIVA can collect compliance evidence from. Connection and
           automated evidence sync arrive with the Phase&nbsp;2 collector — every provider shows as
           <span className="font-medium"> Not connected</span> until then.
         </p>

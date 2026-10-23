@@ -425,7 +425,7 @@ export default function AssetDetailPage() {
         const response = await ermApi.internalControls.getAll();
         return response.data as Array<{ id: number; control_id?: string; name: string; category?: string }>;
       } catch {
-        // Ava's ERM control library isn't wired yet (this endpoint 404s) — degrade
+        // CAIVA's ERM control library isn't wired yet (this endpoint 404s) — degrade
         // to an empty list so the Risks tab renders cleanly instead of erroring.
         return [] as Array<{ id: number; control_id?: string; name: string; category?: string }>;
       }
@@ -3558,7 +3558,7 @@ function CriticalityAssessmentsTab({ assetId }: { assetId: number }) {
 // run history. All API calls go through compliancePluginsApi.
 
 function ComplianceTab({ asset }: { asset: AssetDetailData }) {
-  // Ava onboards assets via the bank's CMDB API (we do not do
+  // CAIVA onboards assets via the bank's CMDB API (we do not do
   // network discovery). For each onboarded asset we DO run CIS compliance
   // rules — that's our core job. This tab combines four blocks:
   //   1. AI Classification — OS profile from the asset feed

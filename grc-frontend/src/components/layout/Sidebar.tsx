@@ -124,7 +124,7 @@ const navigation: NavEntry[] = [
     ],
   },
   {
-    // Help Desk — AVA-native ITIL-lite service desk, one FastAPI engine
+    // Help Desk — CAIVA-native ITIL-lite service desk, one FastAPI engine
     // (modules/helpdesk_native). Findings become remediation Incidents.
     // Teams live in Administration (grc_teams); Home is dropped (Dashboard only).
     name: 'Help Desk',
@@ -661,7 +661,7 @@ export default function Sidebar() {
       if (canAccessItem(item)) acc.push(item);
       return acc;
     }, []);
-  // Ava is a cybersecurity-assurance product only. Show just that section; the
+  // CAIVA is a cybersecurity-assurance product only. Show just that section; the
   // rest of the cloned GRC nav (Governance, Compliance, ERM, …) is hidden.
   const CYBER_SECTIONS = new Set(['Performance', 'IT Asset', 'Cybersecurity', 'Help Desk', 'Reports']);
   const filteredNavigation: NavEntry[] = loaded
@@ -682,7 +682,7 @@ export default function Sidebar() {
       )}>
         {!collapsed && (
           <span className="whitespace-nowrap text-base font-semibold text-[var(--color-text)] flex items-baseline gap-0.5">
-            Ava
+            CAIVA
             <span className="ml-1 text-xs font-medium text-[var(--color-base)] opacity-70">AI</span>
           </span>
         )}
