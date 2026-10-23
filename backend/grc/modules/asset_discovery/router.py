@@ -355,7 +355,10 @@ def _campaign_dict(c: DiscoveryCampaign, *, scopes=False, runs=False) -> dict:
         "next_run_at": c.next_run_at.isoformat() if c.next_run_at else None,
         "blackout_windows": c.blackout_windows,
         "rate_limit_hosts_per_min": c.rate_limit_hosts_per_min,
-        "snmp_communities": c.snmp_communities,
+        # SNMP community strings are device credentials — never return them in
+        # cleartext. Show a mask when set, null when not; editing sends the mask
+        # back unchanged (handled in update_campaign).
+        "snmp_communities": ("***" if c.snmp_communities else None),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "created_by_name": c.created_by_name,
         "scope_count": len(c.scopes),
@@ -478,6 +481,11 @@ def update_campaign(
     tid = get_user_primary_tenant(current_user, db)
     c = _get_campaign_or_404(db, tid, campaign_id)
     data = body.model_dump(exclude_unset=True)
+    # The SNMP community is masked to "***" in responses (a device credential);
+    # when the edit form sends that mask back it means "unchanged" — never
+    # overwrite the stored community with the mask.
+    if data.get("snmp_communities") == "***":
+        data.pop("snmp_communities", None)
     if "method" in data and data["method"] is not None:
         _validate_method(data["method"])
     if data.get("name") and data["name"] != c.name:
