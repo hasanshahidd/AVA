@@ -70,12 +70,14 @@ export default function AssetRecordShell({
                     <span style={CHIP('#E9F1FB', '#2E63A8')}>External · EASM</span>
                     {typeLabel === 'third_party' && <span style={CHIP('#F1F4F6', '#6B7787')}>Third-Party</span>}
                     {asset?.internet_facing && <span style={CHIP('#FBEAEA', '#B23A3A')}>Internet-facing</span>}
+                    {asset?.cde_environment && <span style={CHIP('#EEEBFA', '#6A54C9')}>PCI scope</span>}
                   </>
                 ) : (
                   <>
                     {typeLabel && <span style={CHIP('#E9F1FB', '#2E63A8')}>{typeLabel}</span>}
                     <span style={CHIP('#E7F5EE', '#1F7A54')}>{status}</span>
                     {crit && <span style={CHIP('#FBF2DF', '#9A6410')}>{crit}</span>}
+                    {asset?.cde_environment && <span style={CHIP('#EEEBFA', '#6A54C9')}>PCI scope</span>}
                   </>
                 )}
               </div>

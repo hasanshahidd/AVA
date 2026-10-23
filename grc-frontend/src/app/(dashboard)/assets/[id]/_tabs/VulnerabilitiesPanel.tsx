@@ -23,10 +23,13 @@
  */
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { Bug, Search, X } from 'lucide-react';
+import { Bug, Search, X, ChevronLeft } from 'lucide-react';
 import { InlineLinkPicker } from '@/components/ui';
 import { AlertsPanel } from '@/components/shared/EntityExtras';
+// Reuse the register's full contextual finding detail verbatim (risk scoring +
+// pentest exploit-intel) so opening a linked finding here shows the SAME summary
+// the Vulnerabilities register does — one component, no duplication.
+import FindingDetail from '@/app/(dashboard)/vulnerabilities/[id]/_redesign/FindingDetail';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -177,6 +180,9 @@ export default function VulnerabilitiesPanel({
   const [search, setSearch] = useState('');
   const [sevFilter, setSevFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  // When a linked finding is opened, show the register's full contextual summary
+  // inline (replacing the list) with a back control — not just the severity cards.
+  const [openVulnId, setOpenVulnId] = useState<number | null>(null);
 
   const filtered = linked.filter((v) => {
     if (sevFilter && (v.severity || '').toLowerCase() !== sevFilter) return false;
@@ -207,6 +213,22 @@ export default function VulnerabilitiesPanel({
       popoverWidth={380}
     />
   );
+
+  // Inline full contextual summary — the SAME FindingDetail the register opens,
+  // reached by clicking a linked finding here instead of navigating away.
+  if (openVulnId != null) {
+    return (
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={() => setOpenVulnId(null)}
+          className="self-start inline-flex items-center gap-1 h-[30px] px-2.5 rounded-[9px] border border-[#E8ECEE] bg-white text-[12px] font-semibold text-[#014A81] hover:bg-[#EFF5FA]"
+        >
+          <ChevronLeft size={15} strokeWidth={2.2} /> Back to findings
+        </button>
+        <FindingDetail vulnId={openVulnId} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-[14px]">
@@ -314,9 +336,13 @@ export default function VulnerabilitiesPanel({
                               {vuln.vuln_id || `VULN-${vuln.vulnerability_id}`}
                             </td>
                             <td className={TD}>
-                              <span className="font-semibold text-[#0F1F2B] text-[11.8px]" style={{ overflowWrap: 'anywhere' }}>
+                              <button
+                                onClick={() => setOpenVulnId(vuln.vulnerability_id)}
+                                className="text-left font-semibold text-[#0F1F2B] text-[11.8px] hover:text-[#014A81] hover:underline"
+                                style={{ overflowWrap: 'anywhere' }}
+                              >
                                 {vuln.title || `Vulnerability #${vuln.vulnerability_id}`}
-                              </span>
+                              </button>
                             </td>
                             <td className={TD}>
                               <Chip text={vuln.severity || 'unknown'} cls={sevTone.chip} />
@@ -341,9 +367,12 @@ export default function VulnerabilitiesPanel({
                               )}
                             </td>
                             <td className={TD + ' whitespace-nowrap text-right'}>
-                              <Link href={`/vulnerabilities/${vuln.vulnerability_id}`} className="text-[11.8px] font-semibold text-[#014A81]">
+                              <button
+                                onClick={() => setOpenVulnId(vuln.vulnerability_id)}
+                                className="text-[11.8px] font-semibold text-[#014A81] hover:underline"
+                              >
                                 View
-                              </Link>
+                              </button>
                               <button
                                 onClick={() => onUnlinkVulnerability(vuln.vulnerability_id)}
                                 disabled={isUnlinking}
