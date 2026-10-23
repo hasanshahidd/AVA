@@ -39,7 +39,7 @@ from uuid import UUID
 from sqlalchemy import event, inspect as sa_inspect
 from sqlalchemy.orm import Session
 
-from .rich_audit import SENSITIVE_KEYS
+from .rich_audit import is_sensitive_key
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def _coerce(v: Any) -> Any:
 
 
 def _field(name: str, old: Any, new: Any) -> dict:
-    if name.lower() in SENSITIVE_KEYS:
+    if is_sensitive_key(name):
         return {"old": "***" if old is not None else None,
                 "new": "***" if new is not None else None}
     return {"old": _coerce(old), "new": _coerce(new)}

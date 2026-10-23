@@ -9,6 +9,7 @@ from starlette.responses import Response
 
 from .models import SessionLocal, AuditLog, GRCUser
 from .routers.auth_router import decode_token
+from .rich_audit import is_sensitive_key
 
 
 AUDIT_EXCLUDED_PATH_PREFIXES = (
@@ -63,7 +64,7 @@ def _sanitize_value(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: Dict[str, Any] = {}
         for key, nested_value in value.items():
-            if key.lower() in SENSITIVE_KEYS:
+            if is_sensitive_key(key):
                 sanitized[key] = "***"
             else:
                 sanitized[key] = _sanitize_value(nested_value)

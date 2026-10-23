@@ -96,6 +96,24 @@ SENSITIVE_KEYS = {
     "product_key", "license_key",   # software-license volume keys (modules/license_management)
 }
 
+# Substring match so credential-ish fields are redacted regardless of exact
+# naming — snmp_communities, snmp_community, smtp_password, client_secret,
+# access_token, private_key, etc. Over-redaction beats leaking a secret into
+# the append-only audit log.
+SENSITIVE_SUBSTRINGS = (
+    "password", "passwd", "secret", "token", "communit",
+    "credential", "api_key", "apikey", "private_key", "access_key",
+)
+
+
+def is_sensitive_key(key: Any) -> bool:
+    """True if a dict/column key names a credential that must not be logged."""
+    if not isinstance(key, str):
+        return False
+    k = key.lower()
+    return k in SENSITIVE_KEYS or any(s in k for s in SENSITIVE_SUBSTRINGS)
+
+
 SKIP_INTERNAL_KEYS = {"_sa_instance_state"}
 
 
@@ -113,7 +131,7 @@ def model_to_dict(obj: Any) -> Dict[str, Any]:
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            k: "***" if k.lower() in SENSITIVE_KEYS else _sanitize(v)
+            k: "***" if is_sensitive_key(k) else _sanitize(v)
             for k, v in value.items()
         }
     if isinstance(value, list):
@@ -211,6 +229,7 @@ def write_rich_audit_log(
 
 __all__ = [
     "write_rich_audit_log",
+    "is_sensitive_key",
     "workflow_actor_context",
     "current_actor_source",
     "current_actor_type",
