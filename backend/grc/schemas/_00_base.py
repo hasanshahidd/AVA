@@ -1163,6 +1163,9 @@ class AssetDetailResponse(BaseModel):
     linked_risks: List[dict] = []
     linked_evidence: List[dict] = []
     linked_vulnerabilities: List[dict] = []
+    # DISTINCT open findings (dedup_key fold across all sources) — the "truth" count
+    # the Vulnerabilities tab badge shows, so it matches the pentest view + register.
+    vuln_count_distinct: Optional[int] = None
     risk_assessments: List[dict] = []
     coverage_percentage: Optional[float] = None
     # Phase 5 operational context fields.

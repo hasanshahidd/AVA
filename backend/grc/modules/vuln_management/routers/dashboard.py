@@ -79,8 +79,55 @@ def get_dashboard(
         target_tenant = get_user_primary_tenant(current_user, db) or user_tenants[0]
     
     vulns = query.all()
+
+    # Dedup to DISTINCT findings by the SAME dedup_key fold the AI-pentest view +
+    # inventory badge use, so EVERY register number reads the deduped truth, not raw
+    # cross-scanner rows (owner: "the truth number everywhere, not fold some and not
+    # others"). asset_type (host-type key namespacing) + internet exposure come from
+    # one batch link query over inventory assets only; exposure is a per-link fact so
+    # we keep each group's member ids to decide it. Representative = most severe.
+    from grc.modules.pentest.dedup_tables import dedup_key
+    from grc.modules.pentest.service import _SEV_RANK_DISTINCT
+    _atype: Dict[int, str] = {}
+    _exposed_ids: set = set()
+    _all_ids = [v.id for v in vulns]
+    if _all_ids:
+        for vid, atype, inet, isinet in (
+            db.query(VulnerabilityAssetLink.vulnerability_id, ITAsset.asset_type,
+                     ITAsset.internet_facing, ITAsset.is_internet_facing)
+            .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
+            .filter(VulnerabilityAssetLink.vulnerability_id.in_(_all_ids),
+                    *inventory_assets_only(ITAsset)).all()
+        ):
+            _atype.setdefault(vid, atype)
+            if inet or isinet:
+                _exposed_ids.add(vid)
+    _groups: Dict[Any, dict] = {}
+
+    def _rank(v):
+        return _SEV_RANK_DISTINCT.get((v.severity or "info").strip().lower(), 5)
+    for v in vulns:
+        kd = {"cve_id": v.cve_id, "title": v.title, "asset_type": _atype.get(v.id),
+              "affected_url": getattr(v, "affected_url", None),
+              "affected_component": getattr(v, "affected_component", None)}
+        try:
+            k = dedup_key(kd)
+        except Exception:  # noqa: BLE001 — a bad key must never merge unrelated rows
+            k = ("_id", v.id)
+        g = _groups.get(k)
+        if g is None:
+            _groups[k] = {"rep": v, "ids": [v.id]}
+        else:
+            g["ids"].append(v.id)
+            if _rank(v) < _rank(g["rep"]):
+                g["rep"] = v
+    # Internet-exposed = DISTINCT findings with any member linked to an internet-facing
+    # inventory asset (computed here from the groups, replacing the old raw-link SQL).
+    internet_exposed_count = sum(
+        1 for g in _groups.values() if any(i in _exposed_ids for i in g["ids"]))
+    vulns = [g["rep"] for g in _groups.values()]
     vuln_ids = [v.id for v in vulns]
-    
+
     by_severity = {}
     by_status = {}
     by_assignee = {}
@@ -181,25 +228,9 @@ def get_dashboard(
         "without_mitigations": len(vuln_ids) - len(mit_vuln_ids)
     }
 
-    # Internet-exposed — distinct findings linked to an internet-facing asset.
-    # Honour BOTH exposure columns (canonical `internet_facing` and the legacy
-    # `is_internet_facing`) so this KPI never disagrees with the reachability
-    # engine / finding pages.
-    internet_exposed_count = 0
-    if vuln_ids:
-        internet_exposed_count = (
-            db.query(func.count(func.distinct(VulnerabilityAssetLink.vulnerability_id)))
-            .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
-            .filter(
-                VulnerabilityAssetLink.vulnerability_id.in_(vuln_ids),
-                *inventory_assets_only(ITAsset),  # a finding also linked to an ad-hoc target must not count via it
-                or_(
-                    ITAsset.internet_facing.is_(True),
-                    ITAsset.is_internet_facing.is_(True),
-                ),
-            )
-            .scalar() or 0
-        )
+    # internet_exposed_count is computed in the dedup fold above (distinct FINDINGS
+    # on internet-facing INVENTORY assets, both exposure columns honoured), so it
+    # reads the same deduped truth as every other register number.
 
     # Department breakdown
     by_department: Dict[str, int] = {}

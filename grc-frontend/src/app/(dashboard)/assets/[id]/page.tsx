@@ -200,6 +200,8 @@ interface AssetDetailData {
   linked_risks: Array<{ risk_id: number; title?: string; status?: string }>;
   linked_evidence: LinkedEvidence[];
   linked_vulnerabilities: LinkedVulnerability[];
+  // DISTINCT open findings (deduped across scanners) — the tab badge's "truth" number.
+  vuln_count_distinct?: number;
   risk_assessments: RiskAssessment[];
   coverage_percentage: number;
   // Phase 5 — Operational context. All optional; assets that pre-date the
@@ -731,7 +733,7 @@ export default function AssetDetailPage() {
     risks: (asset?.linked_risks?.length ?? 0)
       + (asset?.linked_internal_controls?.length ?? 0)
       + (asset?.linked_framework_controls?.length ?? 0),
-    vulnerabilities: (asset?.linked_vulnerabilities ?? []).filter(isOpenVuln).length,
+    vulnerabilities: asset?.vuln_count_distinct ?? (asset?.linked_vulnerabilities ?? []).filter(isOpenVuln).length,
     alerts: alertsForCount?.length ?? 0,
     software: softwareCount,
     relationships: (ipPeers?.group ?? []).filter((g: any) => !g.is_self).length,
@@ -784,7 +786,7 @@ export default function AssetDetailPage() {
     software,
     posture,
     kpis: {
-      openFindings: (asset?.linked_vulnerabilities ?? []).filter(isOpenVuln).length,
+      openFindings: asset?.vuln_count_distinct ?? (asset?.linked_vulnerabilities ?? []).filter(isOpenVuln).length,
       controlCoverage: asset?.coverage_percentage ?? 0,
       blastRadius: 0,
     },
@@ -2660,9 +2662,9 @@ function VulnerabilitiesTab({
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
           <Bug className="h-5 w-5 text-teal-600" />
-          Linked Vulnerabilities ({(asset.linked_vulnerabilities ?? []).filter(isOpenVuln).length} open
-          {(asset.linked_vulnerabilities ?? []).length !== (asset.linked_vulnerabilities ?? []).filter(isOpenVuln).length
-            ? ` · ${(asset.linked_vulnerabilities ?? []).length} total`
+          Linked Vulnerabilities ({asset.vuln_count_distinct ?? (asset.linked_vulnerabilities ?? []).filter(isOpenVuln).length} open
+          {asset.vuln_count_distinct != null && (asset.linked_vulnerabilities ?? []).length !== asset.vuln_count_distinct
+            ? ` · ${(asset.linked_vulnerabilities ?? []).length} scanner rows`
             : ''})
         </h3>
         <InlineLinkPicker

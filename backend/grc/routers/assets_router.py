@@ -2231,7 +2231,20 @@ def get_asset_detail(
                 "link_source": getattr(link, "link_source", "manual") or "manual",
                 "auto_linked": bool(getattr(link, "auto_linked", False)),
             })
-    
+
+    # DISTINCT open findings — same dedup_key fold as the pentest view / register, so
+    # the Vulnerabilities tab badge reads the deduped truth (788), not raw rows (864).
+    _CLOSED_V = {"remediated", "verified", "closed", "resolved", "accepted",
+                 "false_positive", "auto_closed_decommissioned", "auto_closed_fixed"}
+    from grc.modules.pentest.service import _fold_distinct
+    _open_v = [l.vulnerability for l in vuln_links
+               if l.vulnerability and (l.vulnerability.status or "open").lower() not in _CLOSED_V]
+    vuln_count_distinct = len(_fold_distinct(
+        [{"id": v.id, "cve_id": v.cve_id, "title": v.title, "severity": v.severity,
+          "affected_url": getattr(v, "affected_url", None),
+          "affected_component": getattr(v, "affected_component", None)} for v in _open_v],
+        asset.asset_type))
+
     risk_assessments = []
     for assessment in asset.risk_assessments:
         risk_assessments.append({
@@ -2313,6 +2326,7 @@ def get_asset_detail(
         linked_risks=linked_risks,
         linked_evidence=linked_evidence,
         linked_vulnerabilities=linked_vulnerabilities,
+        vuln_count_distinct=vuln_count_distinct,
         risk_assessments=risk_assessments,
         coverage_percentage=float(coverage),
         # Business-impact inputs (risk-posture panel). Wire name
