@@ -967,6 +967,7 @@ export default function AssetDetailPage() {
           onClose={() => setShowDeleteConfirm(false)}
           onConfirm={() => deleteMutation.mutate()}
           isDeleting={deleteMutation.isPending}
+          error={deleteMutation.isError ? ((deleteMutation.error as any)?.response?.data?.detail || 'Could not delete this asset — please try again.') : undefined}
         />
       )}
 
@@ -3180,11 +3181,13 @@ function DeleteConfirmModal({
   onClose,
   onConfirm,
   isDeleting,
+  error,
 }: {
   assetName: string;
   onClose: () => void;
   onConfirm: () => void;
   isDeleting: boolean;
+  error?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
@@ -3199,6 +3202,12 @@ function DeleteConfirmModal({
         <p className="mb-6 text-sm text-slate-600">
           Are you sure you want to delete <strong className="text-slate-900">{assetName}</strong>? This action cannot be undone. All linked controls, evidence, and assessments will be unlinked.
         </p>
+
+        {error && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" style={{ overflowWrap: 'anywhere' }}>
+            {error}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3">
           <button

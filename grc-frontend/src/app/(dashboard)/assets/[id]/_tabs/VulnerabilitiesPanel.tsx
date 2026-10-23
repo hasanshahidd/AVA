@@ -163,6 +163,12 @@ export default function VulnerabilitiesPanel({
 
   const openCount = linked.filter(isOpenVuln).length;
   const totalCount = linked.length;
+  const resolvedCount = totalCount - openCount;
+  // High-priority exposure = critical/high findings still OPEN — the "fix first"
+  // load the register's contextual ribbon leads with, scoped to this asset.
+  const openHighPriority = linked.filter(
+    (v) => isOpenVuln(v) && ['critical', 'high'].includes((v.severity || '').toLowerCase()),
+  ).length;
   const sevCount = (s: string) => linked.filter((v) => (v.severity || '').toLowerCase() === s).length;
   const critN = sevCount('critical');
   const highN = sevCount('high');
@@ -238,8 +244,22 @@ export default function VulnerabilitiesPanel({
 
       {totalCount > 0 ? (
         <>
-          {/* summary: severity tiles + stacked bar + by-status split */}
+          {/* summary: contextual posture line + severity tiles + stacked bar + by-status split */}
           <div className={CARD}>
+            {/* Contextual posture — the "fix first" framing the register leads with,
+                scoped to this asset (open load, high-priority exposure, resolved). */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-4 pt-[15px] pb-1 text-[12px] border-b border-[#F0F3F5]">
+              <span className="font-semibold text-[#0F1F2B] text-[12.5px]">Contextual summary</span>
+              <span className="text-[#8A95A1]">
+                <b className={`text-[#B23A3A] ${NUM}`}>{openCount}</b> open of <b className={NUM}>{totalCount}</b>
+              </span>
+              <span className="text-[#8A95A1]">
+                <b className={`text-[#C0682F] ${NUM}`}>{openHighPriority}</b> critical/high to fix first
+              </span>
+              <span className="text-[#8A95A1]">
+                <b className={`text-[#1F7A54] ${NUM}`}>{resolvedCount}</b> resolved
+              </span>
+            </div>
             <div className="grid grid-cols-4 gap-[10px] px-4 py-[15px]">
               <SevTile n={critN} label="Critical" sub={pct(critN)} colorCls={SEV.critical.text} />
               <SevTile n={highN} label="High" sub={pct(highN)} colorCls={SEV.high.text} />
