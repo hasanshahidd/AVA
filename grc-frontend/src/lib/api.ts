@@ -691,6 +691,8 @@ export const assetsApi = {
   }) => apiClient.post<ITAsset>('/assets', data),
   update: (id: number, data: Partial<ITAsset>) => apiClient.put<ITAsset>(`/assets/${id}`, data),
   delete: (id: number) => apiClient.delete(`/assets/${id}`),
+  // Asset-level Before->After vuln risk, averaged across open findings (7-signal model).
+  vulnRiskProfile: (id: number) => apiClient.get(`/assets/${id}/vuln-risk-profile`),
   linkControl: (id: number, data: { normalized_control_id: number; coverage_status?: string }) =>
     apiClient.post(`/assets/${id}/controls`, data),
   unlinkControl: (id: number, linkId: number) =>

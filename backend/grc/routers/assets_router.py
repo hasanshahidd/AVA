@@ -1836,6 +1836,92 @@ def delete_asset(
     return None
 
 
+@router.get("/{asset_id}/vuln-risk-profile")
+def asset_vuln_risk_profile(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: GRCUser = Depends(require_auth),
+):
+    """Asset-level Before->After vulnerability risk, averaged across the asset's
+    OPEN findings with the SAME 7-signal model the finding detail shows.
+    Before = raw CVSS alone (the flaw in the abstract); After = scored on THIS
+    host (CVSS severity + EPSS + exploit maturity + KEV + reachability +
+    internet exposure + asset criticality). Returns the headline raw/contextual
+    average + a per-parameter breakdown (average points) for one table."""
+    import re as _re
+    from grc.models import Vulnerability, VulnerabilityAssetLink
+    user_tenants = get_user_tenants(current_user, db)
+    asset = (db.query(ITAsset)
+             .filter(ITAsset.id == asset_id, ITAsset.tenant_id.in_(user_tenants)).first())
+    if not asset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    _CLOSED = {"remediated", "verified", "closed", "resolved", "accepted",
+               "false_positive", "auto_closed_decommissioned", "auto_closed_fixed"}
+    vulns = (db.query(Vulnerability)
+             .join(VulnerabilityAssetLink, VulnerabilityAssetLink.vulnerability_id == Vulnerability.id)
+             .filter(VulnerabilityAssetLink.asset_id == asset_id).all())
+    openv = [v for v in vulns if (v.status or "open").lower() not in _CLOSED]
+    internet = bool(getattr(asset, "internet_facing", False))
+    crit = (asset.criticality or "").lower() or None
+    exposure_pts = 10 if internet else 0
+    crit_pts = 10 if crit in ("critical", "high") else (5 if crit is None else 3)
+    n = len(openv)
+    if n == 0:
+        return {"count": 0, "scored": 0, "raw": None, "contextual": 0, "delta": 0,
+                "internet_facing": internet, "criticality": asset.criticality, "groups": []}
+    tot = {"sev": 0.0, "epss": 0.0, "mat": 0.0, "kev": 0.0, "av": 0.0, "raw": 0.0, "ctx": 0.0}
+    cvss_sum = 0.0; cvss_n = 0; epss_sum = 0.0; epss_n = 0; kev_n = 0; exp_n = 0; net_n = 0; raw_n = 0
+    for v in openv:
+        cvss = v.cvss_score; epss = v.epss_score
+        vector = v.cvss_vector or v.nvd_cvss_vector or ""
+        has_exp = (v.public_exploit_count or 0) > 0 or (v.exploitdb_count or 0) > 0
+        sev_pts = round((cvss / 10) * 20) if cvss is not None else 0
+        epss_pts = round(epss * 20, 1) if epss is not None else 0
+        mat_pts = 15 if (v.exploitdb_verified_count or 0) > 0 else (6 if has_exp else 0)
+        kev_pts = 15 if v.kev_flag else 0
+        av_pts = 10 if _re.search(r"AV:N", vector) else 0
+        tot["sev"] += sev_pts; tot["epss"] += epss_pts; tot["mat"] += mat_pts
+        tot["kev"] += kev_pts; tot["av"] += av_pts
+        tot["ctx"] += sev_pts + epss_pts + mat_pts + kev_pts + av_pts + exposure_pts + crit_pts
+        if cvss is not None:
+            cvss_sum += cvss; cvss_n += 1; tot["raw"] += round(cvss * 10); raw_n += 1
+        if epss is not None:
+            epss_sum += epss; epss_n += 1
+        if v.kev_flag:
+            kev_n += 1
+        if has_exp:
+            exp_n += 1
+        if av_pts:
+            net_n += 1
+    avg = lambda x: round(x / n, 1)
+    raw_avg = round(tot["raw"] / raw_n) if raw_n else None
+    ctx_avg = round(tot["ctx"] / n)
+    groups = [
+        {"label": "Severity — the flaw itself", "rows": [
+            {"label": "CVSS severity",
+             "evidence": f"avg CVSS {round(cvss_sum / cvss_n, 1)} / 10" if cvss_n else "no CVSS stored",
+             "pts": avg(tot["sev"]), "max": 20}]},
+        {"label": "Exploitability — likelihood it's used", "rows": [
+            {"label": "Exploit probability",
+             "evidence": f"avg EPSS {round((epss_sum / epss_n) * 100, 1)}%" if epss_n else "not enriched",
+             "pts": avg(tot["epss"]), "max": 20},
+            {"label": "Exploit maturity",
+             "evidence": f"{exp_n} of {n} with a public exploit", "pts": avg(tot["mat"]), "max": 15},
+            {"label": "Known exploited",
+             "evidence": f"{kev_n} of {n} on CISA KEV", "pts": avg(tot["kev"]), "max": 15}]},
+        {"label": "Context & reachability — on this host", "rows": [
+            {"label": "Attack vector (reachability)",
+             "evidence": f"{net_n} of {n} network-reachable", "pts": avg(tot["av"]), "max": 10},
+            {"label": "Internet exposure",
+             "evidence": "exposed" if internet else "internal only", "pts": exposure_pts, "max": 10},
+            {"label": "Asset criticality",
+             "evidence": asset.criticality or "assumed medium", "pts": crit_pts, "max": 10}]},
+    ]
+    return {"count": n, "scored": raw_n, "raw": raw_avg, "contextual": ctx_avg,
+            "delta": (raw_avg - ctx_avg) if raw_avg is not None else 0,
+            "internet_facing": internet, "criticality": asset.criticality, "groups": groups}
+
+
 @router.post("/{asset_id}/valuation", response_model=ITAssetResponse)
 def update_asset_valuation(
     asset_id: int,
