@@ -1650,6 +1650,12 @@ def update_asset(
         if field == "is_internet_facing":
             setattr(asset, "internet_facing", value)
             continue
+        # CIA ratings are a 1-5 scale; 0 or null means "unset", never a real
+        # value. The asset edit form defaults untouched ratings to 0 and PUTs
+        # the whole object, so applying a 0 would silently destroy a stored
+        # rating (reported: editing name+owner zeroed CIA). Only 1-5 writes.
+        if field in ("confidentiality_rating", "integrity_rating", "availability_rating") and not value:
+            continue
         setattr(asset, field, value)
 
     # ePHI assets are auto-scoped to HIPAA so they surface in the HIPAA
