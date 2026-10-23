@@ -935,33 +935,55 @@ def update_ticket(db: Session, tid: int, id, payload: dict) -> dict:
     return {"ok": True, "name": str(ticket.id)}
 
 
-def assign(db: Session, tid: int, name: str, agent: Optional[str], team: Optional[str],
+# Sentinel so assign() can tell "field omitted" (leave as-is) from "field = null"
+# (explicit clear) — a team change must NOT wipe the agent, and vice versa.
+_UNSET = object()
+
+
+def assign(db: Session, tid: int, name: str, agent=_UNSET, team=_UNSET,
            actor_email: Optional[str] = None) -> dict:
-    """§A15. agent = HD agent email (null clears); team = team name (null clears)."""
+    """§A15. agent = HD agent email, team = team name. Each is updated ONLY when
+    passed (null clears, omitted leaves unchanged) — so setting the team no longer
+    silently wipes the assignee (bug 1). A non-null agent must be a real agent of
+    this workspace (bug 2); a non-resolving team name is rejected rather than
+    silently clearing the team."""
     ticket = _get_ticket(db, tid, name)
     if not ticket:
         return {"ok": False, "error": "not found"}
     old_agent = ticket.assigned_agent
     old_team = ticket.team.name if ticket.team else None
-    # The FE sends both keys; null means "clear".
-    ticket.assigned_agent = agent
-    _activity(db, tid, ticket, f"assigned to {agent}" if agent else "cleared assignee")
-    t = (
-        db.query(Team).filter(Team.tenant_id == tid, Team.name == team).first()
-        if team else None
-    )
-    ticket.agent_group_id = t.id if t else None
-    if t:
-        assignment.remove_if_not_in_team(db, ticket)
-        _activity(db, tid, ticket, f"moved to team {team}")
-    if agent:  # taking ownership advances New→Assigned where the machine allows it
-        _auto_advance_on_assign(db, tid, ticket)
+
+    if agent is not _UNSET:
+        if agent:
+            if not (db.query(HDAgent)
+                    .filter(HDAgent.tenant_id == tid, HDAgent.user == agent).first()):
+                return {"ok": False, "error": f"'{agent}' is not an agent of this workspace"}
+            ticket.assigned_agent = agent
+            _activity(db, tid, ticket, f"assigned to {agent}")
+            _auto_advance_on_assign(db, tid, ticket)  # New→Assigned where the machine allows
+        else:
+            ticket.assigned_agent = None
+            _activity(db, tid, ticket, "cleared assignee")
+
+    if team is not _UNSET:
+        if team:
+            t = db.query(Team).filter(Team.tenant_id == tid, Team.name == team).first()
+            if not t:
+                return {"ok": False, "error": f"team '{team}' not found"}
+            ticket.agent_group_id = t.id
+            assignment.remove_if_not_in_team(db, ticket)
+            _activity(db, tid, ticket, f"moved to team {team}")
+        else:
+            ticket.agent_group_id = None
+            _activity(db, tid, ticket, "cleared team")
+
     db.commit()
     hd_audit(
         db, tenant_id=tid, actor_email=actor_email,
         action="ticket.assign", entity="ticket", entity_id=ticket.id,
         before={"agent": old_agent, "team": old_team},
-        after={"agent": agent, "team": team},
+        after={"agent": ticket.assigned_agent,
+               "team": ticket.team.name if ticket.team else None},
     )
     return {"ok": True}
 

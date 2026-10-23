@@ -21,7 +21,7 @@ from types import SimpleNamespace
 from grc.models import (
     HDTicketPriority, HDPriorityMatrix, HDTicketStatus, HDStateTransition, HDTicket,
     HDTicketActivity, HDApproval, HDApprovalVote, HDChangeType, HDChangeRiskMatrix,
-    HDDepartment,
+    HDDepartment, HDAgent, Team,
 )
 from grc.models import HDSLATarget, HDServiceLevelAgreement, HDTicketCI
 from grc.modules.helpdesk_native.tickets import (
@@ -450,3 +450,33 @@ def test_origin_fields_source_precedence(monkeypatch):
     assert out[str(td.id)]["department"] == "Finance & Accounting"
     assert out[str(tl.id)]["source"] == "Problem #5" and out[str(tl.id)]["source_kind"] == "linked"
     assert out[str(tp.id)]["source_kind"] == "portal"
+
+
+# ── assign: update only the provided field + validate the assignee (bugs 1 & 2) ──
+def test_assign_updates_only_provided_field_and_validates_agent(monkeypatch):
+    from grc.modules.helpdesk_native import tickets as tk
+    engine = create_engine("sqlite://")
+    for m in (HDTicket, HDAgent, Team, HDTicketActivity):
+        m.__table__.create(engine)
+    db = sessionmaker(bind=engine)()
+    db.add(HDAgent(tenant_id=TENANT, user="bob@x", agent_name="Bob"))
+    team = Team(tenant_id=TENANT, name="Support"); db.add(team); db.flush()
+    t = HDTicket(tenant_id=TENANT, subject="x", process="incident",
+                 assigned_agent="bob@x", agent_group_id=team.id)
+    db.add(t); db.flush()
+    monkeypatch.setattr(tk, "_auto_advance_on_assign", lambda *a, **k: None)
+    monkeypatch.setattr(tk, "hd_audit", lambda *a, **k: None)
+    monkeypatch.setattr("grc.modules.helpdesk_native.assignment.remove_if_not_in_team",
+                        lambda *a, **k: None)
+
+    # Bug 1: changing the team must NOT wipe the agent (agent omitted = _UNSET).
+    r = tk.assign(db, TENANT, str(t.id), team="Support")
+    assert r["ok"] and t.assigned_agent == "bob@x"
+    # Bug 2: a bogus assignee is rejected and nothing changes.
+    r = tk.assign(db, TENANT, str(t.id), agent="nobody@nowhere.invalid")
+    assert r["ok"] is False and t.assigned_agent == "bob@x"
+    # Explicit null still clears.
+    r = tk.assign(db, TENANT, str(t.id), agent=None)
+    assert r["ok"] and t.assigned_agent is None
+    # And the team survived all of that.
+    assert t.agent_group_id == team.id

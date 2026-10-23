@@ -118,7 +118,12 @@ export default function TicketDetail() {
     if (ok) resetDraft();
   };
   const assign = async (agent?: string | null, team?: string | null) => {
-    const ok = await act("assign", { agent: agent ?? null, team: team ?? null }, "Assignment updated.");
+    // Send ONLY the field being changed (undefined = omit) so setting the team
+    // doesn't wipe the assignee and vice versa (bug 1). null = explicit clear.
+    const body: any = {};
+    if (agent !== undefined) body.agent = agent;
+    if (team !== undefined) body.team = team;
+    const ok = await act("assign", body, "Assignment updated.");
     if (ok) setShowAssign(false);
   };
 

@@ -189,7 +189,15 @@ def update_ticket(name: str, body: TicketUpdate, db: Session = Depends(get_db),
 @router.post("/tickets/{name}/assign")
 def assign_ticket(name: str, body: AssignBody, db: Session = Depends(get_db),
                   current_user: GRCUser = Depends(require_auth), _: bool = Depends(require_tickets_assign)):
-    return tickets.assign(db, tenant_id(db), name, body.agent, body.team, actor_email=current_user.email)
+    # Only forward the fields the client actually sent, so updating the team doesn't
+    # wipe the agent (bug 1). model_fields_set tells "sent as null" from "omitted".
+    sent = body.model_fields_set
+    return tickets.assign(
+        db, tenant_id(db), name,
+        agent=body.agent if "agent" in sent else tickets._UNSET,
+        team=body.team if "team" in sent else tickets._UNSET,
+        actor_email=current_user.email,
+    )
 
 
 # ─── people (stubs) ────────────────────────────────────────────────────────
