@@ -144,8 +144,12 @@ def _generate_audit_description(
         return f'Uploaded {module_label} "{filename}"'
 
     # Auth events
-    if "login" in path_lower and action == "create":
-        return "User logged in"
+    if "login" in path_lower:
+        if action.endswith("_failed"):
+            who = payload.get("username") or payload.get("email")
+            return f"Failed login attempt for {who}" if who else "Failed login attempt"
+        if action == "create":
+            return "User logged in"
     if "logout" in path_lower:
         return "User logged out"
 
@@ -165,7 +169,13 @@ def _generate_audit_description(
 
     if action == "update":
         status_val = payload.get("status")
-        if isinstance(status_val, str):
+        # Only claim "status to X" when status ACTUALLY changed — a payload may
+        # carry an unchanged status alongside the real edits (e.g. editing an
+        # asset's name) and we must not log a false "status changed".
+        status_changed = (field_changes is None) or any(
+            "status" in (ent.get("fields") or {}) for ent in field_changes
+        )
+        if isinstance(status_val, str) and status_changed:
             return f'Updated {rt}{id_part} status to "{status_val}"'
         ename = nm or _entity_name()
         target = f'{rt} "{ename}"' if ename else f"{rt}{id_part}"
@@ -1215,14 +1225,21 @@ def list_audit_logs(
                 or "Unknown User"
             )
 
-        description = _generate_audit_description(
-            action=log.action,
-            resource_type=log.resource_type,
-            resource_id=log.resource_id,
-            path=changes.get("path", ""),
-            request_payload=changes.get("request"),
-            field_changes=changes.get("field_changes"),
-        )
+        # Endpoints that journal their own transition store a ready-made
+        # sentence in changes["detail"] (e.g. "Status changed from open to
+        # closed") — prefer it over the generic builder.
+        _detail = changes.get("detail")
+        if isinstance(_detail, str) and _detail.strip():
+            description = _detail.strip()
+        else:
+            description = _generate_audit_description(
+                action=log.action,
+                resource_type=log.resource_type,
+                resource_id=log.resource_id,
+                path=changes.get("path", ""),
+                request_payload=changes.get("request"),
+                field_changes=changes.get("field_changes"),
+            )
 
         result.append({
             "id": log.id,

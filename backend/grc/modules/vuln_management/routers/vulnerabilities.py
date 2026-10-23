@@ -2,7 +2,7 @@ from typing import List, Optional
 import io
 import csv
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -961,6 +961,7 @@ class AcceptRiskIn(BaseModel):
 def accept_risk(
     vuln_id: int,
     body: AcceptRiskIn,
+    http_request: Request,
     db: Session = Depends(get_db),
     current_user: GRCUser = Depends(require_auth),
 ):
@@ -1014,6 +1015,8 @@ def accept_risk(
                 "review_by": body.review_by.isoformat() if body.review_by else None,
             },
         ))
+        # We wrote our own rich row — suppress the generic middleware duplicate.
+        http_request.state.audit_explicit = True
     except Exception:  # noqa: BLE001
         import logging
         logging.getLogger(__name__).exception("accept_risk audit write failed vuln_id=%s", vuln_id)
@@ -1033,6 +1036,7 @@ def accept_risk(
 def change_vulnerability_status(
     vuln_id: int,
     request: VulnerabilityStatusChange,
+    http_request: Request,
     db: Session = Depends(get_db),
     current_user: GRCUser = Depends(require_auth),
     _perm: bool = Depends(require_tenant_permission("vulnerabilities:vulnerability_register:edit"))
@@ -1065,6 +1069,8 @@ def change_vulnerability_status(
                 "to": request.status,
             },
         ))
+        # We wrote our own rich row — suppress the generic middleware duplicate.
+        http_request.state.audit_explicit = True
     except Exception:  # noqa: BLE001 — auditing must never block the change
         import logging
         logging.getLogger(__name__).exception(

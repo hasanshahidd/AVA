@@ -41,6 +41,11 @@ _AUDIT_DROPPED_POLLING = (
     ("POST", "/agents/heartbeat"),
     ("GET", "/agents/jobs"),
     ("GET", "/connect-wizard/status/"),
+    # IdleLogout + admin/dashboard loads read the idle-timeout setting on every
+    # page via GET /admin/password-policy — a background fetch, not a user
+    # "viewing" the policy. Logging it produced false "Viewed password policy"
+    # rows in the security log (24 in one session the user never opened it).
+    ("GET", "/admin/password-policy"),
 )
 
 SENSITIVE_KEYS = {
@@ -100,6 +105,10 @@ _MODULE_SUB_ENTITY_PREFIXES = {
     # generic "admin" resource_type and lose the record id; treating admin as
     # a sub-entity module captures the real entity + id instead.
     "admin",
+    # Help Desk is /helpdesk/<entity>/[id]/... (tickets, incidents, departments,
+    # …). Without this every row bucketed under a generic "helpdesk" resource_type
+    # ("Created new helpdesk") and lost the record id.
+    "helpdesk",
 }
 
 # Map module path slugs → canonical resource type names
@@ -225,6 +234,12 @@ def _action_from_method(method: str, status_code: int, path: str = "") -> str:
             return f"{sub_action}{failed_suffix}"
 
     if method_upper == "POST":
+        # POST to an existing-record path (…/tickets/74) is an edit/action, not a
+        # create — otherwise ticket edits, status changes and replies all logged
+        # as "create" and polluted the Create filter.
+        parts = [p for p in path.split("/") if p]
+        if parts and parts[-1].isdigit():
+            return "update" if status_code < 400 else "update_failed"
         return "create" if status_code < 400 else "create_failed"
     if method_upper in {"PUT", "PATCH"}:
         return "update" if status_code < 400 else "update_failed"
@@ -457,6 +472,12 @@ def write_audit_log(
 ) -> None:
     try:
         path = request.url.path or ""
+        # Endpoints that write their own rich/explicit audit row (e.g. a vuln
+        # status-change journal entry the History tab reads) set this flag so the
+        # generic middleware row isn't also written — otherwise every such action
+        # produced two rows (one duplicate).
+        if getattr(request.state, "audit_explicit", False):
+            return
         # TenantMiddleware stashes a lightweight DICT on request.state.tenant
         # ({"id":..,"slug":..}) and ALSO sets request.state.tenant_id directly.
         # Read tenant_id first — doing getattr(dict, "id") always returns None,
@@ -504,14 +525,25 @@ def write_audit_log(
             return
 
         try:
+            status_code = getattr(response, "status_code", 200)
             user_id = None
-            if username:
+            if "/auth/login" in path:
+                # A login attempt's actor is the attempted identity, never whoever's
+                # stale cookie is attached. A FAILED attempt names nobody (user_id
+                # stays None → "Unknown"), so the log can't imply a real person acted.
+                if status_code < 400 and isinstance(request_payload, dict):
+                    attempted = request_payload.get("username")
+                    if isinstance(attempted, str) and attempted.strip():
+                        u = db.query(GRCUser).filter(
+                            (GRCUser.username == attempted) | (GRCUser.email == attempted)
+                        ).first()
+                        user_id = u.id if u else None
+            elif username:
                 user = db.query(GRCUser).filter(GRCUser.username == username).first()
                 if user:
                     user_id = user.id
 
             resource_type, resource_id = _extract_resource(path)
-            status_code = getattr(response, "status_code", 200)
             duration_ms = int((time.time() - started_at) * 1000)
             method = request.method.upper()
             action = _action_from_method(method, status_code, path)
