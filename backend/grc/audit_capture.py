@@ -18,6 +18,14 @@ Design notes
   fires on explicit flush/commit only — no partial-state double capture.
 * Bullet-proof: every failure is swallowed so audit capture can never break or
   roll back the caller's transaction (mirrors ``rich_audit``).
+
+Known limitation
+----------------
+Only ORM unit-of-work writes fire ``before_flush``. BULK / CORE statements —
+``query(...).delete(synchronize_session=...)``, ``.update(synchronize_session=...)``,
+``bulk_save_objects``/``bulk_*_mappings``, and raw ``db.execute(delete()/update())``
+— bypass this listener and log NOTHING. Any such site must emit its own
+``rich_audit.write_rich_audit_log`` event explicitly (see pentest ``delete_run``).
 """
 from __future__ import annotations
 
