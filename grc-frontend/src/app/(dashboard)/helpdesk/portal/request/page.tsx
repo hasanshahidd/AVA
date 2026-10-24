@@ -241,6 +241,32 @@ export default function RequestSomething() {
     setItem(i); setAnswers({}); setNotes(""); setUrgency(i.urgency || "medium"); setErr(null);
   };
 
+  // Escape hatch: nothing in the list fits. A catch-all item whose subcategory is
+  // "Other" — the requester describes it in the notes box and the agent reclassifies
+  // at triage (keeps the taxonomy clean; no free-typed categories). Reuses the same
+  // request_category/request_subcategory plumbing every real item already uses.
+  const OTHER_KEY = "__other";
+  const makeOther = (): Item => ({
+    key: OTHER_KEY,
+    requestItemId: null,
+    name: `Something else${categoryName ? ` in ${categoryName}` : ""}`,
+    description: "",
+    categoryKey: categoryKey || `n:${categoryName}`,
+    category: categoryName,
+    serviceKey: serviceKey || GENERAL,
+    service: serviceName,
+    approvalRequired: false,
+    slaHours: null,
+    cost: null,
+    departmentId: null,
+    impact: "low",
+    urgency: "medium",
+    requestCategory: categoryName,
+    requestSubcategory: "Other",
+    defaultDescription: "",
+    fields: [],
+  });
+
   const validate = (s: number): string | null => {
     if (s === 0 && !categoryKey) return "Please choose a category.";
     if (s === 1 && !serviceKey) return "Please choose a service.";
@@ -520,6 +546,20 @@ export default function RequestSomething() {
                     </div>
                   </>
                 )}
+                {/* Catch-all — always offered so the requester is never stuck when
+                    their exact item isn't listed. */}
+                <button
+                  type="button"
+                  onClick={() => pickItem(makeOther())}
+                  className={`mt-1 flex w-full flex-col rounded-xl border border-dashed p-4 text-left transition hover:shadow-sm ${
+                    item?.key === OTHER_KEY ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-300 bg-white hover:border-[#005B96]/50"
+                  }`}
+                >
+                  <span className="block font-semibold text-[#0F172A]">Something else</span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Can&apos;t find what you need{categoryName ? ` in ${categoryName}` : ""}? Pick this and describe it — we&apos;ll route it to the right team.
+                  </span>
+                </button>
               </div>
             )}
 
