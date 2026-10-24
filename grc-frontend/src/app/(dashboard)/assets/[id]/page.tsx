@@ -466,11 +466,15 @@ export default function AssetDetailPage() {
     },
   });
 
+  // "Assess risk" = recompute the live Risk Posture (it computes on GET, no
+  // persist) and refresh the header. Replaces the retired 1-10 control-based
+  // AssetRiskAssessment heuristic, so the Overview shows the SAME score as the
+  // Risk & Controls / Risk Posture view.
   const assessRiskMutation = useMutation({
-    mutationFn: () => assetsApi.assessRisk(assetId),
-    onSuccess: () => {
+    mutationFn: () => riskPostureApi.asset(assetId),
+    onSuccess: (res: any) => {
+      queryClient.setQueryData(['asset-risk-posture', assetId], res?.data);
       queryClient.invalidateQueries({ queryKey: ['asset-detail', assetId] });
-      queryClient.invalidateQueries({ queryKey: ['asset-coverage', assetId] });
       queryClient.invalidateQueries({ queryKey: ['asset-trajectory', assetId] });
     },
   });
@@ -785,9 +789,11 @@ export default function AssetDetailPage() {
     software,
     posture,
     kpis: {
+      // Single source of truth: the live Risk Posture composite (same number the
+      // Risk & Controls view shows), not the old 1-10 AssetRiskAssessment heuristic.
+      riskScore: assetPosture?.score ?? null,
+      riskBand: assetPosture?.band?.label ?? null,
       openFindings: asset?.vuln_count_distinct ?? (asset?.linked_vulnerabilities ?? []).filter(isOpenVuln).length,
-      controlCoverage: asset?.coverage_percentage ?? 0,
-      blastRadius: 0,
     },
     tabs: sections.map((s) => ({
       label: s.label,

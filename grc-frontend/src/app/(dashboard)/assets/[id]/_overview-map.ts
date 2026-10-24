@@ -698,7 +698,7 @@ function buildExternalDeep(asset: any, pr: any): any[] {
 export interface OverviewOpts {
   software?: any[];
   posture?: any;
-  kpis?: { riskScore?: any; openFindings?: any; blastRadius?: any; controlCoverage?: any; refreshDue?: any };
+  kpis?: { riskScore?: any; riskBand?: string | null; openFindings?: any; blastRadius?: any; controlCoverage?: any; refreshDue?: any };
   tabs?: { label: string; count?: number; active?: boolean; onClick?: () => void }[];
   actions?: { label: string; primary?: boolean; danger?: boolean; onClick?: () => void }[];
   onEdit?: () => void;
@@ -825,7 +825,7 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
     const out: any[] = [];
     const of = K.openFindings ?? 0;
     if (K.riskScore != null && K.riskScore !== '') {
-      out.push({ label: 'Risk Score', value: dash(K.riskScore), sub: 'Assessed' });
+      out.push({ label: 'Risk Score', value: String(Math.round(K.riskScore)), sub: K.riskBand ? `${K.riskBand} · Risk Posture` : 'Risk Posture', tone: K.riskScore >= 75 ? 'bad' : K.riskScore >= 50 ? 'warn' : 'ok' });
     } else if (probe?.health?.grade) {
       out.push({ label: 'Risk Score', value: `${probe.health.grade} · ${probe.health.score}`,
         sub: hygieneBreakdown ? 'Outside-in health · click for breakdown' : 'Outside-in health (not risk)',
@@ -897,7 +897,7 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
       // score — surface the health grade here so the tile isn't "Not assessed".
       probe?.health?.grade
         ? { label: 'Attack-surface hygiene', value: `${probe.health.grade} · ${probe.health.score}`, sub: hygieneBreakdown ? 'Outside-in health — click for breakdown' : 'Outside-in health (not risk)', tone: ['A', 'B'].includes(probe.health.grade) ? 'ok' : probe.health.grade === 'C' ? 'warn' : 'bad', breakdown: hygieneBreakdown, breakdownTitle: `Attack-surface hygiene — ${probe.health.grade} · ${probe.health.score}/100`, breakdownNote: 'Formula: score = ( Σ parameter × weight ) ÷ ( Σ weights of the applicable parameters ) × 100. Each row shows its % weight. Higher is healthier. Parameters that don’t apply to this host (no mail, no cookies, no CDN) are marked N/A and left out of the maths — never scored 0.' }
-        : { label: 'Risk Score', value: dash(K.riskScore), sub: K.riskScore ? 'Assessed' : 'Not assessed', tone: K.riskScore ? undefined : 'muted' },
+        : { label: 'Risk Score', value: K.riskScore != null ? String(Math.round(K.riskScore)) : '—', sub: K.riskScore != null ? (K.riskBand ? `${K.riskBand} · Risk Posture` : 'Risk Posture') : 'Not scored', tone: K.riskScore == null ? 'muted' : K.riskScore >= 75 ? 'bad' : K.riskScore >= 50 ? 'warn' : 'ok' },
       { label: 'Open Findings', value: String(K.openFindings ?? 0), sub: (K.openFindings ?? 0) ? 'Needs attention' : 'None open', tone: (K.openFindings ?? 0) ? 'bad' : 'ok' },
     ],
     machine,
