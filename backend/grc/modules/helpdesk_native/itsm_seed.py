@@ -36,6 +36,8 @@ from ...models import (
     HDDepartment,
     HDImportBatch,
     HDIncidentCategory,
+    HDProblemCategory,
+    HDChangeCategory,
     HDKPI,
     HDPriorityMatrix,
     HDProcessField,
@@ -154,7 +156,7 @@ _ITSM_MODELS = (
     HDConfigurationItem, HDCIRelationshipType, HDCIRelationship,
     HDPriorityMatrix, HDStateTransition, HDChangeType, HDChangeRiskMatrix,
     HDApproval, HDApprovalVote, HDSupportGroupMap, HDRoleMap,
-    HDIncidentCategory,
+    HDIncidentCategory, HDProblemCategory, HDChangeCategory,
     HDSLATarget, HDProcessField, HDRaci, HDCABConfig, HDKPI,
     HDTicketCI,  # Batch 4 linkage B — impacted-CI bridge
     HDTicketKBLink,  # Batch 4 linkage C — ticket<->KB article bridge
@@ -1079,16 +1081,47 @@ def _ensure_risk_matrix(db: Session, tid: int) -> int:
     return created
 
 
-def _ensure_incident_categories(db: Session, tid: int) -> int:
+def _ensure_process_categories(db: Session, tid: int, model) -> int:
+    """Seed the canonical category tree (SERVICE_CATALOG → category + subcategory)
+    into a per-process category table (incident/problem/change). Idempotent — upserts
+    on `key`, so expanding the canonical set or re-running only adds what's missing.
+    Each process keeps its OWN rows, so it can diverge later. A per-process 'Other'
+    catch-all mirrors the incident taxonomy's original design."""
     created = 0
-    for i, name in enumerate(_INCIDENT_CATEGORIES):
-        key = _slug(name)
-        if not db.query(HDIncidentCategory).filter_by(tenant_id=tid, key=key).first():
-            db.add(HDIncidentCategory(tenant_id=tid, key=key, name=name,
-                                      level="category", sort_order=i))
+    for ci, (cat, subs) in enumerate(SERVICE_CATALOG.items()):
+        ckey = _slug(cat)
+        parent = db.query(model).filter_by(tenant_id=tid, key=ckey).first()
+        if not parent:
+            parent = model(tenant_id=tid, key=ckey, name=cat, level="category", sort_order=ci)
+            db.add(parent)
+            db.flush()  # need parent.id for the subcategory FK
             created += 1
+        for si, sub in enumerate(subs):
+            skey = f"{ckey}/{_slug(sub)}"
+            if not db.query(model).filter_by(tenant_id=tid, key=skey).first():
+                db.add(model(tenant_id=tid, key=skey, name=sub, level="subcategory",
+                             parent_id=parent.id, sort_order=si))
+                created += 1
+    okey = _slug("Other")
+    if not db.query(model).filter_by(tenant_id=tid, key=okey).first():
+        db.add(model(tenant_id=tid, key=okey, name="Other", level="category", sort_order=99))
+        created += 1
     db.commit()
     return created
+
+
+def _ensure_incident_categories(db: Session, tid: int) -> int:
+    # Expands the original 7 flat incident categories to the canonical catalogue set
+    # (the 6 that overlap keep their rows; upsert adds the rest + subcategories).
+    return _ensure_process_categories(db, tid, HDIncidentCategory)
+
+
+def _ensure_problem_categories(db: Session, tid: int) -> int:
+    return _ensure_process_categories(db, tid, HDProblemCategory)
+
+
+def _ensure_change_categories(db: Session, tid: int) -> int:
+    return _ensure_process_categories(db, tid, HDChangeCategory)
 
 
 def _ensure_feedback_options(db: Session, tid: int) -> int:
@@ -1141,7 +1174,9 @@ def ensure_governance_baseline(db: Session, tid: int) -> int:
     number of rows created across change types, risk matrix, incident categories,
     feedback options and SLA targets."""
     return (_ensure_change_types(db, tid) + _ensure_risk_matrix(db, tid)
-            + _ensure_incident_categories(db, tid) + _ensure_feedback_options(db, tid)
+            + _ensure_incident_categories(db, tid)
+            + _ensure_problem_categories(db, tid) + _ensure_change_categories(db, tid)
+            + _ensure_feedback_options(db, tid)
             + _ensure_sla_targets(db, tid))
 
 

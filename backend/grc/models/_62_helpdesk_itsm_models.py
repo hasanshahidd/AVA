@@ -588,6 +588,57 @@ class HDIncidentCategory(Base):
     )
 
 
+class HDProblemCategory(Base):
+    """Per-process category taxonomy for Problems. Same (category -> subcategory)
+    tree shape as HDIncidentCategory; seeded from the canonical service catalogue
+    so every process agrees on the same category set but can diverge per process.
+    Natural key = normalized slash-path `key`, unique per tenant (seed upserts)."""
+    __tablename__ = "grc_hd_problem_category"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    key = Column(String(255), nullable=False)
+    name = Column(String(200), nullable=False)
+    level = Column(String(20), nullable=False)             # category | subcategory
+    parent_id = Column(Integer, ForeignKey("grc_hd_problem_category.id"), nullable=True)
+    sort_order = Column(Integer, nullable=True)
+    enabled = Column(Boolean, server_default=text("true"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    parent = relationship("HDProblemCategory", remote_side=[id])
+
+    __table_args__ = (
+        Index("uq_hd_problem_category_key", "tenant_id", "key", unique=True),
+    )
+
+
+class HDChangeCategory(Base):
+    """Per-process category taxonomy for Changes. Mirrors HDProblemCategory; the
+    domain category of a change (distinct from its change TYPE: Standard/Normal/
+    Emergency). Seeded from the canonical service catalogue."""
+    __tablename__ = "grc_hd_change_category"
+
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    key = Column(String(255), nullable=False)
+    name = Column(String(200), nullable=False)
+    level = Column(String(20), nullable=False)             # category | subcategory
+    parent_id = Column(Integer, ForeignKey("grc_hd_change_category.id"), nullable=True)
+    sort_order = Column(Integer, nullable=True)
+    enabled = Column(Boolean, server_default=text("true"))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    parent = relationship("HDChangeCategory", remote_side=[id])
+
+    __table_args__ = (
+        Index("uq_hd_change_category_key", "tenant_id", "key", unique=True),
+    )
+
+
 # ----------------------------------------------------------------------------
 # PERFORMANCE — the KPI definitions the Insights views report against
 # ----------------------------------------------------------------------------

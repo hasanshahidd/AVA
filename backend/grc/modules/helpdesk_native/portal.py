@@ -322,7 +322,8 @@ def portal_incident_categories(db: Session = Depends(get_db),
     Tenant-scoped; id + name only."""
     tid = tenant_id(db)
     rows = (db.query(HDIncidentCategory)
-            .filter(HDIncidentCategory.tenant_id == tid)
+            .filter(HDIncidentCategory.tenant_id == tid,
+                    HDIncidentCategory.level == "category")  # top-level only for the picker
             .order_by(HDIncidentCategory.sort_order.asc().nullslast(), HDIncidentCategory.name.asc())
             .all())
     return {"categories": [{"id": c.id, "name": c.name} for c in rows]}
