@@ -496,12 +496,14 @@ export default function RequestSomething() {
                   />
                 </div>
                 {visible.length === 0 ? (
-                  <Empty icon={Inbox} title="No matching requests" hint="Try a different search or go back a step." />
+                  <div className="text-xs text-[#94A3B8]">
+                    No matching requests — pick “Something else” below to describe it.
+                  </div>
                 ) : (
-                  <>
-                    <div className="text-xs text-[#94A3B8]">
-                      {visible.length} {visible.length === 1 ? "option" : "options"}
-                    </div>
+                  <div className="text-xs text-[#94A3B8]">
+                    {visible.length} {visible.length === 1 ? "option" : "options"}
+                  </div>
+                )}
                     <div role="radiogroup" aria-label="Request items" className="grid gap-3 sm:grid-cols-2">
                       {visible.map((i) => {
                         const sel = item?.key === i.key;
@@ -543,23 +545,21 @@ export default function RequestSomething() {
                           </button>
                         );
                       })}
+                      {/* Catch-all as a grid cell — fills the row like any item,
+                          never a lone full-width row below. */}
+                      <button
+                        type="button"
+                        onClick={() => pickItem(makeOther())}
+                        className={`flex flex-col rounded-xl border border-dashed p-4 text-left transition hover:shadow-sm ${
+                          item?.key === OTHER_KEY ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-300 bg-white hover:border-[#005B96]/50"
+                        }`}
+                      >
+                        <span className="block font-semibold text-[#0F172A]">Something else</span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Can&apos;t find what you need{categoryName ? ` in ${categoryName}` : ""}? Pick this and describe it.
+                        </span>
+                      </button>
                     </div>
-                  </>
-                )}
-                {/* Catch-all — always offered so the requester is never stuck when
-                    their exact item isn't listed. */}
-                <button
-                  type="button"
-                  onClick={() => pickItem(makeOther())}
-                  className={`mt-1 flex w-full flex-col rounded-xl border border-dashed p-4 text-left transition hover:shadow-sm ${
-                    item?.key === OTHER_KEY ? "border-[#005B96] bg-[#005B96]/5" : "border-slate-300 bg-white hover:border-[#005B96]/50"
-                  }`}
-                >
-                  <span className="block font-semibold text-[#0F172A]">Something else</span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    Can&apos;t find what you need{categoryName ? ` in ${categoryName}` : ""}? Pick this and describe it — we&apos;ll route it to the right team.
-                  </span>
-                </button>
               </div>
             )}
 
