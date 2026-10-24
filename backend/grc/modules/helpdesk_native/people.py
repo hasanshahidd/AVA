@@ -69,12 +69,21 @@ def list_agents(db: Session, tid: int) -> dict:
         .order_by(HDAgent.agent_name.asc())
         .all()
     )
+    # Each agent's team(s): AVA Administration teams whose members include their
+    # login email (Team.members → m.user.email == HDAgent.user), same source as list_teams.
+    email_teams: dict = {}
+    for team in db.query(Team).filter(Team.tenant_id == tid).all():
+        for m in team.members:
+            e = (m.user.email or "").lower() if m.user else ""
+            if e:
+                email_teams.setdefault(e, []).append(team.name)
     return {"agents": [{
         "name": a.user,
         "agent_name": a.agent_name or a.user,
         "email": a.user,
         "availability": a.availability or ("Active" if a.is_active else "Unavailable"),
         "is_active": bool(a.is_active),
+        "teams": email_teams.get((a.user or "").lower(), []),
     } for a in rows]}
 
 

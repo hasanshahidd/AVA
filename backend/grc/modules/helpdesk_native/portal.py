@@ -32,6 +32,7 @@ from ...models import (
     HDRequestItem,
     HDServiceCategory,
     HDTicket,
+    HDTicketFeedbackOption,
 )
 from . import department, kb, itsm_seed, tickets, approvals, sla
 from .common import (
@@ -62,6 +63,11 @@ class RequestCreate(BaseModel):
 
 class RequestReply(BaseModel):
     content: str = ""
+
+
+class FeedbackSubmit(BaseModel):
+    rating: float                          # option rating (0..1)
+    comment: Optional[str] = None
 
 
 class PortalVote(BaseModel):
@@ -195,6 +201,8 @@ def request_detail(name: str, db: Session = Depends(get_db),
     ticket = _own_ticket(db, tid, name, email)  # ownership gate (raises 404)
     detail = tickets.get_detail(db, tid, name)
     detail["approval"] = _approval_summary(db, tid, ticket.id, email)
+    if detail.get("ticket"):
+        detail["ticket"]["feedback_rating"] = ticket.feedback_rating
     return detail
 
 
@@ -207,6 +215,41 @@ def reply_request(name: str, body: RequestReply, db: Session = Depends(get_db),
     tid = tenant_id(db)
     _own_ticket(db, tid, name, email)  # ownership gate (raises 404)
     return tickets.receive_customer_reply(db, tid, name, body.content, sender=email)
+
+
+@router.get("/feedback-options")
+def portal_feedback_options(db: Session = Depends(get_db),
+                            _: bool = Depends(require_requester)):
+    """The CSAT scale a requester can rate a resolved request with."""
+    tid = tenant_id(db)
+    opts = (db.query(HDTicketFeedbackOption)
+            .filter(HDTicketFeedbackOption.tenant_id == tid,
+                    HDTicketFeedbackOption.disabled == False)  # noqa: E712
+            .order_by(HDTicketFeedbackOption.rating.asc())
+            .all())
+    return {"options": [{"rating": o.rating, "label": o.label} for o in opts]}
+
+
+@router.post("/requests/{name}/feedback")
+def submit_feedback(name: str, body: FeedbackSubmit, db: Session = Depends(get_db),
+                    email: str = Depends(current_user_email),
+                    _: bool = Depends(require_requester)):
+    """Rate your OWN request once it's resolved/closed. Ownership-guarded; only in
+    the Resolved category (Resolved + Closed share it). Idempotent — re-rating
+    overwrites. Matches the rating to a feedback option so agent CSAT reports align."""
+    tid = tenant_id(db)
+    ticket = _own_ticket(db, tid, name, email)
+    if (ticket.status_category or "") != "Resolved":
+        raise HTTPException(status_code=400, detail="You can rate a request once it's resolved.")
+    opt = (db.query(HDTicketFeedbackOption)
+           .filter(HDTicketFeedbackOption.tenant_id == tid,
+                   HDTicketFeedbackOption.rating == body.rating)
+           .first())
+    ticket.feedback_rating = body.rating
+    ticket.feedback_id = opt.id if opt else None
+    ticket.feedback_extra = (body.comment or "").strip() or None
+    db.commit()
+    return {"ok": True}
 
 
 # ─── self-service reads (so the requester form + help page work) ────────────

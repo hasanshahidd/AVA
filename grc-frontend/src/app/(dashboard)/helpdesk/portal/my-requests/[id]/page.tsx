@@ -153,9 +153,12 @@ export default function MyRequestDetail() {
       </div>
 
       {done ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-center text-sm text-slate-500">
-          This request is {friendly(t.status).toLowerCase()}. Need more help?{" "}
-          <Link href="/helpdesk/portal/report" className="font-medium text-[#005B96] hover:underline">Report a new issue</Link>.
+        <div className="flex flex-col gap-3">
+          <FeedbackCard id={id} rating={t.feedback_rating ?? null} onDone={reload} />
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-center text-sm text-slate-500">
+            This request is {friendly(t.status).toLowerCase()}. Need more help?{" "}
+            <Link href="/helpdesk/portal/report" className="font-medium text-[#005B96] hover:underline">Report a new issue</Link>.
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-[#EEF1F5] bg-white p-4">
@@ -200,6 +203,58 @@ function ApprovalBanner({ ap }: { ap: any }) {
   return (
     <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] ${m.cls}`}>
       <ShieldCheck size={14} className="shrink-0" /> {m.label}
+    </div>
+  );
+}
+
+/** Post-resolution CSAT — lets the requester rate their own resolved request. */
+function FeedbackCard({ id, rating, onDone }: { id: string; rating: number | null; onDone: () => void }) {
+  const base = `/helpdesk/portal/requests/${encodeURIComponent(id)}`;
+  const { data } = useHd<{ options: { rating: number; label: string }[] }>("/helpdesk/portal/feedback-options");
+  const opts = data?.options || [];
+  const [picked, setPicked] = useState<number | null>(null);
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  if (rating != null || sent) {
+    const label = opts.find((o) => Math.abs(o.rating - (rating ?? 0)) < 0.01)?.label;
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-700">
+        Thanks for your feedback{label ? ` — you rated this “${label}”` : ""}.
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    if (picked == null) return;
+    setBusy(true);
+    try {
+      await apiClient.post(`${base}/feedback`, { rating: picked, comment: comment.trim() || undefined });
+      setSent(true); onDone();
+    } catch { /* keep the form up on error */ } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rounded-xl border border-[#EEF1F5] bg-white px-4 py-4">
+      <div className="mb-2 text-sm font-medium text-[#0F172A]">How did we do?</div>
+      <div className="flex flex-wrap gap-2">
+        {opts.map((o) => (
+          <button key={o.rating} type="button" onClick={() => setPicked(o.rating)}
+            className={`rounded-full border px-3 py-1 text-xs transition ${picked === o.rating ? "border-[#005B96] bg-[#005B96]/10 text-[#005B96]" : "border-slate-200 text-slate-600 hover:border-[#005B96]/50"}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
+        placeholder="Any comments? (optional)"
+        className="mt-3 w-full resize-y rounded-[9px] border border-[#E2E5EC] p-2.5 text-[13px] outline-none focus:border-[#005B96]" />
+      <div className="mt-2 flex justify-end">
+        <button onClick={submit} disabled={busy || picked == null}
+          className="rounded-[9px] bg-[#005B96] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40">
+          Submit feedback
+        </button>
+      </div>
     </div>
   );
 }

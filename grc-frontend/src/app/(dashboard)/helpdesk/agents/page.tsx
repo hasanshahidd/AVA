@@ -26,13 +26,14 @@ export default function AgentsPage() {
         </>} />
       {error && <ErrorBanner msg={error} />}
       {loading ? <Loading what="agents" /> : rows.length === 0 ? <Empty icon={Headset} title="No agents found" hint={q ? "Try a different search." : undefined} /> : (
-        <Table head={["Agent", "Email", "Availability", "Status"]}>
+        <Table head={["Agent", "Email", "Team", "Availability", "Status"]}>
           {rows.map((a) => {
             const active = a.is_active !== false && a.is_active !== 0;
             return (
               <tr key={a.name} className="hover:bg-slate-50">
                 <td className="px-4 py-2.5"><div className="flex items-center gap-3"><Avatar name={a.agent_name || a.name} size={32} /><span className="font-medium text-[var(--color-text)]">{a.agent_name || a.name}</span></div></td>
                 <td className="px-4 py-2.5 text-slate-600">{a.email || a.name || "—"}</td>
+                <td className="px-4 py-2.5 text-slate-600">{Array.isArray(a.teams) && a.teams.length ? a.teams.join(", ") : "—"}</td>
                 <td className="px-4 py-2.5"><Chip value={a.availability || "Unavailable"} map={AVAIL_CHIP} /></td>
                 <td className="px-4 py-2.5"><span className="inline-flex items-center gap-1.5 text-xs text-slate-600"><span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500" : "bg-slate-300"}`} />{active ? "Active" : "Inactive"}</span></td>
               </tr>
