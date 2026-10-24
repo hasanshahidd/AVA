@@ -74,10 +74,11 @@ _EXT_FIELDS = (
     "linked_incident_ids",
     "origin_ticket_id", "origin_process",
     "request_category", "request_subcategory",
+    "incident_category_id", "problem_category_id", "change_category_id",
 )
 
 # §A (Batch 4) — origin_ticket_id is an int id (or None to unlink).
-_EXT_INT = ("origin_ticket_id",)
+_EXT_INT = ("origin_ticket_id", "incident_category_id", "problem_category_id", "change_category_id")
 
 
 def priority_name_from_matrix(impact: Optional[str], urgency: Optional[str]) -> Optional[str]:

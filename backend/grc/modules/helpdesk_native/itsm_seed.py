@@ -123,6 +123,8 @@ _TICKET_ITSM_ALTER_COLUMNS = [
     ("ci_id", "INTEGER REFERENCES grc_hd_ci(id)"),
     ("request_item_id", "INTEGER REFERENCES grc_hd_request_item(id)"),
     ("incident_category_id", "INTEGER REFERENCES grc_hd_incident_category(id)"),
+    ("problem_category_id", "INTEGER REFERENCES grc_hd_problem_category(id)"),
+    ("change_category_id", "INTEGER REFERENCES grc_hd_change_category(id)"),
     ("support_group_code", "VARCHAR(40)"),
 ]
 # Catalogue request item — optional CI-type (asset kind) association. References
@@ -597,7 +599,8 @@ def ensure_itsm_tables(db: Session) -> bool:
 
 def _ensure_itsm_indexes(db: Session) -> None:
     """Indexes `index=True` would have made on the new HDTicket link columns."""
-    for col in ("business_service_id", "ci_id", "incident_category_id", "origin_ticket_id"):
+    for col in ("business_service_id", "ci_id", "incident_category_id",
+                "problem_category_id", "change_category_id", "origin_ticket_id"):
         try:
             db.execute(text(
                 f"CREATE INDEX IF NOT EXISTS ix_grc_hd_ticket_{col} "

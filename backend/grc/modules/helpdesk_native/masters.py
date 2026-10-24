@@ -28,6 +28,9 @@ from sqlalchemy.orm import Session
 from ...models import (
     get_db,
     HDChangeType,
+    HDIncidentCategory,
+    HDProblemCategory,
+    HDChangeCategory,
     HDTicketStatus,
     HDTicketType,
     HDTicketPriority,
@@ -356,6 +359,38 @@ def list_change_types_for_form(db: Session = Depends(get_db), _: bool = Depends(
         "name": c.name,
         "requires_cab": bool(c.requires_cab),
         "auto_approve": bool(c.auto_approve),
+    } for c in rows]}
+
+
+_PROCESS_CATEGORY_MODELS = {
+    "incident": HDIncidentCategory,
+    "problem": HDProblemCategory,
+    "change": HDChangeCategory,
+}
+
+
+@router.get("/process-categories")
+def list_process_categories(process: str, db: Session = Depends(get_db),
+                            _: bool = Depends(require_masterdata_view)):
+    """Per-process category tree (category + subcategory) for the New-ticket form's
+    category picker. `process` = incident | problem | change. Returns a flat list
+    the FE groups into dependent dropdowns (a subcategory links to its category via
+    parent_id). Service requests use the catalogue, not this."""
+    tid = tenant_id(db)
+    model = _PROCESS_CATEGORY_MODELS.get((process or "").strip().lower())
+    if model is None:
+        return {"categories": []}
+    rows = (
+        db.query(model)
+        .filter(model.tenant_id == tid)
+        .order_by(model.sort_order.asc().nullslast(), model.name.asc())
+        .all()
+    )
+    return {"categories": [{
+        "id": c.id,
+        "name": c.name,
+        "level": c.level,
+        "parent_id": c.parent_id,
     } for c in rows]}
 
 

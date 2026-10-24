@@ -22,7 +22,7 @@
  * state ONLY inside applyTemplate (the card onClick); changing the department
  * filter just changes which cards are visible and never mutates the form.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Monitor, KeyRound, Mail, Wifi, Laptop, Download, Package, Printer, Lock,
   Server, UserPlus, Receipt, ShoppingCart, Calculator, FileText, Calendar,
@@ -156,6 +156,9 @@ export function NewTicketDialog({
   // service_request
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
+  // incident/problem/change — per-process category taxonomy (id of the chosen node)
+  const [catId, setCatId] = useState("");
+  const [subcatId, setSubcatId] = useState("");
   // problem
   const [rootCause, setRootCause] = useState("");
   // change
@@ -196,6 +199,17 @@ export function NewTicketDialog({
   const slaResp = slaPrev.data?.response;
   const slaRes = slaPrev.data?.resolution;
 
+  // Per-process category tree (incident/problem/change). Refetches when the process
+  // changes; service_request uses the catalogue so its list comes back empty here.
+  const procCats = useHd<{ categories: { id: number; name: string; level: string; parent_id: number | null }[] }>(
+    `/helpdesk/process-categories?process=${encodeURIComponent(process)}`,
+  );
+  const topCats = (procCats.data?.categories || []).filter((c) => c.level === "category");
+  const subCats = catId
+    ? (procCats.data?.categories || []).filter((c) => c.level === "subcategory" && c.parent_id === Number(catId))
+    : [];
+  useEffect(() => { setCatId(""); setSubcatId(""); }, [process]);
+
   // Group/filter the full library client-side (§2a). No department → section per
   // department; department chosen → that department's cards, sub-grouped by category.
   const sections: Section[] = useMemo(() => {
@@ -235,6 +249,7 @@ export function NewTicketDialog({
     setAssignee(""); setTeam(""); setSupportGroup(""); setCi(null);
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
+    setCatId(""); setSubcatId("");
     setRootCause("");
     setChangeType("normal"); setChangeRisk("medium");
     setPlannedStart(""); setPlannedEnd(""); setImplPlan(""); setBackoutPlan("");
@@ -279,6 +294,14 @@ export function NewTicketDialog({
       if (plannedEnd) payload.planned_end = plannedEnd;
       if (implPlan.trim()) payload.implementation_plan = implPlan.trim();
       if (backoutPlan.trim()) payload.backout_plan = backoutPlan.trim();
+    }
+
+    // per-process category (incident/problem/change) — leaf chosen wins (subcategory over category)
+    const leafCat = subcatId || catId;
+    if (leafCat) {
+      if (process === "incident") payload.incident_category_id = Number(leafCat);
+      else if (process === "problem") payload.problem_category_id = Number(leafCat);
+      else if (process === "change") payload.change_category_id = Number(leafCat);
     }
 
     const create = await hdCall("post", "/helpdesk/tickets", payload);
@@ -445,6 +468,25 @@ export function NewTicketDialog({
             Browse common requests
           </button>
         ))}
+
+        {/* Category + subcategory — incident/problem/change pick from their own
+            per-process taxonomy (same source the end-user side uses for incidents). */}
+        {(process === "incident" || process === "problem" || process === "change") && (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <Field label="Category" hint="What area is this about?">
+              <Select value={catId} onChange={(e) => { setCatId(e.target.value); setSubcatId(""); }}>
+                <option value="">— Select —</option>
+                {topCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Subcategory" hint={catId ? "Optional — narrow it down." : "Pick a category first."}>
+              <Select value={subcatId} onChange={(e) => setSubcatId(e.target.value)} disabled={!catId || subCats.length === 0}>
+                <option value="">{catId && subCats.length === 0 ? "No subcategories" : "— Select —"}</option>
+                {subCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </Field>
+          </div>
+        )}
 
         {/* Incident */}
         {process === "incident" && (
