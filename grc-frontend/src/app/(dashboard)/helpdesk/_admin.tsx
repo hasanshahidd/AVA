@@ -84,6 +84,7 @@ export function Modal({
   children,
   footer,
   wide,
+  side,
 }: {
   open: boolean;
   onClose: () => void;
@@ -92,6 +93,7 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  side?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -100,6 +102,29 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
   if (!open) return null;
+  if (side) {
+    // Right-side drawer (slides in from the edge) instead of a centered box.
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40" onClick={onClose}>
+        <div
+          className={`flex h-full w-full ${wide ? "max-w-xl" : "max-w-md"} flex-col bg-white shadow-2xl`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[#EEF1F5] px-5 py-3.5">
+            <div>
+              <h2 className="m-0 text-[15px] font-semibold text-[#0F172A]">{title}</h2>
+              {subtitle && <p className="m-0 mt-0.5 text-[12px] text-[#64748B]">{subtitle}</p>}
+            </div>
+            <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-lg text-[#94A3B8] hover:bg-[#F6F7FB]">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <div className="flex items-center justify-end gap-2 border-t border-[#EEF1F5] px-5 py-3">{footer}</div>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8" onClick={onClose}>
       <div

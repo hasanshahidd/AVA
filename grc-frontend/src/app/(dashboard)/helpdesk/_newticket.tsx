@@ -329,6 +329,7 @@ export function NewTicketDialog({
       title={lockProcess ? `New ${PROCESS_BADGE[lockProcess].label.toLowerCase()}` : "New ticket"}
       subtitle={lockProcess ? "Fill in what it needs" : "Pick a process, then fill in what it needs"}
       wide
+      side
       footer={
         <>
           <Btn variant="ghost" onClick={close} disabled={busy}>Cancel</Btn>
