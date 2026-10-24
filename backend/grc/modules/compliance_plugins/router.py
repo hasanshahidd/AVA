@@ -4018,10 +4018,17 @@ def _do_scan_all(
         from .services.credentials import resolve_credentials_for_connection as _rc
         from .runners.hostkeys import seed_host_keys
         _conns_in_scan: dict = {}
+        _conn_asset_ip: dict = {}
         for (_pg, _ea, _aa, _cn) in _work_queue:
             if _cn is not None:
                 _conns_in_scan.setdefault(_cn.id, _cn)
-        _cr_by_conn: dict = {cid: (_rc(cn) or {}) for cid, cn in _conns_in_scan.items()}
+                if _ea is not None and getattr(_ea, "ip_address", None) and _cn.id not in _conn_asset_ip:
+                    _conn_asset_ip[_cn.id] = _ea.ip_address
+        # Resolve against the asset IP so an unresolvable stored host falls back
+        # to the reachable IP — same fallback the scan itself uses, so preflight
+        # and seed agree with execution instead of skipping a scannable host.
+        _cr_by_conn: dict = {cid: (_rc(cn, asset_ip=_conn_asset_ip.get(cid)) or {})
+                             for cid, cn in _conns_in_scan.items()}
         # SSH host-key seed (persist once; skipped when the operator pinned theirs)
         _ssh_seed: set = set()
         for _cid, _cn in _conns_in_scan.items():

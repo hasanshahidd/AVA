@@ -222,16 +222,15 @@ def execute_plugin(
             pass
         return run
 
-    credentials = resolve_credentials_for_connection(connection) if connection else {}
-    # The SSH host comes from the connection's console_url, which is often a
-    # discovery hostname (e.g. a DigitalOcean droplet name like
-    # "ubuntu-s-...-tor1-01") that doesn't resolve from the scanner — oscap-ssh
-    # then fails EVERY rule with "Could not resolve hostname". Fall back to the
-    # asset's IP (reachable) when the credential host won't resolve.
-    _ssh_host = credentials.get("ssh_host")
+    # Resolve creds against the target asset's IP: a stored host that won't
+    # resolve from the scanner (common for a discovered host_name like a
+    # DigitalOcean droplet name) otherwise fails EVERY rule with "could not
+    # resolve host". The fallback lives in resolve_credentials_for_connection so
+    # it applies to every transport (SSH / WinRM / DB), not just SSH.
     _tgt_asset = run_asset or asset
-    if _ssh_host and _tgt_asset and getattr(_tgt_asset, "ip_address", None) and not _host_resolves(_ssh_host):
-        credentials = {**credentials, "ssh_host": _tgt_asset.ip_address}
+    credentials = resolve_credentials_for_connection(
+        connection, asset_ip=getattr(_tgt_asset, "ip_address", None)
+    ) if connection else {}
     # Manual (attestation) rules carry no executable check — the operator's
     # pass/fail/N-A decision is injected onto the check_definition so the
     # `manual` runner can turn it into a result through the same pipeline.
