@@ -12,11 +12,13 @@ import { Bug, Inbox, Search } from "lucide-react";
 import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
 import { Btn } from "../_admin";
 import { ProblemPanel, linkedIds } from "./_panel";
+import { NewTicketDialog } from "../_newticket";
 
 export default function HelpDeskProblems() {
   const { data, loading, error, reload } = useHd<{ tickets: any[] }>("/helpdesk/problems");
   const [q, setQ] = useState("");
   const [active, setActive] = useState<any | null>(null);
+  const [showNew, setShowNew] = useState(false);
 
   const tickets = data?.tickets || [];
   const filtered = useMemo(() => {
@@ -29,7 +31,8 @@ export default function HelpDeskProblems() {
 
   return (
     <div className="flex flex-col gap-4 text-[#0F172A]">
-      <PageHeader icon={Bug} title="Problems" subtitle="Root-cause investigations behind recurring incidents" />
+      <PageHeader icon={Bug} title="Problems" subtitle="Root-cause investigations behind recurring incidents"
+        actions={<Btn variant="primary" onClick={() => setShowNew(true)}>New problem</Btn>} />
 
       {error && <ErrorBanner msg={error} />}
 
@@ -94,6 +97,14 @@ export default function HelpDeskProblems() {
           problem={active}
           onClose={() => setActive(null)}
           onChanged={() => { setActive(null); reload(); }}
+        />
+      )}
+      {showNew && (
+        <NewTicketDialog
+          open
+          defaultProcess="problem"
+          onClose={() => setShowNew(false)}
+          onCreated={() => { setShowNew(false); reload(); }}
         />
       )}
     </div>

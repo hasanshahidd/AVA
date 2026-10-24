@@ -109,10 +109,12 @@ export function NewTicketDialog({
   open,
   onClose,
   onCreated,
+  defaultProcess,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  defaultProcess?: Process;
 }) {
   const depts = useHd<{ departments: Dept[] }>("/helpdesk/departments");
   // Shape: a map of category → [subcategories] (§3.5). Tolerate a {catalog:…} wrapper or absence.
@@ -133,7 +135,7 @@ export function NewTicketDialog({
     ? changeTypesRes.data.change_types
     : [{ code: "standard", name: "Standard" }, { code: "normal", name: "Normal" }, { code: "emergency", name: "Emergency" }]);
 
-  const [process, setProcess] = useState<Process>("incident");
+  const [process, setProcess] = useState<Process>(defaultProcess ?? "incident");
   const [departmentId, setDepartmentId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
