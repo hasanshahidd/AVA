@@ -744,7 +744,6 @@ export default function AssetDetailPage() {
     // Order + naming follow the reference ITAM asset tab bar, so the two
     // products read the same. 'risks' now carries Risks AND Controls.
     { id: 'overview', label: 'Overview', icon: Boxes },
-    { id: 'sbp', label: 'SBP Inventory', icon: Building2 },
     { id: 'risks', label: 'Risk & Controls', icon: Shield },
     { id: 'vulnerabilities', label: 'Vulnerabilities', icon: Bug },
     // No Software tab for hosts we can only see from outside — the inventory

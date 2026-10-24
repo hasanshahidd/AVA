@@ -87,7 +87,6 @@ export default function InventoryRedesign(p: Props) {
   });
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
-  const [popup, setPopup] = useState<ITAsset | null>(null);
 
   const ov = useQuery({
     queryKey: [...SCORECARD_QUERY_KEYS.assets],
@@ -321,7 +320,7 @@ export default function InventoryRedesign(p: Props) {
               </div>
               <div style={{ overflow: 'auto', maxHeight: '58vh' }}>
                 {mode === 'uncredential' ? (
-                  <UncredentialView rows={rows} onOpen={setPopup} />
+                  <UncredentialView rows={rows} onOpen={p.onView} />
                 ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 860 }}>
                   <thead><tr>
@@ -420,7 +419,6 @@ export default function InventoryRedesign(p: Props) {
           )}
         </div>
       </div>
-      {popup && <UncredPopup asset={popup} onClose={() => setPopup(null)} onConnect={p.onConnect} />}
     </div>
   );
 }
