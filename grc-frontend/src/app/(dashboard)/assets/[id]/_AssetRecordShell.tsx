@@ -82,7 +82,7 @@ export default function AssetRecordShell({
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                <button type="button" onClick={onAssessRisk} disabled={assessing} style={{ flex: 1, height: 30, borderRadius: 9, border: '1px solid #005B96', background: '#005B96', color: '#06342B', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', opacity: assessing ? 0.6 : 1 }}>{assessing ? (external ? 'Rescanning…' : 'Assessing…') : (external ? 'Rescan domain' : 'Assess risk')}</button>
+                <button type="button" onClick={onAssessRisk} disabled={assessing} style={{ flex: 1, height: 36, borderRadius: 9, border: '1px solid #005B96', background: '#005B96', color: '#ffffff', fontSize: 13, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer', opacity: assessing ? 0.6 : 1 }}>{assessing ? (external ? 'Rescanning…' : 'Assessing…') : (external ? 'Rescan domain' : 'Assess risk')}</button>
                 {canEdit && <button type="button" onClick={onEdit} style={{ height: 30, padding: '0 12px', borderRadius: 9, border: '1px solid #E8ECEE', background: '#fff', color: '#3A4653', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>Edit</button>}
               </div>
             </div>
