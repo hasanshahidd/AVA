@@ -34,7 +34,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Chip, PRIORITY_CHIP, useHd } from "./_ui";
-import { Modal, Field, Input, Textarea, Select, Btn, FormError, hdCall } from "./_admin";
+import { Modal, Field, Input, Textarea, Btn, FormError, hdCall } from "./_admin";
 import { AffectedCiPicker, type CiLite } from "./_ci";
 
 type Dept = { id: number; name: string; enabled: boolean };
@@ -395,12 +395,15 @@ export function NewTicketDialog({
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Field label="Department" hint={!deptList.length ? "No departments yet — create one in Settings → Departments." : process === "service_request" ? "Filters the templates below." : "Routes this to the right team."}>
-            <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              <option value="">— All departments —</option>
-              {deptList.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </Select>
+            <ComboBoxInput
+              ariaLabel="Department"
+              value={departmentId}
+              onChange={setDepartmentId}
+              options={deptList.map((d) => ({ value: String(d.id), label: d.name }))}
+              placeholder="All departments"
+              allowCustom={false}
+              displayLabelInsteadOfValue
+            />
           </Field>
           <Field label="Subject" required>
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary of the request" autoFocus />
@@ -510,16 +513,14 @@ export function NewTicketDialog({
         {process === "incident" && (
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
             <Field label="Impact">
-              <Select value={impact} onChange={(e) => setImpact(e.target.value)}>
-                <option value="">— Select —</option>
-                {LEVELS.map((l) => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
-              </Select>
+              <ComboBoxInput ariaLabel="Impact" value={impact} onChange={setImpact}
+                options={LEVELS.map((l) => ({ value: l, label: l[0].toUpperCase() + l.slice(1) }))}
+                placeholder="— Select —" allowCustom={false} displayLabelInsteadOfValue />
             </Field>
             <Field label="Urgency">
-              <Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                <option value="">— Select —</option>
-                {LEVELS.map((l) => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
-              </Select>
+              <ComboBoxInput ariaLabel="Urgency" value={urgency} onChange={setUrgency}
+                options={LEVELS.map((l) => ({ value: l, label: l[0].toUpperCase() + l.slice(1) }))}
+                placeholder="— Select —" allowCustom={false} displayLabelInsteadOfValue />
             </Field>
             <Field label="Priority" hint="Derived from impact × urgency.">
               <div className="flex h-[38px] items-center">
@@ -534,30 +535,27 @@ export function NewTicketDialog({
           <>
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <Field label="Category">
-                <Select value={category} onChange={(e) => { setCategory(e.target.value); setSubcategory(""); }}>
-                  <option value="">{categories.length ? "— Select —" : "No catalog configured"}</option>
-                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Category" value={category}
+                  onChange={(v) => { setCategory(v); setSubcategory(""); }}
+                  options={categories.map((c) => ({ value: c, label: c }))}
+                  placeholder={categories.length ? "— Select —" : "No catalog configured"} allowCustom={false} />
               </Field>
               <Field label="Subcategory">
-                <Select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} disabled={!subs.length}>
-                  <option value="">{subs.length ? "— Select —" : "—"}</option>
-                  {subs.map((s) => <option key={s} value={s}>{s}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Subcategory" value={subcategory} onChange={setSubcategory}
+                  options={subs.map((s) => ({ value: s, label: s }))}
+                  placeholder={subs.length ? "— Select —" : "—"} allowCustom={false} disabled={!subs.length} />
               </Field>
             </div>
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
               <Field label="Impact">
-                <Select value={impact} onChange={(e) => setImpact(e.target.value)}>
-                  <option value="">— Optional —</option>
-                  {LEVELS.map((l) => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Impact" value={impact} onChange={setImpact}
+                  options={LEVELS.map((l) => ({ value: l, label: l[0].toUpperCase() + l.slice(1) }))}
+                  placeholder="— Optional —" allowCustom={false} displayLabelInsteadOfValue />
               </Field>
               <Field label="Urgency">
-                <Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                  <option value="">— Optional —</option>
-                  {LEVELS.map((l) => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Urgency" value={urgency} onChange={setUrgency}
+                  options={LEVELS.map((l) => ({ value: l, label: l[0].toUpperCase() + l.slice(1) }))}
+                  placeholder="— Optional —" allowCustom={false} displayLabelInsteadOfValue />
               </Field>
               <Field label="Priority" hint="Derived from impact × urgency.">
                 <div className="flex h-[38px] items-center">
@@ -597,7 +595,7 @@ export function NewTicketDialog({
                 onChange={(v) => { const n = Number(v); if (n && !linkedIncs.includes(n)) setLinkedIncs((l) => [...l, n]); }}
                 options={(probIncidents.data?.tickets || [])
                   .filter((t) => !linkedIncs.includes(Number(t.name)))
-                  .map((t) => ({ value: String(t.name), label: `#${t.name} · ${t.subject || "(no subject)"}` }))}
+                  .map((t) => ({ value: String(t.name), label: t.subject || `Incident ${t.name}` }))}
                 placeholder="Search incidents to link…"
                 allowCustom={false}
               />
@@ -610,14 +608,14 @@ export function NewTicketDialog({
           <>
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <Field label="Change type">
-                <Select value={changeType} onChange={(e) => setChangeType(e.target.value)}>
-                  {changeTypes.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Change type" value={changeType} onChange={setChangeType}
+                  options={changeTypes.map((c) => ({ value: c.code, label: c.name }))}
+                  placeholder="Select a change type…" allowCustom={false} displayLabelInsteadOfValue />
               </Field>
               <Field label="Risk">
-                <Select value={changeRisk} onChange={(e) => setChangeRisk(e.target.value)}>
-                  {LEVELS.map((l) => <option key={l} value={l}>{l[0].toUpperCase() + l.slice(1)}</option>)}
-                </Select>
+                <ComboBoxInput ariaLabel="Risk" value={changeRisk} onChange={setChangeRisk}
+                  options={LEVELS.map((l) => ({ value: l, label: l[0].toUpperCase() + l.slice(1) }))}
+                  placeholder="— Select —" allowCustom={false} displayLabelInsteadOfValue />
               </Field>
               <Field label="Planned start">
                 <Input type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} />
@@ -647,41 +645,27 @@ export function NewTicketDialog({
         {/* §2e assignment — optional; unassigned routes by department. */}
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Field label="Assignee" hint="Optional — leave blank to auto-route by department.">
-            <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-              <option value="">Unassigned (route by department)</option>
-              {agentList.map((a) => (
-                <option key={a.email || a.name || ""} value={a.email || a.name || ""}>
-                  {a.agent_name || a.name || a.email}
-                </option>
-              ))}
-            </Select>
+            <ComboBoxInput ariaLabel="Assignee" value={assignee} onChange={setAssignee}
+              options={agentList.map((a) => ({ value: a.email || a.name || "", label: a.agent_name || a.name || a.email || "" }))}
+              placeholder="Unassigned (auto-route)" allowCustom={false} displayLabelInsteadOfValue />
           </Field>
           <Field label="Team" hint="Optional — overrides the department's default team.">
-            <Select value={team} onChange={(e) => setTeam(e.target.value)} disabled={!teamList.length}>
-              <option value="">{teamList.length ? "— Select —" : "No teams configured"}</option>
-              {teamList.map((tm) => (
-                <option key={tm.id} value={tm.name}>{tm.team_name || tm.name}</option>
-              ))}
-            </Select>
+            <ComboBoxInput ariaLabel="Team" value={team} onChange={setTeam}
+              options={teamList.map((tm) => ({ value: tm.name, label: tm.team_name || tm.name }))}
+              placeholder={teamList.length ? "— Select —" : "No teams configured"} allowCustom={false} disabled={!teamList.length} displayLabelInsteadOfValue />
           </Field>
           <Field label="Support group" hint="Optional — routes to the group's mapped team (Governance → Support groups).">
-            <Select value={supportGroup} onChange={(e) => setSupportGroup(e.target.value)}>
-              <option value="">— Select —</option>
-              {(sgRes.data?.support_groups || []).map((g) => (
-                <option key={g.code} value={g.code}>{g.name}{g.mapped ? "" : " (unmapped)"}</option>
-              ))}
-            </Select>
+            <ComboBoxInput ariaLabel="Support group" value={supportGroup} onChange={setSupportGroup}
+              options={(sgRes.data?.support_groups || []).map((g) => ({ value: g.code, label: `${g.name}${g.mapped ? "" : " (unmapped)"}` }))}
+              placeholder="— Select —" allowCustom={false} displayLabelInsteadOfValue />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Field label="Customer" hint="Optional — the organisation this ticket belongs to.">
-            <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)} disabled={!(customersRes.data?.customers || []).length}>
-              <option value="">{(customersRes.data?.customers || []).length ? "— None —" : "No customers configured"}</option>
-              {(customersRes.data?.customers || []).map((c) => (
-                <option key={c.name} value={c.name}>{c.customer_name || c.name}</option>
-              ))}
-            </Select>
+            <ComboBoxInput ariaLabel="Customer" value={customerId} onChange={setCustomerId}
+              options={(customersRes.data?.customers || []).map((c) => ({ value: c.name, label: c.customer_name || c.name }))}
+              placeholder={(customersRes.data?.customers || []).length ? "— None —" : "No customers configured"} allowCustom={false} disabled={!(customersRes.data?.customers || []).length} displayLabelInsteadOfValue />
           </Field>
           <Field label="Contact email" hint="Who raised this, if not an internal user.">
             <Input type="email" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="person@company.com" />
