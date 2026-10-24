@@ -364,7 +364,7 @@ export function NewTicketDialog({
         </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <Field label="Department" hint={deptList.length ? "Filters the templates below." : "No departments yet — create one in Settings → Departments."}>
+          <Field label="Department" hint={!deptList.length ? "No departments yet — create one in Settings → Departments." : process === "service_request" ? "Filters the templates below." : "Routes this to the right team."}>
             <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
               <option value="">— All departments —</option>
               {deptList.map((d) => (
@@ -377,8 +377,10 @@ export function NewTicketDialog({
           </Field>
         </div>
 
-        {/* §2a/2b/2c template picker — grouped, scrollable, process-badged; click = full autofill. */}
-        {!hideTemplates ? (
+        {/* §2a/2b/2c template picker — grouped, scrollable, process-badged; click = full autofill.
+            Only Service Requests order from the catalogue of common requests; Incident/Problem/
+            Change use a clean process form instead, so the template browser is gated to them. */}
+        {process === "service_request" && (!hideTemplates ? (
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[11.5px] font-semibold text-[#475569]">
@@ -442,7 +444,7 @@ export function NewTicketDialog({
           >
             Browse common requests
           </button>
-        )}
+        ))}
 
         {/* Incident */}
         {process === "incident" && (
