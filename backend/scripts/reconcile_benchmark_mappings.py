@@ -50,6 +50,12 @@ from sqlalchemy import cast, String, func  # noqa: E402
 # (os_pattern, old_benchmark, new_benchmark) — repoint only from the old target.
 REMAPS = [
     ("rhel-9",        "CIS_AlmaLinux_OS_9_Benchmark_v2.0.0",             "CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0"),
+    # Bare `rhel` catch-all (version-unknown RHEL host) was left on AlmaLinux-9 —
+    # a different distro's benchmark, even though real RHEL 9 (293 rules) is
+    # loaded. Mirror the rhel-9 repoint so a RHEL host never shows an AlmaLinux
+    # benchmark. (rockylinux-9 stays on Alma 9 — true RHEL-9 clone, no separate
+    # Rocky benchmark loaded.)
+    ("rhel",          "CIS_AlmaLinux_OS_9_Benchmark_v2.0.0",             "CIS_Red_Hat_Enterprise_Linux_9_Benchmark_v2.0.0"),
     ("almalinux-8",   "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0", "CIS_ALMALINUX_OS_8_v4.0.0"),
     ("oraclelinux-8", "CIS_Red_Hat_Enterprise_Linux_8_Benchmark_v4.0.0", "CIS_Oracle_Linux_8_Benchmark_v4.0.0"),
     ("amazonlinux-2", "CIS_Amazon_Linux_2023_Benchmark_v1.0.0",          "CIS_AMAZON_LINUX_2_v4.0.0"),
