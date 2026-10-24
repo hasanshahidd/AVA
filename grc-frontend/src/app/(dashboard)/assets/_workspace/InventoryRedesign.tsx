@@ -322,17 +322,17 @@ export default function InventoryRedesign(p: Props) {
                 {mode === 'uncredential' ? (
                   <UncredentialView rows={rows} onOpen={p.onView} />
                 ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 860 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 1080 }}>
                   <thead><tr>
                     <th style={{ ...th, width: 38 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#014A81', width: 15, height: 15 }} /></th>
-                    {['Asset', 'Type', 'Owner', 'Criticality', 'CIA', 'Last scan', 'Value', 'Status', 'PCI'].map((h) => <th key={h} style={th}>{h}</th>)}
+                    {['Asset', 'Type', 'Owner', 'Department', 'Data Class', 'Business Function', 'Criticality', 'CIA', 'Last scan', 'Value', 'Status', 'PCI'].map((h) => <th key={h} style={th}>{h}</th>)}
                     <th style={{ ...th, width: 36 }}></th>
                   </tr></thead>
                   <tbody>
                     {p.loading ? (
-                      <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
+                      <tr><td colSpan={14} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
                     ) : rows.length === 0 ? (
-                      <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
+                      <tr><td colSpan={14} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
                     ) : orderedRows.map((a) => {
                       const tl = TILE[typeKey(a)] || { bg: '#E4E9ED', fg: '#78838F' };
                       const ck = CRIT[critOf(a)];
@@ -369,6 +369,9 @@ export default function InventoryRedesign(p: Props) {
                           </td>
                           <td style={{ ...td, textTransform: 'capitalize' }}>{(a.asset_type || '').replace(/_/g, ' ') || '—'}</td>
                           <td style={td}>{a.owner_name ? a.owner_name : <span style={{ color: '#A32B2B', fontWeight: 600 }}>Unassigned</span>}</td>
+                          <td style={td}>{a.department || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
+                          <td style={{ ...td, textTransform: 'capitalize' }}>{a.data_classification || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
+                          <td style={td}>{a.business_function || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
                           <td style={td}>{ck ? <span style={{ background: ck.bg, color: ck.fg, borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{a.criticality}</span> : <span style={{ color: '#B4BDC6' }}>—</span>}</td>
                           <td style={td}>{hasCia(a) ? <span className="mono">{a.confidentiality_rating}·{a.integrity_rating}·{a.availability_rating}</span> : <span style={{ color: '#8A5A0C' }}>— assess</span>}</td>
                           <td style={td}>{lastScan(a)}</td>
