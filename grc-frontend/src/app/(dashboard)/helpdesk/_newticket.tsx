@@ -109,12 +109,12 @@ export function NewTicketDialog({
   open,
   onClose,
   onCreated,
-  defaultProcess,
+  lockProcess,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
-  defaultProcess?: Process;
+  lockProcess?: Process;
 }) {
   const depts = useHd<{ departments: Dept[] }>("/helpdesk/departments");
   // Shape: a map of category → [subcategories] (§3.5). Tolerate a {catalog:…} wrapper or absence.
@@ -135,7 +135,7 @@ export function NewTicketDialog({
     ? changeTypesRes.data.change_types
     : [{ code: "standard", name: "Standard" }, { code: "normal", name: "Normal" }, { code: "emergency", name: "Emergency" }]);
 
-  const [process, setProcess] = useState<Process>(defaultProcess ?? "incident");
+  const [process, setProcess] = useState<Process>(lockProcess ?? "incident");
   const [departmentId, setDepartmentId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
@@ -297,8 +297,8 @@ export function NewTicketDialog({
     <Modal
       open={open}
       onClose={close}
-      title="New ticket"
-      subtitle="Pick a process, then fill in what it needs"
+      title={lockProcess ? `New ${PROCESS_BADGE[lockProcess].label.toLowerCase()}` : "New ticket"}
+      subtitle={lockProcess ? "Fill in what it needs" : "Pick a process, then fill in what it needs"}
       wide
       footer={
         <>
@@ -311,32 +311,35 @@ export function NewTicketDialog({
     >
       <FormError msg={err} />
       <div className="flex flex-col gap-3.5">
-        {/* Step 1 — process */}
-        <div>
-          <span className="mb-1.5 block text-[11.5px] font-semibold text-[#475569]">Process</span>
-          <div className="flex flex-wrap gap-2">
-            {PROCESSES.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => setProcess(p.value)}
-                className={`rounded-[9px] border px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                  process === p.value
-                    ? "border-[#005B96] bg-[#005B96] text-white"
-                    : "border-[#E2E5EC] bg-white text-[#334155] hover:bg-[#F6F7FB]"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <span className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-[#64748B]">
-            Creating:
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeBadge.cls}`}>
-              {activeBadge.label}
+        {/* Step 1 — process (hidden when the dialog is locked to one process,
+            e.g. opened from a dedicated Incidents/Problems/Changes page) */}
+        {!lockProcess && (
+          <div>
+            <span className="mb-1.5 block text-[11.5px] font-semibold text-[#475569]">Process</span>
+            <div className="flex flex-wrap gap-2">
+              {PROCESSES.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setProcess(p.value)}
+                  className={`rounded-[9px] border px-3 py-1.5 text-[12.5px] font-semibold transition ${
+                    process === p.value
+                      ? "border-[#005B96] bg-[#005B96] text-white"
+                      : "border-[#E2E5EC] bg-white text-[#334155] hover:bg-[#F6F7FB]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <span className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-[#64748B]">
+              Creating:
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${activeBadge.cls}`}>
+                {activeBadge.label}
+              </span>
             </span>
-          </span>
-        </div>
+          </div>
+        )}
 
         {/* §2d prominent SLA callout — updates live with process × derived priority. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[10px] border border-[#005B96]/20 bg-[#005B96]/[0.06] px-3.5 py-2.5">

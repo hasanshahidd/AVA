@@ -102,7 +102,7 @@ export default function HelpDeskProblems() {
       {showNew && (
         <NewTicketDialog
           open
-          defaultProcess="problem"
+          lockProcess="problem"
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); reload(); }}
         />

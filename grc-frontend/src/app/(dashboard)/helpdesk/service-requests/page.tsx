@@ -9,10 +9,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ClipboardList, Inbox, Search } from "lucide-react";
 import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
+import { Btn } from "../_admin";
+import { NewTicketDialog } from "../_newticket";
 
 export default function HelpDeskServiceRequests() {
-  const { data, loading, error } = useHd<{ tickets: any[] }>("/helpdesk/service-requests");
+  const { data, loading, error, reload } = useHd<{ tickets: any[] }>("/helpdesk/service-requests");
   const [q, setQ] = useState("");
+  const [showNew, setShowNew] = useState(false);
 
   const tickets = data?.tickets || [];
   const filtered = useMemo(() => {
@@ -28,7 +31,8 @@ export default function HelpDeskServiceRequests() {
 
   return (
     <div className="flex flex-col gap-4 text-[#0F172A]">
-      <PageHeader icon={ClipboardList} title="Service Requests" subtitle="Catalog requests — hardware, access, onboarding & more" />
+      <PageHeader icon={ClipboardList} title="Service Requests" subtitle="Catalog requests — hardware, access, onboarding & more"
+        actions={<Btn variant="primary" onClick={() => setShowNew(true)}>New request</Btn>} />
 
       {error && <ErrorBanner msg={error} />}
 
@@ -73,6 +77,9 @@ export default function HelpDeskServiceRequests() {
             </tr>
           ))}
         </Table>
+      )}
+      {showNew && (
+        <NewTicketDialog open lockProcess="service_request" onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); reload(); }} />
       )}
     </div>
   );

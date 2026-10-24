@@ -10,7 +10,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { GitPullRequest, Inbox, Search, ShieldAlert } from "lucide-react";
 import { Chip, PRIORITY_CHIP, ErrorBanner, Empty, Loading, PageHeader, SlaBadge, Table, timeAgo, useHd } from "../_ui";
+import { Btn } from "../_admin";
 import { ApprovalBadge, ChangeActions } from "./_actions";
+import { NewTicketDialog } from "../_newticket";
 
 const fmt = (v?: string | null) => {
   if (!v) return null;
@@ -26,6 +28,7 @@ function PlannedWindow({ start, end }: { start?: string | null; end?: string | n
 export default function HelpDeskChanges() {
   const { data, loading, error, reload } = useHd<{ tickets: any[] }>("/helpdesk/changes");
   const [q, setQ] = useState("");
+  const [showNew, setShowNew] = useState(false);
 
   const tickets = data?.tickets || [];
   const filtered = useMemo(() => {
@@ -38,7 +41,8 @@ export default function HelpDeskChanges() {
 
   return (
     <div className="flex flex-col gap-4 text-[#0F172A]">
-      <PageHeader icon={GitPullRequest} title="Changes" subtitle="Planned changes moving through the approval workflow" />
+      <PageHeader icon={GitPullRequest} title="Changes" subtitle="Planned changes moving through the approval workflow"
+        actions={<Btn variant="primary" onClick={() => setShowNew(true)}>New change</Btn>} />
 
       {error && <ErrorBanner msg={error} />}
 
@@ -87,6 +91,9 @@ export default function HelpDeskChanges() {
             </tr>
           ))}
         </Table>
+      )}
+      {showNew && (
+        <NewTicketDialog open lockProcess="change" onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); reload(); }} />
       )}
     </div>
   );
