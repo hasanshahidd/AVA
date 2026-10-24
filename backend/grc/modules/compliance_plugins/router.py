@@ -3722,6 +3722,32 @@ def _do_scan_all(
                 )
                 break
     if asset is not None and explicit_connection is None and asset_pinned_connection is None:
+        # Distinguish "never onboarded" from "has a connection that was disabled".
+        # The pinned lookup above only considers ACTIVE connections, so a dormant
+        # one (disconnected but still holding valid credentials) lands here with
+        # the misleading "add credentials" message — implying none exist and
+        # sending the operator to re-onboard from scratch. Detect it and point at
+        # Reconnect instead, which re-enables the existing credentials.
+        dormant_conn = None
+        if asset.host_name or asset.ip_address:
+            from .services.connection_matcher import build_index, candidates_for_asset
+            _all_conns = (
+                db.query(IntegrationConnection)
+                .filter(IntegrationConnection.tenant_id == tenant_id)
+                .all()
+            )
+            dormant_conn = next(
+                (c for c in candidates_for_asset(asset, build_index(_all_conns))
+                 if not c.is_active),
+                None,
+            )
+        if dormant_conn is not None:
+            raise HTTPException(
+                409,
+                f"Asset '{asset.name}' has a connection "
+                f"('{dormant_conn.connection_name}') but it is currently disabled. "
+                f"Reconnect the asset to re-enable its stored credentials, then scan.",
+            )
         raise HTTPException(
             400,
             f"Asset '{asset.name}' has no connection. Add credentials via "
@@ -3971,6 +3997,62 @@ def _do_scan_all(
         finally:
             worker_db.close()
 
+    # ── Connection preflight — transport-agnostic root-cause fix ──
+    # The scan fans out up to max_workers (default 10) sessions at once. Cold-
+    # starting them all simultaneously is what raced the SSH known_hosts file
+    # (1282/2041 rules errored "Host key verification failed"); the same cold
+    # fan-out risks first-contact flakiness on ANY transport, and a dead or
+    # mis-authenticated credential becomes hundreds of identical rule errors.
+    # So warm + verify each unique connection ONCE, serially, before the pool —
+    # Windows/WinRM, SSH, Postgres, MSSQL, MySQL, AWS all have a preflight:
+    #   • SSH also gets its host key seeded here, so the parallel oscap-ssh /
+    #     paramiko sessions can't race to add it (preflight's own connect does
+    #     not persist to ~/.ssh/known_hosts). Verification stays on; nothing is
+    #     hardcoded; operator-pinned known_hosts opts out of the seed.
+    #   • If preflight DEFINITIVELY fails (auth rejected or host unreachable),
+    #     that connection's rules are dropped with one clear reason instead of a
+    #     storm of identical errors — for every asset type, not just Linux.
+    _preflight_failed: dict = {}
+    try:
+        from .services.preflight import preflight_check
+        from .services.credentials import resolve_credentials_for_connection as _rc
+        from .runners.hostkeys import seed_host_keys
+        _conns_in_scan: dict = {}
+        for (_pg, _ea, _aa, _cn) in _work_queue:
+            if _cn is not None:
+                _conns_in_scan.setdefault(_cn.id, _cn)
+        _cr_by_conn: dict = {cid: (_rc(cn) or {}) for cid, cn in _conns_in_scan.items()}
+        # SSH host-key seed (persist once; skipped when the operator pinned theirs)
+        _ssh_seed: set = set()
+        for _cid, _cn in _conns_in_scan.items():
+            if (_cn.integration_type or "").lower() in ("linux_ssh", "netdev_ssh"):
+                _cr = _cr_by_conn[_cid]
+                if not _cr.get("ssh_known_hosts") and _cr.get("ssh_host"):
+                    _ssh_seed.add((_cr["ssh_host"], int(_cr.get("ssh_port") or 22)))
+        if _ssh_seed:
+            seed_host_keys(_ssh_seed)
+        # Warm + verify every connection (one serial preflight each)
+        for _cid, _cn in _conns_in_scan.items():
+            try:
+                _pf = preflight_check((_cn.integration_type or "").lower(), _cr_by_conn[_cid])
+            except Exception as _pfx:  # preflight itself errored — never block the scan
+                logger.warning("scan preflight error for connection id=%s: %s", _cid, _pfx)
+                continue
+            if not _pf.ok and _pf.code in ("auth_failed", "network_unreachable"):
+                _preflight_failed[_cid] = f"{_pf.code}: {_pf.detail}"
+                logger.warning("scan preflight: connection id=%s (%s) failed — %s",
+                               _cid, _cn.integration_type, _pf.detail)
+    except Exception as _exc:  # warm-up must never block a scan
+        logger.warning("scan preflight/seed skipped: %s", _exc)
+
+    # Drop rules bound to a connection that definitively failed preflight.
+    skipped_preflight = 0
+    if _preflight_failed:
+        _kept = [(p, ea, aa, c) for (p, ea, aa, c) in _work_queue
+                 if not (c is not None and c.id in _preflight_failed)]
+        skipped_preflight = len(_work_queue) - len(_kept)
+        _work_queue = _kept
+
     max_workers = int(os.environ.get("AVA_SCAN_CONCURRENCY", "10"))
     if _work_queue:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
@@ -3990,7 +4072,14 @@ def _do_scan_all(
     # silent success.
     hint: Optional[str] = None
     if asset is not None and len(runs) == 0:
-        if not asset.os_normalized:
+        _uc = explicit_connection or asset_pinned_connection
+        if _uc is not None and _uc.id in _preflight_failed:
+            hint = (
+                f"Couldn't scan '{asset.name}': the connection "
+                f"'{_uc.connection_name}' failed preflight — {_preflight_failed[_uc.id]}. "
+                f"Fix the credential or host reachability, then retry."
+            )
+        elif not asset.os_normalized:
             hint = (
                 f"Asset '{asset.name}' has no normalized OS — nothing scanned. "
                 f"Use 'Re-detect OS' on the Compliance tab, or set os_normalized "
@@ -4008,6 +4097,7 @@ def _do_scan_all(
         "skipped_wrong_os_version": skipped_wrong_os_version,
         "skipped_ai_refinement": skipped_ai_refinement,
         "skipped_no_connection": skipped_no_connection,
+        "skipped_preflight": skipped_preflight,
         "ai_routed_os_versions": [],
         "hint": hint,
     }

@@ -222,6 +222,12 @@ export default function CompliancePanel({ asset }: { asset: any }) {
   });
   const selfPeerEntry = (selfIpPeersQ.data?.group ?? []).find((g: any) => g.is_self);
   const selfIsConnected: boolean = selfPeerEntry?.is_connected ?? false;
+  // Was this asset EVER scanned? ip-peers sets never_scanned only when no score
+  // exists. An asset that was scanned and later had its connection deactivated
+  // is NOT "not connected yet" — it just needs reconnecting to run a new scan,
+  // and its last results are still shown below. (Fixes the contradictory
+  // "can't be scanned yet" banner on an already-scanned asset.)
+  const selfNeverScanned: boolean = selfPeerEntry?.never_scanned ?? true;
 
   const isBrowserAsset = (() => {
     const k = (asset.os_normalized || '').toLowerCase();
@@ -684,31 +690,47 @@ export default function CompliancePanel({ asset }: { asset: any }) {
         );
       })()}
 
-      {/* ── "Connect this asset" CTA — non-browser variant ── */}
+      {/* ── Connection CTA — non-browser. Distinguishes a never-onboarded asset
+           ("connect to scan") from one that WAS scanned but whose connection is
+           now inactive ("reconnect to rescan"). The latter still shows its last
+           scan results below, so the old "can't be scanned yet" copy was wrong. ── */}
       {selfIpPeersQ.data && !selfIsConnected && !isBrowserAsset && (
-        <div className={CARD + ' border-l-[3px] border-l-[#005B96] overflow-hidden'}>
+        <div className={CARD + ' border-l-[3px] overflow-hidden ' + (selfNeverScanned ? 'border-l-[#005B96]' : 'border-l-[#D8A93B]')}>
           <div className="px-4 py-3.5">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#EFF5FA] text-[#014A81]">
+              <div className={'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ' + (selfNeverScanned ? 'bg-[#EFF5FA] text-[#014A81]' : 'bg-[#FBF2DF] text-[#9A6410]')}>
                 <Network className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-[13.5px] font-semibold text-[#0F1F2B]">This asset isn&apos;t connected yet</h3>
-                <p className="mt-1 text-[12px] text-[#3A4653] leading-relaxed">
-                  Manually-added assets need an integration before they can be scanned.
-                  Connect via the wizard to pick <strong>Agent</strong> (script the host runs once, then scans itself) or
-                  {' '}<strong>Agentless</strong> (your backend reaches out over WinRM / SSH / DB protocol with stored credentials).
-                  {' '}{wizPlatformForSelf
-                    ? <>Detected platform: <code className={MONO + ' text-[#0F1F2B]'}>{wizPlatformForSelf}</code> — wizard will jump straight to its credential form.</>
-                    : <>OS isn&apos;t set on this asset, so the wizard will start at the platform picker.</>}
-                </p>
+                {selfNeverScanned ? (
+                  <>
+                    <h3 className="text-[13.5px] font-semibold text-[#0F1F2B]">This asset isn&apos;t connected yet</h3>
+                    <p className="mt-1 text-[12px] text-[#3A4653] leading-relaxed">
+                      Manually-added assets need an integration before they can be scanned.
+                      Connect via the wizard to pick <strong>Agent</strong> (script the host runs once, then scans itself) or
+                      {' '}<strong>Agentless</strong> (your backend reaches out over WinRM / SSH / DB protocol with stored credentials).
+                      {' '}{wizPlatformForSelf
+                        ? <>Detected platform: <code className={MONO + ' text-[#0F1F2B]'}>{wizPlatformForSelf}</code> — wizard will jump straight to its credential form.</>
+                        : <>OS isn&apos;t set on this asset, so the wizard will start at the platform picker.</>}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-[13.5px] font-semibold text-[#0F1F2B]">No active connection</h3>
+                    <p className="mt-1 text-[12px] text-[#3A4653] leading-relaxed">
+                      This asset has already been scanned — the results below are from that scan — but its integration
+                      connection is now <strong>inactive</strong>, so a new scan can&apos;t run until it&apos;s reconnected.
+                      {' '}Reactivate it in <Link href="/admin/integrations/connect" className="text-[#014A81] underline hover:text-[#0F1F2B]">Integrations</Link>, or reconnect via the wizard.
+                    </p>
+                  </>
+                )}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Link
                     href={connectWizardHref}
                     className="inline-flex items-center gap-1.5 h-[33px] rounded-[9px] bg-[#005B96] px-3.5 text-[12.5px] font-semibold text-white border border-[#005B96] hover:bg-[#014A81]"
                   >
                     <Zap className="h-3.5 w-3.5" />
-                    Connect this asset
+                    {selfNeverScanned ? 'Connect this asset' : 'Reconnect'}
                   </Link>
                   {asset.host_name && (
                     <span className="text-[11.5px] text-[#8A95A1]">
