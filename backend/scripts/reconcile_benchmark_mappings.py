@@ -67,6 +67,10 @@ REMAPS = [
     ("solaris-11",    "CIS_Oracle_Solaris_11_Benchmark_v1.1.0_Archive",   "CIS_Oracle_Solaris_11.4_Benchmark_v1.1.0"),
     ("solaris-11.1",  "CIS_Oracle_Solaris_11.1_Benchmark_v1.0.0_Archive", "CIS_Oracle_Solaris_11.4_Benchmark_v1.1.0"),
     ("oracle-db-18",  "CIS_Oracle_Database_18c_Benchmark_v1.1.0_ARCHIVE", "CIS_Oracle_Database_19c_Benchmark_v2.0.0"),
+    # Win10 assets were pinned to the Windows 11 benchmark (Hassan's Win10->Win11
+    # report). Win10 Enterprise v4.0.0 now exists in the catalog (450 runnable
+    # rules) — repoint so Win10 hosts stop being scanned with Win11 rules.
+    ("windows-10",    "CIS_Microsoft_Windows_11_Enterprise_Benchmark_v5.0.1", "CIS_Microsoft_Windows_10_Enterprise_Benchmark_v4.0.0"),
 ]
 # (pattern, benchmark) mappings to deactivate — dead/ancient or too-generic.
 # NOTE: only deactivate patterns with NO generic catch-all above them. windows-xp
