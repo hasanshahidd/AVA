@@ -56,7 +56,7 @@ import ManualChecksPanel from './ManualChecksPanel';
 const MONO = "font-['ui-monospace','Cascadia_Code',Consolas,monospace] [font-variant-numeric:tabular-nums]";
 const CARD = 'bg-white border border-[#E8ECEE] rounded-[15px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]';
 const SECLABEL = 'text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#8A95A1]';
-const BTN_AC = 'border border-[#005B96] bg-[#005B96] text-[#06342B] font-semibold hover:bg-[#014A81] disabled:opacity-50 disabled:cursor-not-allowed';
+const BTN_AC = 'border border-[#005B96] bg-[#005B96] text-white font-semibold hover:bg-[#014A81] disabled:opacity-50 disabled:cursor-not-allowed';
 
 // mock's svg.ic / svg.ic.sm
 function Ic({ size = 16, children, style }: { size?: number; children: React.ReactNode; style?: React.CSSProperties }) {
@@ -199,6 +199,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const [cTab, setCTab] = useState<'grp' | 'bench' | 'sess' | 'act' | 'manual'>('grp');
   const [noBenchOpen, setNoBenchOpen] = useState(false);
+  const [ruleFilter, setRuleFilter] = useState('');
   const [openSessions, setOpenSessions] = useState<Set<string>>(new Set());
   const [hasInteracted, setHasInteracted] = useState(false);
 
@@ -650,7 +651,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                     {hostInGroup ? (
                       <Link
                         href={`/assets/${hostInGroup.id}?tab=compliance`}
-                        className="inline-flex items-center gap-1.5 h-[33px] rounded-[9px] bg-[#005B96] px-3.5 text-[12.5px] font-semibold text-[#06342B] border border-[#005B96] hover:bg-[#014A81]"
+                        className="inline-flex items-center gap-1.5 h-[33px] rounded-[9px] bg-[#005B96] px-3.5 text-[12.5px] font-semibold text-white border border-[#005B96] hover:bg-[#014A81]"
                       >
                         <Network className="h-3.5 w-3.5" />
                         Go to host: {hostInGroup.name}
@@ -704,7 +705,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Link
                     href={connectWizardHref}
-                    className="inline-flex items-center gap-1.5 h-[33px] rounded-[9px] bg-[#005B96] px-3.5 text-[12.5px] font-semibold text-[#06342B] border border-[#005B96] hover:bg-[#014A81]"
+                    className="inline-flex items-center gap-1.5 h-[33px] rounded-[9px] bg-[#005B96] px-3.5 text-[12.5px] font-semibold text-white border border-[#005B96] hover:bg-[#014A81]"
                   >
                     <Zap className="h-3.5 w-3.5" />
                     Connect this asset
@@ -877,7 +878,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                       {[s.software_key || 'classified', s.benchmark_name, `${(s.rule_count ?? 0).toLocaleString()} rules`].filter(Boolean).join(' · ')}
                     </span>
                   </div>
-                  <Link href={softwareSetupHref(s)} className="shrink-0 inline-flex items-center gap-1 rounded-[8px] bg-[#014A81] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#0d8a72]" title="Set up a read-only credential for this software so its CIS rules can scan.">Set up scan →</Link>
+                  <Link href={softwareSetupHref(s)} className="shrink-0 inline-flex items-center gap-1 rounded-[8px] bg-[#005B96] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#014A81]" title="Set up a read-only credential for this software so its CIS rules can scan.">Set up scan →</Link>
                 </div>
               ))}
             </>
@@ -1048,7 +1049,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                         <b className="font-semibold flex-1 min-w-0 truncate">{s.name}</b>
                         <Mchip ac title={s.benchmark_name}>{s.benchmark_name}</Mchip>
                         <span className="text-[10.5px] text-[#8A95A1] shrink-0"><b className={'text-[#0F1F2B] font-semibold ' + MONO}>{(s.rule_count ?? 0).toLocaleString()}</b> rules</span>
-                        <Link href={softwareSetupHref(s)} className="shrink-0 inline-flex items-center gap-1 rounded-[8px] bg-[#014A81] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#0d8a72]" title="Set up a read-only credential for this software so its CIS rules can scan.">Set up scan →</Link>
+                        <Link href={softwareSetupHref(s)} className="shrink-0 inline-flex items-center gap-1 rounded-[8px] bg-[#005B96] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#014A81]" title="Set up a read-only credential for this software so its CIS rules can scan.">Set up scan →</Link>
                       </div>
                     ))}
                   </>
@@ -1069,44 +1070,75 @@ export default function CompliancePanel({ asset }: { asset: any }) {
               <span className="text-[10px] text-[#AEB8C2]">Library → matched benchmarks → applicable to scan</span>
             </div>
             <div className="grid gap-3 px-4 py-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))' }}>
-              <div className="bg-[#F7F9FA] rounded-[11px] px-[15px] py-[13px]">
-                <b className={'text-[21px] font-semibold ' + MONO}>{total.toLocaleString()}</b>
+              <div className="rounded-[11px] border border-[#EEF1F3] bg-[#F7F9FA] px-[15px] py-[13px] border-l-[3px] border-l-[#CBD4DD]">
+                <b className={'text-[22px] font-semibold ' + MONO}>{total.toLocaleString()}</b>
                 <span className="block text-[11px] text-[#3A4653] font-semibold mt-0.5">Library total</span>
                 <small className="text-[10px] text-[#AEB8C2]">approved CIS plugins</small>
               </div>
-              <div className="bg-[#F7F9FA] rounded-[11px] px-[15px] py-[13px]">
-                <b className={'text-[21px] font-semibold text-[#014A81] ' + MONO}>
+              <div className="rounded-[11px] border border-[#EEF1F3] bg-[#F7F9FA] px-[15px] py-[13px] border-l-[3px] border-l-[#7FA8CC]">
+                <b className={'text-[22px] font-semibold text-[#014A81] ' + MONO}>
                   {ruleCount.toLocaleString()}
                   {swRuleSum > 0 && <span className="text-[12px] text-[#8A95A1] font-medium"> + {swRuleSum.toLocaleString()} software</span>}
                 </b>
                 <span className="block text-[11px] text-[#3A4653] font-semibold mt-0.5">From matched benchmarks</span>
                 <small className="text-[10px] text-[#AEB8C2]">{(stage1.skipped ?? 0).toLocaleString()} from other benchmarks skipped</small>
               </div>
-              <div className="bg-[#EFF5FA] rounded-[11px] px-[15px] py-[13px]">
-                <b className={'text-[21px] font-semibold text-[#014A81] ' + MONO}>{applyTotal.toLocaleString()}</b>
+              <div className="rounded-[11px] border border-[#B3CDE0] bg-[#EFF5FA] px-[15px] py-[13px] border-l-[3px] border-l-[#005B96] shadow-[0_1px_2px_rgba(1,74,129,0.06)]">
+                <b className={'text-[22px] font-semibold text-[#014A81] ' + MONO}>{applyTotal.toLocaleString()}</b>
                 <span className="block text-[11px] text-[#014A81] font-semibold mt-0.5">Applicable to scan</span>
                 <small className="text-[10px] text-[#4A8577]">{total ? Math.round((applyTotal / total) * 100) : 0}% of library</small>
                 {hostBenchRuleSum > 0 && <small className="block text-[10px] text-[#8A5A0C] mt-1">+{hostBenchRuleSum.toLocaleString()} from detected software — set up to include</small>}
               </div>
             </div>
-            <div className="px-4 pt-0.5 pb-1"><div className={SECLABEL}>Preview — sample rules that will run</div></div>
-            <div className="px-4 pt-2 pb-3 flex flex-col gap-1.5">
-              {(!Array.isArray(applicable.examples) || applicable.examples.length === 0) ? (
-                <div className="text-[11px] italic text-[#AEB8C2] px-0.5">No applicable rules until OS data lands.</div>
-              ) : (
-                <>
-                  {applicable.examples.map((it: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2.5 border border-[#E8ECEE] rounded-[9px] px-3 py-2 text-[11.5px]">
-                      <span className={MONO + ' bg-[#F1F4F6] rounded-md px-2 py-px text-[10px] font-semibold shrink-0'}>{it.rule_id}</span>
-                      <span className="flex-1 min-w-0">{it.title}</span>
-                    </div>
-                  ))}
-                  <div className="text-[10px] text-[#AEB8C2] px-0.5 pt-0.5">
-                    {applicable.examples.length} of {ruleCount.toLocaleString()} · all from <span className={MONO}>{benchmark}</span> · full outcomes appear per scan session
+            {(() => {
+              // Full applicable rule list (backend `rules`); falls back to the
+              // 5-row `examples` sample if an older backend is answering.
+              const allRules: any[] = Array.isArray(applicable.rules) && applicable.rules.length
+                ? applicable.rules
+                : (Array.isArray(applicable.examples) ? applicable.examples : []);
+              const q = ruleFilter.trim().toLowerCase();
+              const shown = q
+                ? allRules.filter((r: any) =>
+                    (r.rule_id || '').toLowerCase().includes(q) || (r.title || '').toLowerCase().includes(q))
+                : allRules;
+              return (
+                <div className="border-t border-[#F0F3F5] px-4 pt-3 pb-3.5">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <div className={SECLABEL + ' flex-1'}>Rules that will run</div>
+                    {allRules.length > 0 && (
+                      <>
+                        <input
+                          value={ruleFilter}
+                          onChange={(e) => setRuleFilter(e.target.value)}
+                          placeholder="Filter by id or title…"
+                          className="h-[27px] w-[180px] max-w-full rounded-[8px] border border-[#E4E8EC] bg-white px-2.5 text-[11px] text-[#0F1F2B] placeholder:text-[#AEB8C2] focus:border-[#005B96] focus:outline-none"
+                        />
+                        <span className={'text-[10px] text-[#8A95A1] shrink-0 ' + MONO}>
+                          {shown.length.toLocaleString()}{q ? ` / ${allRules.length.toLocaleString()}` : ` of ${ruleCount.toLocaleString()}`}
+                        </span>
+                      </>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
+                  {allRules.length === 0 ? (
+                    <div className="text-[11px] italic text-[#AEB8C2] px-0.5">No applicable rules until OS data lands.</div>
+                  ) : shown.length === 0 ? (
+                    <div className="text-[11px] italic text-[#AEB8C2] px-0.5 py-2">No rule matches “{ruleFilter}”.</div>
+                  ) : (
+                    <div className="max-h-[380px] overflow-y-auto rounded-[10px] border border-[#E8ECEE] divide-y divide-[#F0F3F5]">
+                      {shown.map((it: any, i: number) => (
+                        <div key={it.rule_id || i} className="flex items-center gap-2.5 px-3 py-[7px] text-[11.5px] hover:bg-[#F7F9FA]">
+                          <span className={MONO + ' bg-[#F1F4F6] rounded-md px-2 py-px text-[10px] font-semibold shrink-0'}>{it.rule_id}</span>
+                          <span className="flex-1 min-w-0 truncate" title={it.title}>{it.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-[#AEB8C2] px-0.5 pt-2">
+                    all from <span className={MONO}>{benchmark}</span> · full pass/fail outcomes appear per scan session
+                  </div>
+                </div>
+              );
+            })()}
           </article>
         </>
       )}

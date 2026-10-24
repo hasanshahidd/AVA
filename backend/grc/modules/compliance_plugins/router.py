@@ -1169,6 +1169,9 @@ def match_preview(
             # / manual rules by old broken scans and disagrees with the posture.
             "plugin_ids": [p.id for p in stage2_kept],
             "examples": _sample(stage2_kept, n=5),
+            # Full rule list (id + title) so the preview can show ALL applicable
+            # rules scrollable, not just the 5-row sample. ~400 light rows.
+            "rules": [{"rule_id": p.rule_id, "title": (p.title or "")[:120]} for p in stage2_kept],
         },
     }
 
