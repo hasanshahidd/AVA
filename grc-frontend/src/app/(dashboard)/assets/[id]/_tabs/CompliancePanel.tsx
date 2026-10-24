@@ -36,10 +36,10 @@
  * Must render inside a <RoomScanProvider> (../page.tsx does today).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Network, Zap } from 'lucide-react';
+import { Loader2, Network, X, Zap } from 'lucide-react';
 import { apiClient, assetsApi, compliancePluginsApi } from '@/lib/api';
 import { GuideMarker } from '@/components/guide';
 import { useRoomScan } from '../_room-scan-context';
@@ -160,6 +160,100 @@ function splitBenchmark(name: string | null): { title: string; version: string |
   return { title, version: m ? m[2] : null };
 }
 
+// Per-rule "why" detail — click any scan-result row to see the reasoning behind
+// its verdict (plain-English meaning, evidence, error cause, remediation). All
+// data is already on the run row from _run_to_dict; this just surfaces it.
+function ScanDetailModal({ run, benchmark, onClose }: { run: any; benchmark: string | null; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  const st = (run.status || '').toLowerCase();
+  const tone: 'ok' | 'red' | 'warn' | 'neutral' | 'ac' =
+    st === 'passed' ? 'ok' : st === 'failed' ? 'red' : st === 'error' ? 'warn'
+      : (st === 'running' || st === 'pending') ? 'ac' : 'neutral';
+  const statusLabel = st === 'passed' ? '✓ Passed' : st === 'failed' ? '✕ Failed'
+    : st === 'error' ? '⚠ Error' : st === 'skipped' ? 'Not applicable' : (st || 'unknown');
+  const means: Record<string, string> = {
+    passed: 'This control is compliant on this host.',
+    failed: 'This control is non-compliant — a real hardening gap. See remediation below.',
+    error: 'OpenSCAP could not evaluate this rule. The most common cause is that the check needs elevated (sudo) access on the target, or a required file/probe wasn’t available on this host — a target prerequisite, not a scanner fault. Granting the scan account passwordless sudo resolves privilege-related errors.',
+    skipped: 'Not applicable to this host — OpenSCAP marked it notapplicable (e.g. a desktop/GNOME or package-specific rule on a server that doesn’t have it). It is neither a pass nor a fail and does not affect the score.',
+  };
+  const ro = (run.raw_output && typeof run.raw_output === 'object') ? run.raw_output : {};
+  const isOscap = ro.engine === 'openscap' || ro.xccdf_result != null;
+  const isCmd = ro.command != null;
+  const label = run.plugin_title || run.plugin_name || run.plugin_key || `#${run.plugin_id}`;
+  const ruleId = ro.rule_id || run.plugin_key || '';
+  const ms = run.duration_ms ?? null;
+  const dur = ms == null ? '-' : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
+  let started: string | null = null;
+  try { started = run.started_at ? new Date(run.started_at).toLocaleString() : null; } catch { started = run.started_at ?? null; }
+  const clip = (s: any, n = 4000) => { const t = String(s ?? ''); return t.length > n ? t.slice(0, n) + `\n…[truncated, ${t.length} chars]` : t; };
+  const Mono = ({ children }: { children: any }) => (
+    <pre className={MONO + ' text-[11px] text-[#0F1F2B] bg-[#F7F9FA] border border-[#E8ECEE] rounded-lg p-2.5 overflow-auto max-h-[220px] whitespace-pre-wrap [overflow-wrap:anywhere]'}>{clip(children)}</pre>
+  );
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="px-5 py-3.5 border-t border-[#F0F3F5]">
+      <div className={SECLABEL + ' mb-1.5'}>{title}</div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={onClose}>
+      <div className={CARD + ' w-full max-w-[640px] max-h-[85vh] flex flex-col overflow-hidden'} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 py-4 border-b border-[#F0F3F5] shrink-0">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[14px] font-semibold text-[#0F1F2B] leading-snug [overflow-wrap:anywhere]">{label}</h3>
+            {ruleId && <div className={MONO + ' text-[10px] text-[#8A95A1] mt-0.5 [overflow-wrap:anywhere]'}>{ruleId}</div>}
+          </div>
+          <Pill tone={tone}>{statusLabel}</Pill>
+          <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 text-[#AEB8C2] hover:text-[#3A4653] -mr-1 -mt-1 p-1"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="overflow-y-auto">
+          <Section title="What this means">
+            <p className="text-[12px] text-[#3A4653] leading-relaxed">{means[st] || run.result_summary || 'No additional detail recorded for this verdict.'}</p>
+          </Section>
+          {run.result_summary && <Section title="Summary"><p className="text-[12px] text-[#3A4653] [overflow-wrap:anywhere]">{run.result_summary}</p></Section>}
+          {isOscap && (
+            <Section title="Evidence · OpenSCAP">
+              <div className="flex flex-col gap-1 text-[11.5px]">
+                {benchmark && <div><span className="text-[#8A95A1]">Benchmark: </span><span className={MONO}>{benchmark}</span></div>}
+                {ro.xccdf_result && <div><span className="text-[#8A95A1]">XCCDF result: </span><span className={MONO + ' font-semibold'}>{ro.xccdf_result}</span></div>}
+                {ro.profile && <div><span className="text-[#8A95A1]">Profile: </span><span className={MONO + ' [overflow-wrap:anywhere]'}>{ro.profile}</span></div>}
+              </div>
+            </Section>
+          )}
+          {isCmd && (
+            <Section title="Evidence · command check">
+              {ro.command != null && <><div className="text-[10.5px] text-[#8A95A1] mb-1">Command</div><Mono>{ro.command}</Mono></>}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] mt-2">
+                {ro.exit_status != null && <div><span className="text-[#8A95A1]">exit: </span><span className={MONO}>{String(ro.exit_status)}</span></div>}
+                {ro.expectation_detail && <div className="min-w-0"><span className="text-[#8A95A1]">expected: </span><span className={MONO + ' [overflow-wrap:anywhere]'}>{ro.expectation_detail}</span></div>}
+              </div>
+              {ro.stdout ? <><div className="text-[10.5px] text-[#8A95A1] mt-2 mb-1">stdout</div><Mono>{ro.stdout}</Mono></> : null}
+              {ro.stderr ? <><div className="text-[10.5px] text-[#8A95A1] mt-2 mb-1">stderr</div><Mono>{ro.stderr}</Mono></> : null}
+            </Section>
+          )}
+          {run.error_message && <Section title="Error detail"><p className={MONO + ' text-[11px] text-[#B23A3A] [overflow-wrap:anywhere]'}>{run.error_message}</p></Section>}
+          {run.result_detail && <Section title="Detail"><p className="text-[12px] text-[#3A4653] [overflow-wrap:anywhere]">{String(run.result_detail)}</p></Section>}
+          {run.remediation_shown && <Section title="How to fix"><p className="text-[12px] text-[#3A4653] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{run.remediation_shown}</p></Section>}
+          <div className="px-5 py-3 border-t border-[#F0F3F5] flex flex-wrap gap-x-4 gap-y-1 text-[10.5px] text-[#8A95A1]">
+            <span>Duration <b className={MONO + ' text-[#3A4653]'}>{dur}</b></span>
+            {started && <span>Ran <b className="text-[#3A4653]">{started}</b></span>}
+            {run.connection_name && <span>Via <b className="text-[#3A4653] [overflow-wrap:anywhere]">{run.connection_name}</b></span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Backend timestamps are naive UTC (no zone). Without a 'Z', new Date() reads
 // them as LOCAL time, shifting by the browser's offset (a 40-min-old scan then
 // showed "5h ago" at UTC+5). Force UTC.
@@ -202,6 +296,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
   const [ruleFilter, setRuleFilter] = useState('');
   const [openSessions, setOpenSessions] = useState<Set<string>>(new Set());
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [detailRun, setDetailRun] = useState<any>(null);  // scan-result row → "why" modal
 
   // Room-scan selection from the shared context (filled by HostApplicationsPanel
   // as the user ticks peer checkboxes).
@@ -754,6 +849,9 @@ export default function CompliancePanel({ asset }: { asset: any }) {
         </Callout>
       )}
 
+      {/* ── Per-rule "why" detail modal ── */}
+      {detailRun && <ScanDetailModal run={detailRun} benchmark={benchmark} onClose={() => setDetailRun(null)} />}
+
       {/* ══ HEADER CARD ══ */}
       <article className={CARD}>
         <div className="flex items-center gap-4 px-[18px] py-3.5 flex-wrap">
@@ -1177,7 +1275,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
               <GuideMarker id="asset.compScanFrequency" n={4} />
               <GuideMarker id="asset.compFeedsHardeningGap" n={5} />
             </h3>
-            <span className="block text-[11px] text-[#8A95A1] mt-0.5">One session per scan · expand for rule outcomes · {ruleCount.toLocaleString()} applicable rules</span>
+            <span className="block text-[11px] text-[#8A95A1] mt-0.5">One session per scan · expand a scan, then click any rule to see why · {ruleCount.toLocaleString()} applicable rules</span>
           </div>
 
           {scanProgress.running && (
@@ -1239,20 +1337,29 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                       const off = Math.max(0, Math.round((rt - session.endedAt) / 1000));
                       const st = (run.status || '').toLowerCase();
                       return (
-                        <div key={run.id} className="grid gap-2.5 items-center px-3.5 py-[9px] border-t border-[#F0F3F5] text-[11.5px]" style={{ gridTemplateColumns: 'minmax(0,1fr) 70px 90px 50px' }}>
+                        <div
+                          key={run.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setDetailRun(run)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailRun(run); } }}
+                          title="View why — evidence & reasoning"
+                          className="grid gap-2.5 items-center px-3.5 py-[10px] border-t border-[#F0F3F5] text-[11.5px] cursor-pointer hover:bg-[#F7FBFA] transition-colors"
+                          style={{ gridTemplateColumns: 'minmax(0,1fr) 92px 56px 14px' }}
+                        >
                           <div className="min-w-0">
                             <b className="font-semibold leading-snug">{pluginLabel(run)}</b>
-                            {run.result_summary && <span className="block text-[10px] text-[#8A95A1] line-clamp-2">{run.result_summary}</span>}
+                            {run.result_summary && <span className="block text-[10px] text-[#8A95A1] line-clamp-1">{run.result_summary}</span>}
                           </div>
-                          <span className={MONO + ' text-[10.5px] text-[#8A95A1]'}>+{off}s</span>
-                          <span>
+                          <span className="justify-self-start">
                             {st === 'passed' ? <Pill tone="ok">✓ Passed</Pill>
                               : st === 'failed' ? <Pill tone="red">✕ Failed</Pill>
                                 : st === 'error' ? <Pill tone="warn">⚠ Error</Pill>
                                   : st === 'running' || st === 'pending' ? <Pill tone="ac"><Loader2 className="h-2.5 w-2.5 animate-spin" />Running</Pill>
                                     : <Pill tone="neutral">{st || 'unknown'}</Pill>}
                           </span>
-                          <span className={MONO + ' text-[10.5px] text-right'}>{fmtDuration(run)}</span>
+                          <span title={`+${off}s into the scan`} className={MONO + ' text-[10.5px] text-right text-[#8A95A1]'}>{fmtDuration(run)}</span>
+                          <span className="text-[#C8CFD8] justify-self-end"><Ic size={13}><path d="M9 6l6 6-6 6" /></Ic></span>
                         </div>
                       );
                     })}
