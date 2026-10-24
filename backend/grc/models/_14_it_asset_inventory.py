@@ -350,7 +350,10 @@ class AssetSecurityComplianceSelection(Base):
     id = Column(Integer, primary_key=True, index=True)
     asset_id = Column(Integer, ForeignKey("grc_it_assets.id"), nullable=False, index=True)
     benchmark = Column(String(100), nullable=False, default="CIS_WS2012R2")
-    control_id = Column(String(128), nullable=False)
+    # oscap XCCDF rule ids are long ("oscap:<benchmark>:xccdf_org.ssgproject.
+    # content_rule_<...>" easily exceeds 128 chars), which truncated the insert
+    # and left the run stuck 'running'. 512 covers any CIS/oscap control id.
+    control_id = Column(String(512), nullable=False)
     selected_by = Column(Integer, ForeignKey("grc_users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
