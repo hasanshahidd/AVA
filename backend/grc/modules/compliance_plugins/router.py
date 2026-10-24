@@ -3287,12 +3287,20 @@ def execute(
         if not explicit_connection:
             raise HTTPException(404, "Connection not found")
 
-    # Same auto-resolution as /scan-all: if the caller didn't pin a
-    # specific connection, fall back to the tenant's most-recent active
-    # connection whose runner family matches this plugin.
-    connection = _resolve_connection_for_plugin(
-        db, tenant_id, plugin, explicit_connection, conn_cache={},
-    )
+    # Manual (attestation) checks record a human verdict and never connect to
+    # the target — don't auto-resolve a connection for them. Doing so made the
+    # tick "buffer": execute_plugin would resolve the connection's credentials,
+    # which DNS-resolves the host, stalling on an unresolvable discovery
+    # host_name. Only non-manual runners need a live connection.
+    if plugin.runner_type == "manual":
+        connection = explicit_connection  # None unless the caller pinned one
+    else:
+        # Same auto-resolution as /scan-all: if the caller didn't pin a specific
+        # connection, fall back to the tenant's most-recent active connection
+        # whose runner family matches this plugin.
+        connection = _resolve_connection_for_plugin(
+            db, tenant_id, plugin, explicit_connection, conn_cache={},
+        )
 
     run = execute_plugin(
         db=db,
