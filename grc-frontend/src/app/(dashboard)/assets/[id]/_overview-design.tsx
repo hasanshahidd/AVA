@@ -227,7 +227,8 @@ function ProvenanceCard({ card, accent, kind, full }: { card: any; accent: strin
   );
 }
 
-type SurfaceFacts = { ip: string | null; mac: string | null; ports: number[] | null; deviceType: string | null; vendor: string | null; internetFacing: boolean };
+type SurfaceFingerprint = { osGuess: string | null; product: string | null; sshBanner: string | null; httpServer: string | null; httpTitle: string | null; snmpSysdescr: string | null; confidence: number | null; evidence: string[] | null; hostname: string | null };
+type SurfaceFacts = { ip: string | null; mac: string | null; ports: number[] | null; deviceType: string | null; vendor: string | null; internetFacing: boolean; fingerprint?: SurfaceFingerprint | null };
 
 export default function AssetOverview({ A, surface }: { A: any; surface?: SurfaceFacts | null }) {
   // Default to the first collected domain — 'hardware' for a host, 'instance' for
@@ -307,6 +308,8 @@ export default function AssetOverview({ A, surface }: { A: any; surface?: Surfac
   // the blank KPI strip / telemetry cards the credentialed path renders.
   if (surface) {
     const ports = surface.ports || [];
+    const fp = surface.fingerprint || null;
+    const cap = (s: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
     const facts: [string, string][] = [
       ['IP address', surface.ip || '—'],
       ['MAC', surface.mac || '—'],
@@ -314,6 +317,19 @@ export default function AssetOverview({ A, surface }: { A: any; surface?: Surfac
       ['Vendor', surface.vendor || '—'],
       ['Internet-facing', surface.internetFacing ? 'Yes' : 'No'],
     ];
+    if (fp?.osGuess) facts.push(['OS (inferred)', cap(fp.osGuess)]);
+    if (fp?.product) facts.push(['Primary product', fp.product]);
+    if (fp?.hostname && fp.hostname !== surface.ip) facts.push(['Computer name', fp.hostname]);
+    // Credential-free "surface intelligence" — banners + service versions the
+    // sweep already captured; shown so the page isn't a bare IP + "needs creds".
+    const intel: [string, string][] = [];
+    if (fp?.sshBanner) intel.push(['SSH service', fp.sshBanner]);
+    if (fp?.httpServer) intel.push(['Web server', fp.httpServer + (fp.httpTitle ? ` — "${fp.httpTitle}"` : '')]);
+    else if (fp?.httpTitle) intel.push(['Web page', `"${fp.httpTitle}"`]);
+    if (fp?.snmpSysdescr) intel.push(['SNMP sysDescr', fp.snmpSysdescr]);
+    const classLine = fp && (fp.confidence != null || (fp.evidence && fp.evidence.length))
+      ? `${surface.deviceType || 'host'}${fp.confidence != null ? ` · ${Math.round(fp.confidence * 100)}% confidence` : ''}${fp.evidence && fp.evidence.length ? ` · via ${fp.evidence.join(', ')}` : ''}`
+      : null;
     return (
       <div className="inv2" style={{ fontSize: 13.5 }}>
         {/* Surface facts */}
@@ -343,6 +359,25 @@ export default function AssetOverview({ A, surface }: { A: any; surface?: Surfac
                 </div>
               ) : <div className="text-[12px] text-[#aeb8c2]">No open ports recorded</div>}
             </div>
+            {intel.length > 0 && (
+              <div className="col-span-2 lg:col-span-3 border-t border-[#eef1f3] pt-3 mt-1">
+                <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide mb-2">Surface intelligence · inferred, no credentials</div>
+                <div className="space-y-2">
+                  {intel.map(([k, v]) => (
+                    <div key={k} className="flex gap-3">
+                      <div className="text-[11px] text-[#8a95a1] w-28 flex-none">{k}</div>
+                      <div className={'text-[12px] text-[#0f1f2b] min-w-0 break-words ' + MONO}>{v}</div>
+                    </div>
+                  ))}
+                  {classLine && (
+                    <div className="flex gap-3">
+                      <div className="text-[11px] text-[#8a95a1] w-28 flex-none">Classification</div>
+                      <div className="text-[12px] text-[#0f1f2b]">{classLine}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

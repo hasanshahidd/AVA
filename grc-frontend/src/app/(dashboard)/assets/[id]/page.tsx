@@ -828,6 +828,7 @@ export default function AssetDetailPage() {
   // telemetry (DNS/TLS/HTTP/email + health breakdown), rendered by the design's
   // own A.external path — the surface card would hide all of it.
   const isSurface = !outsideOnly && (asset?.scan_depth ?? (asset?.discovery_state === 'unmanaged' ? 'surface' : 'credentialed')) === 'surface';
+  const _fp = (asset?.platform_properties?.fingerprint || {}) as Record<string, any>;
   const surfaceFacts = isSurface && asset ? {
     ip: asset.ip_address || null,
     mac: asset.primary_mac || null,
@@ -835,6 +836,20 @@ export default function AssetDetailPage() {
     deviceType: asset.device_type || null,
     vendor: asset.vendor || null,
     internetFacing: !!asset.internet_facing,
+    // Credential-free intelligence the sweep already captured (banners, service
+    // versions, OS inference, device classification) — rendered so a surface
+    // asset isn't a bare IP + "requires credentials".
+    fingerprint: {
+      osGuess: _fp.os_guess || null,
+      product: _fp.product || null,
+      sshBanner: _fp.ssh_banner || null,
+      httpServer: _fp.http_server || null,
+      httpTitle: _fp.http_title || null,
+      snmpSysdescr: _fp.snmp_sysdescr || null,
+      confidence: typeof _fp.confidence === 'number' ? _fp.confidence : null,
+      evidence: Array.isArray(_fp.evidence) ? _fp.evidence : null,
+      hostname: _fp.hostname || null,
+    },
   } : null;
 
   return (

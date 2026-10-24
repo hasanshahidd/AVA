@@ -605,6 +605,19 @@ def _purge_asset_references(db: Session, asset: "ITAsset") -> None:
     # Self-references from other assets.
     db.execute(_sql("UPDATE grc_it_assets SET parent_asset_id = NULL WHERE parent_asset_id = :aid"), {"aid": aid})
     db.execute(_sql("UPDATE grc_it_assets SET replacement_asset_id = NULL WHERE replacement_asset_id = :aid"), {"aid": aid})
+    # A promoted software child (asset_role='application'): clear the back-link in
+    # the PARENT host's detected_software_json so its Software tab stops showing
+    # "Asset #<gone>". promoted_asset_id lives in a JSON column, not an FK, so the
+    # parent_asset_id null above never reaches it — this was the dangling-#88 orphan.
+    if asset.parent_asset_id:
+        parent = db.get(ITAsset, asset.parent_asset_id)
+        inv = parent.detected_software_json if parent else None
+        if inv and any(isinstance(e, dict) and e.get("promoted_asset_id") == aid for e in inv):
+            for e in inv:
+                if isinstance(e, dict) and e.get("promoted_asset_id") == aid:
+                    e["promoted_asset_id"] = None
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(parent, "detected_software_json")
 
 
 @router.post("/bulk-delete")

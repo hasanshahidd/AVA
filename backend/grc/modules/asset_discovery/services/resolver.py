@@ -31,6 +31,7 @@ from confirmed inventory instead of dumping raw scan hits into the register.
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -387,11 +388,43 @@ def _mark_internet_facing(asset: ITAsset) -> None:
         logger.exception("resolver: criticality recompute failed for internet-facing asset")
 
 
+# Docker bridges, loopback and link-local are host-internal plumbing, never a
+# device ON the network — so they must NOT be auto-adopted into inventory no
+# matter what CIDR is swept. This is exactly what let the box's own docker0
+# (172.17.0.1) and a container (172.17.0.2) land as assets #85/#86.
+# shortcut: 172.17/16 + 172.18/16 are docker's DEFAULT bridge ranges; a real
+# network deliberately using those would also be skipped — upgrade to per-host
+# docker-subnet detection (read the scanner's docker0/br-* ifaces) if that comes up.
+_NON_INVENTORY_NETS = tuple(ipaddress.ip_network(n) for n in (
+    "127.0.0.0/8", "169.254.0.0/16", "172.17.0.0/16", "172.18.0.0/16"))
+
+
+def _is_non_inventory_ip(ip: Optional[str]) -> bool:
+    if not ip:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(addr in net for net in _NON_INVENTORY_NETS)
+
+
 def resolve_observation(db: Session, obs: DiscoveryObservation) -> Dict[str, Any]:
     """Resolve one observation. Mutates the observation (and possibly creates or
     updates an asset). Caller commits. Returns a small decision dict."""
     if obs.resolution not in ("pending", "review"):
         return {"action": "skip", "reason": f"already {obs.resolution}"}
+
+    # Never auto-adopt host-internal plumbing (docker/loopback/link-local) — it's
+    # not a device on the network. Still recorded as an observation (resolution
+    # 'ignored') so a sweep of such a range isn't silently empty.
+    if obs.source != "external" and _is_non_inventory_ip(obs.ip_address):
+        obs.resolution = "ignored"
+        obs.resolved_asset_id = None
+        obs.resolution_note = (
+            "docker / loopback / link-local address — host-internal plumbing, "
+            "not added to inventory")
+        return {"action": "ignored", "reason": "non_inventory_ip"}
 
     tier, candidate_ids = _candidates(db, obs.tenant_id, obs)
     # Link any scanner findings already imported for a just-adopted external host
