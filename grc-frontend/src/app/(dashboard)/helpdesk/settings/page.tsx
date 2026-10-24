@@ -48,7 +48,7 @@ function SettingsInner() {
     <div className="flex flex-col gap-4 text-[#0F172A]">
       <PageHeader icon={Settings} title="Help Desk settings" subtitle="Set up departments, agents, ticket config and SLAs. Teams and roles live in Administration." />
       <div className="flex flex-col gap-5 lg:flex-row">
-        <nav className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-56 lg:flex-col">
+        <nav className="flex shrink-0 flex-row flex-wrap gap-1 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:w-56 lg:flex-col lg:self-start lg:overflow-y-auto">
           {TABS.map((t) => {
             const Icon = t.icon;
             const on = t.key === active;
