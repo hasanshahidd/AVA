@@ -161,6 +161,8 @@ export function NewTicketDialog({
   const [subcatId, setSubcatId] = useState("");
   // problem
   const [rootCause, setRootCause] = useState("");
+  const [linkedIncs, setLinkedIncs] = useState<number[]>([]);
+  const [incPick, setIncPick] = useState("");
   // change
   const [changeType, setChangeType] = useState("normal");
   const [changeRisk, setChangeRisk] = useState("medium");
@@ -210,6 +212,9 @@ export function NewTicketDialog({
     : [];
   useEffect(() => { setCatId(""); setSubcatId(""); }, [process]);
 
+  // Open incidents to link into a Problem (ITIL: a problem groups recurring incidents).
+  const probIncidents = useHd<{ tickets: { name: string; subject?: string }[] }>("/helpdesk/incidents");
+
   // Group/filter the full library client-side (§2a). No department → section per
   // department; department chosen → that department's cards, sub-grouped by category.
   const sections: Section[] = useMemo(() => {
@@ -250,7 +255,7 @@ export function NewTicketDialog({
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
     setCatId(""); setSubcatId("");
-    setRootCause("");
+    setRootCause(""); setLinkedIncs([]); setIncPick("");
     setChangeType("normal"); setChangeRisk("medium");
     setPlannedStart(""); setPlannedEnd(""); setImplPlan(""); setBackoutPlan("");
     setHideTemplates(false);
@@ -286,6 +291,7 @@ export function NewTicketDialog({
     }
     if (process === "problem") {
       if (rootCause.trim()) payload.root_cause = rootCause.trim();
+      if (linkedIncs.length) payload.linked_incident_ids = linkedIncs;
     }
     if (process === "change") {
       payload.change_type = changeType;
@@ -552,9 +558,38 @@ export function NewTicketDialog({
 
         {/* Problem */}
         {process === "problem" && (
-          <Field label="Root cause" hint="Optional — linked incidents can be added on the problem detail page.">
-            <Textarea value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder="Suspected or confirmed root cause…" />
-          </Field>
+          <>
+            <Field label="Root cause" hint="Optional — the suspected or confirmed cause behind these incidents.">
+              <Textarea value={rootCause} onChange={(e) => setRootCause(e.target.value)} placeholder="Suspected or confirmed root cause…" />
+            </Field>
+            <div>
+              <p className="mb-1 text-[11.5px] font-semibold text-[#475569]">Link related incidents</p>
+              <p className="m-0 mb-1.5 text-[11px] text-[#94A3B8]">Pick the recurring incidents this problem investigates — grouping them is what a problem is for.</p>
+              {linkedIncs.length > 0 && (
+                <ul className="m-0 mb-2 flex list-none flex-col gap-1 p-0">
+                  {linkedIncs.map((lid) => {
+                    const t = (probIncidents.data?.tickets || []).find((x) => Number(x.name) === lid);
+                    return (
+                      <li key={lid} className="flex items-center gap-2 rounded-[9px] border border-[#E2E5EC] bg-white px-2.5 py-1.5 text-[12.5px]">
+                        <span className="font-mono text-[11px] text-[#005B96]">#{lid}</span>
+                        <span className="min-w-0 flex-1 truncate text-[#334155]">{t?.subject || "(incident)"}</span>
+                        <button type="button" onClick={() => setLinkedIncs((l) => l.filter((x) => x !== lid))} className="text-[11.5px] font-semibold text-rose-600 hover:text-rose-700">Remove</button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <Select
+                value={incPick}
+                onChange={(e) => { const v = Number(e.target.value); if (v && !linkedIncs.includes(v)) setLinkedIncs((l) => [...l, v]); setIncPick(""); }}
+              >
+                <option value="">— Add an incident —</option>
+                {(probIncidents.data?.tickets || [])
+                  .filter((t) => !linkedIncs.includes(Number(t.name)))
+                  .map((t) => <option key={t.name} value={t.name}>#{t.name} · {t.subject || "(no subject)"}</option>)}
+              </Select>
+            </div>
+          </>
         )}
 
         {/* Change */}
