@@ -21,12 +21,21 @@ const FRIENDLY_STATUS: Record<string, string> = {
 const friendly = (s?: string | null) => FRIENDLY_STATUS[(s || "").toLowerCase().replace(/\s+/g, "_")] || s || "—";
 const doneRe = /resolved|closed/i;
 
+// Approval state → requester-facing label (only requests/changes that need sign-off carry one).
+const APPROVAL: Record<string, { label: string; cls: string }> = {
+  approved: { label: "Approved", cls: "text-emerald-600" },
+  rejected: { label: "Rejected", cls: "text-red-600" },
+  pending: { label: "Pending", cls: "text-amber-600" },
+  draft: { label: "Pending", cls: "text-amber-600" },
+};
+const approval = (s?: string | null) => APPROVAL[(s || "").toLowerCase()] || null;
+
 export default function MyRequests() {
   const { data, loading, error } = useHd<{ tickets: any[] }>("/helpdesk/portal/my-requests");
   const rows = data?.tickets || [];
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 text-[#0F172A]">
+    <div className="mx-auto flex max-w-4xl flex-col gap-3 text-[#0F172A]">
       <PageHeader
         icon={ListTodo}
         title="My Requests"
@@ -45,16 +54,16 @@ export default function MyRequests() {
       ) : rows.length === 0 ? (
         <Empty icon={Inbox} title="No requests yet" hint="Something not working? Use “Report an issue” and we'll help." />
       ) : (
-        <Table head={["#", "Issue", "Status", "We'll respond by", "Raised"]}>
+        <Table head={["#", "Issue", "Status", "Approval", "We'll respond by", "Raised"]}>
           {rows.map((t) => {
             const done = doneRe.test(t.status || "");
             const sla = slaState(t.response_by, done);
             return (
               <tr key={t.name} className="hover:bg-[#F9FAFC]">
-                <td className="px-4 py-2.5 font-mono text-[11px] text-[#94A3B8]">
+                <td className="px-4 py-2 font-mono text-[11px] text-[#94A3B8]">
                   <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(t.name)}`} className="hover:text-[#005B96]">#{t.name}</Link>
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2">
                   <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(t.name)}`} className="font-medium text-[#0F172A] hover:text-[#005B96]">
                     {t.subject || "(no subject)"}
                   </Link>
@@ -62,12 +71,20 @@ export default function MyRequests() {
                     <span className="mt-0.5 block text-[11px] text-[#94A3B8]">Asset: {t.ci.name}</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5"><Chip value={friendly(t.status)} /></td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2"><Chip value={friendly(t.status)} /></td>
+                <td className="px-4 py-2">
+                  {(() => {
+                    const a = approval(t.approval_state);
+                    return a
+                      ? <span className={`text-xs font-medium ${a.cls}`}>{a.label}</span>
+                      : <span className="text-xs text-[#94A3B8]">—</span>;
+                  })()}
+                </td>
+                <td className="px-4 py-2">
                   {done ? <span className="text-xs font-medium text-emerald-600">Done</span>
                         : <span className={`text-xs font-medium ${sla.cls}`}>{sla.label === "—" ? "As soon as we can" : sla.label}</span>}
                 </td>
-                <td className="px-4 py-2.5 text-[11.5px] text-[#94A3B8]">{timeAgo(t.created)}</td>
+                <td className="px-4 py-2 text-[11.5px] text-[#94A3B8]">{timeAgo(t.created)}</td>
               </tr>
             );
           })}

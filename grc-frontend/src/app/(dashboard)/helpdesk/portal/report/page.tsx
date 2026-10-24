@@ -45,12 +45,14 @@ export default function ReportIssue() {
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState("medium");
+  const [categoryId, setCategoryId] = useState("");
   const [asset, setAsset] = useState<PickedAsset | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [doneId, setDoneId] = useState<string | null>(null);
 
   const kb = useHd<{ articles: any[] }>("/helpdesk/portal/kb");
+  const cats = useHd<{ categories: { id: number; name: string }[] }>("/helpdesk/portal/incident-categories");
   const suggestions = useMemo(
     () => suggestArticles(subject, Array.isArray(kb.data?.articles) ? kb.data!.articles : []),
     [subject, kb.data],
@@ -68,6 +70,7 @@ export default function ReportIssue() {
       // category so they don't land uncategorised.
       impact: urgency,
       request_category: "Incident",
+      ...(categoryId ? { incident_category_id: Number(categoryId) } : {}),
       ...(asset ? { ci_id: asset.id } : {}),
     });
     setBusy(false);
@@ -90,7 +93,7 @@ export default function ReportIssue() {
           <Link href={`/helpdesk/portal/my-requests/${encodeURIComponent(doneId)}`}>
             <Btn variant="primary">View my request</Btn>
           </Link>
-          <Btn variant="ghost" onClick={() => { setDoneId(null); setSubject(""); setDescription(""); setUrgency("medium"); setAsset(null); }}>
+          <Btn variant="ghost" onClick={() => { setDoneId(null); setSubject(""); setDescription(""); setUrgency("medium"); setCategoryId(""); setAsset(null); }}>
             Report another
           </Btn>
         </div>
@@ -134,6 +137,14 @@ export default function ReportIssue() {
           )}
           <Field label="Tell us more" hint="What happened, when it started, anything you've already tried.">
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the issue…" />
+          </Field>
+          <Field label="What's it about?" hint="Optional — pick the area so we can route it faster.">
+            <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">Not sure / other</option>
+              {(cats.data?.categories || []).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
           </Field>
           <Field label="How urgent is this?">
             <Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>

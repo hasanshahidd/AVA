@@ -28,6 +28,7 @@ from ...models import (
     HDBusinessService,
     HDCIType,
     HDConfigurationItem,
+    HDIncidentCategory,
     HDRequestItem,
     HDServiceCategory,
     HDTicket,
@@ -53,6 +54,7 @@ class RequestCreate(BaseModel):
     urgency: Optional[str] = None
     request_category: Optional[str] = None
     request_subcategory: Optional[str] = None
+    incident_category_id: Optional[int] = None  # incident taxonomy tag (report-an-issue)
     request_item_id: Optional[int] = None  # links the ticket to the chosen catalogue item
     ci_id: Optional[int] = None            # the affected asset / CI this request is about (optional)
     fields: Optional[Any] = None           # wizard field answers (already folded into description by the UI)
@@ -93,6 +95,7 @@ def create_request(body: RequestCreate, db: Session = Depends(get_db),
     # the UI already folds field answers into `description`; we just persist the
     # catalogue link after the ticket exists.
     req_item_id = data.pop("request_item_id", None)
+    inc_cat_id = data.pop("incident_category_id", None)
     data.pop("fields", None)
     # Load the catalogue item up front so its OWN config drives routing + approval
     # (previously both were dropped, making the admin's catalogue setup cosmetic).
@@ -107,6 +110,15 @@ def create_request(body: RequestCreate, db: Session = Depends(get_db),
     elif ri is not None and ri.fulfilment_team_id and not data.get("agent_group_id"):
         data["agent_group_id"] = ri.fulfilment_team_id
     res = tickets.create_ticket(db, tid, data, raised_by=email)
+    # Tag the reported incident's category (validated to this tenant). Report-an-issue
+    # sends incident_category_id; service requests never do, so the two paths don't overlap.
+    if inc_cat_id is not None and res.get("ok"):
+        t = tickets._get_ticket(db, tid, res["name"])
+        if t is not None and db.query(HDIncidentCategory.id).filter(
+                HDIncidentCategory.id == inc_cat_id, HDIncidentCategory.tenant_id == tid).first():
+            t.incident_category_id = inc_cat_id
+            db.flush()
+            db.commit()
     if req_item_id and res.get("ok"):
         t = tickets._get_ticket(db, tid, res["name"])
         if t is not None:
@@ -258,6 +270,19 @@ def portal_assets(q: Optional[str] = None, db: Session = Depends(get_db),
     return {"assets": [{"id": c.id, "code": c.code, "name": c.name,
                         "type": c.ci_type.name if c.ci_type else None,
                         "owner": c.owner, "mine": mine(c)} for c in hits[:50]]}
+
+
+@router.get("/incident-categories")
+def portal_incident_categories(db: Session = Depends(get_db),
+                               _: bool = Depends(require_requester)):
+    """Incident categories a requester can tag a reported issue with (report-an-issue).
+    Tenant-scoped; id + name only."""
+    tid = tenant_id(db)
+    rows = (db.query(HDIncidentCategory)
+            .filter(HDIncidentCategory.tenant_id == tid)
+            .order_by(HDIncidentCategory.sort_order.asc().nullslast(), HDIncidentCategory.name.asc())
+            .all())
+    return {"categories": [{"id": c.id, "name": c.name} for c in rows]}
 
 
 @router.get("/catalogue")
