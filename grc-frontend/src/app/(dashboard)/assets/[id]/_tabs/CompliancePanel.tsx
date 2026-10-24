@@ -254,6 +254,24 @@ function ScanDetailModal({ run, benchmark, onClose }: { run: any; benchmark: str
   );
 }
 
+// Loading indicator for the software / benchmark sections, which populate after
+// the main panel paints (detectedSwQ classifies every installed package, which
+// is slow on a 1200-app host). An animated bar so an in-flight fetch never
+// renders as the "No software / no benchmark" empty state.
+function SwLoading({ label }: { label: string }) {
+  return (
+    <div className="px-0.5 py-1.5">
+      <style>{'@keyframes avaSwSlide{0%{margin-left:-35%}100%{margin-left:100%}}'}</style>
+      <div className="flex items-center gap-2 text-[10.5px] text-[#8A95A1] mb-1.5">
+        <Loader2 className="h-3 w-3 animate-spin" /><span>{label}</span>
+      </div>
+      <div className="h-[5px] rounded-full bg-[#EAEEF1] overflow-hidden">
+        <i className="block h-full w-[35%] rounded-full bg-[#005B96]" style={{ animation: 'avaSwSlide 1.15s ease-in-out infinite' }} />
+      </div>
+    </div>
+  );
+}
+
 // Backend timestamps are naive UTC (no zone). Without a 'Z', new Date() reads
 // them as LOCAL time, shifting by the browser's offset (a 40-min-old scan then
 // showed "5h ago" at UTC+5). Force UTC.
@@ -649,6 +667,10 @@ export default function CompliancePanel({ asset }: { asset: any }) {
   const hostRecognized = hostSw.filter((s: any) => !s.benchmark_available);
   const hostBenchRuleSum = hostBench.reduce((s: number, x: any) => s + (x.rule_count || 0), 0);
   const swRuleSum = swWithBench.reduce((s: number, g: any) => s + (g.rule_count ?? 0), 0);
+  // The software (detectedSwQ) and peer (selfIpPeersQ) queries resolve after the
+  // panel first paints, so guard the "no software / no benchmark" empty states on
+  // their loading flags — otherwise an in-flight fetch shows as "nothing here".
+  const swLoading = detectedSwQ.isLoading || selfIpPeersQ.isLoading;
 
   const ruleCount = applicable.count ?? 0;
   const applyTotal = ruleCount + peerExtra;
@@ -967,7 +989,9 @@ export default function CompliancePanel({ asset }: { asset: any }) {
           <div className="px-[18px] pt-3 pb-1 border-t border-[#F0F3F5]">
             <div className={SECLABEL}>Agent-detected software with CIS benchmarks</div>
           </div>
-          {swWithBench.length === 0 && hostBench.length === 0 ? (
+          {swLoading ? (
+            <div className="px-[18px] py-3 border-b border-[#F0F3F5]"><SwLoading label="Classifying detected software…" /></div>
+          ) : swWithBench.length === 0 && hostBench.length === 0 ? (
             <div className="px-[18px] py-3 text-[11px] text-[#8A95A1] border-b border-[#F0F3F5]">No software with a CIS benchmark detected on this host.</div>
           ) : (
             <>
@@ -1064,7 +1088,9 @@ export default function CompliancePanel({ asset }: { asset: any }) {
               )}
               <div className="px-4 pt-2 pb-[3px] border-t border-[#F0F3F5]"><div className={SECLABEL}>Detected software · classified</div></div>
               <div className="px-4 pt-1.5 pb-3 flex flex-col gap-1.5">
-                {hostBench.length === 0 && hostRecognized.length === 0 && peers.length === 0 ? (
+                {swLoading ? (
+                  <SwLoading label="Classifying detected software…" />
+                ) : hostBench.length === 0 && hostRecognized.length === 0 && peers.length === 0 ? (
                   <div className="text-[10.5px] text-[#AEB8C2] px-0.5">No software detected on this host yet — run an inventory / agent scan.</div>
                 ) : (
                   <>
@@ -1145,7 +1171,9 @@ export default function CompliancePanel({ asset }: { asset: any }) {
 
               <div className="px-4 pt-2.5 pb-1 border-t border-[#F0F3F5]"><div className={SECLABEL}>Software benchmarks · include in scan scope</div></div>
               <div className="px-4 pt-1.5 pb-2.5 flex flex-col gap-1.5">
-                {swWithBench.length === 0 && hostBench.length === 0 ? (
+                {swLoading ? (
+                  <SwLoading label="Checking software for benchmarks…" />
+                ) : swWithBench.length === 0 && hostBench.length === 0 ? (
                   <div className="text-[10.5px] text-[#AEB8C2] px-0.5">No software benchmark to fold into this scan.</div>
                 ) : (
                   <>
