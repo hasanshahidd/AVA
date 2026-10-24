@@ -170,6 +170,7 @@ export function NewTicketDialog({
   const [plannedEnd, setPlannedEnd] = useState("");
   const [implPlan, setImplPlan] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
+  const [originProblem, setOriginProblem] = useState(""); // problem this change addresses (ticket name == id)
 
   const [hideTemplates, setHideTemplates] = useState(false);
 
@@ -214,6 +215,8 @@ export function NewTicketDialog({
 
   // Open incidents to link into a Problem (ITIL: a problem groups recurring incidents).
   const probIncidents = useHd<{ tickets: { name: string; subject?: string }[] }>("/helpdesk/incidents");
+  // Problems a Change can be raised to address (ITIL: a change implements a problem's fix).
+  const changeProblems = useHd<{ tickets: { name: string; subject?: string }[] }>("/helpdesk/problems");
 
   // Group/filter the full library client-side (§2a). No department → section per
   // department; department chosen → that department's cards, sub-grouped by category.
@@ -258,6 +261,7 @@ export function NewTicketDialog({
     setRootCause(""); setLinkedIncs([]);
     setChangeType("normal"); setChangeRisk("medium");
     setPlannedStart(""); setPlannedEnd(""); setImplPlan(""); setBackoutPlan("");
+    setOriginProblem("");
     setHideTemplates(false);
     setErr(null);
   };
@@ -300,6 +304,7 @@ export function NewTicketDialog({
       if (plannedEnd) payload.planned_end = plannedEnd;
       if (implPlan.trim()) payload.implementation_plan = implPlan.trim();
       if (backoutPlan.trim()) payload.backout_plan = backoutPlan.trim();
+      if (originProblem) { payload.origin_ticket_id = Number(originProblem); payload.origin_process = "problem"; }
     }
 
     // per-process category (incident/problem/change) — leaf chosen wins (subcategory over category)
@@ -629,6 +634,11 @@ export function NewTicketDialog({
             </Field>
             <Field label="Backout plan">
               <Textarea value={backoutPlan} onChange={(e) => setBackoutPlan(e.target.value)} placeholder="How to roll back if it goes wrong…" />
+            </Field>
+            <Field label="Addresses problem" hint="Optional — the problem this change was raised to fix. Leave blank for a standalone change.">
+              <ComboBoxInput ariaLabel="Addresses problem" value={originProblem} onChange={setOriginProblem}
+                options={(changeProblems.data?.tickets || []).map((t) => ({ value: String(t.name), label: t.subject || `Problem ${t.name}` }))}
+                placeholder="Search problems…" allowCustom={false} displayLabelInsteadOfValue />
             </Field>
           </>
         )}
