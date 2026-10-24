@@ -23,6 +23,7 @@
  * filter just changes which cards are visible and never mutates the form.
  */
 import { useEffect, useMemo, useState } from "react";
+import { ComboBoxInput } from "@/components/ui/ComboBoxInput";
 import {
   Monitor, KeyRound, Mail, Wifi, Laptop, Download, Package, Printer, Lock,
   Server, UserPlus, Receipt, ShoppingCart, Calculator, FileText, Calendar,
@@ -162,7 +163,6 @@ export function NewTicketDialog({
   // problem
   const [rootCause, setRootCause] = useState("");
   const [linkedIncs, setLinkedIncs] = useState<number[]>([]);
-  const [incPick, setIncPick] = useState("");
   // change
   const [changeType, setChangeType] = useState("normal");
   const [changeRisk, setChangeRisk] = useState("medium");
@@ -255,7 +255,7 @@ export function NewTicketDialog({
     setImpact(""); setUrgency("");
     setCategory(""); setSubcategory("");
     setCatId(""); setSubcatId("");
-    setRootCause(""); setLinkedIncs([]); setIncPick("");
+    setRootCause(""); setLinkedIncs([]);
     setChangeType("normal"); setChangeRisk("medium");
     setPlannedStart(""); setPlannedEnd(""); setImplPlan(""); setBackoutPlan("");
     setHideTemplates(false);
@@ -480,16 +480,27 @@ export function NewTicketDialog({
         {(process === "incident" || process === "problem" || process === "change") && (
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <Field label="Category" hint="What area is this about?">
-              <Select value={catId} onChange={(e) => { setCatId(e.target.value); setSubcatId(""); }}>
-                <option value="">— Select —</option>
-                {topCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
+              <ComboBoxInput
+                ariaLabel="Category"
+                value={catId}
+                onChange={(v) => { setCatId(v); setSubcatId(""); }}
+                options={topCats.map((c) => ({ value: String(c.id), label: c.name }))}
+                placeholder="Search a category…"
+                allowCustom={false}
+                displayLabelInsteadOfValue
+              />
             </Field>
             <Field label="Subcategory" hint={catId ? "Optional — narrow it down." : "Pick a category first."}>
-              <Select value={subcatId} onChange={(e) => setSubcatId(e.target.value)} disabled={!catId || subCats.length === 0}>
-                <option value="">{catId && subCats.length === 0 ? "No subcategories" : "— Select —"}</option>
-                {subCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
+              <ComboBoxInput
+                ariaLabel="Subcategory"
+                value={subcatId}
+                onChange={setSubcatId}
+                options={subCats.map((c) => ({ value: String(c.id), label: c.name }))}
+                placeholder={catId ? "Search a subcategory…" : "Pick a category first"}
+                allowCustom={false}
+                disabled={!catId || subCats.length === 0}
+                displayLabelInsteadOfValue
+              />
             </Field>
           </div>
         )}
@@ -579,15 +590,16 @@ export function NewTicketDialog({
                   })}
                 </ul>
               )}
-              <Select
-                value={incPick}
-                onChange={(e) => { const v = Number(e.target.value); if (v && !linkedIncs.includes(v)) setLinkedIncs((l) => [...l, v]); setIncPick(""); }}
-              >
-                <option value="">— Add an incident —</option>
-                {(probIncidents.data?.tickets || [])
+              <ComboBoxInput
+                ariaLabel="Add an incident"
+                value=""
+                onChange={(v) => { const n = Number(v); if (n && !linkedIncs.includes(n)) setLinkedIncs((l) => [...l, n]); }}
+                options={(probIncidents.data?.tickets || [])
                   .filter((t) => !linkedIncs.includes(Number(t.name)))
-                  .map((t) => <option key={t.name} value={t.name}>#{t.name} · {t.subject || "(no subject)"}</option>)}
-              </Select>
+                  .map((t) => ({ value: String(t.name), label: `#${t.name} · ${t.subject || "(no subject)"}` }))}
+                placeholder="Search incidents to link…"
+                allowCustom={false}
+              />
             </div>
           </>
         )}
