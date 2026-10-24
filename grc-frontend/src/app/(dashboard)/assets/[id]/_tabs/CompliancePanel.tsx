@@ -571,21 +571,38 @@ export default function CompliancePanel({ asset }: { asset: any }) {
     // until the applicable list loads.
     const applicableIds = new Set<number>(((previewQuery.data as any)?.applicable?.plugin_ids as number[]) || []);
     const rows = applicableIds.size ? latestByPlugin.filter((r) => applicableIds.has(r.plugin_id)) : latestByPlugin;
-    const passed = rows.filter((r) => (r.status || '').toLowerCase() === 'passed').length;
-    const failed = rows.filter((r) => (r.status || '').toLowerCase() === 'failed').length;
+    const autoPassed = rows.filter((r) => (r.status || '').toLowerCase() === 'passed').length;
+    const autoFailed = rows.filter((r) => (r.status || '').toLowerCase() === 'failed').length;
     const errored = rows.filter((r) => (r.status || '').toLowerCase() === 'error').length;
     const scanned = rows.length;
+    // Manual attestations count toward the one CIS score (owner's call): a human
+    // pass/fail on a manual check is a verdict like any other. Only attested
+    // (passed/failed) manuals enter the denominator — not-assessed / na drop out,
+    // same as an automated skip. Mirrors _asset_own_compliance on the backend, so
+    // the card, risk posture and asset-compliance API all agree.
+    let manualPassed = 0;
+    let manualFailed = 0;
+    for (const b of (((manualChecksQ.data as any)?.benchmarks ?? []) as any[]))
+      for (const sec of ((b.sections ?? []) as any[]))
+        for (const su of ((sec.subsections ?? []) as any[]))
+          for (const r of ((su.rules ?? []) as any[])) {
+            const s = (r.status || '').toLowerCase();
+            if (s === 'passed') manualPassed++;
+            else if (s === 'failed') manualFailed++;
+          }
+    const passed = autoPassed + manualPassed;
+    const failed = autoFailed + manualFailed;
     // CIS score = passed / evaluated (passed+failed). Not-applicable (skipped)
-    // and errored rules drop out of the denominator — same basis as the risk
-    // posture, so the % is identical on both pages.
+    // and errored rules drop out of the denominator.
     const evaluated = passed + failed;
     const passRate = evaluated ? Math.round((passed / evaluated) * 100) : 0;
-    // Did the scan actually run on the host, or did it bypass? A real run yields
-    // pass/fail verdicts; a scan that never connected leaves every rule errored.
-    const executed = evaluated > 0;
-    const bypassed = scanned > 0 && evaluated === 0 && errored > 0;
-    return { passed, failed, errored, scanned, passRate, evaluated, executed, bypassed };
-  }, [latestByPlugin, previewQuery.data]);
+    // Did the host scan actually run, or bypass? Judged on the automated rules
+    // only: a real run yields pass/fail verdicts; one that never connected leaves
+    // every rule errored. Manual attestations don't speak to host reachability.
+    const executed = (autoPassed + autoFailed) > 0;
+    const bypassed = scanned > 0 && (autoPassed + autoFailed) === 0 && errored > 0;
+    return { passed, failed, errored, scanned, passRate, evaluated, executed, bypassed, manualPassed, manualFailed };
+  }, [latestByPlugin, previewQuery.data, manualChecksQ.data]);
 
   // One session per Scan-all invocation — runs within 5 min of each other.
   const sessions = useMemo(() => {
@@ -673,8 +690,13 @@ export default function CompliancePanel({ asset }: { asset: any }) {
   const swLoading = detectedSwQ.isLoading || selfIpPeersQ.isLoading;
 
   const ruleCount = applicable.count ?? 0;
+  // Blended CIS scope = automated applicable rules + manual checks (the score now
+  // spans both), so the card's "rules" count matches the blended denominator.
+  const blendedRuleCount = ruleCount + (manualCount ?? 0);
   const applyTotal = ruleCount + peerExtra;
-  const scored = scanStats.scanned > 0;
+  // Scored if the host scan ran OR any manual attestation exists — either yields
+  // a real verdict for the blended score.
+  const scored = scanStats.scanned > 0 || scanStats.evaluated > 0;
   const headScore = scored ? scanStats.passRate : null;
   const bench = splitBenchmark(benchmark);
   const canScan = applyTotal > 0 && !scanMutation.isPending && !scanProgress.running;
@@ -900,7 +922,7 @@ export default function CompliancePanel({ asset }: { asset: any }) {
                 <>
                   <b className={'text-[#1F7A54] font-semibold ' + MONO}>{scanStats.passed}</b> pass ·{' '}
                   <b className={'text-[#B23A3A] font-semibold ' + MONO}>{scanStats.failed}</b> fail{scanStats.errored > 0 && <> · <b className={'text-[#9A6410] font-semibold ' + MONO}>{scanStats.errored}</b> error</>} ·{' '}
-                  <span className={MONO}>{ruleCount.toLocaleString()}</span> rules · last scan {lastRun ? relTime(parseTs(lastRun.started_at || lastRun.created_at).getTime()) : '—'}
+                  <span className={MONO}>{blendedRuleCount.toLocaleString()}</span> rules · last scan {lastRun ? relTime(parseTs(lastRun.started_at || lastRun.created_at).getTime()) : '—'}
                 </>
               ) : (
                 <>
