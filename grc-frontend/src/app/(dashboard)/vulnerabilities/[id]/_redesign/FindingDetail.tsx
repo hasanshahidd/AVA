@@ -60,20 +60,21 @@ const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline
 // CVSS 3.x vector → per-metric label + factor (the "Before" card breakdown).
 const CVSS_META: Record<string, Record<string, [string, string]>> = {
   AV: { N: ['Network', '×0.85'], A: ['Adjacent', '×0.62'], L: ['Local', '×0.55'], P: ['Physical', '×0.20'] },
-  AC: { L: ['Low', '×0.77'], H: ['High', '×0.44'] },
+  AC: { L: ['Low', '×0.77'], M: ['Medium', '×0.61'], H: ['High', '×0.44'] }, // M is CVSS v2
+  Au: { N: ['None', '×0.70'], S: ['Single', '×0.56'], M: ['Multiple', '×0.45'] }, // CVSS v2 Authentication
   PR: { N: ['None', '×0.85'], L: ['Low', '×0.62'], H: ['High', '×0.27'] },
   UI: { N: ['None', '×0.85'], R: ['Required', '×0.62'] },
   S: { U: ['Unchanged', 'rule'], C: ['Changed', 'rule'] },
-  C: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'] },
-  I: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'] },
-  A: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'] },
+  C: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'], C: ['Complete', '×0.66'], P: ['Partial', '×0.28'] },
+  I: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'], C: ['Complete', '×0.66'], P: ['Partial', '×0.28'] },
+  A: { H: ['High', '×0.56'], L: ['Low', '×0.22'], N: ['None', '×0.00'], C: ['Complete', '×0.66'], P: ['Partial', '×0.28'] },
 };
-const CVSS_LABEL: Record<string, string> = { AV: 'Attack vector', AC: 'Attack complexity', PR: 'Privileges required', UI: 'User interaction', S: 'Scope', C: 'Confidentiality impact', I: 'Integrity impact', A: 'Availability impact' };
+const CVSS_LABEL: Record<string, string> = { AV: 'Attack vector', AC: 'Attack complexity', Au: 'Authentication', PR: 'Privileges required', UI: 'User interaction', S: 'Scope', C: 'Confidentiality impact', I: 'Integrity impact', A: 'Availability impact' };
 function parseCvss(vector: string): { label: string; value: string; mult: string }[] {
   if (!vector) return [];
   const parts: Record<string, string> = {};
   vector.split('/').forEach((p) => { const [k, val] = p.split(':'); if (k && val) parts[k] = val; });
-  return ['AV', 'AC', 'PR', 'UI', 'S', 'C', 'I', 'A'].filter((k) => parts[k] && CVSS_META[k]?.[parts[k]]).map((k) => ({ label: CVSS_LABEL[k], value: CVSS_META[k][parts[k]][0], mult: CVSS_META[k][parts[k]][1] }));
+  return ['AV', 'AC', 'Au', 'PR', 'UI', 'S', 'C', 'I', 'A'].filter((k) => parts[k] && CVSS_META[k]?.[parts[k]]).map((k) => ({ label: CVSS_LABEL[k], value: CVSS_META[k][parts[k]][0], mult: CVSS_META[k][parts[k]][1] }));
 }
 const sumPts = (rows: any[]) => rows.reduce((s, r) => s + r.pts, 0);
 
@@ -400,6 +401,13 @@ function Analysis({ v, asset, score, vTone, verdictKey, hasAsset, onExploit }: a
   const [open, setOpen] = useState<Record<string, boolean>>({ severity: true, exploit: true, context: true });
   const vector = v.cvss_vector || v.nvd_cvss_vector || '';
   const factors = parseCvss(vector);
+  // The Before card must always itemize its parameters (owner). If the vector
+  // doesn't parse (none stored, or a format we don't map), fall back to the CVSS
+  // base score + severity band so the card is never a bare total.
+  const beforeFactors = factors.length ? factors : [
+    { label: 'CVSS base score', value: `${(score.raw / 10).toFixed(1)} / 10`, mult: score.rawEstimated ? 'est.' : 'stored' },
+    { label: 'Severity', value: SEVMETA[normSev(v.severity)].label, mult: '' },
+  ];
   const grp = score.groups;
   const signals = grp.flatMap((x: any) => x.rows); // the 7 exploitability signals, flat
   const sums = { sev: sumPts(grp[0].rows), exp: sumPts(grp[1].rows), reach: grp[2].rows[0]?.pts || 0, ctx: (grp[2].rows[1]?.pts || 0) + (grp[2].rows[2]?.pts || 0) };
@@ -416,13 +424,14 @@ function Analysis({ v, asset, score, vTone, verdictKey, hasAsset, onExploit }: a
             <b className="num" style={{ fontSize: 30, fontWeight: 600, color: '#8A95A1' }}>{score.raw ?? '—'}</b>
           </div>
           <div style={{ padding: '0 16px 10px' }}>
-            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.05em', color: FAINT, margin: '8px 0 4px' }}>CVSS VECTOR FACTORS</div>
-            {factors.length ? factors.map((f) => (
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.05em', color: FAINT, margin: '8px 0 4px' }}>{factors.length ? 'CVSS VECTOR FACTORS' : 'CVSS BASE'}</div>
+            {beforeFactors.map((f) => (
               <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', padding: '6px 0', borderBottom: '1px solid #F7F9FA' }}>
                 <span style={{ fontSize: 12, color: SEC }}>{f.label}</span>
                 <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}><b style={{ fontSize: 12, fontWeight: 600, color: '#C2453F' }}>{f.value}</b><code style={{ fontFamily: MONO, fontSize: 10.5, color: FAINT, minWidth: 34, textAlign: 'right' }}>{f.mult}</code></span>
               </div>
-            )) : <div style={{ fontSize: 11.5, color: MUTED }}>No CVSS vector stored — Before estimated from the {SEVMETA[normSev(v.severity)].label} severity band.</div>}
+            ))}
+            {!factors.length && <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4 }}>No CVSS vector stored — Before estimated from the {SEVMETA[normSev(v.severity)].label} severity band.</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 10, paddingTop: 8, borderTop: `1px solid ${BORDER2}` }}>
               <code style={{ fontFamily: MONO, fontSize: 10, color: MUTED, wordBreak: 'break-all', flex: 1 }}>{vector || '—'}</code>
               <span style={{ fontSize: 11.5, color: MUTED, whiteSpace: 'nowrap' }}>Total <b style={{ color: INK }}>{score.raw ?? '—'}</b> / 100</span>
