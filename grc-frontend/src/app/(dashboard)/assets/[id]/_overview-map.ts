@@ -784,6 +784,41 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
     }];
   }
 
+  // Credential-free ("surface") card. A host we can't log into has no deep
+  // inventory groups — this shows what the sweep pulled without any login: SMB
+  // identity, service+version banners, TLS certs, SNMP installed software. Only
+  // when deep groups are absent (the credential-free case this exists for) and
+  // the sweep actually captured bucket-B evidence, so credentialed hosts (which
+  // already render full deep cards) never get a redundant card.
+  const surf = pp.surface;
+  const hasSurfaceEnrich = surf && (surf.smb || (Array.isArray(surf.services) && surf.services.length)
+    || (Array.isArray(surf.tls_certs) && surf.tls_certs.length) || surf.snmp_host_resources);
+  if (!outside && deep.groups.length === 0 && hasSurfaceEnrich) {
+    const sf: any[] = [];
+    if (Array.isArray(surf.open_ports) && surf.open_ports.length)
+      sf.push({ label: 'Open ports', value: surf.open_ports.join(', ') });
+    const smb = surf.smb || {};
+    if (smb.computer_name) sf.push({ label: 'Computer name', value: smb.computer_name });
+    if (smb.domain || smb.netbios_domain) sf.push({ label: 'Domain', value: smb.domain || smb.netbios_domain });
+    if (smb.os) sf.push({ label: 'OS (SMB)', value: smb.os });
+    if (smb.signing_required != null)
+      sf.push({ label: 'SMB signing', value: smb.signing_required ? 'Required' : 'Not required', tone: smb.signing_required ? 'ok' : 'warn' });
+    for (const s of (surf.services || []).slice(0, 8)) {
+      const v = [s.product, s.version].filter(Boolean).join(' ') || s.banner || s.service || '—';
+      sf.push({ label: `Port ${s.port}${s.service ? ' · ' + s.service : ''}`, value: String(v).slice(0, 80) });
+    }
+    for (const c of (surf.tls_certs || []).slice(0, 3)) {
+      const exp = c.not_after ? `exp ${String(c.not_after).slice(0, 11)}${c.days_to_expiry != null ? ` (${c.days_to_expiry}d)` : ''}` : '';
+      sf.push({ label: `TLS :${c.port}`, value: [c.subject_cn, exp].filter(Boolean).join(' · ') || '—', tone: c.days_to_expiry != null && c.days_to_expiry < 0 ? 'bad' : undefined });
+    }
+    const hr = surf.snmp_host_resources;
+    if (hr && hr.software_count) {
+      const sample = (hr.installed_software || []).slice(0, 3).join(', ');
+      sf.push({ label: 'Installed software (SNMP)', value: `${hr.software_count} packages${sample ? ' — ' + sample + '…' : ''}` });
+    }
+    if (sf.length) machine = [...machine, { title: 'Surface (credential-free)', note: 'observed without a login', fields: sf }];
+  }
+
   // Health-score breakdown — how the grade·score is composed, dimension by
   // dimension. Same signals as the Risk & Controls / posture breakdown, shown
   // here as HEALTH (higher = better). It is NOT rendered as an always-on card;

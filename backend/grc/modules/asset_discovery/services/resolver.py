@@ -185,6 +185,9 @@ def _merge_into(db: Session, asset: ITAsset, obs: DiscoveryObservation) -> None:
         _record_external_identity(db, asset.tenant_id, asset.id, src, ext, raw.get("id_type"))
     # Enrich with the protocol-aware classification — fill blanks only.
     _apply_classification(asset, _classification(obs), fill_only=True)
+    # Refresh surface evidence (open ports / banners / credential-free bucket-B
+    # enrichment) — observation, not a curated field, so a re-scan keeps it current.
+    _apply_surface(asset, raw)
 
 
 # ── Discovery classification -> inventory mapping ───────────────────────────
@@ -289,6 +292,13 @@ def _apply_surface(asset: ITAsset, raw: Dict[str, Any]) -> None:
         "banners": banners or None,
         "device_type": raw.get("device_type"),
     }
+    # Credential-free bucket-B enrichment captured by the sweep (SMB identity,
+    # service+version, TLS certs, SNMP installed-software). Merged flat so the
+    # inventory 'surface' view finds each field predictably.
+    enrich = fp.get("surface_scan") if isinstance(fp.get("surface_scan"), dict) else {}
+    for k in ("services", "smb", "tls_certs", "snmp_host_resources", "provenance"):
+        if enrich.get(k):
+            surface[k] = enrich[k]
     surface = {k: v for k, v in surface.items() if v is not None}
     if not surface:
         return
