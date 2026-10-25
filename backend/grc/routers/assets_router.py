@@ -1920,7 +1920,7 @@ def asset_vuln_risk_profile(
     # BEFORE breakdown - the CVSS base metrics that make up the raw score, summarized across the
     # asset's open findings (dominant value + share; bar = share at the most-severe value). v3 + v2.
     _V3 = [("AV","Attack vector",{"N":"Network","A":"Adjacent","L":"Local","P":"Physical"},"N"),
-           ("AC","Attack complexity",{"L":"Low","H":"High"},"H"),
+           ("AC","Attack complexity",{"L":"Low","H":"High"},"L"),  # Low complexity = easier to exploit = most severe
            ("PR","Privileges required",{"N":"None","L":"Low","H":"High"},"N"),
            ("UI","User interaction",{"N":"None","R":"Required"},"N"),
            ("S","Scope",{"U":"Unchanged","C":"Changed"},"C"),
@@ -1928,7 +1928,7 @@ def asset_vuln_risk_profile(
            ("I","Integrity impact",{"H":"High","L":"Low","N":"None"},"H"),
            ("A","Availability impact",{"H":"High","L":"Low","N":"None"},"H")]
     _V2 = [("AV","Attack vector",{"N":"Network","A":"Adjacent","L":"Local"},"N"),
-           ("AC","Attack complexity",{"L":"Low","M":"Medium","H":"High"},"H"),
+           ("AC","Attack complexity",{"L":"Low","M":"Medium","H":"High"},"L"),  # v2: Low complexity = most severe
            ("Au","Authentication",{"N":"None","S":"Single","M":"Multiple"},"N"),
            ("C","Confidentiality impact",{"C":"Complete","P":"Partial","N":"None"},"C"),
            ("I","Integrity impact",{"C":"Complete","P":"Partial","N":"None"},"C"),
