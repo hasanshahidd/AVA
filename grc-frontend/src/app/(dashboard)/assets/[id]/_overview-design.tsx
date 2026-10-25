@@ -440,34 +440,34 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
         const netColor = d === 0 ? TONE.muted : (down ? '#1f7a54' : '#b23a3a');
         return (
           <div className="mb-2.5">
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className={CARD + ' p-3.5'}>
+            <div className="grid grid-cols-3 gap-2">
+              <div className={CARD + ' p-2.5'}>
                 <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk Before Context</div>
                 <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[28px] font-extrabold leading-none ' + MONO} style={{ color: TONE.bad }}>{riskProfile.raw}</span>
+                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.bad }}>{riskProfile.raw}</span>
                   <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
                 </div>
-                <div className="text-[10px] text-[#8a95a1] mt-2 leading-snug">Raw CVSS severity, the flaw in the abstract, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
+                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Raw CVSS severity, the flaw in the abstract, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
               </div>
-              <div className={CARD + ' p-3.5'}>
+              <div className={CARD + ' p-2.5'}>
                 <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk After Context</div>
                 <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[28px] font-extrabold leading-none ' + MONO} style={{ color: TONE.ok }}>{riskProfile.contextual}</span>
+                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.ok }}>{riskProfile.contextual}</span>
                   <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
                 </div>
-                <div className="text-[10px] text-[#8a95a1] mt-2 leading-snug">Scored on this host: exposure, exploitability, KEV and criticality{riskProfile.internet_facing ? ' (internet-facing)' : ''}</div>
+                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Scored on this host: exposure, exploitability, KEV and criticality{riskProfile.internet_facing ? ' (internet-facing)' : ''}</div>
               </div>
-              <div className={CARD + ' p-3.5 cursor-pointer ' + HOVER} onClick={() => setRiskOpen((v) => !v)}
+              <div className={CARD + ' p-2.5 cursor-pointer ' + HOVER} onClick={() => setRiskOpen((v) => !v)}
                    title="Click to see the before to after breakdown, averaged across this asset's open findings">
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Net Effect</div>
                   <span className="text-[10px] font-semibold text-[#2e63a8]">{riskOpen ? 'Hide' : 'Breakdown'}</span>
                 </div>
                 <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[28px] font-extrabold leading-none ' + MONO} style={{ color: netColor }}>{d > 0 ? '-' : d < 0 ? '+' : ''}{Math.abs(d)}</span>
+                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: netColor }}>{d > 0 ? '-' : d < 0 ? '+' : ''}{Math.abs(d)}</span>
                   <span className="text-[12px] text-[#aeb8c2]">pts</span>
                 </div>
-                <div className="text-[10px] text-[#8a95a1] mt-2 leading-snug">{d === 0 ? 'Context leaves the raw score unchanged' : (down ? 'Context lowers the abstract CVSS to real risk on this host' : 'Context raises the abstract CVSS on this host')}</div>
+                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">{d === 0 ? 'Context leaves the raw score unchanged' : (down ? 'Context lowers the abstract CVSS to real risk on this host' : 'Context raises the abstract CVSS on this host')}</div>
               </div>
             </div>
             {riskOpen && Array.isArray(riskProfile.groups) && (
