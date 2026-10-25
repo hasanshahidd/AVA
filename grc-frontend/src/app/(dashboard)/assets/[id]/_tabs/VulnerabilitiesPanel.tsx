@@ -247,13 +247,9 @@ export default function VulnerabilitiesPanel({
 
   return (
     <div className="flex flex-col gap-[14px]">
-      {/* Alerts sit on top — the severity ranking of the very list below, built from the same
-          VulnerabilityAssetLink join. Shared component, self-fetching, rendered unchanged. */}
-      <AlertsPanel assetId={assetId} canEdit={canEdit} />
-
-      {totalCount > 0 ? (
-        <>
-          {/* summary: contextual posture line + severity tiles + stacked bar + by-status split */}
+      {/* Risk score + posture summary on top — the risk score matters most, so it is
+          lifted above the alerts. Only renders when the asset has findings. */}
+      {totalCount > 0 && (
           <div className={CARD}>
             {/* Asset-level Before→After risk score + per-parameter breakdown, averaged
                 across the asset's open findings (same 7-signal model as the finding detail). */}
@@ -373,7 +369,13 @@ export default function VulnerabilitiesPanel({
               </div>
             </div>
           </div>
+      )}
 
+      {/* Alerts below the risk score — severity ranking of the list, shared self-fetching component. */}
+      <AlertsPanel assetId={assetId} canEdit={canEdit} />
+
+      {totalCount > 0 ? (
+        <>
           {/* search / severity filter row */}
           <div className="flex flex-wrap items-center gap-[7px]">
             <div className="relative w-[260px]">

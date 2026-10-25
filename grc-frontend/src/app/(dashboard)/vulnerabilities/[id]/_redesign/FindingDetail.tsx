@@ -80,10 +80,14 @@ const sumPts = (rows: any[]) => rows.reduce((s, r) => s + r.pts, 0);
 // ── 7-signal composite score (mirrors backend priority.py / handoff score.ts), from real fields ──
 function computeScore(v: any, asset: any) {
   const cvss = v?.cvss_score ?? null;
+  // Before needs a severity floor when no numeric CVSS is stored (pentest / non-CVE
+  // findings), else "Before" renders blank. Band midpoints per CVSS v3.1 severity.
+  const SEV_CVSS: Record<string, number> = { critical: 9.5, high: 8, medium: 5.5, low: 2, info: 0 };
+  const cvssEff = cvss ?? SEV_CVSS[normSev(v?.severity)];
   const epss = v?.epss_score ?? null;
   const vector = v?.cvss_vector || v?.nvd_cvss_vector || '';
   const hasExp = (v?.public_exploit_count ?? 0) > 0 || (v?.exploitdb_count ?? 0) > 0;
-  const sevPts = cvss != null ? Math.round((cvss / 10) * 20) : 0;
+  const sevPts = Math.round((cvssEff / 10) * 20);
   const epssPts = epss != null ? +(epss * 20).toFixed(1) : 0;
   const matPts = (v?.exploitdb_verified_count ?? 0) > 0 ? 15 : hasExp ? 6 : 0;
   const kevPts = v?.kev_flag ? 15 : 0;
@@ -93,7 +97,7 @@ function computeScore(v: any, asset: any) {
   const critPts = crit === 'critical' || crit === 'high' ? 10 : crit == null ? 5 : 3;
   const groups = [
     { key: 'severity', label: 'Severity — the flaw itself', c: '#6A54C9', rows: [
-      { label: 'CVSS severity', evidence: cvss != null ? `CVSS ${cvss} / 10` : 'no CVSS stored', pts: sevPts, max: 20 },
+      { label: 'CVSS severity', evidence: cvss != null ? `CVSS ${cvss} / 10` : `est. ${cvssEff}/10 · ${SEVMETA[normSev(v?.severity)].label} severity (no CVSS)`, pts: sevPts, max: 20 },
     ] },
     { key: 'exploit', label: "Exploitability — likelihood it's used", c: '#C0682F', rows: [
       { label: 'Exploit probability', evidence: epss != null ? `EPSS ${(epss * 100).toFixed(1)}%` : 'not enriched', pts: epssPts, max: 20 },
@@ -107,9 +111,9 @@ function computeScore(v: any, asset: any) {
     ] },
   ];
   const contextual = Math.round(groups.flatMap((g) => g.rows).reduce((s, r) => s + r.pts, 0));
-  const raw = cvss != null ? Math.round(cvss * 10) : null;
+  const raw = Math.round(cvssEff * 10);
   const known = [asset?.internet_facing != null && !!asset, true, true, epss != null].filter(Boolean).length;
-  return { raw, contextual, delta: raw != null ? raw - contextual : 0, groups, known };
+  return { raw, contextual, delta: raw - contextual, rawEstimated: cvss == null, groups, known };
 }
 
 export default function FindingDetail({ vulnId }: { vulnId: number }) {
@@ -418,7 +422,7 @@ function Analysis({ v, asset, score, vTone, verdictKey, hasAsset, onExploit }: a
                 <span style={{ fontSize: 12, color: SEC }}>{f.label}</span>
                 <span style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}><b style={{ fontSize: 12, fontWeight: 600, color: '#C2453F' }}>{f.value}</b><code style={{ fontFamily: MONO, fontSize: 10.5, color: FAINT, minWidth: 34, textAlign: 'right' }}>{f.mult}</code></span>
               </div>
-            )) : <div style={{ fontSize: 11.5, color: MUTED }}>No CVSS vector stored for this finding.</div>}
+            )) : <div style={{ fontSize: 11.5, color: MUTED }}>No CVSS vector stored — Before estimated from the {SEVMETA[normSev(v.severity)].label} severity band.</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 10, paddingTop: 8, borderTop: `1px solid ${BORDER2}` }}>
               <code style={{ fontFamily: MONO, fontSize: 10, color: MUTED, wordBreak: 'break-all', flex: 1 }}>{vector || '—'}</code>
               <span style={{ fontSize: 11.5, color: MUTED, whiteSpace: 'nowrap' }}>Total <b style={{ color: INK }}>{score.raw ?? '—'}</b> / 100</span>
@@ -430,7 +434,8 @@ function Analysis({ v, asset, score, vTone, verdictKey, hasAsset, onExploit }: a
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px 6px' }}>
             <span style={{ width: 34, height: 34, borderRadius: 9, background: '#EFF5FA', color: '#014A81', display: 'grid', placeItems: 'center', flex: 'none' }}><Crosshair size={17} /></span>
             <div style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 15 }}>After</b><div style={{ fontSize: 11, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>scored on this host · {asset?.name || '—'}</div></div>
-            {score.raw != null && score.delta !== 0 && <span style={{ ...pill('#1F7A54', '#E7F5EE'), fontSize: 10.5 }}>↓{score.delta}</span>}
+            {score.delta > 0 && <span style={{ ...pill('#1F7A54', '#E7F5EE'), fontSize: 10.5 }}>↓{score.delta}</span>}
+            {score.delta < 0 && <span style={{ ...pill('#B23A3A', '#FBEAEA'), fontSize: 10.5 }}>↑{-score.delta}</span>}
             <b className="num" style={{ fontSize: 30, fontWeight: 600 }}>{score.contextual}</b>
           </div>
           {/* Pentest-AI exploitability verdict — the SAME verdict the Exploit Test tab
@@ -538,7 +543,7 @@ function ExploitTest({ intel, vTone, verdictKey, hasAsset, v, score }: any) {
             </div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>pentest exploitability verdict · assessed on <b style={{ color: SEC }}>{d?.asset?.name || 'the affected asset'}</b></div>
           </div>
-          {score?.contextual != null && <div style={{ textAlign: 'right' }}><b className="num" style={{ fontSize: 24, color: vTone.fg }}>{score.contextual}</b>{score.raw != null && score.delta !== 0 && <span style={{ fontSize: 11, color: MUTED, marginLeft: 6 }}>↓{score.delta} vs raw {score.raw}</span>}</div>}
+          {score?.contextual != null && <div style={{ textAlign: 'right' }}><b className="num" style={{ fontSize: 24, color: vTone.fg }}>{score.contextual}</b>{score.delta !== 0 && <span style={{ fontSize: 11, color: MUTED, marginLeft: 6 }}>{score.delta > 0 ? '↓' : '↑'}{Math.abs(score.delta)} vs raw {score.raw}</span>}</div>}
         </div>
         {notAssessed && (
           <p style={{ fontSize: 12.5, color: SEC, marginTop: 10, lineHeight: 1.55 }}>
