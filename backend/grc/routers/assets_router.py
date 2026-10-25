@@ -2282,6 +2282,18 @@ def get_asset_detail(
         VulnerabilityAssetLink.asset_id == asset_id,
         Vulnerability.tenant_id.in_(user_tenants)
     ).all()
+    # dedup_key per linked vuln — the SAME canonical fold the register uses
+    # (_fold_distinct), so the Vulnerabilities tab can collapse to DISTINCT findings
+    # and its tiles/status/bar/table match the deduped count, not the raw link rows.
+    from grc.modules.pentest.dedup_tables import dedup_key as _dedup_key
+    def _dk_for(v):
+        try:
+            k = _dedup_key({"cve_id": v.cve_id, "title": v.title, "asset_type": asset.asset_type,
+                            "affected_url": getattr(v, "affected_url", None),
+                            "affected_component": getattr(v, "affected_component", None)})
+            return "|".join(map(str, k)) if isinstance(k, (tuple, list)) else str(k)
+        except Exception:
+            return f"_id:{v.id}"
     for link in vuln_links:
         vuln = link.vulnerability
         if vuln:
@@ -2298,6 +2310,7 @@ def get_asset_detail(
                 # Provenance — Auto badge + source chip on the UI.
                 "link_source": getattr(link, "link_source", "manual") or "manual",
                 "auto_linked": bool(getattr(link, "auto_linked", False)),
+                "dedup_key": _dk_for(vuln),
             })
 
     # DISTINCT open findings — same dedup_key fold as the pentest view / register, so

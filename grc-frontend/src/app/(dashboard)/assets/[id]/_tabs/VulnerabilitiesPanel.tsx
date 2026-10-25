@@ -22,7 +22,7 @@
  * assetId/canEdit props — it is rendered unchanged, exactly as the tab does today.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bug, Search, X, ChevronLeft } from 'lucide-react';
 import { InlineLinkPicker } from '@/components/ui';
@@ -52,6 +52,7 @@ export interface LinkedVulnerabilityRow {
   status?: string | null;
   link_source?: string | null;
   auto_linked?: boolean | null;
+  dedup_key?: string | null;
 }
 
 export interface VulnerabilitiesPanelProps {
@@ -100,6 +101,7 @@ const TD = 'px-3.5 py-[9px] text-[11.8px] text-[#3A4653] border-b border-[#F0F3F
 // Compact variants for the Before→After averaged breakdown table (owner wanted that panel tighter).
 const THC = 'text-left px-3 py-[3px] text-[9px] uppercase tracking-[0.04em] text-[#8A95A1] font-semibold bg-[#FAFBFC] border-b border-[#E8ECEE] whitespace-nowrap';
 const TDC = 'px-3 py-[4px] text-[10.5px] text-[#3A4653] border-b border-[#F0F3F5] align-middle';
+const SEV_RANK_DISTINCT: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 const BTN_PRI = 'h-[33px] px-3.5 rounded-[10px] border border-[#005B96] bg-[#005B96] text-[#06342B] text-[12px] font-semibold whitespace-nowrap hover:bg-[#014A81] hover:border-[#014A81]';
 const FILTER_BTN = (on: boolean) =>
   `h-[33px] px-3 rounded-[10px] border text-[11.5px] whitespace-nowrap ${on ? 'border-[#005B96] bg-[#EFF5FA] text-[#014A81] font-semibold' : 'border-[#E8ECEE] bg-white text-[#3A4653] font-medium'}`;
@@ -151,6 +153,20 @@ export default function VulnerabilitiesPanel({
 }: VulnerabilitiesPanelProps) {
   const linked = asset.linked_vulnerabilities ?? [];
   const linkedVulnIds = linked.map((v) => v.vulnerability_id);
+  // Fold to DISTINCT findings by dedup_key (the backend's _fold_distinct truth —
+  // keep the most-severe per group) so the tiles/status/bar/table all read the same
+  // deduped count the panel shows up top, matching the register's "truth number".
+  const linkedDistinct = useMemo(() => {
+    const groups = new Map<string, any>();
+    const order: string[] = [];
+    for (const v of linked) {
+      const k = v.dedup_key || `_id:${v.vulnerability_id ?? v.link_id}`;
+      const cur = groups.get(k);
+      if (!cur) { groups.set(k, v); order.push(k); }
+      else if ((SEV_RANK_DISTINCT[(v.severity || '').toLowerCase()] ?? 5) < (SEV_RANK_DISTINCT[(cur.severity || '').toLowerCase()] ?? 5)) groups.set(k, v);
+    }
+    return order.map((k) => groups.get(k));
+  }, [linked]);
 
   // Picker items — same shape/derivation as the tab today (exclude already-linked).
   const vulnPickerItems = allVulnerabilities
@@ -166,22 +182,22 @@ export default function VulnerabilitiesPanel({
       };
     });
 
-  const openCount = linked.filter(isOpenVuln).length;
-  const totalCount = linked.length;
+  const openCount = linkedDistinct.filter(isOpenVuln).length;
+  const totalCount = linkedDistinct.length;
   const resolvedCount = totalCount - openCount;
   // High-priority exposure = critical/high findings still OPEN — the "fix first"
   // load the register's contextual ribbon leads with, scoped to this asset.
-  const openHighPriority = linked.filter(
+  const openHighPriority = linkedDistinct.filter(
     (v) => isOpenVuln(v) && ['critical', 'high'].includes((v.severity || '').toLowerCase()),
   ).length;
-  const sevCount = (s: string) => linked.filter((v) => (v.severity || '').toLowerCase() === s).length;
+  const sevCount = (s: string) => linkedDistinct.filter((v) => (v.severity || '').toLowerCase() === s).length;
   const critN = sevCount('critical');
   const highN = sevCount('high');
   const medN = sevCount('medium');
   const lowN = sevCount('low');
   const pct = (n: number) => (totalCount > 0 ? `${((n / totalCount) * 100).toFixed(1)}% of total` : '—');
 
-  const statusCounts = linked.reduce<Record<string, number>>((acc, v) => {
+  const statusCounts = linkedDistinct.reduce<Record<string, number>>((acc, v) => {
     const key = (v.status || 'unknown').toLowerCase();
     acc[key] = (acc[key] || 0) + 1;
     return acc;
@@ -205,7 +221,7 @@ export default function VulnerabilitiesPanel({
     queryFn: async () => (await assetsApi.vulnRiskProfile(assetId)).data,
   });
 
-  const filtered = linked.filter((v) => {
+  const filtered = linkedDistinct.filter((v) => {
     if (sevFilter && (v.severity || '').toLowerCase() !== sevFilter) return false;
     if (search) {
       const q = search.toLowerCase();
