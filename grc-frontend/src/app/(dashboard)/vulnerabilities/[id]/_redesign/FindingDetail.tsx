@@ -188,7 +188,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
 
   return (
     <div className="inv2" style={{ margin: '-16px', background: '#F4F6F7', minHeight: '100vh', padding: '10px 22px 40px', fontSize: 13.5, color: INK }}>
-      <Link href="/vulnerabilities" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED, marginBottom: 8 }}><ArrowLeft size={14} />Back to register</Link>
+      <Link href="/vulnerabilities?tab=vulnerabilities" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED, marginBottom: 8 }}><ArrowLeft size={14} />Back to register</Link>
 
       {/* header */}
       <div style={{ ...card, padding: '11px 16px', marginBottom: 10 }}>
