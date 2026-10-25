@@ -230,7 +230,7 @@ function ProvenanceCard({ card, accent, kind, full }: { card: any; accent: strin
 type SurfaceFingerprint = { osGuess: string | null; product: string | null; sshBanner: string | null; httpServer: string | null; httpTitle: string | null; snmpSysdescr: string | null; confidence: number | null; evidence: string[] | null; hostname: string | null };
 type SurfaceFacts = { ip: string | null; mac: string | null; ports: number[] | null; deviceType: string | null; vendor: string | null; internetFacing: boolean; fingerprint?: SurfaceFingerprint | null };
 
-export default function AssetOverview({ A, surface }: { A: any; surface?: SurfaceFacts | null }) {
+export default function AssetOverview({ A, surface, riskProfile }: { A: any; surface?: SurfaceFacts | null; riskProfile?: any }) {
   // Default to the first collected domain — 'hardware' for a host, 'instance' for
   // a database, 'account' for cloud, etc. — so the correct tab is highlighted.
   const [deepTab, setDeepTab] = useState<string>(() => A.deep?.[0]?.key || 'hardware');
@@ -431,6 +431,34 @@ export default function AssetOverview({ A, surface }: { A: any; surface?: Surfac
       </div>
 
       {/* KPI strip â one compact card, cells divided */}
+      {/* Asset-level Before -> After contextual vuln risk (raw CVSS vs scored on this host) */}
+      {riskProfile && riskProfile.raw != null && (
+        <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+          <div className={CARD + ' p-3.5'}>
+            <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk Before Context</div>
+            <div className="flex items-baseline gap-1.5 mt-1.5">
+              <span className={'text-[30px] font-extrabold leading-none ' + MONO} style={{ color: TONE.bad }}>{riskProfile.raw}</span>
+              <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
+            </div>
+            <div className="text-[10px] text-[#8a95a1] mt-2 leading-snug">Raw CVSS severity, the flaw in the abstract, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
+          </div>
+          <div className={CARD + ' p-3.5'}>
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk After Context</div>
+              {riskProfile.delta != null && riskProfile.delta !== 0 && (
+                <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={riskProfile.delta > 0 ? { color: '#1f7a54', background: '#e7f5ee' } : { color: '#b23a3a', background: '#fbeaea' }}>
+                  {Math.abs(riskProfile.delta)} {riskProfile.delta > 0 ? 'lower' : 'higher'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-1.5 mt-1.5">
+              <span className={'text-[30px] font-extrabold leading-none ' + MONO} style={{ color: TONE.ok }}>{riskProfile.contextual}</span>
+              <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
+            </div>
+            <div className="text-[10px] text-[#8a95a1] mt-2 leading-snug">Scored on this host: exposure, exploitability, KEV and criticality{riskProfile.internet_facing ? ' (internet-facing)' : ''}</div>
+          </div>
+        </div>
+      )}
       <div className={CARD + ' mb-2.5 flex flex-wrap'}>
         {A.kpis.map((k: any, i: number) => {
           const col = k.tone === 'muted' ? '#8a95a1' : TONE[k.tone] || '#0f1f2b';

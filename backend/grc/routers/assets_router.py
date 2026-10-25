@@ -1874,6 +1874,14 @@ def asset_vuln_risk_profile(
              .join(VulnerabilityAssetLink, VulnerabilityAssetLink.vulnerability_id == Vulnerability.id)
              .filter(VulnerabilityAssetLink.asset_id == asset_id).all())
     openv = [v for v in vulns if (v.status or "open").lower() not in _CLOSED]
+    # Fold to DISTINCT findings (same dedup_key as every other count surface) so the
+    # before/after score + its denominators read the truth number, not raw links.
+    from grc.modules.pentest.service import _fold_distinct as _fd
+    _rows = [{"id": v.id, "cve_id": v.cve_id, "title": v.title, "severity": v.severity,
+              "affected_url": getattr(v, "affected_url", None),
+              "affected_component": getattr(v, "affected_component", None)} for v in openv]
+    _keep = {r['id'] for r in _fd(_rows, asset.asset_type)}
+    openv = [v for v in openv if v.id in _keep]
     internet = bool(getattr(asset, "internet_facing", False))
     crit = (asset.criticality or "").lower() or None
     exposure_pts = 10 if internet else 0

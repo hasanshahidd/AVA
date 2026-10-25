@@ -384,6 +384,15 @@ export default function AssetDetailPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Before->After contextual vuln risk for the Overview cards (raw CVSS vs
+  // scored on this host). Server folds to DISTINCT findings; empty -> cards hide.
+  const { data: riskProfile } = useQuery({
+    queryKey: ['asset-vuln-risk-profile', assetId],
+    queryFn: async () => (await assetsApi.vulnRiskProfile(assetId)).data,
+    enabled: !!asset,
+    staleTime: 60000,
+  });
+
   const { data: coverage } = useQuery({
     queryKey: ['asset-coverage', assetId],
     queryFn: async () => {
@@ -869,7 +878,7 @@ export default function AssetDetailPage() {
                     only implied the passive scan was incomplete. Re-enable ONLY alongside a real
                     active-scan feature (which the backend requires be authorization-gated). */}
                 {false && overviewData.external && <ScopeAuthorizationCard asset={asset} canManage={canEdit} />}
-                <AssetOverviewDesign A={overviewData} surface={surfaceFacts} />
+                <AssetOverviewDesign A={overviewData} surface={surfaceFacts} riskProfile={riskProfile} />
               </>
             )}
             {activeTab === 'trajectory' && <TrajectoryPanel assetId={assetId} />}
