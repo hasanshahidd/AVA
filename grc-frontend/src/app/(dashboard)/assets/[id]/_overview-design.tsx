@@ -240,7 +240,7 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
   // Which KPI tile has its breakdown open (only the hygiene tile carries one).
   const [openKpi, setOpenKpi] = useState<number | null>(null);
   // Risk Before/After breakdown reveal (the 3rd card toggles the averaged parameter table).
-  const [riskOpen, setRiskOpen] = useState(false);
+  const [riskView, setRiskView] = useState<'before' | 'after' | null>(null);
 
   const software = useMemo(() => {
     const q = swQuery.trim().toLowerCase();
@@ -433,75 +433,65 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
       </div>
 
       {/* KPI strip â one compact card, cells divided */}
-      {/* Asset-level Before -> After contextual vuln risk: a 3-card row (raw / contextual / net), click to reveal the averaged parameter breakdown. */}
+      {/* Asset-level Before / After vuln risk: two clickable cards, each opens ITS OWN parameter breakdown (no section headings). */}
       {riskProfile && riskProfile.raw != null && (() => {
-        const d = riskProfile.delta ?? 0;
-        const down = d > 0;   // delta = raw - contextual; >0 means context LOWERED the abstract risk
-        const netColor = d === 0 ? TONE.muted : (down ? '#1f7a54' : '#b23a3a');
+        const beforeRows = Array.isArray(riskProfile.before_groups) ? riskProfile.before_groups : [];
+        const afterRows = Array.isArray(riskProfile.groups) ? riskProfile.groups.flatMap((g: any) => g.rows || []) : [];
+        const rows = riskView === 'before' ? beforeRows : riskView === 'after' ? afterRows : [];
+        const title = riskView === 'before'
+          ? `Before - the parameters behind the raw CVSS score, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}`
+          : `After - how this host's context scores the risk, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}`;
+        const cardCls = (active: boolean) => CARD + ' p-2.5 cursor-pointer ' + HOVER + (active ? ' ring-2 ring-[#2e63a8]' : '');
         return (
           <div className="mb-2.5">
-            <div className="grid grid-cols-3 gap-2">
-              <div className={CARD + ' p-2.5'}>
-                <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk Before Context</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className={cardCls(riskView === 'before')} onClick={() => setRiskView((v) => (v === 'before' ? null : 'before'))}
+                   title="Click to see the parameters behind the raw CVSS (before) score">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk Before Context</div>
+                  <span className="text-[10px] font-semibold text-[#2e63a8]">{riskView === 'before' ? 'Hide' : 'Parameters'}</span>
+                </div>
                 <div className="flex items-baseline gap-1.5 mt-1.5">
                   <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.bad }}>{riskProfile.raw}</span>
                   <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
                 </div>
                 <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Raw CVSS severity, the flaw in the abstract, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
               </div>
-              <div className={CARD + ' p-2.5'}>
-                <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk After Context</div>
+              <div className={cardCls(riskView === 'after')} onClick={() => setRiskView((v) => (v === 'after' ? null : 'after'))}
+                   title="Click to see the context parameters that score the risk on this host">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk After Context</div>
+                  <span className="text-[10px] font-semibold text-[#2e63a8]">{riskView === 'after' ? 'Hide' : 'Parameters'}</span>
+                </div>
                 <div className="flex items-baseline gap-1.5 mt-1.5">
                   <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.ok }}>{riskProfile.contextual}</span>
                   <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
                 </div>
                 <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Scored on this host: exposure, exploitability, KEV and criticality{riskProfile.internet_facing ? ' (internet-facing)' : ''}</div>
               </div>
-              <div className={CARD + ' p-2.5 cursor-pointer ' + HOVER} onClick={() => setRiskOpen((v) => !v)}
-                   title="Click to see the before to after breakdown, averaged across this asset's open findings">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Net Effect</div>
-                  <span className="text-[10px] font-semibold text-[#2e63a8]">{riskOpen ? 'Hide' : 'Breakdown'}</span>
-                </div>
-                <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: netColor }}>{d > 0 ? '-' : d < 0 ? '+' : ''}{Math.abs(d)}</span>
-                  <span className="text-[12px] text-[#aeb8c2]">pts</span>
-                </div>
-                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">{d === 0 ? 'Context leaves the raw score unchanged' : (down ? 'Context lowers the abstract CVSS to real risk on this host' : 'Context raises the abstract CVSS on this host')}</div>
-              </div>
             </div>
-            {riskOpen && Array.isArray(riskProfile.groups) && (
+            {riskView && rows.length > 0 && (
               <div className="rounded-2xl border-2 border-[#2e63a8] bg-[#e9f1fb] p-[16px] mt-2.5">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[13px] font-bold text-[#0f1f2b]">Before to After, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
-                    <p className="mt-0.5 text-[11.5px] text-[#3a4653] max-w-3xl">Each row is the mean contribution across this asset's open findings. Raw CVSS ({riskProfile.raw}/100) becomes the contextual score ({riskProfile.contextual}/100) once exploitability, reachability, exposure and criticality are applied.</p>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); setRiskOpen(false); }} className="text-[11.5px] font-semibold text-[#2e63a8] whitespace-nowrap">Close</button>
+                  <div className="text-[12px] font-bold text-[#0f1f2b]">{title}</div>
+                  <button onClick={(e) => { e.stopPropagation(); setRiskView(null); }} className="text-[11.5px] font-semibold text-[#2e63a8] whitespace-nowrap">Close</button>
                 </div>
-                <div className="mt-3 space-y-3">
-                  {riskProfile.groups.map((g: any, gi: number) => (
-                    <div key={gi}>
-                      <div className="text-[10px] font-bold tracking-[0.04em] uppercase text-[#3a4653] mb-1.5">{g.label}</div>
-                      <div className="space-y-2">
-                        {(g.rows || []).map((r: any, ri: number) => {
-                          const pct = r.max ? Math.max(0, Math.min(100, (r.pts / r.max) * 100)) : 0;
-                          return (
-                            <div key={ri} className="flex items-center gap-3">
-                              <div className="w-56 flex-none">
-                                <div className="text-[12px] font-semibold text-[#0f1f2b]">{r.label}</div>
-                                <div className="text-[10.5px] text-[#8a95a1]">{r.evidence}</div>
-                              </div>
-                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white">
-                                <div className="h-full rounded-full" style={{ width: Math.max(2, pct) + '%', background: '#2e63a8' }} />
-                              </div>
-                              <div className={'w-16 flex-none text-right text-[12px] font-semibold tabular-nums text-[#0f1f2b] ' + MONO}>{r.pts} / {r.max}</div>
-                            </div>
-                          );
-                        })}
+                <div className="mt-3 space-y-2">
+                  {rows.map((r: any, ri: number) => {
+                    const pct = r.max ? Math.max(0, Math.min(100, (r.pts / r.max) * 100)) : 0;
+                    return (
+                      <div key={ri} className="flex items-center gap-3">
+                        <div className="w-56 flex-none">
+                          <div className="text-[12px] font-semibold text-[#0f1f2b]">{r.label}</div>
+                          <div className="text-[10.5px] text-[#8a95a1]">{r.evidence}</div>
+                        </div>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white">
+                          <div className="h-full rounded-full" style={{ width: Math.max(2, pct) + '%', background: '#2e63a8' }} />
+                        </div>
+                        <div className={'w-16 flex-none text-right text-[12px] font-semibold tabular-nums text-[#0f1f2b] ' + MONO}>{r.pts} / {r.max}</div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
