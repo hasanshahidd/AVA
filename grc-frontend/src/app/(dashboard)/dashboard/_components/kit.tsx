@@ -170,12 +170,14 @@ export const Unavailable = ({ what, href }: { what: string; href?: string }) => 
 );
 
 /** Small labelled figure used inside cards. */
-export function Figure({ label, value, sub, className = '' }: { label: string; value: ReactNode; sub?: ReactNode; className?: string }) {
+export function Figure({ label, value, sub, className = '', dense = false }: { label: string; value: ReactNode; sub?: ReactNode; className?: string; dense?: boolean }) {
+  // `dense` is opt-in (default keeps every existing dashboard unchanged); it shrinks
+  // the big value + labels for screens the owner flagged as reading too large/zoomed.
   return (
     <div className={`min-w-0 ${className}`}>
-      <p className="m-0 truncate text-[11px] font-medium text-[#64748B]">{label}</p>
-      <p className="m-0 mt-0.5 text-[20px] font-semibold leading-[1.15] text-[#0F172A]">{value}</p>
-      {sub && <p className="m-0 mt-0.5 text-[11px] leading-[1.4] text-[#64748B]">{sub}</p>}
+      <p className={`m-0 truncate ${dense ? 'text-[10px]' : 'text-[11px]'} font-medium text-[#64748B]`}>{label}</p>
+      <p className={`m-0 mt-0.5 ${dense ? 'text-[16px]' : 'text-[20px]'} font-semibold leading-[1.15] text-[#0F172A]`}>{value}</p>
+      {sub && <p className={`m-0 mt-0.5 ${dense ? 'text-[10px]' : 'text-[11px]'} leading-[1.4] text-[#64748B]`}>{sub}</p>}
     </div>
   );
 }

@@ -109,7 +109,7 @@ function prettyBenchmark(raw?: string | null): string {
 
 /* ---------- pass-rate ring (compliance reads green-high, so it is its own mark —
    the kit Gauge is a risk gauge whose zones are green-low/red-high) ---------- */
-function Ring({ pct, size = 112 }: { pct: number | null; size?: number }) {
+function Ring({ pct, size = 86 }: { pct: number | null; size?: number }) {
   const C = 2 * Math.PI * 52;
   const off = pct == null ? C : C * (1 - Math.min(100, Math.max(0, pct)) / 100);
   return (
@@ -358,12 +358,12 @@ export default function CisDashboard() {
   /* --- executive summary band (header + confident sentence + coverage stat) --- */
   const summaryBand = (
     <section aria-label="CIS executive summary"
-      className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] border border-[#E2E5EC] bg-white px-4 py-3 ${CARD_SHADOW}`}
+      className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[12px] border border-[#E2E5EC] bg-white px-3.5 py-2.5 ${CARD_SHADOW}`}
       style={{ borderLeft: `3px solid ${T.base}` }}>
       <h2 className="sr-only">CIS benchmark compliance</h2>
       <div className="min-w-0 flex-1 basis-[280px]">
         <Eyebrow>Executive summary · CIS hardening</Eyebrow>
-        <p className="m-0 mt-0.5 text-[13.5px] leading-[1.5] text-[#0F172A]" aria-live="polite">
+        <p className="m-0 mt-0.5 text-[12px] leading-[1.45] text-[#0F172A]" aria-live="polite">
           {postureSentence({
             passRate: roll.passRate, scannedAssets: roll.scannedAssets, failed: roll.failed,
             critHigh: fail.haveData ? fail.critHigh : null,
@@ -382,7 +382,7 @@ export default function CisDashboard() {
   );
 
   return (
-    <div className="flex flex-col gap-3" style={{ background: '#EDF0F5', padding: '18px 20px', minHeight: 'calc(100vh - 46px)', fontFamily: FONT, color: T.text }}>
+    <div className="flex flex-col gap-2.5" style={{ background: '#EDF0F5', padding: '12px 16px', minHeight: 'calc(100vh - 46px)', fontFamily: FONT, color: T.text }}>
       {overviewQ.isLoading ? (
         <Loading rows={6} note="Loading CIS scan results across the estate…" />
       ) : overviewQ.isError ? (
@@ -396,8 +396,8 @@ export default function CisDashboard() {
           <div className={grid}>
             <Card title="Scan coverage" sub="Assets ready vs scanned" className="xl:col-span-5">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
-                <Figure label="Matched & ready" value={nfmt(roll.withBenchmark)} sub={`of ${nfmt(roll.total)} assets`} />
-                <Figure label="No benchmark yet" value={nfmt(roll.unmapped)} sub="need an OS profile" />
+                <Figure dense label="Matched & ready" value={nfmt(roll.withBenchmark)} sub={`of ${nfmt(roll.total)} assets`} />
+                <Figure dense label="No benchmark yet" value={nfmt(roll.unmapped)} sub="need an OS profile" />
               </div>
               <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={covParts} label="Scan coverage" /></div>
               <div style={{ marginTop: 10 }}><PartLegend parts={covParts} total={roll.total} /></div>
@@ -416,26 +416,26 @@ export default function CisDashboard() {
           {/* ── Answer + trust: posture · coverage honesty · estate by hardening ── */}
           <div className={grid}>
             <Card title="Overall CIS compliance" sub="Passed ÷ (passed + failed)" busy={overviewQ.isFetching} className="xl:col-span-4">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <Ring pct={roll.passRate} />
                 <div style={{ flex: 1, minWidth: 128 }}>
                   <Pill tone={band}>{band.label} hardening</Pill>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', marginTop: 12 }}>
-                    <Figure label="Failing checks" value={nfmt(roll.failed)} sub={roll.failed > 0 ? 'need remediation' : 'all passing'} />
-                    <Figure label="Critical & high"
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', marginTop: 8 }}>
+                    <Figure dense label="Failing checks" value={nfmt(roll.failed)} sub={roll.failed > 0 ? 'need remediation' : 'all passing'} />
+                    <Figure dense label="Critical & high"
                       value={fail.haveData ? nfmt(fail.critHigh) : (fail.loading ? '…' : '—')}
                       sub="highest severity" />
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 'auto', paddingTop: 14 }}><StackBar parts={checkParts} label="Checks passed, failed, errored" /></div>
+              <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={checkParts} label="Checks passed, failed, errored" /></div>
               <div style={{ marginTop: 10 }}><PartLegend parts={checkParts} total={roll.checks} cols={3} /></div>
             </Card>
 
             <Card title="Scan coverage" sub="You can't claim compliance on unscanned assets" className="xl:col-span-4">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
-                <Figure label="Scanned" value={`${nfmt(roll.scannedAssets)} / ${nfmt(roll.total)}`} sub={`${pctOf(roll.scannedAssets, roll.total)}% of the estate`} />
-                <Figure label="Unmeasured" value={nfmt(unmeasured)} sub="awaiting scan or unmapped" />
+                <Figure dense label="Scanned" value={`${nfmt(roll.scannedAssets)} / ${nfmt(roll.total)}`} sub={`${pctOf(roll.scannedAssets, roll.total)}% of the estate`} />
+                <Figure dense label="Unmeasured" value={nfmt(unmeasured)} sub="awaiting scan or unmapped" />
               </div>
               <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={covParts} label="Scan coverage" /></div>
               <div style={{ marginTop: 10 }}><PartLegend parts={covParts} total={roll.total} /></div>
@@ -453,8 +453,8 @@ export default function CisDashboard() {
               ) : (
                 <>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
-                    <Figure label="Well hardened" value={nfmt(roll.strong)} sub={`${pctOf(roll.strong, roll.scored)}% of ${plural(roll.scored, 'scored asset')}`} />
-                    <Figure label="Weak (<55%)" value={nfmt(roll.weak)} sub={roll.weak > 0 ? 'act first' : 'none'} />
+                    <Figure dense label="Well hardened" value={nfmt(roll.strong)} sub={`${pctOf(roll.strong, roll.scored)}% of ${plural(roll.scored, 'scored asset')}`} />
+                    <Figure dense label="Weak (<55%)" value={nfmt(roll.weak)} sub={roll.weak > 0 ? 'act first' : 'none'} />
                   </div>
                   <div style={{ marginTop: 'auto', paddingTop: 10 }}><StackBar parts={hardeningParts} label="Scanned assets by hardening band" /></div>
                   <div style={{ marginTop: 10 }}><PartLegend parts={hardeningParts} total={roll.scored} /></div>
