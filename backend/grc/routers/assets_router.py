@@ -1889,7 +1889,7 @@ def asset_vuln_risk_profile(
     n = len(openv)
     if n == 0:
         return {"count": 0, "scored": 0, "raw": None, "contextual": 0, "delta": 0,
-                "internet_facing": internet, "criticality": asset.criticality, "groups": []}
+                "internet_facing": internet, "criticality": asset.criticality, "groups": [], "before_groups": []}
     tot = {"sev": 0.0, "epss": 0.0, "mat": 0.0, "kev": 0.0, "av": 0.0, "raw": 0.0, "ctx": 0.0}
     cvss_sum = 0.0; cvss_n = 0; epss_sum = 0.0; epss_n = 0; kev_n = 0; exp_n = 0; net_n = 0; raw_n = 0
     for v in openv:
@@ -1917,6 +1917,53 @@ def asset_vuln_risk_profile(
     avg = lambda x: round(x / n, 1)
     raw_avg = round(tot["raw"] / raw_n) if raw_n else None
     ctx_avg = round(tot["ctx"] / n)
+    # BEFORE breakdown - the CVSS base metrics that make up the raw score, summarized across the
+    # asset's open findings (dominant value + share; bar = share at the most-severe value). v3 + v2.
+    _V3 = [("AV","Attack vector",{"N":"Network","A":"Adjacent","L":"Local","P":"Physical"},"N"),
+           ("AC","Attack complexity",{"L":"Low","H":"High"},"H"),
+           ("PR","Privileges required",{"N":"None","L":"Low","H":"High"},"N"),
+           ("UI","User interaction",{"N":"None","R":"Required"},"N"),
+           ("S","Scope",{"U":"Unchanged","C":"Changed"},"C"),
+           ("C","Confidentiality impact",{"H":"High","L":"Low","N":"None"},"H"),
+           ("I","Integrity impact",{"H":"High","L":"Low","N":"None"},"H"),
+           ("A","Availability impact",{"H":"High","L":"Low","N":"None"},"H")]
+    _V2 = [("AV","Attack vector",{"N":"Network","A":"Adjacent","L":"Local"},"N"),
+           ("AC","Attack complexity",{"L":"Low","M":"Medium","H":"High"},"H"),
+           ("Au","Authentication",{"N":"None","S":"Single","M":"Multiple"},"N"),
+           ("C","Confidentiality impact",{"C":"Complete","P":"Partial","N":"None"},"C"),
+           ("I","Integrity impact",{"C":"Complete","P":"Partial","N":"None"},"C"),
+           ("A","Availability impact",{"C":"Complete","P":"Partial","N":"None"},"C")]
+    def _bparse(vec):
+        out = {}
+        for part in vec.split("/"):
+            if ":" in part:
+                k, _, val = part.partition(":"); out[k.strip()] = val.strip()
+        return out
+    _btally = {}; _bworst = {}; _border = []
+    for v in openv:
+        vec = (v.cvss_vector or v.nvd_cvss_vector or "").strip()
+        if not vec:
+            continue
+        pd = _bparse(vec)
+        spec = _V3 if (vec.upper().startswith("CVSS:3") or "UI" in pd) else _V2
+        for key, label, vmap, worst in spec:
+            val = pd.get(key)
+            if val is None:
+                continue
+            lab = vmap.get(val, val)
+            if label not in _btally:
+                _btally[label] = {}; _border.append(label); _bworst[label] = vmap.get(worst, worst)
+            _btally[label][lab] = _btally[label].get(lab, 0) + 1
+    before_groups = []
+    for label in _border:
+        bucket = _btally[label]; _btot = sum(bucket.values())
+        wn = bucket.get(_bworst[label], 0)
+        ev = " · ".join("%s %d%%" % (lab, round(100 * c / _btot)) for lab, c in sorted(bucket.items(), key=lambda kv: -kv[1])[:3])
+        before_groups.append({"label": label, "evidence": ev, "pts": round(100 * wn / _btot), "max": 100})
+    if not before_groups:
+        before_groups = [{"label": "CVSS severity", "max": 100,
+                          "evidence": ("avg CVSS %s/10" % round(cvss_sum / cvss_n, 1)) if cvss_n else "no CVSS vector stored",
+                          "pts": round((cvss_sum / cvss_n) * 10) if cvss_n else 0}]
     groups = [
         {"label": "Severity — the flaw itself", "rows": [
             {"label": "CVSS severity",
@@ -1940,7 +1987,7 @@ def asset_vuln_risk_profile(
     ]
     return {"count": n, "scored": raw_n, "raw": raw_avg, "contextual": ctx_avg,
             "delta": (raw_avg - ctx_avg) if raw_avg is not None else 0,
-            "internet_facing": internet, "criticality": asset.criticality, "groups": groups}
+            "internet_facing": internet, "criticality": asset.criticality, "groups": groups, "before_groups": before_groups}
 
 
 @router.post("/{asset_id}/valuation", response_model=ITAssetResponse)
