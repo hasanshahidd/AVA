@@ -685,13 +685,31 @@ def _vuln_score(
         VULN_SEVERITY_POINTS.get((v.severity or "low").lower(), 0) for v in active
     )
 
+    # Dedup active findings by dedup_key so open_count matches the distinct truth (787),
+    # not raw link instances (863) - consistent with the tab badge / Overview Open Findings.
+    try:
+        from grc.modules.pentest.service import _fold_distinct as _fd
+        _arows = [{"id": v.id, "cve_id": getattr(v, "cve_id", None), "title": getattr(v, "title", None),
+                   "severity": getattr(v, "severity", None),
+                   "affected_url": getattr(v, "affected_url", None),
+                   "affected_component": getattr(v, "affected_component", None)} for v in active]
+        _adist = _fd(_arows, getattr(asset, "asset_type", None))
+        _open_distinct = len(_adist)
+        _sev_distinct = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for _r in _adist:
+            _s = (_r.get("severity") or "low").lower()
+            if _s in _sev_distinct:
+                _sev_distinct[_s] += 1
+    except Exception:  # noqa: BLE001
+        _open_distinct = len(active)
+        _sev_distinct = breakdown
     return {
         "score": round(best_score, 4), "known": True,
         "raw_points": round(legacy_points, 2),
-        "open_count": len(active),
-        "active_count": len(active),
+        "open_count": _open_distinct,
+        "active_count": _open_distinct,
         "total_linked": len(links),
-        "by_severity": breakdown,
+        "by_severity": _sev_distinct,
         "by_status": by_status,
         # NEW (Risk Posture v2): explainable breakdown of the dimension.
         # Surfaces in the asset detail page's "Why this score" callout

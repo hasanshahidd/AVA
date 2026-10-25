@@ -98,7 +98,7 @@ export default function AssetRecordShell({
     <div className="inv2" style={{ margin: '-16px', background: '#F4F6F7', minHeight: '100vh' }}>
       {/* slim back link — the global top bar now carries the breadcrumb, so no second bar */}
       <div style={{ padding: '10px 18px 0' }}>
-        <Link href="/assets" style={{ fontSize: 11.5, color: '#8A95A1', display: 'inline-flex', alignItems: 'center', gap: 4 }}>‹ Back to register</Link>
+        <Link href="/assets?tab=inventory" style={{ fontSize: 11.5, color: '#8A95A1', display: 'inline-flex', alignItems: 'center', gap: 4 }}>‹ Back to register</Link>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 16, padding: '10px 18px 14px', alignItems: 'start' }}>
