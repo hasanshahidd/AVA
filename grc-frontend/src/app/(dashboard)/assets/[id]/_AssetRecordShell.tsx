@@ -30,6 +30,54 @@ const GLOBE = (
   <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
 );
 
+// ── Dynamic header badges — derived from live fields, not the static stored
+// defaults (every discovered asset was literally "infrastructure / active"). ──
+const cap = (s?: string) => (!s ? '' : s.charAt(0).toUpperCase() + s.slice(1));
+const toneChip = (tone: string): React.CSSProperties =>
+  tone === 'ok' ? CHIP('#E7F5EE', '#1F7A54')
+  : tone === 'warn' ? CHIP('#FBF2DF', '#9A6410')
+  : tone === 'bad' ? CHIP('#FBEAEA', '#B23A3A')
+  : CHIP('#F1F4F6', '#6B7787');
+
+const PK_LABEL: Record<string, string> = { server: 'Server', database: 'Database', network: 'Network device', cloud: 'Cloud', identity: 'Identity', cluster: 'Cluster', storage: 'Storage', hypervisor: 'Hypervisor', workstation: 'Workstation' };
+// Real type from the backend-computed platform_kind, else inferred from the OS
+// fingerprint, else the stored asset_type — never a bare hardcoded "infrastructure".
+function assetTypeLabel(a: any): string {
+  const pk = (a?.platform_kind || '').toString().toLowerCase();
+  if (PK_LABEL[pk]) return PK_LABEL[pk];
+  const os = `${a?.os_normalized || ''} ${a?.os_family || ''}`.toLowerCase();
+  if (/ios|nx-os|junos|routeros|cisco|fortinet|network/.test(os)) return 'Network device';
+  if (/esxi|vmware|hyper-v|proxmox/.test(os)) return 'Hypervisor';
+  if (/windows server|ubuntu|debian|centos|rhel|red hat|\blinux\b|server/.test(os)) return 'Server';
+  if (/windows 1[01]|windows 7|windows 8|macos|mac os/.test(os)) return 'Workstation';
+  if (a?.asset_role) return cap(a.asset_role);
+  return cap(a?.asset_type) || 'Asset';
+}
+// Liveness from last_seen_at, with lifecycle overriding (a decommissioned box is
+// not "active" however recently it was seen). tone drives the chip colour.
+function livenessBadge(a: any): { label: string; tone: 'ok' | 'warn' | 'muted' } {
+  const lc = `${a?.lifecycle_state || ''} ${a?.status || ''}`.toLowerCase();
+  if (/decommiss|retire/.test(lc)) return { label: 'Decommissioned', tone: 'muted' };
+  if (/\binactive\b/.test(lc)) return { label: 'Inactive', tone: 'muted' };
+  const t = a?.last_seen_at ? new Date(a.last_seen_at).getTime() : NaN;
+  if (!Number.isFinite(t)) return { label: 'Not seen', tone: 'muted' };
+  const days = (Date.now() - t) / 86400000;
+  if (days <= 7) return { label: 'Active', tone: 'ok' };
+  if (days <= 30) return { label: `Idle ${Math.round(days)}d`, tone: 'warn' };
+  return { label: `Dormant ${Math.round(days)}d`, tone: 'warn' };
+}
+// Criticality band + its computed score, so it reads as a real value not a static
+// word. The backend sets criticality = score_to_bucket(criticality_score) when the
+// scoring inputs exist. Null when neither band nor score is set (shows nothing).
+function criticalityBadge(a: any): { label: string; tone: string } | null {
+  const band = (a?.criticality || '').toString().toLowerCase();
+  const score = typeof a?.criticality_score === 'number' ? a.criticality_score : null;
+  if (!band && score == null) return null;
+  const label = (cap(band) || 'Scored') + (score != null ? ` · ${score.toFixed(1)}` : '');
+  const tone = band === 'critical' || band === 'high' ? 'bad' : (band === 'medium' || band === 'moderate') ? 'warn' : 'ok';
+  return { label, tone };
+}
+
 export default function AssetRecordShell({
   asset, overviewData, displayName, sections, activeTab, onTab, tabCounts,
   canEdit, canDelete, getIcon, onAssessRisk, assessing, onEdit, onLifecycle,
@@ -40,9 +88,10 @@ export default function AssetRecordShell({
   // "External posture" rail, a "Rescan domain" primary. Internal assets are
   // untouched. Single source of truth = the mapper's isOutsideOnly flag.
   const external = !!overviewData?.external;
-  const typeLabel = (asset?.asset_type || '').toString();
-  const status = (asset?.status || 'active').toString();
+  const typeLabel = assetTypeLabel(asset);
+  const live = livenessBadge(asset);
   const crit = (asset?.criticality || '').toString();
+  const critBadge = criticalityBadge(asset);
   const idline = overviewData?.header?.idline || asset?.description || asset?.ip_address || '';
 
   return (
@@ -65,18 +114,18 @@ export default function AssetRecordShell({
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 9 }}>
                 {external ? (
                   <>
-                    {crit && <span style={CHIP('#FBF2DF', '#9A6410')}>{crit}</span>}
-                    <span style={CHIP('#E7F5EE', '#1F7A54')}>{status}</span>
+                    {critBadge && <span style={toneChip(critBadge.tone)}>{critBadge.label}</span>}
+                    <span style={toneChip(live.tone)}>{live.label}</span>
                     <span style={CHIP('#E9F1FB', '#2E63A8')}>External · EASM</span>
-                    {typeLabel === 'third_party' && <span style={CHIP('#F1F4F6', '#6B7787')}>Third-Party</span>}
+                    {asset?.asset_type === 'third_party' && <span style={CHIP('#F1F4F6', '#6B7787')}>Third-Party</span>}
                     {asset?.internet_facing && <span style={CHIP('#FBEAEA', '#B23A3A')}>Internet-facing</span>}
                     {asset?.cde_environment && <span style={CHIP('#EEEBFA', '#6A54C9')}>PCI scope</span>}
                   </>
                 ) : (
                   <>
                     {typeLabel && <span style={CHIP('#E9F1FB', '#2E63A8')}>{typeLabel}</span>}
-                    <span style={CHIP('#E7F5EE', '#1F7A54')}>{status}</span>
-                    {crit && <span style={CHIP('#FBF2DF', '#9A6410')}>{crit}</span>}
+                    <span style={toneChip(live.tone)}>{live.label}</span>
+                    {critBadge && <span style={toneChip(critBadge.tone)}>{critBadge.label}</span>}
                     {asset?.cde_environment && <span style={CHIP('#EEEBFA', '#6A54C9')}>PCI scope</span>}
                   </>
                 )}
@@ -106,7 +155,8 @@ export default function AssetRecordShell({
             <div style={{ padding: '5px 14px 10px' }}>
               <div style={KV}><span style={{ color: '#8A95A1' }}>Owner</span><b style={{ fontWeight: 600, color: asset?.owner_name ? '#0F1F2B' : '#AEB8C2' }}>{asset?.owner_name || 'Not set'}</b></div>
               {asset?.ip_address && <div style={KV}><span style={{ color: '#8A95A1' }}>IP address</span><b style={{ fontWeight: 600, fontFamily: 'ui-monospace,Consolas,monospace' }}>{asset.ip_address}</b></div>}
-              <div style={KV}><span style={{ color: '#8A95A1' }}>Criticality</span><b style={{ fontWeight: 600 }}>{crit || '—'}</b></div>
+              <div style={KV}><span style={{ color: '#8A95A1' }}>Criticality</span><b style={{ fontWeight: 600 }}>{critBadge?.label || crit || '—'}</b></div>
+              <div style={KV}><span style={{ color: '#8A95A1' }}>Last seen</span><b style={{ fontWeight: 600, color: live.tone === 'ok' ? '#1F7A54' : '#3A4653' }}>{asset?.last_seen_at ? `${live.label} · ${new Date(asset.last_seen_at).toLocaleDateString()}` : live.label}</b></div>
               {asset?.lifecycle_state && <div style={{ ...KV, borderBottom: 0 }}><span style={{ color: '#8A95A1' }}>Lifecycle</span><b style={{ fontWeight: 600 }}>{asset.lifecycle_state}</b></div>}
             </div>
           </div>

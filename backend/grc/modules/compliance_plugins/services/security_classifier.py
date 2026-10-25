@@ -21,7 +21,9 @@ Adding a product is a one-line signature edit; nothing else changes.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 
@@ -101,6 +103,20 @@ def _haystack(entry: Dict[str, Any]) -> str:
     return f" {(entry.get('name') or '')} {(entry.get('software_key') or '')} ".lower()
 
 
+@lru_cache(maxsize=1024)
+def _needle_re(needle: str) -> "re.Pattern[str]":
+    # Match on alphanumeric boundaries so a short acronym needle like "mde" hits
+    # the token "mde" but NOT the middle of another word. The old plain-substring
+    # match read "libheif-plugin-aomdec" as "mde" (= Microsoft Defender for
+    # Endpoint) and mislabelled a HEIF codec as an EDR. Hyphens/spaces/dots are
+    # boundaries; this keeps every real multi-word product name matching.
+    return re.compile(r"(?<![a-z0-9])" + re.escape(needle.strip().lower()) + r"(?![a-z0-9])")
+
+
+def _matches(needle: str, hay: str) -> bool:
+    return bool(_needle_re(needle).search(hay))
+
+
 def classify(entry: Dict[str, Any]) -> Optional[str]:
     """Return the category for one software entry, or None if it matches no
     known family (ordinary application). First matching family wins; EDR is
@@ -108,7 +124,7 @@ def classify(entry: Dict[str, Any]) -> Optional[str]:
     hay = _haystack(entry)
     for category, needles in _SIGNATURES:
         for needle in needles:
-            if needle in hay:
+            if _matches(needle, hay):
                 return category
     return None
 
@@ -125,7 +141,7 @@ def _edr_family(text: str) -> Optional[str]:
     """The EDR signature a name hits — lines a software-list entry up with the
     deep scan's service read of the same product."""
     hay = f" {text} ".lower()
-    return next((n for n in _EDR_NEEDLES if n in hay), None)
+    return next((n for n in _EDR_NEEDLES if _matches(n, hay)), None)
 
 
 def _deep(platform_properties: Any, section: str) -> Dict[str, Any]:

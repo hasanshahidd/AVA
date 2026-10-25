@@ -22,7 +22,7 @@
  * assetId/canEdit props — it is rendered unchanged, exactly as the tab does today.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bug, Search, X, ChevronLeft } from 'lucide-react';
 import { InlineLinkPicker } from '@/components/ui';
@@ -98,8 +98,8 @@ const CARD = 'bg-white border border-[#E8ECEE] rounded-[15px] shadow-[0_1px_2px_
 const TH = 'text-left px-3.5 py-[9px] text-[9.5px] uppercase tracking-[0.04em] text-[#8A95A1] font-semibold bg-[#FAFBFC] border-b border-[#E8ECEE] whitespace-nowrap';
 const TD = 'px-3.5 py-[9px] text-[11.8px] text-[#3A4653] border-b border-[#F0F3F5] align-middle';
 // Compact variants for the Before→After averaged breakdown table (owner wanted that panel tighter).
-const THC = 'text-left px-3 py-[5px] text-[9px] uppercase tracking-[0.04em] text-[#8A95A1] font-semibold bg-[#FAFBFC] border-b border-[#E8ECEE] whitespace-nowrap';
-const TDC = 'px-3 py-[5px] text-[11px] text-[#3A4653] border-b border-[#F0F3F5] align-middle';
+const THC = 'text-left px-3 py-[3px] text-[9px] uppercase tracking-[0.04em] text-[#8A95A1] font-semibold bg-[#FAFBFC] border-b border-[#E8ECEE] whitespace-nowrap';
+const TDC = 'px-3 py-[4px] text-[10.5px] text-[#3A4653] border-b border-[#F0F3F5] align-middle';
 const BTN_PRI = 'h-[33px] px-3.5 rounded-[10px] border border-[#005B96] bg-[#005B96] text-[#06342B] text-[12px] font-semibold whitespace-nowrap hover:bg-[#014A81] hover:border-[#014A81]';
 const FILTER_BTN = (on: boolean) =>
   `h-[33px] px-3 rounded-[10px] border text-[11.5px] whitespace-nowrap ${on ? 'border-[#005B96] bg-[#EFF5FA] text-[#014A81] font-semibold' : 'border-[#E8ECEE] bg-white text-[#3A4653] font-medium'}`;
@@ -269,17 +269,17 @@ export default function VulnerabilitiesPanel({
               {riskProfile && riskProfile.count > 0 ? (
                 <>
                   {/* Before → After headline */}
-                  <div className="flex items-stretch gap-2 mb-2.5">
-                    <div className="flex-1 border border-[#E8ECEE] rounded-[10px] px-3 py-2 min-w-0">
+                  <div className="flex items-stretch gap-2 mb-2">
+                    <div className="flex-1 border border-[#E8ECEE] rounded-[10px] px-3 py-1.5 min-w-0">
                       <div className="text-[9.5px] text-[#8A95A1] uppercase tracking-[0.04em] font-semibold">Before</div>
-                      <div className="text-[10px] text-[#AEB8C2] mb-1">CVSS alone · the flaw in the abstract</div>
+                      <div className="text-[10px] text-[#AEB8C2] mb-0.5">CVSS alone · the flaw in the abstract</div>
                       <div className="flex items-baseline gap-1">
-                        <span className={`text-[20px] font-semibold leading-none text-[#8A95A1] ${NUM}`}>{riskProfile.raw ?? '—'}</span>
+                        <span className={`text-[18px] font-semibold leading-none text-[#8A95A1] ${NUM}`}>{riskProfile.raw ?? '—'}</span>
                         <span className="text-[10.5px] text-[#AEB8C2]">/ 100</span>
                       </div>
                     </div>
                     <div className="flex items-center text-[#AEB8C2] text-[15px]">→</div>
-                    <div className="flex-1 border border-[#005B96] rounded-[10px] px-3 py-2 bg-[#F3F9FC] min-w-0">
+                    <div className="flex-1 border border-[#005B96] rounded-[10px] px-3 py-1.5 bg-[#F3F9FC] min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <div className="text-[9.5px] text-[#014A81] uppercase tracking-[0.04em] font-semibold">After</div>
                         {riskProfile.raw != null && riskProfile.delta !== 0 && (
@@ -288,9 +288,9 @@ export default function VulnerabilitiesPanel({
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-[#8A95A1] mb-1">scored on this host</div>
+                      <div className="text-[10px] text-[#8A95A1] mb-0.5">scored on this host</div>
                       <div className="flex items-baseline gap-1">
-                        <span className={`text-[20px] font-semibold leading-none text-[#014A81] ${NUM}`}>{riskProfile.contextual}</span>
+                        <span className={`text-[18px] font-semibold leading-none text-[#014A81] ${NUM}`}>{riskProfile.contextual}</span>
                         <span className="text-[10.5px] text-[#AEB8C2]">/ 100</span>
                       </div>
                     </div>
@@ -307,25 +307,18 @@ export default function VulnerabilitiesPanel({
                         </tr>
                       </thead>
                       <tbody>
-                        {riskProfile.groups.map((g: any) => (
-                          <React.Fragment key={g.label}>
-                            <tr>
-                              <td colSpan={3} className="px-3 py-[4px] text-[9px] uppercase tracking-[0.04em] font-semibold text-[#8A95A1] bg-[#FAFBFC] border-b border-[#F0F3F5]">{g.label}</td>
-                            </tr>
-                            {g.rows.map((r: any) => (
-                              <tr key={r.label} className="hover:bg-[#F7FBFA]">
-                                <td className={TDC + ' font-medium text-[#0F1F2B]'}>{r.label}</td>
-                                <td className={TDC + ' text-[#8A95A1]'}>{r.evidence}</td>
-                                <td className={TDC + ' text-right whitespace-nowrap'}>
-                                  <span className={`${NUM} font-semibold text-[#0F1F2B]`}>{r.pts}</span>
-                                  <span className="text-[#AEB8C2] text-[10.5px]"> / {r.max}</span>
-                                  <span className="inline-block align-middle ml-2 w-[44px] h-[5px] rounded-full bg-[#F0F3F5] overflow-hidden">
-                                    <span className="block h-full bg-[#005B96]" style={{ width: `${Math.min(100, (r.pts / r.max) * 100)}%` }} />
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
+                        {riskProfile.groups.flatMap((g: any) => g.rows).map((r: any) => (
+                          <tr key={r.label} className="hover:bg-[#F7FBFA]">
+                            <td className={TDC + ' font-medium text-[#0F1F2B]'}>{r.label}</td>
+                            <td className={TDC + ' text-[#8A95A1]'}>{r.evidence}</td>
+                            <td className={TDC + ' text-right whitespace-nowrap'}>
+                              <span className={`${NUM} font-semibold text-[#0F1F2B]`}>{r.pts}</span>
+                              <span className="text-[#AEB8C2] text-[10.5px]"> / {r.max}</span>
+                              <span className="inline-block align-middle ml-2 w-[44px] h-[5px] rounded-full bg-[#F0F3F5] overflow-hidden">
+                                <span className="block h-full bg-[#005B96]" style={{ width: `${Math.min(100, (r.pts / r.max) * 100)}%` }} />
+                              </span>
+                            </td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
