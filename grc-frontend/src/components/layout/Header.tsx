@@ -172,6 +172,17 @@ export default function Header() {
               </div>
             );
           }
+          // Pentest run pages (/pentest/runs/<id>) have no static entry — show the
+          // section breadcrumb back to the hub so the top bar isn't blank.
+          if (!info && /^\/pentest\/runs\/[^/]+$/.test(pathname ?? '')) {
+            return (
+              <div className="flex items-center gap-1.5 min-w-0 text-sm leading-none">
+                <span className="font-medium text-[var(--color-muted)] truncate">Cybersecurity Assurance</span>
+                <span className="text-[var(--color-muted)]">/</span>
+                <Link href="/pentest" className="font-semibold text-[var(--color-text)]">AI Pentest</Link>
+              </div>
+            );
+          }
           if (!info) return null;
           // Pages that render their own big heading in the body (redesign kit)
           // get a breadcrumb here instead of a repeated title+subtitle, so the
