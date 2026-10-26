@@ -3,8 +3,8 @@
 // basic hardware) and sends it to the cloud. For machines we can't reach over
 // the network or where the client won't share credentials.
 //
-// stdlib ONLY (no modules) so it cross-compiles for Windows+Linux with no
-// network fetch and runs with zero deps on the target.
+// stdlib ONLY (no modules) so it cross-compiles for Windows, Linux and macOS
+// with no network fetch and runs with zero deps on the target.
 //
 // Config (baked in by the per-download installer, or passed as env):
 //
@@ -32,6 +32,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -137,6 +138,14 @@ func osName() string {
 		}
 		return run("cmd", "/c", "ver")
 	}
+	if runtime.GOOS == "darwin" {
+		name := run("sw_vers", "-productName")   // "macOS"
+		ver := run("sw_vers", "-productVersion") // "14.5"
+		if name != "" {
+			return strings.TrimSpace(name + " " + ver)
+		}
+		return "macOS"
+	}
 	// Linux: PRETTY_NAME from /etc/os-release
 	if f, err := os.Open("/etc/os-release"); err == nil {
 		defer f.Close()
@@ -176,6 +185,26 @@ func software() []sw {
 				s.Version = p[1]
 			}
 			list = append(list, s)
+		}
+		return list
+	}
+	if runtime.GOOS == "darwin" {
+		// Best-effort: Homebrew formulae+casks. No brew → empty list (inventory
+		// still reports OS/hardware/network); macOS app enumeration is heavier
+		// and left for later.
+		if out := run("brew", "list", "--versions"); out != "" {
+			for _, line := range strings.Split(out, "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				p := strings.SplitN(line, " ", 2)
+				s := sw{Name: p[0]}
+				if len(p) == 2 {
+					s.Version = strings.TrimSpace(p[1])
+				}
+				list = append(list, s)
+			}
 		}
 		return list
 	}
@@ -251,6 +280,14 @@ func memInfo() string {
 	if runtime.GOOS == "windows" {
 		return run("powershell", "-NoProfile", "-Command",
 			"[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB,1).ToString()+' GB'")
+	}
+	if runtime.GOOS == "darwin" {
+		if b := run("sysctl", "-n", "hw.memsize"); b != "" {
+			if n, err := strconv.ParseInt(strings.TrimSpace(b), 10, 64); err == nil && n > 0 {
+				return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+			}
+		}
+		return ""
 	}
 	if f, err := os.Open("/proc/meminfo"); err == nil {
 		defer f.Close()

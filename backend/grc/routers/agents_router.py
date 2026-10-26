@@ -459,7 +459,13 @@ def download_datastream(p: str, authorization: Optional[str] = Header(default=No
 # ── Installer download (the "Download agent" buttons) ───────────────────────
 # Compiled binaries live outside git (built on the droplet), served from here.
 AGENT_DIST = os.environ.get("AVA_AGENT_DIST", "/root/AVA/agent-dist")
-_BIN = {"linux": "ava-agent-linux", "windows": "ava-agent-windows.exe"}
+_BIN = {
+    "linux": "ava-agent-linux",
+    "windows": "ava-agent-windows.exe",
+    # macOS ships per-arch; the installer picks by `uname -m`.
+    "darwin-amd64": "ava-agent-darwin-amd64",
+    "darwin-arm64": "ava-agent-darwin-arm64",
+}
 
 
 def _public_base(request: Request) -> str:
@@ -554,6 +560,47 @@ Write-Host "Ava agent installed and started. It will appear in your console shor
 """
 
 
+def _macos_installer(url: str, token: str, tenant: str) -> str:
+    return f"""#!/bin/sh
+# Ava Compliance Agent installer (macOS). Downloads the agent, installs it as a
+# LaunchDaemon, enrolls, and sends the first inventory to the cloud. macOS agents
+# report hardware/software inventory; local CIS (OpenSCAP) is Linux-only.
+set -e
+AVA_URL="{url}"
+AVA_ENROLL="{token}"
+AVA_TENANT="{tenant}"
+[ "$(id -u)" -eq 0 ] || {{ echo "Run with sudo"; exit 1; }}
+case "$(uname -m)" in
+  arm64) BIN="darwin-arm64" ;;
+  x86_64) BIN="darwin-amd64" ;;
+  *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
+install -d /opt/ava-agent
+echo "Downloading agent..."
+curl -fsSL "$AVA_URL/grc/agents/installer/$BIN/bin" -o /opt/ava-agent/ava-agent
+chmod +x /opt/ava-agent/ava-agent
+cat > /Library/LaunchDaemons/io.caiva.agent.plist <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.caiva.agent</string>
+  <key>ProgramArguments</key><array><string>/opt/ava-agent/ava-agent</string></array>
+  <key>EnvironmentVariables</key><dict>
+    <key>AVA_URL</key><string>$AVA_URL</string>
+    <key>AVA_ENROLL</key><string>$AVA_ENROLL</string>
+    <key>AVA_TENANT</key><string>$AVA_TENANT</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>
+PLIST
+launchctl load -w /Library/LaunchDaemons/io.caiva.agent.plist
+echo "Ava agent installed and started. It will appear in your console shortly."
+"""
+
+
 @router.get("/installer/{os_family}/{enrollment_token}", response_class=PlainTextResponse)
 def download_installer(os_family: str, enrollment_token: str, request: Request):
     """Personalised one-shot installer script with the tenant's enrollment token
@@ -567,6 +614,8 @@ def download_installer(os_family: str, enrollment_token: str, request: Request):
         return _linux_installer(url, enrollment_token, tenant)
     if os_family == "windows":
         return _windows_installer(url, enrollment_token, tenant)
+    if os_family in ("macos", "darwin"):
+        return _macos_installer(url, enrollment_token, tenant)
     raise HTTPException(404, "Unknown OS")
 
 

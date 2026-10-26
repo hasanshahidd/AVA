@@ -106,16 +106,22 @@ export default function AgentsAdminPage() {
       )}
 
       {/* Agent installers — one self-contained binary per OS. It enrols,
-          inventories the host, and runs CIS benchmarks locally, then reports
-          to CAIVA. One file works on any host of the same OS family. */}
-      <div className="grid gap-4 sm:grid-cols-2">
+          inventories the host, reports to CAIVA, and (on Linux) runs CIS
+          benchmarks locally. One file works on any host of the same OS family. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {([
           { os: 'windows' as const, glyph: '🪟', title: 'Windows agent',
             meta: 'x64 · runs as LocalSystem',
+            caps: ['Full hardware + software inventory', 'Auto-enrols, heartbeats & reports on schedule'],
             support: 'Windows 10 / 11 · Server 2016 – 2022' },
           { os: 'linux' as const, glyph: '🐧', title: 'Linux agent',
             meta: 'x64 · systemd service',
+            caps: ['Full hardware + software inventory', 'Runs CIS benchmarks locally (OpenSCAP)', 'Auto-enrols, heartbeats & re-scans on schedule'],
             support: 'Ubuntu 20/22/24 · Debian 11/12 · RHEL/Alma 8/9 · Amazon Linux' },
+          { os: 'macos' as const, glyph: '💻', title: 'macOS agent',
+            meta: 'Apple Silicon + Intel · LaunchDaemon',
+            caps: ['Full hardware + software inventory', 'Auto-enrols, heartbeats & reports on schedule'],
+            support: 'macOS 12 Monterey and later' },
         ]).map((c) => (
           <div
             key={c.os}
@@ -129,11 +135,7 @@ export default function AgentsAdminPage() {
               </div>
             </div>
             <ul className="mt-4 space-y-1.5 text-xs text-slate-600">
-              {[
-                'Full hardware + software inventory',
-                'Runs CIS benchmarks locally — no inbound firewall rule',
-                'Auto-enrols, heartbeats, re-scans on schedule',
-              ].map((f) => (
+              {c.caps.map((f) => (
                 <li key={f} className="flex items-start gap-1.5">
                   <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   <span>{f}</span>
@@ -298,7 +300,7 @@ export default function AgentsAdminPage() {
 function InstallerButtons({
   os, label, canManage, toast,
 }: {
-  os: 'windows' | 'linux';
+  os: 'windows' | 'linux' | 'macos';
   label: string;
   canManage: boolean;
   toast: ReturnType<typeof useToast>;
@@ -321,7 +323,10 @@ function InstallerButtons({
       const enr = await agentsApi.enroll({ agent_name: `${os} agent`, os_family: os });
       const token = (enr.data as { enrollment_token: string }).enrollment_token;
       const resp = await apiClient.get(`/agents/installer/${os}/${token}`, { responseType: 'blob' });
-      const filename = os === 'windows' ? 'install-ava-agent.ps1' : 'install-ava-agent.sh';
+      const filename = os === 'windows'
+        ? 'install-ava-agent.ps1'
+        : os === 'macos' ? 'install-ava-agent.command' : 'install-ava-agent.sh';
+      const runAs = os === 'windows' ? 'Administrator' : 'root (sudo)';
       const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/octet-stream' }));
       const a = document.createElement('a');
       a.href = url;
@@ -332,7 +337,7 @@ function InstallerButtons({
       URL.revokeObjectURL(url);
       toast.toast({
         title: 'Installer downloaded',
-        message: `Run ${filename} as ${os === 'windows' ? 'Administrator' : 'root'} on the target host — it enrols, scans, and reports automatically.`,
+        message: `Run ${filename} as ${runAs} on the target host — it enrols, inventories, and reports automatically.`,
         type: 'success',
       });
     } catch (e: unknown) {
