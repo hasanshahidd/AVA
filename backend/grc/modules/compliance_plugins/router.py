@@ -3299,7 +3299,7 @@ def execute(
         # connection, fall back to the tenant's most-recent active connection
         # whose runner family matches this plugin.
         connection = _resolve_connection_for_plugin(
-            db, tenant_id, plugin, explicit_connection, conn_cache={},
+            db, tenant_id, plugin, explicit_connection, conn_cache={}, asset=asset,
         )
 
     run = execute_plugin(
@@ -3316,10 +3316,38 @@ def execute(
     return _run_to_dict(run, plugin, asset, connection, triggered_by_user=current_user)
 
 
+def _agent_connection_for_asset(
+    db: Session, tenant_id: int, asset: Optional[ITAsset],
+) -> Optional[IntegrationConnection]:
+    """The active collector-agent connection bound to this asset, if any.
+
+    An installed agent reports in and gets a host-pinned connection tagged with
+    ``assigned_collector_agent_id`` (agents_router._ensure_agent_connection). When
+    the scanned asset has such an agent, CIS runs the agent can execute locally
+    should be dispatched to it rather than attempted agentless. Scoped to THIS
+    asset only (via the agent↔asset link), so it never targets another host."""
+    if asset is None:
+        return None
+    from grc.models import ComplianceAgent
+    agent = (db.query(ComplianceAgent)
+             .filter(ComplianceAgent.tenant_id == tenant_id,
+                     ComplianceAgent.asset_id == asset.id,
+                     ComplianceAgent.status.in_(("active", "pending")))
+             .order_by(ComplianceAgent.id.desc()).first())
+    if agent is None:
+        return None
+    return (db.query(IntegrationConnection)
+            .filter(IntegrationConnection.tenant_id == tenant_id,
+                    IntegrationConnection.assigned_collector_agent_id == agent.id,
+                    IntegrationConnection.is_active.is_(True))
+            .order_by(IntegrationConnection.id.desc()).first())
+
+
 def _resolve_connection_for_plugin(
     db: Session, tenant_id: int, plugin: CompliancePlugin,
     explicit_connection: Optional[IntegrationConnection],
     conn_cache: dict[str, Optional[IntegrationConnection]],
+    asset: Optional[ITAsset] = None,
 ) -> Optional[IntegrationConnection]:
     """Pick the right tenant connection for a plugin run.
 
@@ -3346,6 +3374,14 @@ def _resolve_connection_for_plugin(
     if (explicit_connection is not None and
             explicit_connection.integration_type in acceptable):
         return explicit_connection
+    # Agent routing: if the scanned asset has an active collector agent and this
+    # plugin is one the agent runs locally (carries an oscap datastream), prefer
+    # the agent's connection so the run is dispatched to it. Asset-scoped and
+    # oscap-gated, so it never hijacks an agentless host or a Windows CIS plugin.
+    if asset is not None and isinstance(plugin.check_definition, dict) and plugin.check_definition.get("oscap"):
+        agent_conn = _agent_connection_for_asset(db, tenant_id, asset)
+        if agent_conn is not None:
+            return agent_conn
     cached = conn_cache.get(plugin.runner_type, "MISSING")
     if cached != "MISSING":
         return cached
@@ -3355,6 +3391,10 @@ def _resolve_connection_for_plugin(
             IntegrationConnection.tenant_id == tenant_id,
             IntegrationConnection.integration_type.in_(acceptable),
             IntegrationConnection.is_active.is_(True),
+            # Host-pinned collector-agent connections are reachable only via the
+            # asset↔agent link above — keep them out of the tenant-wide fallback
+            # so they never become another host's resolved connection.
+            IntegrationConnection.assigned_collector_agent_id.is_(None),
         )
         .order_by(IntegrationConnection.updated_at.desc().nullslast(),
                   IntegrationConnection.id.desc())
@@ -4029,6 +4069,11 @@ def _do_scan_all(
         _conn_asset_ip: dict = {}
         for (_pg, _ea, _aa, _cn) in _work_queue:
             if _cn is not None:
+                # Collector-agent connections execute remotely on the agent host
+                # (no backend SSH/creds) — preflighting one would always "fail"
+                # and wrongly drop every rule it carries. Leave them untouched.
+                if getattr(_cn, "assigned_collector_agent_id", None):
+                    continue
                 _conns_in_scan.setdefault(_cn.id, _cn)
                 if _ea is not None and getattr(_ea, "ip_address", None) and _cn.id not in _conn_asset_ip:
                     _conn_asset_ip[_cn.id] = _ea.ip_address

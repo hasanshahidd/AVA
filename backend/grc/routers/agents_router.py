@@ -283,6 +283,46 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
     return asset.id
 
 
+def _ensure_agent_connection(db: Session, agent: ComplianceAgent, asset: ITAsset, now: datetime) -> None:
+    """Give a Linux agent a host-pinned connection tagged with itself as the
+    collector, so a UI/scheduled CIS scan on the agent's asset is dispatched to
+    the agent (run_service.execute_plugin collector branch) rather than attempting
+    an agentless SSH reach we don't have for a NAT'd / firewalled endpoint.
+
+    Linux only: the agent runs `oscap` locally, so its connection uses the
+    oscap-eligible ``linux_ssh`` family and the scan's per-plugin filter accepts
+    it. Windows local CIS is not built yet, so Windows agents get inventory only.
+    The connection's console_url is the asset host, so it matches ONLY this asset
+    (connection_matcher) and never another host. Idempotent on the agent id."""
+    from grc.models import IntegrationConnection
+    if (agent.os_family or "").lower() not in ("linux", "unix"):
+        return
+    host = (asset.host_name or asset.ip_address or "").strip()
+    if not host:
+        return
+    existing = (db.query(IntegrationConnection)
+                .filter(IntegrationConnection.tenant_id == agent.tenant_id,
+                        IntegrationConnection.assigned_collector_agent_id == agent.id)
+                .first())
+    if existing is not None:
+        existing.console_url = host  # asset IP/name can drift; keep it current
+        existing.is_active = True
+        existing.status = "connected"
+        existing.updated_at = now
+        return
+    db.add(IntegrationConnection(
+        tenant_id=agent.tenant_id,
+        integration_type="linux_ssh",            # oscap-eligible transport family
+        category="collector",
+        connection_name=f"Agent · {agent.agent_name} (#{agent.id})"[:200],
+        console_url=host,
+        assigned_collector_agent_id=agent.id,
+        is_active=True,
+        status="connected",
+        created_at=now, updated_at=now,
+    ))
+
+
 @router.post("/report")
 def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=None),
                  db: Session = Depends(get_db)):
@@ -291,6 +331,9 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
     now = datetime.utcnow()
     asset_id = _upsert_asset_from_report(db, agent, body, now)
     agent.asset_id = asset_id
+    _asset = db.get(ITAsset, asset_id)
+    if _asset is not None:
+        _ensure_agent_connection(db, agent, _asset, now)
     agent.last_result_at = now
     agent.last_heartbeat_at = now
     agent.status = "active"
