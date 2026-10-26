@@ -348,13 +348,14 @@ def download_agent_binary(os_family: str):
     return FileResponse(path, media_type="application/octet-stream", filename=name)
 
 
-def _linux_installer(url: str, token: str) -> str:
+def _linux_installer(url: str, token: str, tenant: str) -> str:
     return f"""#!/bin/sh
 # Ava Compliance Agent installer (Linux). Downloads the agent, installs it as a
 # systemd service, enrolls, and sends the first inventory to the cloud.
 set -e
 AVA_URL="{url}"
 AVA_ENROLL="{token}"
+AVA_TENANT="{tenant}"
 [ "$(id -u)" -eq 0 ] || {{ echo "Run as root (sudo)"; exit 1; }}
 install -d /opt/ava-agent
 echo "Downloading agent..."
@@ -368,6 +369,7 @@ Wants=network-online.target
 [Service]
 Environment=AVA_URL=$AVA_URL
 Environment=AVA_ENROLL=$AVA_ENROLL
+Environment=AVA_TENANT=$AVA_TENANT
 ExecStart=/opt/ava-agent/ava-agent
 Restart=always
 RestartSec=10
@@ -380,20 +382,22 @@ echo "Ava agent installed and started. It will appear in your console shortly."
 """
 
 
-def _windows_installer(url: str, token: str) -> str:
+def _windows_installer(url: str, token: str, tenant: str) -> str:
     return f"""# Ava Compliance Agent installer (Windows). Run in an elevated PowerShell.
 $ErrorActionPreference = "Stop"
 $AvaUrl = "{url}"
 $AvaEnroll = "{token}"
+$AvaTenant = "{tenant}"
 $dir = "$env:ProgramData\\AvaAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/grc/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
 [Environment]::SetEnvironmentVariable('AVA_URL', $AvaUrl, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_ENROLL', $AvaEnroll, 'Machine')
+[Environment]::SetEnvironmentVariable('AVA_TENANT', $AvaTenant, 'Machine')
 # Run at startup as SYSTEM (a scheduled task; a full Windows service is a later hardening).
 schtasks /Create /TN "AvaAgent" /TR "`"$dir\\ava-agent.exe`"" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null
-$env:AVA_URL = $AvaUrl; $env:AVA_ENROLL = $AvaEnroll
+$env:AVA_URL = $AvaUrl; $env:AVA_ENROLL = $AvaEnroll; $env:AVA_TENANT = $AvaTenant
 Start-Process -FilePath "$dir\\ava-agent.exe" -WindowStyle Hidden
 Write-Host "Ava agent installed and started. It will appear in your console shortly."
 """
@@ -402,13 +406,16 @@ Write-Host "Ava agent installed and started. It will appear in your console shor
 @router.get("/installer/{os_family}/{enrollment_token}", response_class=PlainTextResponse)
 def download_installer(os_family: str, enrollment_token: str, request: Request):
     """Personalised one-shot installer script with the tenant's enrollment token
-    baked in. The token IS the auth (same model as the connect wizard), so this
-    is intentionally not user-session gated."""
+    AND tenant slug baked in (the agent sends the slug as X-Tenant-Slug so the
+    backend routes to the right per-tenant DB). The token IS the auth (same model
+    as the connect wizard), so this is intentionally not user-session gated — but
+    the tenant slug comes from the authenticated browser that downloads it."""
     url = _public_base(request)
+    tenant = getattr(request.state, "tenant_slug", None) or ""
     if os_family == "linux":
-        return _linux_installer(url, enrollment_token)
+        return _linux_installer(url, enrollment_token, tenant)
     if os_family == "windows":
-        return _windows_installer(url, enrollment_token)
+        return _windows_installer(url, enrollment_token, tenant)
     raise HTTPException(404, "Unknown OS")
 
 
@@ -426,10 +433,12 @@ if __name__ == "__main__":  # self-check — pure logic, no DB
     assert _effective_status(_A("active", now - timedelta(minutes=30)), now) == "stale"
     assert _effective_status(_A("active", now - timedelta(minutes=5)), now) == "active"
 
-    lin = _linux_installer("https://app.caiva.io", "enr_abc")
+    lin = _linux_installer("https://app.caiva.io", "enr_abc", "ava")
     assert 'AVA_URL="https://app.caiva.io"' in lin and 'AVA_ENROLL="enr_abc"' in lin
+    assert 'AVA_TENANT="ava"' in lin and "Environment=AVA_TENANT=$AVA_TENANT" in lin
     assert "/grc/agents/installer/linux/bin" in lin and "systemctl enable --now ava-agent" in lin
-    win = _windows_installer("https://app.caiva.io", "enr_xyz")
-    assert '$AvaEnroll = "enr_xyz"' in win and "ava-agent.exe" in win and "schtasks" in win
+    win = _windows_installer("https://app.caiva.io", "enr_xyz", "ava")
+    assert '$AvaEnroll = "enr_xyz"' in win and '$AvaTenant = "ava"' in win
+    assert "ava-agent.exe" in win and "schtasks" in win and "AVA_TENANT" in win
     assert _BIN["linux"] == "ava-agent-linux" and _BIN["windows"] == "ava-agent-windows.exe"
     print("agents_router self-check PASSED")

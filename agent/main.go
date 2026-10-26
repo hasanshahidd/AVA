@@ -78,6 +78,11 @@ func post(url, bearer string, payload any) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// Per-tenant DB routing: the backend resolves which tenant database to use
+	// from this header (baked into the installer from the console's tenant).
+	if t := os.Getenv("AVA_TENANT"); t != "" {
+		req.Header.Set("X-Tenant-Slug", t)
+	}
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
