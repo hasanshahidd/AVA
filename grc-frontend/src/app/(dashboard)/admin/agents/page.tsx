@@ -2,15 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Download, RefreshCw, CheckCircle2 } from 'lucide-react';
 import apiClient, { agentsApi } from '@/lib/api';
-import EmptyState from '@/components/common/EmptyState';
 import { useToast } from '@/components/ui/ToastProvider';
 import { usePermissions } from '@/hooks/usePermissions';
-import SetupWizard from './_setup-wizard';
 
 type Agent = {
   id: number;
@@ -66,49 +63,11 @@ export default function AgentsAdminPage() {
   const toast = useToast();
   const { hasPermission, isLoading: permsLoading } = usePermissions();
   const canManageAgents = hasPermission('compliance:agents:manage');
-  // Wizard launch state — the Setup Wizard handles both single + bulk + discovery
-  // handoff in one progressive flow, so the page only tracks open/closed +
-  // any prefilled hostnames coming from /admin/discover.
-  const [showWizard, setShowWizard] = useState(false);
-  const [wizardPrefill, setWizardPrefill] = useState<{
-    hostnames: string[];
-    mode?: 'collector' | 'endpoint';
-    osFamily?: string;
-  } | null>(null);
   // Custom revoke modal state — replaces browser prompt+confirm
   const [revokeTarget, setRevokeTarget] = useState<Agent | null>(null);
   const [revokeReason, setRevokeReason] = useState('');
 
-  // Pick up prefill from Discovery's "Send to Bulk Enroll" handoff: sessionStorage
-  // + ?bulkEnroll=1 query param. We forward both into the wizard so the user
-  // lands directly on the Configure step with hostnames already loaded.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('bulkEnroll') !== '1') return;
-    const raw = sessionStorage.getItem('ava.bulkEnroll.prefill');
-    if (!raw) return;
-    try {
-      const prefill = JSON.parse(raw) as { hostnames?: string[]; mode?: string; os_family?: string };
-      if (prefill.hostnames?.length) {
-        setWizardPrefill({
-          hostnames: prefill.hostnames,
-          mode: prefill.mode === 'collector' || prefill.mode === 'endpoint' ? prefill.mode : 'endpoint',
-          osFamily: prefill.os_family,
-        });
-        setShowWizard(true);
-      }
-    } catch {
-      // Swallow malformed prefill — user can still launch the wizard manually
-    } finally {
-      sessionStorage.removeItem('ava.bulkEnroll.prefill');
-      const url = new URL(window.location.href);
-      url.searchParams.delete('bulkEnroll');
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, []);
-
-  const q = useQuery<{ agents: Agent[] }>({
+  const q = useQuery<{ items: Agent[] }>({
     queryKey: ['agents'],
     queryFn: async () => (await agentsApi.list()).data,
     refetchInterval: 5000,
@@ -127,142 +86,89 @@ export default function AgentsAdminPage() {
     onError: () => toast.toast({ title: 'Revoke failed', type: 'error' }),
   });
 
-  const agents = q.data?.agents ?? [];
+  const agents = q.data?.items ?? [];
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="min-w-0 max-w-3xl">
-          <h1 className="text-2xl font-semibold text-slate-900">Compliance Agents</h1>
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold text-slate-900">Compliance Agents</h1>
+        <p className="mt-1 max-w-3xl text-sm text-slate-500">
+          Install a lightweight agent on a host — it enrols, inventories the machine, and runs
+          CIS benchmarks locally, then reports to CAIVA. Built for endpoints you can&apos;t reach
+          over the network: roaming laptops, NAT&apos;d or firewalled boxes. Pick an OS to download.
+        </p>
+      </div>
+
+      {!permsLoading && !canManageAgents && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          You need the <code className="rounded bg-amber-100 px-1">compliance:agents:manage</code> permission to install or revoke agents.
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Link
-            href="/admin/integrations/connect"
-            title={!canManageAgents && !permsLoading
-              ? "You don't have permission to open the Connect Wizard"
-              : 'Open the agentless Connect Wizard (Windows / Linux / Cloud)'}
-            aria-disabled={!canManageAgents}
-            onClick={(e) => {
-              if (!canManageAgents) {
-                e.preventDefault();
-                toast.toast({
-                  title: 'Permission required',
-                  message: 'Only Scanning Admins / Administrators can open the Connect Wizard. Ask your tenant admin for "compliance:agents:manage".',
-                  type: 'warning',
-                });
-              }
-            }}
-            className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap border ${
-              canManageAgents
-                ? 'border-primary-200 bg-white text-primary-700 hover:bg-primary-50'
-                : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
-            }`}
+      )}
+
+      {/* Agent installers — one self-contained binary per OS. It enrols,
+          inventories the host, and runs CIS benchmarks locally, then reports
+          to CAIVA. One file works on any host of the same OS family. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {([
+          { os: 'windows' as const, glyph: '🪟', title: 'Windows agent',
+            meta: 'x64 · runs as LocalSystem',
+            support: 'Windows 10 / 11 · Server 2016 – 2022' },
+          { os: 'linux' as const, glyph: '🐧', title: 'Linux agent',
+            meta: 'x64 · systemd service',
+            support: 'Ubuntu 20/22/24 · Debian 11/12 · RHEL/Alma 8/9 · Amazon Linux' },
+        ]).map((c) => (
+          <div
+            key={c.os}
+            className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-primary-300 hover:shadow"
           >
-            {canManageAgents ? '🔌 Open Connect Wizard →' : '🔒 Open Connect Wizard'}
-          </Link>
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-50 text-2xl">{c.glyph}</div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-900">{c.title}</div>
+                <div className="text-[11px] text-slate-500">{c.meta}</div>
+              </div>
+            </div>
+            <ul className="mt-4 space-y-1.5 text-xs text-slate-600">
+              {[
+                'Full hardware + software inventory',
+                'Runs CIS benchmarks locally — no inbound firewall rule',
+                'Auto-enrols, heartbeats, re-scans on schedule',
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-1.5">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto pt-4">
+              <InstallerButtons
+                os={c.os}
+                label={`Download ${c.title.split(' ')[0]} installer`}
+                canManage={canManageAgents}
+                toast={toast}
+              />
+              <p className="mt-2 text-center text-[10px] text-slate-400">{c.support}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Installed agents */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Installed agents
+            {agents.length > 0 && (
+              <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{agents.length}</span>
+            )}
+          </h2>
           <button
-            onClick={() => {
-              if (!canManageAgents) {
-                toast.toast({
-                  title: 'Permission required',
-                  message: 'Only Scanning Admins / Administrators can enroll agents. Ask your tenant admin for "compliance:agents:manage".',
-                  type: 'warning',
-                });
-                return;
-              }
-              setWizardPrefill(null);
-              setShowWizard(true);
-            }}
-            disabled={permsLoading}
-            title={!canManageAgents && !permsLoading ? "You don't have permission to install agents" : 'Start the guided agent setup'}
-            className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap disabled:opacity-50 ${
-              canManageAgents ? 'bg-primary-600 text-[#0a0a0a] hover:bg-primary-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-            }`}
+            onClick={() => q.refetch()}
+            className="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-primary-700"
           >
-            {canManageAgents ? '🪄 Setup Wizard' : '🔒 Setup Wizard'}
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </button>
         </div>
-      </div>
-
-      <SetupWizard
-        open={showWizard}
-        onClose={() => { setShowWizard(false); setWizardPrefill(null); }}
-        discoveryPrefill={wizardPrefill}
-      />
-
-      {/* ─── ENDPOINT AGENT PACKAGES ─────────────────────────────────────
-          Surfaces the per-OS installer endpoints from the CIS Phase 3
-          backend merge. The Setup Wizard above still handles the
-          enrollment-token generation flow; these cards give operators
-          the installer binary directly when they already have their own
-          fleet-management tool (GPO / Intune / Ansible / Jamf). Cisco /
-          AWS / Oracle DB etc don't get a native agent — they use the
-          Agentless Connect Wizard surfaced below. */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-        <div className="px-5 py-3 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-900">Endpoint agent packages</h2>
-        </div>
-        <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          <div className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">🪟</span>
-              <span className="font-semibold text-sm text-slate-900">Windows</span>
-              <span
-                className="ml-auto text-[10px] text-slate-500"
-                title="PowerShell installer fetches the agent binary and runs it at startup as SYSTEM. Signed MSI service is on the roadmap."
-              >
-                x64 · service
-              </span>
-            </div>
-            <div className="text-xs text-slate-600 mb-3">
-              Win 10 / 11 + Server 2016/19/22. Runs as
-              <code className="bg-slate-100 px-1 rounded mx-0.5">LocalSystem</code>.
-            </div>
-            <InstallerButtons
-              endpoint="installer.cmd"
-              label="Download Windows installer"
-              hint="One file. Runs on any Windows host. Will refuse to enrol on Linux/Mac."
-              toast={toast}
-            />
-            <Link href="/admin/integrations/connect?platform=windows" className="mt-1.5 block text-center text-[10px] text-slate-500 hover:text-primary-700 hover:underline">
-              or connect agentless (WinRM)
-            </Link>
-          </div>
-
-          <div className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">🐧</span>
-              <span className="font-semibold text-sm text-slate-900">Linux</span>
-              <span
-                className="ml-auto text-[10px] text-slate-500"
-                title="Shell installer fetches the agent binary and installs it as a systemd service. Native .deb + .rpm packages are on the roadmap."
-              >
-                x64 · systemd
-              </span>
-            </div>
-            <div className="text-xs text-slate-600 mb-3">
-              Ubuntu 20/22/24 · Debian 11/12 · RHEL 8/9 · AlmaLinux · Amazon Linux. Installs as
-              <code className="bg-slate-100 px-1 rounded mx-0.5">systemd</code> service.
-            </div>
-            <InstallerButtons
-              endpoint="installer.sh"
-              label="Download Linux installer"
-              hint="One file. Runs on any Linux host. Will refuse to enrol on Windows/Mac."
-              toast={toast}
-            />
-            <Link href="/admin/integrations/connect?platform=linux" className="mt-1.5 block text-center text-[10px] text-slate-500 hover:text-primary-700 hover:underline">
-              or connect agentless (SSH)
-            </Link>
-          </div>
-
-        </div>
-      </div>
-
-      {/* ─── AGENTLESS TARGETS ─────────────────────────────────────────── */}
-      <AgentlessTargetsSection />
-
-      {/* Agents table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
@@ -280,14 +186,15 @@ export default function AgentsAdminPage() {
             <tbody className="divide-y divide-slate-100">
               {agents.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-2">
-                    <EmptyState
-                      icon="🤖"
-                      title="No agents installed yet"
-                      description="Install a collector agent to push CIS scan results back to CAIVA — useful when WinRM/SSH inbound is blocked or for endpoints behind NAT."
-                      primaryAction={{ label: '🪄 Setup Wizard', onClick: () => { setWizardPrefill(null); setShowWizard(true); } }}
-                      secondaryAction={{ label: 'Use Agentless instead', href: '/admin/discover' }}
-                    />
+                  <td colSpan={8} className="px-4 py-12 text-center">
+                    <div className="mx-auto max-w-sm">
+                      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-2xl">🤖</div>
+                      <div className="text-sm font-medium text-slate-900">No agents installed yet</div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Download an installer above and run it on a host. It appears here within a
+                        minute of enrolling, then inventories and scans on schedule.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -389,16 +296,23 @@ export default function AgentsAdminPage() {
 // (/agents/installer.cmd | .sh | .command). Revocable any time via the
 // Agents table below.
 function InstallerButtons({
-  endpoint, label, hint, toast,
+  os, label, canManage, toast,
 }: {
-  endpoint: 'installer.cmd' | 'installer.sh' | 'installer.command';
+  os: 'windows' | 'linux';
   label: string;
-  hint: string;
+  canManage: boolean;
   toast: ReturnType<typeof useToast>;
 }) {
   const [busy, setBusy] = useState(false);
-  const os: 'windows' | 'linux' = endpoint === 'installer.cmd' ? 'windows' : 'linux';
   const download = async () => {
+    if (!canManage) {
+      toast.toast({
+        title: 'Permission required',
+        message: 'You need the "compliance:agents:manage" permission to download an installer.',
+        type: 'warning',
+      });
+      return;
+    }
     setBusy(true);
     try {
       // Mint a one-time enrollment token, then fetch the personalised installer
@@ -430,41 +344,14 @@ function InstallerButtons({
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={download}
-        disabled={busy}
-        className="block w-full text-center px-3 py-2 bg-primary-600 text-white text-xs font-medium rounded-md hover:bg-primary-700 disabled:opacity-50"
-      >
-        {busy ? 'Preparing…' : `📥 ${label}`}
-      </button>
-      <div className="mt-1 text-center text-[10px] text-slate-500">{hint}</div>
-    </>
-  );
-}
-
-// ─── AgentlessTargetsSection ─────────────────────────────────────────────
-// Single CTA card pointing operators to the Connect Wizard for non-agent
-// device classes (Cisco / AWS / Azure / DBs / AD / K8s). The package's
-// earlier version rendered a 12-tile grid; current shape is a single CTA
-// because the grouped tile UI already lives at /admin/integrations/connect
-// (one source of truth, not two pages of the same logic).
-function AgentlessTargetsSection() {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">Agentless targets</h2>
-      </div>
-      <div className="flex items-center justify-end gap-3 p-5">
-        <Link
-          href="/admin/integrations/connect"
-          className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-3.5 py-2 text-xs font-medium text-primary-700 hover:bg-primary-100"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Open Connect Wizard
-        </Link>
-      </div>
-    </section>
+    <button
+      type="button"
+      onClick={download}
+      disabled={busy}
+      className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+    >
+      <Download className="h-3.5 w-3.5" />
+      {busy ? 'Preparing…' : label}
+    </button>
   );
 }
