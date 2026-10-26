@@ -92,9 +92,6 @@ export default function ConnectorsAdminPage() {
             Wire ServiceNow, Splunk, MS Teams and more. Credentials are encrypted at rest;
             OAuth2 connectors authorise per-tenant through their vendor's consent screen.
           </p>
-          <a href="/connectors" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
-            Browse the full integration catalogue (Cloud, Identity, Endpoint, HR…) <ExternalLink className="h-3 w-3" />
-          </a>
         </div>
         {catalog && !catalog.encryption_enabled && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
