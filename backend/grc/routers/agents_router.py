@@ -394,6 +394,25 @@ def agent_jobs_results(body: CisResultsIn,
     return {"ok": True, "applied": applied, "skipped": skipped}
 
 
+# SCAP content roots the agent may fetch a datastream from. Serving the server's
+# OWN datastream to the agent means it runs oscap against the exact same content
+# the cloud uses, so rule IDs align perfectly and the host needs only the oscap
+# binary (no local SCAP content to install or keep in sync).
+_SCAP_DIRS = ("/opt/ssg", "/usr/share/xml/scap")
+
+
+@router.get("/datastream")
+def download_datastream(p: str, authorization: Optional[str] = Header(default=None),
+                        db: Session = Depends(get_db)):
+    """Stream a SCAP datastream to an enrolled agent. Whitelisted to the SCAP
+    content dirs and realpath-checked, so `p` can't traverse out."""
+    _agent_by_api_token(db, authorization)  # token-gated
+    real = os.path.realpath(p)
+    if not any(real.startswith(d + os.sep) for d in _SCAP_DIRS) or not os.path.isfile(real):
+        raise HTTPException(404, "datastream not available")
+    return FileResponse(real, media_type="application/xml", filename=os.path.basename(real))
+
+
 # ── Installer download (the "Download agent" buttons) ───────────────────────
 # Compiled binaries live outside git (built on the droplet), served from here.
 AGENT_DIST = os.environ.get("AVA_AGENT_DIST", "/root/AVA/agent-dist")
@@ -438,15 +457,17 @@ install -d /opt/ava-agent
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/grc/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
-# Compliance engine for the CIS scan (best-effort — inventory works without it).
+# OpenSCAP binary for the CIS scan (the datastream content is fetched from the
+# server per job, so only the oscap engine is needed here). Best-effort —
+# inventory still works without it.
 echo "Installing the compliance scanner (OpenSCAP)..."
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -qq >/dev/null 2>&1 || true
-  apt-get install -y openscap-scanner ssg-debderived >/dev/null 2>&1 || apt-get install -y libopenscap8 >/dev/null 2>&1 || true
+  apt-get install -y openscap-scanner >/dev/null 2>&1 || apt-get install -y libopenscap8 >/dev/null 2>&1 || true
 elif command -v dnf >/dev/null 2>&1; then
-  dnf install -y openscap-scanner scap-security-guide >/dev/null 2>&1 || true
+  dnf install -y openscap-scanner >/dev/null 2>&1 || true
 elif command -v yum >/dev/null 2>&1; then
-  yum install -y openscap-scanner scap-security-guide >/dev/null 2>&1 || true
+  yum install -y openscap-scanner >/dev/null 2>&1 || true
 fi
 cat > /etc/systemd/system/ava-agent.service <<UNIT
 [Unit]

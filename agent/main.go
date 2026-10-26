@@ -27,6 +27,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,7 +71,7 @@ func saveState(s state) error {
 	return os.WriteFile(p, b, 0o600)
 }
 
-var httpc = &http.Client{Timeout: 30 * time.Second}
+var httpc = &http.Client{Timeout: 180 * time.Second} // generous for multi-MB datastream downloads
 
 func post(url, bearer string, payload any) ([]byte, int, error) {
 	body, _ := json.Marshal(payload)
@@ -345,18 +346,57 @@ func mapOscap(r string) string {
 	}
 }
 
-// runOscap runs one `oscap xccdf eval` for a (datastream, profile) and returns
-// {rule-idref: xccdf-result}. oscap exits non-zero when any rule fails — that's
-// normal, so the exit code is ignored; only the results XML matters.
-func runOscap(datastream, profile string) map[string]string {
+// fetchDatastream downloads the server's SCAP datastream to a temp file so the
+// agent runs oscap against the exact same content the cloud uses (rule IDs
+// align). Streams straight to disk — datastreams are multi-MB.
+func fetchDatastream(apiToken, dsPath string) (string, bool) {
+	req, err := http.NewRequest("GET", base()+"/grc/agents/datastream?p="+url.QueryEscape(dsPath), nil)
+	if err != nil {
+		return "", false
+	}
+	if t := os.Getenv("AVA_TENANT"); t != "" {
+		req.Header.Set("X-Tenant-Slug", t)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+	resp, err := httpc.Do(req)
+	if err != nil {
+		return "", false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", false
+	}
+	tmp, err := os.CreateTemp("", "ds-*.xml")
+	if err != nil {
+		return "", false
+	}
+	n, err := io.Copy(tmp, io.LimitReader(resp.Body, 128<<20))
+	tmp.Close()
+	if err != nil || n < 1000 {
+		os.Remove(tmp.Name())
+		return "", false
+	}
+	return tmp.Name(), true
+}
+
+// runOscap fetches the (server-side) datastream, runs one `oscap xccdf eval` for
+// a (datastream, profile), and returns {rule-idref: xccdf-result}. oscap exits
+// non-zero when any rule fails — normal, so the exit code is ignored; only the
+// results XML matters.
+func runOscap(apiToken, datastream, profile string) map[string]string {
 	out := map[string]string{}
+	localDS, ok := fetchDatastream(apiToken, datastream)
+	if !ok {
+		return out // no content → caller marks these rules "error"
+	}
+	defer os.Remove(localDS)
 	tmp, err := os.CreateTemp("", "oscap-*.xml")
 	if err != nil {
 		return out
 	}
 	tmp.Close()
 	defer os.Remove(tmp.Name())
-	args := []string{"xccdf", "eval", "--profile", profile, "--results", tmp.Name(), datastream}
+	args := []string{"xccdf", "eval", "--profile", profile, "--results", tmp.Name(), localDS}
 	_ = exec.Command("oscap", args...).Run()
 	data, err := os.ReadFile(tmp.Name())
 	if err != nil || len(data) == 0 {
@@ -411,7 +451,7 @@ func cisRun(apiToken string) {
 	}
 	var results []cisResult
 	for k, jobs := range groups {
-		verdicts := runOscap(k.ds, k.prof)
+		verdicts := runOscap(apiToken, k.ds, k.prof)
 		for _, j := range jobs {
 			v, ok := verdicts[j.Oscap.RuleID]
 			st := mapOscap(v)
