@@ -126,7 +126,8 @@ def list_agents(current_user: GRCUser = Depends(require_auth), db: Session = Dep
 
 
 @router.post("")
-def enroll_agent(body: EnrollIn, current_user: GRCUser = Depends(require_auth),
+def enroll_agent(body: EnrollIn, request: Request,
+                 current_user: GRCUser = Depends(require_auth),
                  db: Session = Depends(get_db)):
     if not body.agent_name.strip():
         raise HTTPException(422, "agent_name is required")
@@ -135,8 +136,10 @@ def enroll_agent(body: EnrollIn, current_user: GRCUser = Depends(require_auth),
                             mode=body.mode or "collector", os_family=body.os_family,
                             asset_id=body.asset_id, user_id=current_user.id)
     db.commit(); db.refresh(agent)
+    slug = getattr(request.state, "tenant_slug", None) or ""
     return {"id": agent.id, "agent_name": agent.agent_name, "status": agent.status,
             "enrollment_token": enr, "expires_in": int(ENROLLMENT_TTL.total_seconds()),
+            "tenant_slug": slug, "commands": _install_commands(request, enr, slug),
             "install": _install_hint(enr, body.os_family)}
 
 
@@ -478,6 +481,23 @@ def _public_base(request: Request) -> str:
     host = (request.headers.get("x-forwarded-host") or request.headers.get("host")
             or request.url.netloc).split(",")[0].strip()
     return f"{proto}://{host}"
+
+
+def _install_commands(request: Request, token: str, tenant: str) -> Dict[str, str]:
+    """One-line install commands the console shows for a fresh enrollment token —
+    run in an elevated terminal on the target host. This is the primary install
+    path (no downloaded .ps1/.sh to "open with…"): the one-liner fetches the
+    personalised installer and executes it. ``?tenant_slug`` is carried so the
+    tenant is baked even though the fetch has no browser session (TenantMiddleware
+    resolves it from the query param)."""
+    base = _public_base(request)
+    q = f"?tenant_slug={tenant}" if tenant else ""
+    return {
+        # Elevated PowerShell. iwr → iex runs the installer in the current session.
+        "windows": f'iwr "{base}/grc/agents/installer/windows/{token}{q}" -UseBasicParsing | iex',
+        "linux": f'curl -fsSL "{base}/grc/agents/installer/linux/{token}{q}" | sudo sh',
+        "macos": f'curl -fsSL "{base}/grc/agents/installer/macos/{token}{q}" | sudo sh',
+    }
 
 
 @router.get("/installer/{os_family}/bin")

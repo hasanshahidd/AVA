@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, RefreshCw, CheckCircle2 } from 'lucide-react';
-import apiClient, { agentsApi } from '@/lib/api';
+import { Download, RefreshCw, CheckCircle2, Copy } from 'lucide-react';
+import { agentsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -143,9 +143,8 @@ export default function AgentsAdminPage() {
               ))}
             </ul>
             <div className="mt-auto pt-4">
-              <InstallerButtons
+              <InstallAgent
                 os={c.os}
-                label={`Download ${c.title.split(' ')[0]} installer`}
                 canManage={canManageAgents}
                 toast={toast}
               />
@@ -290,73 +289,100 @@ export default function AgentsAdminPage() {
   );
 }
 
-// ─── InstallerButtons ────────────────────────────────────────────────────
-// Mints a fleet enrollment token (unlimited uses, 72h TTL) and streams the
-// per-OS installer file as a download. One file works on any host of the
-// SAME OS family — the installer + agent both refuse to enrol on a
-// mismatched OS. Powered by the CIS Phase 3 backend endpoints
-// (/agents/installer.cmd | .sh | .command). Revocable any time via the
-// Agents table below.
-function InstallerButtons({
-  os, label, canManage, toast,
+// ─── InstallAgent ─────────────────────────────────────────────────────────
+// Mints a one-time enrollment token and shows a COPY-PASTE install command the
+// operator runs in an elevated terminal on the target host — the way real
+// endpoint agents (Datadog/Wazuh/CrowdStrike) install. This avoids the dead-end
+// of downloading a .ps1/.sh that the OS then asks "which app should open this?".
+// The backend bakes the tenant (?tenant_slug) into the command so it works even
+// though the target host has no browser session.
+function InstallAgent({
+  os, canManage, toast,
 }: {
   os: 'windows' | 'linux' | 'macos';
-  label: string;
   canManage: boolean;
   toast: ReturnType<typeof useToast>;
 }) {
   const [busy, setBusy] = useState(false);
-  const download = async () => {
+  const [cmd, setCmd] = useState<string | null>(null);
+  const runner = os === 'windows' ? 'an elevated PowerShell' : 'a terminal as root (sudo)';
+
+  const copyText = async (text: string, note: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.toast({ title: 'Copied', message: note, type: 'success' });
+    } catch {
+      toast.toast({ title: 'Command ready', message: 'Select the command and copy it.', type: 'info' });
+    }
+  };
+
+  const generate = async () => {
     if (!canManage) {
       toast.toast({
         title: 'Permission required',
-        message: 'You need the "compliance:agents:manage" permission to download an installer.',
+        message: 'You need the "compliance:agents:manage" permission to install an agent.',
         type: 'warning',
       });
       return;
     }
     setBusy(true);
     try {
-      // Mint a one-time enrollment token, then fetch the personalised installer
-      // (enrollment token + cloud URL baked in) and save it as a file. Running it
-      // installs the agent as a service → it enrols, scans this host, and reports.
+      // Mint a one-time token; the backend returns the full install command with
+      // the cloud URL + tenant + token baked in (one command per OS family).
       const enr = await agentsApi.enroll({ agent_name: `${os} agent`, os_family: os });
-      const token = (enr.data as { enrollment_token: string }).enrollment_token;
-      const resp = await apiClient.get(`/agents/installer/${os}/${token}`, { responseType: 'blob' });
-      const filename = os === 'windows'
-        ? 'install-ava-agent.ps1'
-        : os === 'macos' ? 'install-ava-agent.command' : 'install-ava-agent.sh';
-      const runAs = os === 'windows' ? 'Administrator' : 'root (sudo)';
-      const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/octet-stream' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.toast({
-        title: 'Installer downloaded',
-        message: `Run ${filename} as ${runAs} on the target host — it enrols, inventories, and reports automatically.`,
-        type: 'success',
-      });
+      const data = enr.data as { commands?: Record<string, string> };
+      const command = data.commands?.[os];
+      if (!command) throw new Error('No install command returned by the server');
+      setCmd(command);
+      await copyText(command, `Paste into ${runner} on the target host.`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      toast.toast({ title: 'Download failed', message: msg, type: 'error' });
+      toast.toast({ title: 'Could not prepare installer', message: msg, type: 'error' });
     } finally {
       setBusy(false);
     }
   };
 
+  if (!cmd) {
+    return (
+      <button
+        type="button"
+        onClick={generate}
+        disabled={busy}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+      >
+        <Download className="h-3.5 w-3.5" />
+        {busy ? 'Preparing…' : 'Get install command'}
+      </button>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      onClick={download}
-      disabled={busy}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
-    >
-      <Download className="h-3.5 w-3.5" />
-      {busy ? 'Preparing…' : label}
-    </button>
+    <div className="space-y-1.5">
+      <div className="flex items-stretch gap-1.5">
+        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-2 font-mono text-[10px] leading-5 text-slate-100">
+          {cmd}
+        </code>
+        <button
+          type="button"
+          onClick={() => copyText(cmd, `Paste into ${runner} on the target host.`)}
+          title="Copy command"
+          className="shrink-0 rounded-md border border-slate-300 px-2 text-slate-600 transition hover:bg-slate-50"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <p className="text-[10px] text-slate-500">
+        Run in {runner} on the target host. One-time token, expires in 24h.
+      </p>
+      <button
+        type="button"
+        onClick={generate}
+        disabled={busy}
+        className="text-[10px] text-slate-400 underline-offset-2 hover:text-primary-700 hover:underline disabled:opacity-50"
+      >
+        {busy ? 'Regenerating…' : 'Generate a new command'}
+      </button>
+    </div>
   );
 }
