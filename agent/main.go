@@ -22,6 +22,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net"
@@ -80,6 +81,26 @@ func post(url, bearer string, payload any) ([]byte, int, error) {
 	req.Header.Set("Content-Type", "application/json")
 	// Per-tenant DB routing: the backend resolves which tenant database to use
 	// from this header (baked into the installer from the console's tenant).
+	if t := os.Getenv("AVA_TENANT"); t != "" {
+		req.Header.Set("X-Tenant-Slug", t)
+	}
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	resp, err := httpc.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return rb, resp.StatusCode, nil
+}
+
+func get(url, bearer string) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
 	if t := os.Getenv("AVA_TENANT"); t != "" {
 		req.Header.Set("X-Tenant-Slug", t)
 	}
@@ -290,6 +311,128 @@ func heartbeat(apiToken string) {
 	_, _, _ = post(base()+"/grc/agents/heartbeat", apiToken, map[string]any{})
 }
 
+// ─────────────────────────── CIS / compliance (local) ───────────────────────
+type cisOscap struct {
+	RuleID     string `json:"rule_id"`
+	Datastream string `json:"datastream"`
+	Profile    string `json:"profile"`
+}
+type cisJob struct {
+	RunID      int       `json:"run_id"`
+	RuleID     string    `json:"rule_id"`
+	RunnerType string    `json:"runner_type"`
+	Oscap      *cisOscap `json:"oscap"`
+}
+type cisResult struct {
+	RunID     int            `json:"run_id"`
+	Status    string         `json:"status"`
+	Summary   string         `json:"summary"`
+	RawOutput map[string]any `json:"raw_output,omitempty"`
+}
+
+// mapOscap mirrors oscap_runner._STATUS_MAP exactly so agent verdicts score
+// identically to the agentless path.
+func mapOscap(r string) string {
+	switch r {
+	case "pass", "fixed":
+		return "passed"
+	case "fail":
+		return "failed"
+	case "notapplicable", "notchecked", "notselected", "informational":
+		return "skipped"
+	default: // error, unknown, notreported, ""
+		return "error"
+	}
+}
+
+// runOscap runs one `oscap xccdf eval` for a (datastream, profile) and returns
+// {rule-idref: xccdf-result}. oscap exits non-zero when any rule fails — that's
+// normal, so the exit code is ignored; only the results XML matters.
+func runOscap(datastream, profile string) map[string]string {
+	out := map[string]string{}
+	tmp, err := os.CreateTemp("", "oscap-*.xml")
+	if err != nil {
+		return out
+	}
+	tmp.Close()
+	defer os.Remove(tmp.Name())
+	args := []string{"xccdf", "eval", "--profile", profile, "--results", tmp.Name(), datastream}
+	_ = exec.Command("oscap", args...).Run()
+	data, err := os.ReadFile(tmp.Name())
+	if err != nil || len(data) == 0 {
+		return out
+	}
+	type ruleResult struct {
+		Idref  string `xml:"idref,attr"`
+		Result string `xml:"result"`
+	}
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		if se, ok := tok.(xml.StartElement); ok && se.Name.Local == "rule-result" {
+			var rr ruleResult
+			if dec.DecodeElement(&rr, &se) == nil && rr.Idref != "" {
+				out[rr.Idref] = strings.TrimSpace(rr.Result)
+			}
+		}
+	}
+	return out
+}
+
+// cisRun pulls this agent's pending CIS rules, runs the benchmark locally with
+// oscap, and posts verdicts back. Linux only for now (Windows CIS is WinRM-based).
+func cisRun(apiToken string) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	rb, code, err := get(base()+"/grc/agents/jobs", apiToken)
+	if err != nil || code != 200 {
+		return
+	}
+	var jr struct {
+		Jobs []cisJob `json:"jobs"`
+	}
+	if json.Unmarshal(rb, &jr) != nil || len(jr.Jobs) == 0 {
+		return
+	}
+	// Group by (datastream, profile): oscap evaluates the whole profile once and
+	// returns every rule's verdict, so we never run it per-rule.
+	type key struct{ ds, prof string }
+	groups := map[key][]cisJob{}
+	for _, j := range jr.Jobs {
+		if j.Oscap == nil || j.Oscap.Datastream == "" {
+			continue
+		}
+		k := key{j.Oscap.Datastream, j.Oscap.Profile}
+		groups[k] = append(groups[k], j)
+	}
+	var results []cisResult
+	for k, jobs := range groups {
+		verdicts := runOscap(k.ds, k.prof)
+		for _, j := range jobs {
+			v, ok := verdicts[j.Oscap.RuleID]
+			st := mapOscap(v)
+			if !ok {
+				st, v = "error", "rule not present in oscap results"
+			}
+			results = append(results, cisResult{
+				RunID: j.RunID, Status: st, Summary: "oscap: " + v,
+				RawOutput: map[string]any{"engine": "agent-oscap", "rule_id": j.Oscap.RuleID,
+					"xccdf_result": v, "profile": k.prof},
+			})
+		}
+	}
+	if len(results) > 0 {
+		if _, c, _ := post(base()+"/grc/agents/jobs/results", apiToken,
+			map[string]any{"results": results}); c == 200 {
+			fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
+		}
+	}
+}
+
 func main() {
 	if base() == "" {
 		fmt.Fprintln(os.Stderr, "AVA_URL is required")
@@ -313,15 +456,18 @@ func main() {
 	} else {
 		fmt.Println("reported inventory OK")
 	}
+	cisRun(st.APIToken) // run any pending CIS rules now
 	if os.Getenv("AVA_ONCE") == "1" {
 		return
 	}
-	// Service loop: heartbeat every 5 min, full re-report hourly.
+	// Service loop: heartbeat + pick up pending CIS jobs every 5 min, full
+	// inventory re-report hourly.
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	elapsed := 0
 	for range ticker.C {
 		heartbeat(st.APIToken)
+		cisRun(st.APIToken)
 		elapsed += 5
 		if elapsed >= 60 {
 			elapsed = 0

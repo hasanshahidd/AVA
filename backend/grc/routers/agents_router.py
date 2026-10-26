@@ -317,6 +317,83 @@ def agent_heartbeat(authorization: Optional[str] = Header(default=None),
     return {"ok": True, "scan_now": bool(agent.pending_scan_at)}
 
 
+# ── Agent CIS jobs (local compliance execution) ─────────────────────────────
+class CisResultIn(BaseModel):
+    run_id: int
+    status: str                       # passed | failed | error | skipped
+    summary: Optional[str] = ""
+    raw_output: Optional[Dict[str, Any]] = None
+
+
+class CisResultsIn(BaseModel):
+    results: List[CisResultIn]
+
+
+@router.get("/jobs")
+def agent_jobs(authorization: Optional[str] = Header(default=None),
+               db: Session = Depends(get_db)):
+    """Pending CIS rules this agent must run locally. Each carries the oscap
+    datastream+profile+rule_id so the agent runs `oscap xccdf eval` itself and
+    posts verdicts to /agents/jobs/results. These rows were created as 'pending'
+    by the agentless executor's collector branch (run_service.execute_plugin)."""
+    from grc.models import CompliancePlugin, CompliancePluginRun
+    agent = _agent_by_api_token(db, authorization)
+    rows = (db.query(CompliancePluginRun, CompliancePlugin)
+            .join(CompliancePlugin, CompliancePlugin.id == CompliancePluginRun.plugin_id)
+            .filter(CompliancePluginRun.executed_by_agent_id == agent.id,
+                    CompliancePluginRun.status == "pending").all())
+    jobs = []
+    for run, plugin in rows:
+        cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
+        jobs.append({
+            "run_id": run.id, "plugin_id": plugin.id,
+            "rule_id": plugin.rule_id, "plugin_key": plugin.plugin_key,
+            "benchmark": plugin.benchmark, "runner_type": plugin.runner_type,
+            "oscap": cd.get("oscap"),  # {rule_id, datastream, profile} for linux oscap rules
+        })
+    if agent.pending_scan_at is not None:  # work pulled — clear the nudge
+        agent.pending_scan_at = None
+        db.commit()
+    return {"jobs": jobs, "count": len(jobs)}
+
+
+@router.post("/jobs/results")
+def agent_jobs_results(body: CisResultsIn,
+                       authorization: Optional[str] = Header(default=None),
+                       db: Session = Depends(get_db)):
+    """Accept locally-produced CIS verdicts and finalize the pending run rows
+    through the SAME path agentless uses — identical scoring, cascades and
+    audit (run_service._finalize_run)."""
+    from grc.models import CompliancePlugin, CompliancePluginRun
+    from grc.modules.compliance_plugins.runners.registry import RunnerResult
+    from grc.modules.compliance_plugins.services.run_service import _finalize_run
+    agent = _agent_by_api_token(db, authorization)
+    applied, skipped = 0, 0
+    for r in body.results:
+        run = db.get(CompliancePluginRun, r.run_id)
+        if (run is None or run.executed_by_agent_id != agent.id
+                or run.tenant_id != agent.tenant_id or run.status != "pending"):
+            skipped += 1
+            continue
+        plugin = db.get(CompliancePlugin, run.plugin_id)
+        if plugin is None:
+            skipped += 1
+            continue
+        status = r.status if r.status in ("passed", "failed", "error", "skipped") else "error"
+        result = RunnerResult(
+            status=status, summary=(r.summary or "")[:4000],
+            raw_output=r.raw_output or {},
+            error_message=(r.summary or "")[:500] if status == "error" else None)
+        _finalize_run(db, run, result, plugin=plugin, tenant_id=agent.tenant_id,
+                      user_id=None, triggered_by="agent")
+        applied += 1
+    now = datetime.utcnow()
+    agent.last_result_at = now
+    agent.last_heartbeat_at = now
+    db.commit()
+    return {"ok": True, "applied": applied, "skipped": skipped}
+
+
 # ── Installer download (the "Download agent" buttons) ───────────────────────
 # Compiled binaries live outside git (built on the droplet), served from here.
 AGENT_DIST = os.environ.get("AVA_AGENT_DIST", "/root/AVA/agent-dist")
@@ -361,6 +438,16 @@ install -d /opt/ava-agent
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/grc/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
+# Compliance engine for the CIS scan (best-effort — inventory works without it).
+echo "Installing the compliance scanner (OpenSCAP)..."
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -qq >/dev/null 2>&1 || true
+  apt-get install -y openscap-scanner ssg-debderived >/dev/null 2>&1 || apt-get install -y libopenscap8 >/dev/null 2>&1 || true
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y openscap-scanner scap-security-guide >/dev/null 2>&1 || true
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y openscap-scanner scap-security-guide >/dev/null 2>&1 || true
+fi
 cat > /etc/systemd/system/ava-agent.service <<UNIT
 [Unit]
 Description=Ava Compliance Agent

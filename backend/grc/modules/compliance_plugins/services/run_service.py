@@ -152,6 +152,112 @@ def _cascade_to_controls(
     return touched
 
 
+def _strip_nul(v):
+    """Postgres TEXT columns reject NUL bytes (0x00). `secedit /export` emits
+    UTF-16 with embedded NULs; strip before persisting."""
+    if isinstance(v, str):
+        return v.replace("\x00", "")
+    if isinstance(v, dict):
+        return {k: _strip_nul(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_strip_nul(x) for x in v]
+    return v
+
+
+def _finalize_run(
+    db: Session,
+    run: CompliancePluginRun,
+    result: RunnerResult,
+    *,
+    plugin: CompliancePlugin,
+    tenant_id: int,
+    user_id: Optional[int],
+    triggered_by: str,
+) -> CompliancePluginRun:
+    """Persist a RunnerResult onto a (running or pending) run row, then cascade
+    to framework controls, the legacy selection table and the audit log.
+
+    Shared by the agentless executor (execute_plugin) AND the agent CIS results
+    endpoint, so a collector/agent-produced result is BYTE-IDENTICAL to a
+    locally-executed one — same row fields, same cascades, same scoring inputs.
+    """
+    completed = datetime.utcnow()
+    started = run.started_at or completed
+    duration_ms = int((completed - started).total_seconds() * 1000)
+    raw = _strip_nul(result.raw_output or {})
+    safe_summary = _strip_nul(result.summary) if result.summary else None
+    safe_error = _strip_nul(result.error_message) if result.error_message else None
+    run_asset = db.get(ITAsset, run.asset_id) if run.asset_id else None
+
+    snapshot = {
+        "plugin_key": plugin.plugin_key,
+        "plugin_id": plugin.id,
+        "asset_id": run.asset_id,
+        "connection_id": run.connection_id,
+        "raw": raw,
+        "status": result.status,
+        "completed_at": completed.isoformat(),
+    }
+    run.status = result.status
+    run.result_summary = safe_summary[:2000] if safe_summary else None
+    run.result_detail = safe_summary
+    run.raw_output = raw
+    run.evidence_snapshot = snapshot
+    run.evidence_hash = _evidence_hash(snapshot)
+    run.error_message = safe_error
+    run.completed_at = completed
+    run.duration_ms = duration_ms
+    db.add(run)
+
+    framework_controls_touched = _cascade_to_controls(
+        db, tenant_id=tenant_id, plugin=plugin, run=run,
+    )
+    if run_asset is not None and result.status in ("passed", "failed"):
+        existing = (
+            db.query(AssetSecurityComplianceSelection)
+            .filter(
+                AssetSecurityComplianceSelection.asset_id == run_asset.id,
+                AssetSecurityComplianceSelection.benchmark == "CIS_PLUGIN",
+                AssetSecurityComplianceSelection.control_id == plugin.plugin_key,
+            )
+            .first()
+        )
+        if existing is None:
+            db.add(AssetSecurityComplianceSelection(
+                asset_id=run_asset.id, benchmark="CIS_PLUGIN",
+                control_id=plugin.plugin_key, selected_by=user_id,
+            ))
+
+    audit_action = "failed" if result.status == "failed" else "execute"
+    write_rich_audit_log(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        action=audit_action,
+        resource_type="compliance.plugin_runs",
+        resource_id=run.id,
+        resource_name=f"plugin_run:{plugin.plugin_key}",
+        resource_url=f"/grc/compliance/plugin_runs/{run.id}",
+        summary=(
+            f"Plugin '{plugin.title}' [{plugin.rule_id}] → {result.status}: "
+            f"{(result.summary or '')[:160]}"
+        ),
+        snapshot={
+            "plugin_id": plugin.id,
+            "plugin_key": plugin.plugin_key,
+            "asset_id": run.asset_id,
+            "connection_id": run.connection_id,
+            "status": result.status,
+            "evidence_hash": run.evidence_hash,
+            "framework_controls_cascaded": framework_controls_touched,
+            "triggered_by": triggered_by,
+        },
+    )
+    db.commit()
+    db.refresh(run)
+    return run
+
+
 def execute_plugin(
     db: Session,
     *,
@@ -265,115 +371,7 @@ def execute_plugin(
     else:
         result = run_check(plugin.runner_type, effective_check, credentials)
 
-    completed = datetime.utcnow()
-    duration_ms = int((completed - started).total_seconds() * 1000)
-    raw = result.raw_output or {}
-
-    # Postgres TEXT columns reject NUL bytes (0x00). `secedit /export`
-    # writes its INI as UTF-16 LE with BOM and embedded NULs between
-    # ASCII characters — when WinRM hands that bytestring back as a
-    # str, the NULs survive and crash the commit. Strip them before
-    # persisting (the JSON column would accept them but psycopg's
-    # text codec rejects on the way in).
-    def _strip_nul(v):
-        if isinstance(v, str):
-            return v.replace("\x00", "")
-        if isinstance(v, dict):
-            return {k: _strip_nul(x) for k, x in v.items()}
-        if isinstance(v, list):
-            return [_strip_nul(x) for x in v]
-        return v
-
-    raw = _strip_nul(raw)
-    safe_summary = _strip_nul(result.summary) if result.summary else None
-    safe_error = _strip_nul(result.error_message) if result.error_message else None
-
-    snapshot = {
-        "plugin_key": plugin.plugin_key,
-        "plugin_id": plugin.id,
-        "asset_id": run.asset_id,
-        "connection_id": run.connection_id,
-        "raw": raw,
-        "status": result.status,
-        "completed_at": completed.isoformat(),
-    }
-    run.status = result.status
-    run.result_summary = safe_summary[:2000] if safe_summary else None
-    run.result_detail = safe_summary  # full text; result_summary is truncated
-    run.raw_output = raw
-    run.evidence_snapshot = snapshot
-    run.evidence_hash = _evidence_hash(snapshot)
-    run.error_message = safe_error
-    run.completed_at = completed
-    run.duration_ms = duration_ms
-    db.add(run)
-
-    # ── Cascade: framework controls (preferred) + legacy asset selection table.
-    framework_controls_touched = _cascade_to_controls(
-        db, tenant_id=tenant_id, plugin=plugin, run=run,
+    return _finalize_run(
+        db, run, result, plugin=plugin, tenant_id=tenant_id,
+        user_id=user_id, triggered_by=triggered_by,
     )
-    # Legacy AssetSecurityComplianceSelection table tags the attributed asset
-    # (peer in room-scan, host otherwise) so its compliance page sees the
-    # selection alongside the run.
-    if run_asset is not None and result.status in ("passed", "failed"):
-        existing = (
-            db.query(AssetSecurityComplianceSelection)
-            .filter(
-                AssetSecurityComplianceSelection.asset_id == run_asset.id,
-                AssetSecurityComplianceSelection.benchmark == "CIS_PLUGIN",
-                AssetSecurityComplianceSelection.control_id == plugin.plugin_key,
-            )
-            .first()
-        )
-        if existing is None:
-            sel = AssetSecurityComplianceSelection(
-                asset_id=run_asset.id,
-                benchmark="CIS_PLUGIN",
-                control_id=plugin.plugin_key,
-                selected_by=user_id,
-            )
-            db.add(sel)
-
-    # ── Workflow audit emission (single row per plugin run).
-    # Action is `execute` for completed runs and `failed` for failures, so the
-    # workflow engine fires the matching `compliance.plugin_runs.{execute,failed}`
-    # trigger family. resource_type uses the dotted "compliance.plugin_runs"
-    # form so the dispatcher's _EVENT_MAP keys match directly with no
-    # post-hoc mutation of the audit row.
-    #
-    # Previously emitted TWO audit rows per run (`create` + `execute`/`failed`)
-    # so workflow subscribers to `create` would also fire — but that doubled
-    # the audit log volume from compliance scans (40% of the entire audit
-    # table came from these duplicates). The `create` emit is removed; any
-    # workflow that genuinely needs creation signal should subscribe to
-    # `execute`/`failed` instead (same row = same row_id), which fires the
-    # moment the result is recorded.
-    audit_action = "failed" if result.status == "failed" else "execute"
-    write_rich_audit_log(
-        db=db,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        action=audit_action,
-        resource_type="compliance.plugin_runs",
-        resource_id=run.id,
-        resource_name=f"plugin_run:{plugin.plugin_key}",
-        resource_url=f"/grc/compliance/plugin_runs/{run.id}",
-        summary=(
-            f"Plugin '{plugin.title}' [{plugin.rule_id}] → {result.status}: "
-            f"{(result.summary or '')[:160]}"
-        ),
-        snapshot={
-            "plugin_id": plugin.id,
-            "plugin_key": plugin.plugin_key,
-            "asset_id": run.asset_id,
-            "connection_id": run.connection_id,
-            "status": result.status,
-            "evidence_hash": run.evidence_hash,
-            "framework_controls_cascaded": framework_controls_touched,
-            "triggered_by": triggered_by,
-        },
-    )
-
-    db.commit()
-    db.refresh(run)
-    return run
