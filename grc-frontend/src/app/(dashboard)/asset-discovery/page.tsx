@@ -294,8 +294,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
                 { label: 'Internal hosts', n: netSeen, cls: 'bar-net' },
                 { label: 'External hostnames', n: easmSeen, cls: 'bar-easm' },
                 { label: 'Linked to inventory', n: linkedTotal, cls: 'bar-linked', note: linkage + '%' },
-                { label: 'Connected', n: netConn, cls: 'bar-conn' },
-                { label: 'Awaiting login', n: netWait, cls: 'bar-wait' },
+                { label: 'Needs a decision', n: inboxCount, cls: 'bar-wait' },
               ] as { label: string; n: number; cls: string; note?: string }[]).map((r) => (
                 <div className="estate-row" key={r.label}>
                   <div className="estate-top"><span>{r.label}</span><b>{r.n}{r.note ? <em>{r.note}</em> : null}</b></div>
