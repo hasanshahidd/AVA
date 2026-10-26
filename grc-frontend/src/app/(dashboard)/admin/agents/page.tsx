@@ -202,16 +202,16 @@ export default function AgentsAdminPage() {
         <div className="px-5 py-3 border-b border-slate-200">
           <h2 className="text-sm font-semibold text-slate-900">Endpoint agent packages</h2>
         </div>
-        <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+        <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">🪟</span>
               <span className="font-semibold text-sm text-slate-900">Windows</span>
               <span
                 className="ml-auto text-[10px] text-slate-500"
-                title="Self-elevating .cmd wrapper that downloads setup.ps1 + agent.py. Notarised MSI is on the roadmap."
+                title="PowerShell installer fetches the agent binary and runs it at startup as SYSTEM. Signed MSI service is on the roadmap."
               >
-                .cmd · x64
+                x64 · service
               </span>
             </div>
             <div className="text-xs text-slate-600 mb-3">
@@ -235,9 +235,9 @@ export default function AgentsAdminPage() {
               <span className="font-semibold text-sm text-slate-900">Linux</span>
               <span
                 className="ml-auto text-[10px] text-slate-500"
-                title="Self-elevating .sh bootstrap that installs as systemd. Native .deb + .rpm packages are on the roadmap."
+                title="Shell installer fetches the agent binary and installs it as a systemd service. Native .deb + .rpm packages are on the roadmap."
               >
-                .sh bootstrap
+                x64 · systemd
               </span>
             </div>
             <div className="text-xs text-slate-600 mb-3">
@@ -255,66 +255,6 @@ export default function AgentsAdminPage() {
             </Link>
           </div>
 
-          <div className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">🍎</span>
-              <span className="font-semibold text-sm text-slate-900">macOS</span>
-              <span
-                className="ml-auto text-[10px] text-slate-500"
-                title="Double-clickable .command bootstrap (Terminal opens, asks for sudo). Signed .pkg is on the roadmap."
-              >
-                .command
-              </span>
-            </div>
-            <div className="text-xs text-slate-600 mb-3">
-              macOS 12 Monterey or later. Notarised PKG installs as a launch daemon.
-            </div>
-            <InstallerButtons
-              endpoint="installer.command"
-              label="Download macOS installer"
-              hint="One file. Runs on any Mac. Will refuse to enrol on Windows/Linux."
-              toast={toast}
-            />
-            <p className="mt-1.5 text-center text-[10px] text-slate-400">macOS uses agent-only onboarding</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── COLLECTOR AGENT (Linux, reaches OUT to remote targets) ─────── */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Collector agent</h2>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4 p-4">
-          <div className="p-4 border border-slate-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">📡</span>
-              <span className="font-semibold text-sm text-slate-900">Collector agent (Linux)</span>
-              <span className="ml-auto text-[10px] text-slate-500">SSH / SQL / LDAP drivers preinstalled</span>
-            </div>
-            <div className="text-xs text-slate-600 mb-3">
-              Same agent binary as endpoint, runs in <code className="bg-slate-100 px-1 rounded">mode=collector</code>. Installer also
-              pip-installs <code className="bg-slate-100 px-1 rounded">paramiko</code>, <code className="bg-slate-100 px-1 rounded">pymssql</code>,
-              <code className="bg-slate-100 px-1 rounded">psycopg2</code>, <code className="bg-slate-100 px-1 rounded">pymysql</code>,
-              <code className="bg-slate-100 px-1 rounded">oracledb</code>, <code className="bg-slate-100 px-1 rounded">ldap3</code> so the box
-              can execute every remote-target runner.
-            </div>
-            <InstallerButtons
-              endpoint="installer.sh"
-              label="Download collector installer"
-              hint="One file. Use on one Linux box per LAN segment. Refuses non-Linux."
-              toast={toast}
-              extraParams={{ collector: 1 }}
-            />
-          </div>
-          <div className="p-4 border border-primary-200 rounded-lg bg-primary-50">
-            <div className="text-xs font-semibold text-primary-800 mb-2">When to use a collector vs server-side agentless?</div>
-            <ul className="text-[11px] text-slate-700 space-y-1.5 list-disc list-inside">
-              <li><strong>Use the collector</strong> when the bank's firewall blocks inbound from CAIVA — collector dials OUT, then dials IN to the targets it can already reach.</li>
-              <li><strong>Use agentless</strong> when CAIVA can reach the targets directly (cloud-hosted backend + targets with public IPs / VPN).</li>
-              <li>Both paths reuse the same Connect Wizard credentials. Switching is a one-line config change.</li>
-            </ul>
-          </div>
         </div>
       </div>
 
@@ -449,26 +389,26 @@ export default function AgentsAdminPage() {
 // (/agents/installer.cmd | .sh | .command). Revocable any time via the
 // Agents table below.
 function InstallerButtons({
-  endpoint, label, hint, toast, extraParams,
+  endpoint, label, hint, toast,
 }: {
   endpoint: 'installer.cmd' | 'installer.sh' | 'installer.command';
   label: string;
   hint: string;
   toast: ReturnType<typeof useToast>;
-  extraParams?: Record<string, string | number>;
 }) {
-  const download = async (params: Record<string, string | number>) => {
-    if (extraParams) params = { ...extraParams, ...params };
+  const [busy, setBusy] = useState(false);
+  const os: 'windows' | 'linux' = endpoint === 'installer.cmd' ? 'windows' : 'linux';
+  const download = async () => {
+    setBusy(true);
     try {
-      const resp = await apiClient.get(`/agents/${endpoint}`, {
-        params,
-        responseType: 'blob',
-      });
-      const blob = new Blob([resp.data], { type: 'application/octet-stream' });
-      const cd = String(resp.headers['content-disposition'] || '');
-      const m = cd.match(/filename="?([^";]+)"?/);
-      const filename = m ? m[1] : `AvaAgent.${endpoint.split('.').pop()}`;
-      const url = URL.createObjectURL(blob);
+      // Mint a one-time enrollment token, then fetch the personalised installer
+      // (enrollment token + cloud URL baked in) and save it as a file. Running it
+      // installs the agent as a service → it enrols, scans this host, and reports.
+      const enr = await agentsApi.enroll({ agent_name: `${os} agent`, os_family: os });
+      const token = (enr.data as { enrollment_token: string }).enrollment_token;
+      const resp = await apiClient.get(`/agents/installer/${os}/${token}`, { responseType: 'blob' });
+      const filename = os === 'windows' ? 'install-ava-agent.ps1' : 'install-ava-agent.sh';
+      const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/octet-stream' }));
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
@@ -476,11 +416,16 @@ function InstallerButtons({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      return filename;
+      toast.toast({
+        title: 'Installer downloaded',
+        message: `Run ${filename} as ${os === 'windows' ? 'Administrator' : 'root'} on the target host — it enrols, scans, and reports automatically.`,
+        type: 'success',
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
       toast.toast({ title: 'Download failed', message: msg, type: 'error' });
-      return null;
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -488,19 +433,11 @@ function InstallerButtons({
     <>
       <button
         type="button"
-        onClick={async () => {
-          const filename = await download({ fleet: 1, expires_hours: 72 });
-          if (filename) {
-            toast.toast({
-              title: 'Installer ready',
-              message: `${filename} — share with any number of hosts. Reusable for 72h, revocable any time.`,
-              type: 'success',
-            });
-          }
-        }}
-        className="block w-full text-center px-3 py-2 bg-primary-600 text-[#0a0a0a] text-xs font-medium rounded-md hover:bg-primary-700"
+        onClick={download}
+        disabled={busy}
+        className="block w-full text-center px-3 py-2 bg-primary-600 text-white text-xs font-medium rounded-md hover:bg-primary-700 disabled:opacity-50"
       >
-        📥 {label}
+        {busy ? 'Preparing…' : `📥 ${label}`}
       </button>
       <div className="mt-1 text-center text-[10px] text-slate-500">{hint}</div>
     </>

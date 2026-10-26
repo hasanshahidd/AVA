@@ -67,6 +67,7 @@ from .modules.automation import (
 # (the Vulnerabilities → CTEM Scopes board consumes it at /erm/ctem/scopes/*).
 from .modules.erm import ctem_scopes_router as erm_ctem_scopes_router
 from .routers.connect_wizard_router import router as connect_wizard_router
+from .routers.agents_router import router as agents_router
 from .routers.admin_ai_usage_router import router as admin_ai_usage_router
 from .routers.ai_recommendations_router import router as ai_recommendations_router
 from .routers.reporting_router import router as reporting_router
@@ -282,6 +283,7 @@ app.include_router(automation_frameworks_router)
 # (matches the CTEM Scopes board's API calls). Router carries its own /ctem/scopes prefix.
 app.include_router(erm_ctem_scopes_router, prefix="/erm")
 app.include_router(connect_wizard_router)
+app.include_router(agents_router)
 app.include_router(admin_ai_usage_router)
 
 
