@@ -313,8 +313,12 @@ function Overview({ go }: { go: (t?: string) => void }) {
                 <div className="estate-top"><span>Onboarded from discovery</span><b>{linkedTotal}<em>{linkage}%</em></b></div>
                 <div className="estate-track"><i className="bar-linked" style={{ width: `${observed ? Math.max(linkedTotal > 0 ? 4 : 0, Math.round((linkedTotal / observed) * 100)) : 0}%` }}></i></div>
               </div>
+              <div className="estate-row">
+                <div className="estate-top"><span>Awaiting a decision</span><b>{inboxCount}</b></div>
+                <div className="estate-track"><i className="bar-wait" style={{ width: `${observed ? Math.max(inboxCount > 0 ? 4 : 0, Math.round((inboxCount / observed) * 100)) : 0}%` }}></i></div>
+              </div>
             </div>
-            <div className="rc-foot"><b>{observed}</b> discovered · <b style={{ color: 'var(--amber)' }}>{inboxCount}</b> awaiting a decision</div>
+            <div className="rc-foot"><b>{observed}</b> discovered across this estate · <b>{coverage}%</b> scope coverage</div>
           </div>
         </div>
       </div>

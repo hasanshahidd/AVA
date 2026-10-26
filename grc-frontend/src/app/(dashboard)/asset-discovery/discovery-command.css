@@ -48,7 +48,7 @@
 /* estate breakdown (replaces the decorative radar) — real proportions of the observed estate */
 .disc-cc .estate-card{display:flex;flex-direction:column}
 .disc-cc .estate-eyebrow{font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em}
-.disc-cc .estate{display:flex;flex-direction:column;justify-content:center;gap:15px;flex:1;margin:16px 0}
+.disc-cc .estate{display:flex;flex-direction:column;justify-content:space-between;gap:14px;flex:1;margin:16px 0}
 .disc-cc .estate-row{display:flex;flex-direction:column;gap:6px}
 .disc-cc .estate-top{display:flex;justify-content:space-between;align-items:baseline}
 .disc-cc .estate-top>span{font-size:12px;color:var(--muted)}
