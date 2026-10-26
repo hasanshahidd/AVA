@@ -172,6 +172,18 @@ export default function Header() {
               </div>
             );
           }
+          // Pentest run workspace (/pentest/runs/<id>) has no static entry — show
+          // the run-identity breadcrumb so the otherwise-empty top bar is used.
+          if (!info && /^\/pentest\/runs\/[^/]+$/.test(pathname ?? '')) {
+            const rid = (pathname ?? '').split('/').pop();
+            return (
+              <div className="flex items-center gap-1.5 min-w-0 text-sm leading-none">
+                <Link href="/pentest" className="font-medium text-[var(--color-muted)] truncate">AI Pentest</Link>
+                <span className="text-[var(--color-muted)]">/</span>
+                <span className="font-semibold text-[var(--color-text)] truncate">Run #{rid}</span>
+              </div>
+            );
+          }
           if (!info) return null;
           // Pages that render their own big heading in the body (redesign kit)
           // get a breadcrumb here instead of a repeated title+subtitle, so the
