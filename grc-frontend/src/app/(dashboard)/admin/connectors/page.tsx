@@ -23,6 +23,37 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; descri
 
 const CATEGORY_ORDER = ['ticketing', 'siem', 'edr', 'identity', 'pentest', 'collab', 'transcribe', 'easm_source'] as const;
 
+// Official brand logos, bundled locally in /public/logos/connectors (no runtime
+// CDN, no CSP concern). Keyed by provider id. SVGs are monochrome marks; PNGs are
+// the vendor's own logo. A provider with no entry (or a logo that fails to load)
+// falls back to its category icon — never a broken image.
+const PROVIDER_LOGO: Record<string, string> = {
+  okta: 'okta.svg', splunk: 'splunk.svg', zoom: 'zoom.svg', metasploit: 'metasploit.svg',
+  crowdstrike: 'crowdstrike.png', servicenow: 'servicenow.png', censys: 'censys.png',
+  fireflies: 'fireflies.png', sentinelone: 'sentinelone.png', wazuh: 'wazuh.png',
+  qradar: 'qradar.png', msteams: 'msteams.png', office365: 'office365.png',
+  defender: 'defender.png', core_impact: 'core_impact.png', halo_itsm: 'halo_itsm.png',
+  entra: 'entra.png', shodan: 'shodan.png', securitytrails: 'securitytrails.png',
+  bmc_remedy: 'bmc_remedy.png',
+};
+
+function ProviderLogo({ provider }: { provider: ConnectorProviderMeta }) {
+  const [failed, setFailed] = useState(false);
+  const file = PROVIDER_LOGO[provider.provider];
+  const Fallback = CATEGORY_META[provider.category]?.icon ?? Plug;
+  return (
+    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+      {file && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/logos/connectors/${file}`} alt="" loading="lazy"
+          className="h-6 w-6 object-contain" onError={() => setFailed(true)} />
+      ) : (
+        <Fallback className="h-5 w-5 text-slate-400" strokeWidth={1.75} />
+      )}
+    </div>
+  );
+}
+
 export default function ConnectorsAdminPage() {
   const [openSetupFor, setOpenSetupFor] = useState<ConnectorProviderMeta | null>(null);
   const [editingConnector, setEditingConnector] = useState<ConnectorRow | null>(null);
@@ -174,30 +205,36 @@ function ProviderCard({ provider, connections, onAdd, onEdit }: ProviderCardProp
   });
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 hover:border-primary-300 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-semibold text-slate-900">{provider.label}</h4>
+    <div className="group rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-[var(--color-base)] hover:shadow-sm">
+      <div className="flex items-start gap-3">
+        <ProviderLogo provider={provider} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="truncate text-sm font-semibold text-slate-900">{provider.label}</h4>
+            {connections.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                <CheckCircle className="h-2.5 w-2.5" />{connections.length} connected
+              </span>
+            )}
             {provider.beta && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 uppercase">
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase bg-amber-100 text-amber-700">
                 Beta
               </span>
             )}
             {provider.auth_method === 'oauth2' && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-50 text-primary-700">
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-[var(--color-base-soft)] text-[var(--color-base)]">
                 OAuth2
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-1 leading-relaxed">{provider.description}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{provider.description}</p>
         </div>
         {provider.docs_url && (
           <a
             href={provider.docs_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 hover:text-slate-600 shrink-0"
+            className="shrink-0 text-slate-400 hover:text-[var(--color-base)]"
             title="Vendor docs"
           >
             <ExternalLink className="h-3.5 w-3.5" />
