@@ -307,13 +307,32 @@ function InstallAgent({
   const [cmd, setCmd] = useState<string | null>(null);
   const runner = os === 'windows' ? 'an elevated PowerShell' : 'a terminal as root (sudo)';
 
-  const copyText = async (text: string, note: string) => {
+  const copyText = async (text: string) => {
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(text);
-      toast.toast({ title: 'Copied', message: note, type: 'success' });
-    } catch {
-      toast.toast({ title: 'Command ready', message: 'Select the command and copy it.', type: 'info' });
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch { /* insecure context or denied — fall through to execCommand */ }
+    if (!ok) {
+      // On plain HTTP the Clipboard API is unavailable; use the legacy path so
+      // Copy still works until the app is behind HTTPS.
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { ok = false; }
     }
+    toast.toast(ok
+      ? { title: 'Command copied', message: `Paste it into ${runner} on the machine you want to add.`, type: 'success' }
+      : { title: 'Press Ctrl/Cmd+C', message: 'The command is highlighted below — copy it.', type: 'info' });
   };
 
   const generate = async () => {
@@ -334,7 +353,7 @@ function InstallAgent({
       const command = data.commands?.[os];
       if (!command) throw new Error('No install command returned by the server');
       setCmd(command);
-      await copyText(command, `Paste into ${runner} on the target host.`);
+      await copyText(command);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
       toast.toast({ title: 'Could not prepare installer', message: msg, type: 'error' });
@@ -358,31 +377,46 @@ function InstallAgent({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
+      <ol className="space-y-1 text-[11px] text-slate-600">
+        <li><span className="font-semibold text-slate-800">1.</span> Copy the command below.</li>
+        <li><span className="font-semibold text-slate-800">2.</span> On the machine you want to add, open {runner}.</li>
+        <li><span className="font-semibold text-slate-800">3.</span> Paste it, press Enter — the agent installs, enrols &amp; reports.</li>
+      </ol>
       <div className="flex items-stretch gap-1.5">
-        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-2 font-mono text-[10px] leading-5 text-slate-100">
+        <code
+          onClick={(e) => {
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(e.currentTarget);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }}
+          title="Click to select the whole command"
+          className="flex-1 cursor-text select-all overflow-x-auto whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-2 font-mono text-[10px] leading-5 text-slate-100"
+        >
           {cmd}
         </code>
         <button
           type="button"
-          onClick={() => copyText(cmd, `Paste into ${runner} on the target host.`)}
+          onClick={() => copyText(cmd)}
           title="Copy command"
-          className="shrink-0 rounded-md border border-slate-300 px-2 text-slate-600 transition hover:bg-slate-50"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white transition hover:bg-primary-700"
         >
-          <Copy className="h-3.5 w-3.5" />
+          <Copy className="h-3.5 w-3.5" /> Copy
         </button>
       </div>
-      <p className="text-[10px] text-slate-500">
-        Run in {runner} on the target host. One-time token, expires in 24h.
+      <p className="text-[10px] text-slate-400">
+        One-time token, expires in 24h. ·{' '}
+        <button
+          type="button"
+          onClick={generate}
+          disabled={busy}
+          className="underline-offset-2 hover:text-primary-700 hover:underline disabled:opacity-50"
+        >
+          {busy ? 'Regenerating…' : 'New command'}
+        </button>
       </p>
-      <button
-        type="button"
-        onClick={generate}
-        disabled={busy}
-        className="text-[10px] text-slate-400 underline-offset-2 hover:text-primary-700 hover:underline disabled:opacity-50"
-      >
-        {busy ? 'Regenerating…' : 'Generate a new command'}
-      </button>
     </div>
   );
 }

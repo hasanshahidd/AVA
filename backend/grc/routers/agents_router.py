@@ -103,6 +103,15 @@ def _new_agent(db: Session, tenant_id: int, *, name: str, mode: str,
                user_id: Optional[int], hostname: Optional[str] = None) -> tuple[ComplianceAgent, str]:
     now = datetime.utcnow()
     enr = "enr_" + secrets.token_urlsafe(32)
+    # agent_name is UNIQUE per tenant. The console auto-names by OS ("windows
+    # agent"), so enrolling a second host of the same OS would collide and 500.
+    # Suffix to keep it unique and readable: "windows agent", "windows agent 2", …
+    base, n = name, 1
+    while db.query(ComplianceAgent.id).filter(
+            ComplianceAgent.tenant_id == tenant_id,
+            ComplianceAgent.agent_name == name).first():
+        n += 1
+        name = f"{base} {n}"
     agent = ComplianceAgent(
         tenant_id=tenant_id, agent_name=name, mode=(mode or "collector"),
         os_family=os_family, asset_id=asset_id, hostname=hostname,
