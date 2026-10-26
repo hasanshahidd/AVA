@@ -174,43 +174,6 @@ const td: React.CSSProperties = { padding: '9px 12px', borderBottom: '1px solid 
 /* ─── Overview ─────────────────────────────────────────────────────── */
 
 /* Live discovery radar — ported verbatim from the antimetal mockup canvas loop. */
-function RadarCanvas({ labels = [] }: { labels?: string[] }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const cv = ref.current; if (!cv) return; const ctx = cv.getContext('2d'); if (!ctx) return;
-    const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2, R = Math.min(cx, cy) - 12, A = 'rgba(0,91,150,';
-    // One blip per real discovered device, spread deterministically so positions are stable.
-    const names = (labels.length ? labels : ['host-01', 'host-02', 'host-03', 'host-04', 'host-05', 'host-06']).slice(0, 7);
-    const blips = names.map((nm, i) => ({ a: (i / names.length) * 6.2832 + 0.4, r: 0.34 + ((i * 41) % 52) / 100, lit: 0, nm }));
-    let sweep = 0, raf = 0; const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const frame = () => {
-      ctx.clearRect(0, 0, W, H);
-      ctx.strokeStyle = A + '.16)'; ctx.lineWidth = 1;
-      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, R * i / 3, 0, 7); ctx.stroke(); }
-      ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-      for (let k = 0; k < 30; k++) { const a = sweep - k * 0.045; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a, a + 0.05); ctx.closePath(); ctx.fillStyle = A + (0.14 * (1 - k / 30)) + ')'; ctx.fill(); }
-      ctx.strokeStyle = A + '.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
-      ctx.textBaseline = 'middle';
-      blips.forEach((b) => {
-        const d = ((sweep - b.a) % 6.2832 + 6.2832) % 6.2832; if (d < 0.09) b.lit = 1; b.lit *= 0.978;
-        const x = cx + Math.cos(b.a) * R * b.r, y = cy + Math.sin(b.a) * R * b.r;
-        ctx.beginPath(); ctx.arc(x, y, 2.2 + b.lit * 3.2, 0, 7); ctx.fillStyle = A + (0.42 + b.lit * 0.58) + ')'; ctx.fill();
-        // Name only while the sweep is passing this dot (ping reveal) — never a wall of overlapping labels.
-        if (b.lit > 0.14) {
-          const nm = b.nm.length > 16 ? b.nm.slice(0, 15) + '…' : b.nm;
-          const right = x >= cx; ctx.textAlign = right ? 'left' : 'right';
-          ctx.font = '600 10px Inter, system-ui, sans-serif';
-          ctx.fillStyle = 'rgba(0,91,150,' + Math.min(1, b.lit) + ')';
-          ctx.fillText(nm, x + (right ? 9 : -9), y);
-        }
-      });
-      sweep += 0.028; if (sweep > 6.2832) sweep -= 6.2832; if (!reduce) raf = requestAnimationFrame(frame);
-    };
-    frame(); return () => cancelAnimationFrame(raf);
-  }, [labels.join('|')]);
-  return <canvas ref={ref} width={360} height={208} className="radar-cv" />;
-}
-
 function Overview({ go }: { go: (t?: string) => void }) {
   const campaigns = useQuery({ queryKey: ['disc-campaigns'], queryFn: async () => (await discoveryApi.listCampaigns()).data.campaigns as any[] });
   // Pull enough run history that EVERY campaign's latest run is present — a small
@@ -218,7 +181,6 @@ function Overview({ go }: { go: (t?: string) => void }) {
   const runs = useQuery({ queryKey: ['disc-runs'], queryFn: async () => (await discoveryApi.listRuns(undefined, 200)).data.runs as any[] });
   const inbox = useQuery({ queryKey: ['disc-inbox'], queryFn: async () => (await discoveryApi.inbox('open')).data.observations as any[] });
   const radarDevQ = useQuery({ queryKey: ['disc-discovered-devices', 'all'], queryFn: async () => (await discoveryApi.discoveredDevices()).data as any });
-  const radarLabels: string[] = (radarDevQ.data?.devices ?? []).slice(0, 7).map((d: any) => d.host_name || d.name || d.ip_address || 'device');
 
   const camps = campaigns.data ?? [];
   const runList = runs.data ?? [];
@@ -325,10 +287,23 @@ function Overview({ go }: { go: (t?: string) => void }) {
           </section>
         </div>
         <div className="ovhero-r">
-          <div className="radar-card">
-            <div className="rc-head"><span className="live"><i></i> Live · sweeping</span><code>{netScope ? scopeText(netScope) : '—'}</code></div>
-            <RadarCanvas labels={radarLabels} />
-            <div className="rc-foot"><b>{netSeen}</b> hosts found this sweep · <b>{netWait}</b> need review</div>
+          <div className="radar-card estate-card">
+            <div className="rc-head"><span className="estate-eyebrow">Estate breakdown</span><code>{observed} observed</code></div>
+            <div className="estate">
+              {([
+                { label: 'Internal hosts', n: netSeen, cls: 'bar-net' },
+                { label: 'External hostnames', n: easmSeen, cls: 'bar-easm' },
+                { label: 'Linked to inventory', n: linkedTotal, cls: 'bar-linked', note: linkage + '%' },
+                { label: 'Connected', n: netConn, cls: 'bar-conn' },
+                { label: 'Awaiting login', n: netWait, cls: 'bar-wait' },
+              ] as { label: string; n: number; cls: string; note?: string }[]).map((r) => (
+                <div className="estate-row" key={r.label}>
+                  <div className="estate-top"><span>{r.label}</span><b>{r.n}{r.note ? <em>{r.note}</em> : null}</b></div>
+                  <div className="estate-track"><i className={r.cls} style={{ width: `${observed ? Math.max(r.n > 0 ? 3 : 0, Math.round((r.n / observed) * 100)) : 0}%` }}></i></div>
+                </div>
+              ))}
+            </div>
+            <div className="rc-foot"><b>{linkage}%</b> of observed entities linked · <b style={{ color: 'var(--amber)' }}>{inboxCount}</b> need a decision</div>
           </div>
         </div>
       </div>
