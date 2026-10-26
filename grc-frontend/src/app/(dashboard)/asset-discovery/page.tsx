@@ -15,7 +15,7 @@ import {
   Radar, Inbox, Network, History, Play, Plus, Trash2, X,
   ShieldCheck, RefreshCw, Check, Plug,
 } from 'lucide-react';
-import { discoveryApi } from '@/lib/api';
+import apiClient, { discoveryApi } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useTabParam } from '@/lib/useTabParam';
 import ConnectWizardPage, { PLATFORMS, PLATFORM_GROUPS, type Platform } from '../admin/integrations/connect/page';
@@ -181,6 +181,10 @@ function Overview({ go }: { go: (t?: string) => void }) {
   const runs = useQuery({ queryKey: ['disc-runs'], queryFn: async () => (await discoveryApi.listRuns(undefined, 200)).data.runs as any[] });
   const inbox = useQuery({ queryKey: ['disc-inbox'], queryFn: async () => (await discoveryApi.inbox('open')).data.observations as any[] });
   const radarDevQ = useQuery({ queryKey: ['disc-discovered-devices', 'all'], queryFn: async () => (await discoveryApi.discoveredDevices()).data as any });
+  // Authoritative managed-estate composition — the SAME source the IT Asset
+  // Inventory Overview uses, so external/internal counts match what the operator
+  // sees there (the discovered-devices feed classifies external differently).
+  const estateQ = useQuery({ queryKey: ['assets', 'estate-overview'], queryFn: async () => (await apiClient.get('/estate-overview')).data as any });
 
   const camps = campaigns.data ?? [];
   const runList = runs.data ?? [];
@@ -225,6 +229,12 @@ function Overview({ go }: { go: (t?: string) => void }) {
   const observed = allDevices.length;
   const linkedTotal = allDevices.filter((d: any) => d.in_inventory).length;
   const linkage = observed ? Math.round((linkedTotal / observed) * 100) : 0;
+  // Managed estate (authoritative, matches the IT Asset Inventory Overview).
+  const estate = estateQ.data ?? {};
+  const estHosts = Number(estate.total ?? 0);
+  const estAssets = Number(estate.rolled_total ?? 0);
+  const estExt = Number(estate.external?.total ?? 0);
+  const estInt = Number(estate.internal?.total ?? 0);
   const covered = camps.filter((c) => runList.some((r) => r.campaign_id === c.id && r.status === 'succeeded')).length;
   const coverage = camps.length ? Math.round((covered / camps.length) * 100) : 0;
   // network status composition (real): connected vs awaiting-login vs evidence-only
@@ -288,21 +298,23 @@ function Overview({ go }: { go: (t?: string) => void }) {
         </div>
         <div className="ovhero-r">
           <div className="radar-card estate-card">
-            <div className="rc-head"><span className="estate-eyebrow">Estate breakdown</span><code>{observed} observed</code></div>
+            <div className="rc-head"><span className="estate-eyebrow">Managed estate</span><code>{estHosts} hosts · {estAssets} assets</code></div>
             <div className="estate">
               {([
-                { label: 'Internal hosts', n: netSeen, cls: 'bar-net' },
-                { label: 'External hostnames', n: easmSeen, cls: 'bar-easm' },
-                { label: 'Linked to inventory', n: linkedTotal, cls: 'bar-linked', note: linkage + '%' },
-                { label: 'Needs a decision', n: inboxCount, cls: 'bar-wait' },
-              ] as { label: string; n: number; cls: string; note?: string }[]).map((r) => (
+                { label: 'External hosts', n: estExt, cls: 'bar-easm' },
+                { label: 'Internal hosts', n: estInt, cls: 'bar-net' },
+              ] as { label: string; n: number; cls: string }[]).map((r) => (
                 <div className="estate-row" key={r.label}>
-                  <div className="estate-top"><span>{r.label}</span><b>{r.n}{r.note ? <em>{r.note}</em> : null}</b></div>
-                  <div className="estate-track"><i className={r.cls} style={{ width: `${observed ? Math.max(r.n > 0 ? 3 : 0, Math.round((r.n / observed) * 100)) : 0}%` }}></i></div>
+                  <div className="estate-top"><span>{r.label}</span><b>{r.n}</b></div>
+                  <div className="estate-track"><i className={r.cls} style={{ width: `${estHosts ? Math.max(r.n > 0 ? 4 : 0, Math.round((r.n / estHosts) * 100)) : 0}%` }}></i></div>
                 </div>
               ))}
+              <div className="estate-row">
+                <div className="estate-top"><span>Onboarded from discovery</span><b>{linkedTotal}<em>{linkage}%</em></b></div>
+                <div className="estate-track"><i className="bar-linked" style={{ width: `${observed ? Math.max(linkedTotal > 0 ? 4 : 0, Math.round((linkedTotal / observed) * 100)) : 0}%` }}></i></div>
+              </div>
             </div>
-            <div className="rc-foot"><b>{linkage}%</b> of observed entities linked · <b style={{ color: 'var(--amber)' }}>{inboxCount}</b> need a decision</div>
+            <div className="rc-foot"><b>{observed}</b> discovered · <b style={{ color: 'var(--amber)' }}>{inboxCount}</b> awaiting a decision</div>
           </div>
         </div>
       </div>
