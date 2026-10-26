@@ -310,7 +310,7 @@ func enroll() (string, error) {
 	}
 	host, _ := os.Hostname()
 	ip, _ := netInfo()
-	rb, code, err := post(base()+"/grc/agents/enroll", "", map[string]any{
+	rb, code, err := post(base()+"/api/agents/enroll", "", map[string]any{
 		"enrollment_token": tok, "hostname": host, "os_family": runtime.GOOS,
 		"agent_version": agentVersion, "ip_address": ip,
 	})
@@ -331,7 +331,7 @@ func enroll() (string, error) {
 
 func report(apiToken string) error {
 	inv, host, ip := collectInventory()
-	rb, code, err := post(base()+"/grc/agents/report", apiToken, map[string]any{
+	rb, code, err := post(base()+"/api/agents/report", apiToken, map[string]any{
 		"hostname": host, "os_name": osName(), "os_family": runtime.GOOS,
 		"ip_address": ip, "agent_version": agentVersion,
 		"software": software(), "inventory": inv,
@@ -346,7 +346,7 @@ func report(apiToken string) error {
 }
 
 func heartbeat(apiToken string) {
-	_, _, _ = post(base()+"/grc/agents/heartbeat", apiToken, map[string]any{})
+	_, _, _ = post(base()+"/api/agents/heartbeat", apiToken, map[string]any{})
 }
 
 // ─────────────────────────── CIS / compliance (local) ───────────────────────
@@ -387,7 +387,7 @@ func mapOscap(r string) string {
 // agent runs oscap against the exact same content the cloud uses (rule IDs
 // align). Streams straight to disk — datastreams are multi-MB.
 func fetchDatastream(apiToken, dsPath string) (string, bool) {
-	req, err := http.NewRequest("GET", base()+"/grc/agents/datastream?p="+url.QueryEscape(dsPath), nil)
+	req, err := http.NewRequest("GET", base()+"/api/agents/datastream?p="+url.QueryEscape(dsPath), nil)
 	if err != nil {
 		return "", false
 	}
@@ -465,7 +465,7 @@ func cisRun(apiToken string) {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	rb, code, err := get(base()+"/grc/agents/jobs", apiToken)
+	rb, code, err := get(base()+"/api/agents/jobs", apiToken)
 	if err != nil || code != 200 {
 		return
 	}
@@ -503,7 +503,7 @@ func cisRun(apiToken string) {
 		}
 	}
 	if len(results) > 0 {
-		if _, c, _ := post(base()+"/grc/agents/jobs/results", apiToken,
+		if _, c, _ := post(base()+"/api/agents/jobs/results", apiToken,
 			map[string]any{"results": results}); c == 200 {
 			fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
 		}

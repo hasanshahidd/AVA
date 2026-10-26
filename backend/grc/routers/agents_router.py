@@ -73,8 +73,8 @@ def _install_hint(enrollment_token: str, os_family: Optional[str]) -> Dict[str, 
     binary is served from /agents/installer/* (wired when the agent ships); the
     token is what matters for the handshake."""
     return {
-        "linux": f"curl -fsSL $AVA_URL/grc/agents/installer/linux | sudo AVA_ENROLL={enrollment_token} sh",
-        "windows": f"iwr $AVA_URL/grc/agents/installer/windows -UseB | iex   # AVA_ENROLL={enrollment_token}",
+        "linux": f"curl -fsSL $AVA_URL/api/agents/installer/linux | sudo AVA_ENROLL={enrollment_token} sh",
+        "windows": f"iwr $AVA_URL/api/agents/installer/windows -UseB | iex   # AVA_ENROLL={enrollment_token}",
     }
 
 
@@ -494,9 +494,9 @@ def _install_commands(request: Request, token: str, tenant: str) -> Dict[str, st
     q = f"?tenant_slug={tenant}" if tenant else ""
     return {
         # Elevated PowerShell. iwr → iex runs the installer in the current session.
-        "windows": f'iwr "{base}/grc/agents/installer/windows/{token}{q}" -UseBasicParsing | iex',
-        "linux": f'curl -fsSL "{base}/grc/agents/installer/linux/{token}{q}" | sudo sh',
-        "macos": f'curl -fsSL "{base}/grc/agents/installer/macos/{token}{q}" | sudo sh',
+        "windows": f'iwr "{base}/api/agents/installer/windows/{token}{q}" -UseBasicParsing | iex',
+        "linux": f'curl -fsSL "{base}/api/agents/installer/linux/{token}{q}" | sudo sh',
+        "macos": f'curl -fsSL "{base}/api/agents/installer/macos/{token}{q}" | sudo sh',
     }
 
 
@@ -524,7 +524,7 @@ AVA_TENANT="{tenant}"
 [ "$(id -u)" -eq 0 ] || {{ echo "Run as root (sudo)"; exit 1; }}
 install -d /opt/ava-agent
 echo "Downloading agent..."
-curl -fsSL "$AVA_URL/grc/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
+curl -fsSL "$AVA_URL/api/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
 # OpenSCAP binary for the CIS scan (the datastream content is fetched from the
 # server per job, so only the oscap engine is needed here). Best-effort —
@@ -568,7 +568,7 @@ $AvaTenant = "{tenant}"
 $dir = "$env:ProgramData\\AvaAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 Write-Host "Downloading agent..."
-Invoke-WebRequest "$AvaUrl/grc/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
+Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
 [Environment]::SetEnvironmentVariable('AVA_URL', $AvaUrl, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_ENROLL', $AvaEnroll, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_TENANT', $AvaTenant, 'Machine')
@@ -597,7 +597,7 @@ case "$(uname -m)" in
 esac
 install -d /opt/ava-agent
 echo "Downloading agent..."
-curl -fsSL "$AVA_URL/grc/agents/installer/$BIN/bin" -o /opt/ava-agent/ava-agent
+curl -fsSL "$AVA_URL/api/agents/installer/$BIN/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
 cat > /Library/LaunchDaemons/io.caiva.agent.plist <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -656,7 +656,7 @@ if __name__ == "__main__":  # self-check — pure logic, no DB
     lin = _linux_installer("https://app.caiva.io", "enr_abc", "ava")
     assert 'AVA_URL="https://app.caiva.io"' in lin and 'AVA_ENROLL="enr_abc"' in lin
     assert 'AVA_TENANT="ava"' in lin and "Environment=AVA_TENANT=$AVA_TENANT" in lin
-    assert "/grc/agents/installer/linux/bin" in lin and "systemctl enable --now ava-agent" in lin
+    assert "/api/agents/installer/linux/bin" in lin and "systemctl enable --now ava-agent" in lin
     win = _windows_installer("https://app.caiva.io", "enr_xyz", "ava")
     assert '$AvaEnroll = "enr_xyz"' in win and '$AvaTenant = "ava"' in win
     assert "ava-agent.exe" in win and "schtasks" in win and "AVA_TENANT" in win
