@@ -239,7 +239,7 @@ export function AttackSurface({ devices, easm }: { devices: Qs<Devices>; easm: Q
   const parts: Part[] = [
     { key: 'inv', label: 'In inventory', n: inInv, c: T.base },
     { key: 'ready', label: 'Login answered, not onboarded', n: ready, c: '#7FA7C9' },
-    { key: 'rest', label: 'Not yet managed', n: total - inInv - ready, c: '#CBD5E1' },
+    { key: 'rest', label: 'Not yet connected', n: total - inInv - ready, c: '#CBD5E1' },
   ];
   const es = easm.data?.summary;
   const graded = es?.graded ?? 0;
