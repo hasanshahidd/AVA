@@ -38,11 +38,13 @@ class AdhocScanIn(BaseModel):
     coverage: str = "auto"
     lane: str | None = None           # operator's chosen engine lane (overrides assess() auto-route)
     find_mcp: str | None = None       # operator's chosen scanner within the lane (optional)
+    credential_id: int | None = None  # saved credential to run the scan with (host/cloud/repo lanes)
 
 
 def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
                       allow_uncredentialed: bool, coverage: str,
-                      lane: str | None = None, find_mcp: str | None = None) -> dict:
+                      lane: str | None = None, find_mcp: str | None = None,
+                      credential_id: int | None = None) -> dict:
     """Shared body for both scan modes: assess() (auto-route) → credential gate → start_scan()
     (find-only, run_id=None). The operator MAY override the engine: `lane` pins the engine lane and
     `find_mcp` the scanner within it; when neither is given the asset's assess() auto-route is used.
@@ -89,12 +91,14 @@ def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
     if not target:
         raise HTTPException(status_code=422, detail="Asset has no IP or hostname to scan.")
 
-    cred_available = bool(creds.get("have_profile")) or creds.get("action") in ("reuse", "available")
+    # An operator-attached credential makes the scan credentialed regardless of the asset's
+    # auto-detected profile; otherwise fall back to the assess() credential decision.
+    cred_available = bool(credential_id) or bool(creds.get("have_profile")) or creds.get("action") in ("reuse", "available")
     return service.start_scan(
         db, tenant_id=user_tenants[0], asset_id=asset_id, target=target,
         lane=lane_key, find_mcp=chosen,
         credentialed=cred_available and not allow_uncredentialed,
-        coverage=coverage,
+        coverage=coverage, credential_id=credential_id,
         # run_id defaults to None -> find-only, no exploit (register-owned scan).
     )
 
@@ -106,6 +110,7 @@ def scan_register_asset(
     coverage: str = "auto",              # auto | all | nessus | openvas (passthrough to engine)
     lane: Optional[str] = None,          # operator's chosen engine lane (else assess() auto-route)
     find_mcp: Optional[str] = None,      # operator's chosen scanner within the lane (optional)
+    credential_id: Optional[int] = None, # saved credential to scan with (host/cloud/repo lanes)
     db: Session = Depends(get_db),
     current_user=Depends(require_auth),
 ):
@@ -117,7 +122,7 @@ def scan_register_asset(
         raise HTTPException(status_code=404, detail="asset not found")
     return _launch_find_scan(db, asset_id, user_tenants,
                              allow_uncredentialed=allow_uncredentialed, coverage=coverage,
-                             lane=lane, find_mcp=find_mcp)
+                             lane=lane, find_mcp=find_mcp, credential_id=credential_id)
 
 
 @router.post("/scan/adhoc", dependencies=[Depends(_require_scan)])
@@ -143,7 +148,7 @@ def scan_register_adhoc(
         raise HTTPException(status_code=400, detail=str(e))
     res = _launch_find_scan(db, asset.id, user_tenants,
                             allow_uncredentialed=body.allow_uncredentialed, coverage=body.coverage,
-                            lane=body.lane, find_mcp=body.find_mcp)
+                            lane=body.lane, find_mcp=body.find_mcp, credential_id=body.credential_id)
     return {**res, "asset_id": asset.id, "adhoc": True}
 
 
@@ -163,6 +168,22 @@ def scan_plan(
     if result is None:
         raise HTTPException(status_code=404, detail="asset not found")
     return result
+
+
+@router.get("/scan-jobs")
+def register_scan_jobs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    """List recent scan sessions (newest-first, inventory + ad-hoc) for the register's Scan page.
+    Reuses grc_pentest_scan_jobs + ITAsset; no new table. Each row:
+    {job_id, asset_id, asset_name, target, adhoc, lane, find_mcp, status, progress,
+     findings_count, created_at, started_at, finished_at}."""
+    user_tenants = get_user_tenants(current_user, db)
+    if not user_tenants:
+        return {"jobs": []}
+    return {"jobs": service.list_scan_jobs(db, user_tenants, limit=limit)}
 
 
 @router.get("/scan-jobs/{job_id}")
