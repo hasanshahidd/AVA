@@ -68,7 +68,7 @@ export default function AdvisoriesPage() {
   const [syncMsg, setSyncMsg] = useState<Flash | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [feedKey, setFeedKey] = useState('');
+  const [feedKeys, setFeedKeys] = useState<Set<string>>(new Set());
 
   const [fRegion, setFRegion] = useState(ALL);
   const [fOrigin, setFOrigin] = useState(ALL);
@@ -112,15 +112,21 @@ export default function AdvisoriesPage() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: (key: string) => advisoriesApi.syncSource(key),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['advisories'] });
-      const d = res.data;
-      setSyncMsg(d.ok === false
-        ? { text: `${d.source}: ${d.error}`, ok: false }
-        : { text: `${d.source}: ${d.created} new${d.updated ? `, ${d.updated} already tracked` : ''}`, ok: true });
+    // Sync each selected feed (reuses the single-source endpoint) and aggregate the result.
+    mutationFn: async (keys: string[]) => {
+      const out = [];
+      for (const k of keys) out.push((await advisoriesApi.syncSource(k)).data);
+      return out;
     },
-    onError: () => setSyncMsg({ text: 'Sync failed — check the source is reachable', ok: false }),
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ['advisories'] });
+      const created = results.reduce((n, d) => n + (d.created || 0), 0);
+      const failed = results.filter((d) => d.ok === false);
+      setSyncMsg(failed.length
+        ? { text: `${created} new; ${failed.length} feed(s) unreachable: ${failed.map((f) => f.source).join(', ')}`, ok: created > 0 }
+        : { text: `${created} new advisor${created === 1 ? 'y' : 'ies'} from ${results.length} feed${results.length > 1 ? 's' : ''}`, ok: true });
+    },
+    onError: () => setSyncMsg({ text: 'Sync failed — check the sources are reachable', ok: false }),
   });
 
   const recheckMutation = useMutation({
@@ -376,41 +382,42 @@ export default function AdvisoriesPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-              <p className="text-xs cw-text-muted">
-                Two ways advisories get here: <span className="font-medium cw-text-default">Sync</span> a public feed below, or
-                <span className="font-medium cw-text-default"> Upload</span> a PDF yourself.
-              </p>
-
-              <div className="mt-5">
-                <p className="mb-1 rounded-md bg-[var(--color-subtle)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider cw-text-default">
-                  Sync a public feed
+              <div>
+                <h3 className="text-base font-bold cw-text-default">Sync public feeds</h3>
+                <p className="mt-0.5 mb-3 text-xs cw-text-muted">
+                  Pick one or more feeds and sync their latest advisories — no upload needed.
                 </p>
-                <p className="mb-2 text-xs cw-text-muted">
-                  Sync fetches this feed&apos;s latest advisories through its public API and files them here — no download or upload needed. Pick a feed and click Sync.
-                </p>
-                <div className="flex gap-2">
-                  <select value={feedKey || apiSources[0]?.key || ''} onChange={(e) => setFeedKey(e.target.value)}
-                    className="min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-transparent px-2 py-2 text-sm cw-text-default">
-                    {apiSources.map((s) => (
-                      <option key={s.key} value={s.key}>{s.name}{s.region ? ` · ${s.region}` : ''}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => syncMutation.mutate(feedKey || apiSources[0]?.key)}
-                    disabled={syncMutation.isPending || apiSources.length === 0}
-                    className="btn-secondary flex items-center gap-1.5">
-                    {syncMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync
-                  </button>
+                <div className="space-y-1.5">
+                  {apiSources.map((s) => {
+                    const on = feedKeys.has(s.key);
+                    return (
+                      <label key={s.key}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm hover:bg-[var(--color-hover)]">
+                        <input type="checkbox" checked={on}
+                          onChange={() => setFeedKeys((prev) => {
+                            const n = new Set(prev);
+                            if (on) n.delete(s.key); else n.add(s.key);
+                            return n;
+                          })} />
+                        <span className="min-w-0 flex-1 truncate cw-text-default">{s.name}</span>
+                        {s.region && <span className="shrink-0 text-xs cw-text-muted">{s.region}</span>}
+                      </label>
+                    );
+                  })}
                 </div>
+                <button onClick={() => syncMutation.mutate([...feedKeys])}
+                  disabled={syncMutation.isPending || feedKeys.size === 0}
+                  className="btn-secondary mt-3 flex items-center gap-1.5">
+                  {syncMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Sync{feedKeys.size > 0 ? ` (${feedKeys.size})` : ''}
+                </button>
                 {syncMsg && <p className={`mt-2 text-xs ${syncMsg.ok ? 'text-green-700' : 'text-yellow-700'}`}>{syncMsg.text}</p>}
               </div>
 
               <div className="mt-5">
-                <p className="mb-2 rounded-md bg-[var(--color-subtle)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider cw-text-default">
-                  Upload a PDF
-                </p>
-                <p className="text-xs cw-text-muted">
-                  Have an advisory from any CERT or vendor, any country — including ones with no public feed? Download its PDF and use
-                  <span className="font-medium"> Upload advisory</span>. Same parser; it auto-detects the issuing region and files it there (you confirm if it&apos;s unsure).
+                <h3 className="text-base font-bold cw-text-default">Upload a PDF</h3>
+                <p className="mt-0.5 text-xs cw-text-muted">
+                  For an advisory with no public feed — any CERT or vendor, any country. Same parser; it auto-detects the region.
                 </p>
                 {uploadedDocs.length > 0 && (
                   <div className="mt-3">
