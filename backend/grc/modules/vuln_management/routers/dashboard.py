@@ -12,16 +12,13 @@ from ....models import (
     NormalizedControl, InternalControl, VulnerabilityMitigation
 )
 
-RESOLVED_STATUSES = [
-    "resolved", "remediated", "verified", "closed",
-    "accepted", "false_positive", "auto_closed_decommissioned",
-    "auto_closed_fixed",
-]
 from ....schemas import (
     VulnerabilityDashboard, OverdueVulnerabilityResponse, AssetExposureResponse
 )
 from ....routers.auth_router import require_auth, get_user_tenants, get_user_primary_tenant
 from .._adhoc_filter import exclude_adhoc, inventory_assets_only
+# Single source of truth: RESOLVED_STATUSES + the shared deduped-distinct count helper.
+from ..dedup_count import RESOLVED_STATUSES, distinct_vuln_count  # noqa: F401 (re-exported for callers)
 
 router = APIRouter(prefix="/dashboard", tags=["Vulnerability Dashboard"])
 
@@ -86,41 +83,10 @@ def get_dashboard(
     # others"). asset_type (host-type key namespacing) + internet exposure come from
     # one batch link query over inventory assets only; exposure is a per-link fact so
     # we keep each group's member ids to decide it. Representative = most severe.
-    from grc.modules.pentest.dedup_tables import dedup_key
-    from grc.modules.pentest.service import _SEV_RANK_DISTINCT
-    _atype: Dict[int, str] = {}
-    _exposed_ids: set = set()
-    _all_ids = [v.id for v in vulns]
-    if _all_ids:
-        for vid, atype, inet, isinet in (
-            db.query(VulnerabilityAssetLink.vulnerability_id, ITAsset.asset_type,
-                     ITAsset.internet_facing, ITAsset.is_internet_facing)
-            .join(ITAsset, ITAsset.id == VulnerabilityAssetLink.asset_id)
-            .filter(VulnerabilityAssetLink.vulnerability_id.in_(_all_ids),
-                    *inventory_assets_only(ITAsset)).all()
-        ):
-            _atype.setdefault(vid, atype)
-            if inet or isinet:
-                _exposed_ids.add(vid)
-    _groups: Dict[Any, dict] = {}
-
-    def _rank(v):
-        return _SEV_RANK_DISTINCT.get((v.severity or "info").strip().lower(), 5)
-    for v in vulns:
-        kd = {"cve_id": v.cve_id, "title": v.title, "asset_type": _atype.get(v.id),
-              "affected_url": getattr(v, "affected_url", None),
-              "affected_component": getattr(v, "affected_component", None)}
-        try:
-            k = dedup_key(kd)
-        except Exception:  # noqa: BLE001 — a bad key must never merge unrelated rows
-            k = ("_id", v.id)
-        g = _groups.get(k)
-        if g is None:
-            _groups[k] = {"rep": v, "ids": [v.id]}
-        else:
-            g["ids"].append(v.id)
-            if _rank(v) < _rank(g["rep"]):
-                g["rep"] = v
+    # The dedup fold is the SHARED implementation (one source of truth for every "open vulns" surface —
+    # register, IT Asset Inventory, AI Pentest). get_dashboard is the canonical caller; keep it identical.
+    from ..dedup_count import fold_distinct_vulns
+    _groups, _exposed_ids = fold_distinct_vulns(db, vulns)
     # Internet-exposed = DISTINCT findings with any member linked to an internet-facing
     # inventory asset (computed here from the groups, replacing the old raw-link SQL).
     internet_exposed_count = sum(

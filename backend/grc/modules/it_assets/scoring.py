@@ -415,6 +415,14 @@ def score_inventory(db, tids, now=None):
     grade = (None if perf is None else "excellent" if perf >= 85 else "good" if perf >= 70
              else "fair" if perf >= 50 else "poor")
 
+    # Headline vuln counts use the SHARED deduped-distinct helper, so the inventory's
+    # "open vulns / Needs attention" reconciles exactly with the register Overview and the
+    # AI Pentest dashboard (one dedup truth, inventory-scoped, ad-hoc excluded). The per-metric
+    # ratios above intentionally keep their raw open_vulns inputs.
+    from ..vuln_management.dedup_count import distinct_vuln_count as _distinct
+    _distinct_total = _distinct(db, tids, inventory_only=True)
+    _distinct_open = _distinct(db, tids, open_only=True, inventory_only=True)
+
     return {
         "as_of": now.isoformat(),
         # True when there is no inventory to score at all — the UI should show
@@ -424,7 +432,7 @@ def score_inventory(db, tids, now=None):
         # `hosts` keeps the flat per-name count so a scanning/attack-surface card can
         # still show "N domains · M hosts" without hiding the host figure.
         "counts": {"assets": rolled_n, "hosts": N, "external": rolled_external, "internal": rolled_internal,
-                   "vulnerabilities": len(vulns), "open_vulnerabilities": len(open_vulns), "cde_scoped": rolled_cde},
+                   "vulnerabilities": _distinct_total, "open_vulnerabilities": _distinct_open, "cde_scoped": rolled_cde},
         "performance": {"score": perf, "grade": grade, "components": comps},
         "fleet_cis": fleet_cis,
         "sections": sections,
