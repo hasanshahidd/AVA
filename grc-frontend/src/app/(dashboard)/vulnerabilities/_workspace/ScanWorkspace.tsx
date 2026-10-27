@@ -12,8 +12,8 @@
  * job=poll) + /pentest/scanned-assets for the rail. No new scanner.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ScanLine, Play, Loader2, ShieldCheck, Server, Globe, KeyRound, Target, Plus } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus } from 'lucide-react';
 import apiClient, { vulnManagementApi } from '@/lib/api';
 import { AssetCveSidebar, type SidebarAsset } from '@/components/scan/AssetCveSidebar';
 import ScanLauncher from './ScanLauncher';
@@ -91,12 +91,6 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     }, 3000);
   };
 
-  const scanMut = useMutation({
-    mutationFn: (assetId: number) => vulnManagementApi.scan.start(assetId),
-    onMutate: () => setJob({ status: 'queued', stage: 'starting' }),
-    onSuccess: (res) => { const id = res.data?.job_id; if (id) poll(id); else setJob({ status: 'failed', error: 'scan did not start' }); },
-    onError: (e: any) => setJob({ status: 'failed', error: e?.response?.data?.detail || 'could not start scan' }),
-  });
   // The rich launcher started one or more scans; focus the first scanned asset and poll its job.
   const onLauncherStarted = (assetId: number, jobId: number) => {
     setShowLauncher(false);
@@ -140,9 +134,6 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                   <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: INK }}>{plan?.asset?.name || selMeta?.label || `Asset ${selected}`}{selMeta?.adhoc && <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '2px 6px', marginLeft: 8 }}>AD-HOC</span>}</h2>
                   <div style={{ fontSize: 11, color: MUTED, fontFamily: 'ui-monospace,Consolas,monospace' }}>{[plan?.asset?.ip, plan?.asset?.hostname, plan?.asset?.asset_type].filter(Boolean).join(' · ') || '—'}</div>
                 </div>
-                <button style={{ ...btnGreen, opacity: scanning ? 0.6 : 1, cursor: scanning ? 'not-allowed' : 'pointer' }} disabled={scanning || selMeta?.adhoc} title={selMeta?.adhoc ? 'Re-scan an ad-hoc target by adding it again' : 'Run a live find-scan of this asset'} onClick={() => selected != null && scanMut.mutate(selected)}>
-                  {scanning ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}{scanning ? 'Scanning…' : 'Run scan'}
-                </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
                 <Meta icon={<Target size={13} />} label="Routed lane" value={routing.lane_label || routing.lane || '—'} />
