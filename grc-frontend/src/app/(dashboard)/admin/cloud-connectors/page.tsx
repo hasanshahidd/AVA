@@ -8,15 +8,13 @@ import {
 import { cloudConnectorsApi, type CloudConnector } from '@/lib/api';
 import { PageLoader } from '@/components/ui';
 import {
-  AwsIcon, AzureIcon, GcpIcon, NessusIcon, NexposeIcon, getProviderIcon,
+  AwsIcon, AzureIcon, GcpIcon, getProviderIcon,
 } from '@/components/integrations/ProviderIcons';
 
-// Card catalogue — drives the top-of-page card grid. Each entry maps to
-// either a `CloudConnector` provider (new framework) or the legacy
-// scanner integrations table. The card shows status pulled from the
-// live connector list; clicking either opens the create modal pre-filled
-// with the right provider, or deep-links to the legacy admin page.
-type CardKind = 'cloud_connector' | 'legacy_scanner';
+// Card catalogue — drives the top-of-page card grid. Each entry maps to a
+// `CloudConnector` provider; the card shows status pulled from the live
+// connector list and clicking opens the create modal pre-filled.
+type CardKind = 'cloud_connector';
 interface ProviderCard {
   provider: string;
   label: string;
@@ -53,22 +51,8 @@ const PROVIDER_CATALOGUE: ProviderCard[] = [
     iconBg: 'bg-emerald-50',
     icon: GcpIcon,
   },
-  {
-    provider: 'nessus',
-    label: 'Tenable Nessus',
-    description: 'Scanner ingest via Nessus / Tenable.io API key pair.',
-    kind: 'legacy_scanner',
-    iconBg: 'bg-sky-50',
-    icon: NessusIcon,
-  },
-  {
-    provider: 'nexpose',
-    label: 'Rapid7 Nexpose',
-    description: 'Scanner ingest via Nexpose / InsightVM console credentials.',
-    kind: 'legacy_scanner',
-    iconBg: 'bg-rose-50',
-    icon: NexposeIcon,
-  },
+  // Nessus / Nexpose scanners are NOT cloud — they live in the Vulnerability
+  // Scanners category. Kept out of here to avoid duplication.
 ];
 
 const STATUS_STYLES: Record<string, string> = {
