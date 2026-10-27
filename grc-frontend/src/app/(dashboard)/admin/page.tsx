@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, KeyRound, Lock, UsersRound, Server } from 'lucide-react';
+import { Building2, Users as UsersIcon, ShieldCheck, ScrollText, Lock, UsersRound, Plug } from 'lucide-react';
 import OrganizationProfilePage from './organization/page';
 import UsersManagementPage from './users/page';
 import RolesManagementPage from './roles/page';
@@ -10,14 +10,17 @@ import TeamsAdminPage from './teams/page';
 import DepartmentsAdminPage from './departments/page';
 import AuditLogsPage from './audit-logs/page';
 import PasswordPolicyPage from './password-policy/page';
-import IntegrationsConnectionsPage from '../integrations/connections/page';
-import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
+import ConnectorsHub, { type ConnectorCategory } from './_connectors-hub';
 
-type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'identity' | 'password-policy' | 'integrations' | 'audit';
+type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'connectors' | 'password-policy' | 'audit';
+
+// Legacy deep-links (the Entra SSO consent callback lands on ?tab=identity, and
+// cloud-connectors links back to ?tab=integrations) now resolve to the unified
+// Connectors tab with the matching category preselected.
+const LEGACY_TAB_CATEGORY: Record<string, ConnectorCategory> = { identity: 'identity', integrations: 'scanners' };
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
-  'company','users','roles','teams','departments','identity','password-policy',
-  'integrations','audit',
+  'company','users','roles','teams','departments','connectors','password-policy','audit',
 ]);
 
 export default function AdminPage() {
@@ -25,12 +28,14 @@ export default function AdminPage() {
   // Sidebar Administration popover deep-links via ?tab=<id>. Default
   // landing stays 'company' when no/invalid param is given — preserves
   // existing behavior for anyone hitting /admin without a query string.
+  const rawTab = searchParams?.get('tab') ?? '';
   const initialTab = (() => {
-    const raw = searchParams?.get('tab');
-    if (raw && VALID_ADMIN_TABS.has(raw as AdminTab)) return raw as AdminTab;
+    if (rawTab in LEGACY_TAB_CATEGORY) return 'connectors' as AdminTab;
+    if (rawTab && VALID_ADMIN_TABS.has(rawTab as AdminTab)) return rawTab as AdminTab;
     return 'company';
   })();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const connectorsInitialCategory: ConnectorCategory = LEGACY_TAB_CATEGORY[rawTab] ?? 'external';
 
   const adminTabs: { id: AdminTab; label: string; icon: typeof Building2 }[] = [
     { id: 'company', label: 'Company', icon: Building2 },
@@ -40,11 +45,11 @@ export default function AdminPage() {
     { id: 'teams', label: 'Teams', icon: UsersRound },
     // Help-Desk service-desk departments, surfaced in Admin (also visible in HD).
     { id: 'departments', label: 'Departments', icon: Building2 },
-    { id: 'identity', label: 'Identity Providers', icon: KeyRound },
     // Password & session policy — controls complexity, lockout, and idle timeout.
     { id: 'password-policy', label: 'Password Policy', icon: Lock },
-    // Vulnerability scanner consoles — Rapid7 Nexpose / Tenable Nessus ingest.
-    { id: 'integrations', label: 'Vulnerability Scanners', icon: Server },
+    // Unified connectors — External Connectors, Vulnerability Scanners, Cloud,
+    // Discovery Hosts and Identity/SSO as categories on one page.
+    { id: 'connectors', label: 'Connectors', icon: Plug },
     // Tenant-scoped activity trail — who did what, when (audit_log middleware).
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
   ];
@@ -84,9 +89,8 @@ export default function AdminPage() {
         {activeTab === 'roles' && <RolesManagementPage />}
         {activeTab === 'teams' && <TeamsAdminPage />}
         {activeTab === 'departments' && <DepartmentsAdminPage />}
-        {activeTab === 'identity' && <IdentityProvidersCard />}
         {activeTab === 'password-policy' && <PasswordPolicyPage />}
-        {activeTab === 'integrations' && <IntegrationsConnectionsPage />}
+        {activeTab === 'connectors' && <ConnectorsHub initialCategory={connectorsInitialCategory} />}
         {activeTab === 'audit' && <AuditLogsPage />}
       </div>
       </div>
