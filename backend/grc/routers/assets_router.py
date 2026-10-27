@@ -361,6 +361,14 @@ def _fleet_lane(asset):
         at = (getattr(asset, "asset_type", "") or "").lower()
         if at in ("web", "website", "url", "webapp"):
             return "web"
+        # EASM web-probed asset: external_probe found a LIVE http/https service on it (an asset carries no
+        # affected_url for _lane_for_target to web-detect, but the EASM probe is the same signal) → web lane,
+        # not the network default. This is what lets a discovered site (e.g. www.liztek.ca) land under Web.
+        pp = getattr(asset, "platform_properties", None)
+        if isinstance(pp, dict):
+            probe = pp.get("external_probe")
+            if isinstance(probe, dict) and probe.get("live") and str(probe.get("scheme", "")).lower() in ("http", "https"):
+                return "web"
         return _lane_for_target(asset)
     except Exception:
         return None
