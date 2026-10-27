@@ -574,6 +574,8 @@ AVA_ENROLL="{token}"
 AVA_TENANT="{tenant}"
 [ "$(id -u)" -eq 0 ] || {{ echo "Run as root (sudo)"; exit 1; }}
 install -d /opt/ava-agent
+# Idempotent re-install: stop any running agent so the binary isn't busy (ETXTBSY).
+systemctl stop ava-agent 2>/dev/null || true
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/api/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
@@ -618,6 +620,10 @@ $AvaEnroll = "{token}"
 $AvaTenant = "{tenant}"
 $dir = "$env:ProgramData\\AvaAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
+# Idempotent re-install: stop any running agent so the .exe isn't locked.
+schtasks /End /TN "AvaAgent" 2>$null | Out-Null
+Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
 [Environment]::SetEnvironmentVariable('AVA_URL', $AvaUrl, 'Machine')
@@ -647,6 +653,8 @@ case "$(uname -m)" in
   *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
 esac
 install -d /opt/ava-agent
+# Idempotent re-install: unload any running agent so the binary isn't busy.
+launchctl bootout system /Library/LaunchDaemons/io.caiva.agent.plist 2>/dev/null || launchctl unload /Library/LaunchDaemons/io.caiva.agent.plist 2>/dev/null || true
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/api/agents/installer/$BIN/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent

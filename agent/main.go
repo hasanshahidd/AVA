@@ -555,6 +555,23 @@ func cisRun(apiToken string) {
 	}
 }
 
+// reEnroll swaps a revoked/invalid api_token for a fresh one using AVA_ENROLL
+// (set by the installer, so it's present after a re-install) — lets a revoked
+// agent recover when it's re-installed with a new token. Returns true on success.
+func reEnroll(st *state) bool {
+	if os.Getenv("AVA_ENROLL") == "" {
+		return false
+	}
+	tok, err := enroll()
+	if err != nil {
+		return false
+	}
+	st.APIToken = tok
+	_ = saveState(*st)
+	fmt.Println("re-enrolled OK")
+	return true
+}
+
 func main() {
 	if base() == "" {
 		fmt.Fprintln(os.Stderr, "AVA_URL is required")
@@ -574,7 +591,12 @@ func main() {
 		fmt.Println("enrolled OK")
 	}
 	if err := report(st.APIToken); err != nil {
-		fmt.Fprintln(os.Stderr, "report error:", err)
+		if strings.Contains(err.Error(), "(401)") && reEnroll(&st) {
+			_ = report(st.APIToken)
+			fmt.Println("reported inventory OK")
+		} else {
+			fmt.Fprintln(os.Stderr, "report error:", err)
+		}
 	} else {
 		fmt.Println("reported inventory OK")
 	}
@@ -594,7 +616,11 @@ func main() {
 		if elapsed >= 60 {
 			elapsed = 0
 			if err := report(st.APIToken); err != nil {
-				fmt.Fprintln(os.Stderr, "periodic report error:", err)
+				if strings.Contains(err.Error(), "(401)") && reEnroll(&st) {
+					_ = report(st.APIToken)
+				} else {
+					fmt.Fprintln(os.Stderr, "periodic report error:", err)
+				}
 			}
 		}
 	}
