@@ -213,8 +213,9 @@ export default function InventoryRedesign(p: Props) {
     return <span className="num">{v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `$${Math.round(v / 1e3)}K` : `$${Math.round(v)}`}</span>;
   };
 
+  // zoom 0.8 matches the Vulnerability Register's house-compact scale.
   return (
-    <div className="inv2 fade" style={{ fontSize: 13.5 }}>
+    <div className="inv2 fade" style={{ fontSize: 13.5, zoom: 0.8 }}>
       {/* PAGE HEAD — parent now renders the common title + toggle header, so this
           is skipped when embedded (hideHead) to avoid a duplicate heading. */}
       {!p.hideHead && (
@@ -351,7 +352,7 @@ export default function InventoryRedesign(p: Props) {
                                   onClick={(e) => { e.stopPropagation(); setOpenApex((s) => { const n = new Set(s); const k = dnsName(a); if (n.has(k)) n.delete(k); else n.add(k); return n; }); }}
                                   style={{ width: 18, height: 18, flex: 'none', border: 'none', background: 'transparent', cursor: 'pointer', color: '#78838F', fontSize: 12, lineHeight: 1, transform: apexOpen ? 'rotate(90deg)' : 'none', transition: 'transform .12s' }}>▸</button>
                               ) : isChild ? <span style={{ width: 18, flex: 'none', color: '#C4CCD3', textAlign: 'center' }}>└</span> : null}
-                              <span style={{ width: 32, height: 32, borderRadius: 9, background: tl.bg, color: tl.fg, display: 'grid', placeItems: 'center', fontWeight: 600, flex: 'none' }}>{(a.name || '?').match(/[a-z0-9]/i)?.[0]?.toUpperCase() || '?'}</span>
+                              <span style={{ width: 26, height: 26, borderRadius: 7, fontSize: 12, background: tl.bg, color: tl.fg, display: 'grid', placeItems: 'center', fontWeight: 600, flex: 'none' }}>{(a.name || '?').match(/[a-z0-9]/i)?.[0]?.toUpperCase() || '?'}</span>
                               <div style={{ minWidth: 0 }}>
                                 <span style={{ fontWeight: 600, color: '#0F1F2B' }}>{a.name}</span>
                                 <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>

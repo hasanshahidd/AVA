@@ -161,6 +161,39 @@ func osName() string {
 	return runtime.GOOS
 }
 
+// detectDomain reports the machine's AD/DNS domain and whether it is actually
+// domain-joined. The backend uses this to refuse enrollment of a PC that isn't
+// on the required domain (a leaked install command run on a WORKGROUP/home PC).
+func detectDomain() (string, bool) {
+	switch runtime.GOOS {
+	case "windows":
+		// Win32_ComputerSystem.Domain is the AD DNS domain when joined, else the
+		// workgroup name; PartOfDomain is the authoritative join flag.
+		out := run("powershell", "-NoProfile", "-Command",
+			"$cs=Get-CimInstance Win32_ComputerSystem; Write-Output ($cs.Domain + '|' + $cs.PartOfDomain)")
+		p := strings.SplitN(out, "|", 2)
+		joined := len(p) == 2 && strings.EqualFold(strings.TrimSpace(p[1]), "True")
+		return strings.TrimSpace(p[0]), joined
+	case "linux":
+		// Only an actual realm/AD join counts as part-of-domain.
+		if r := run("realm", "list", "--name-only"); r != "" {
+			return strings.TrimSpace(strings.Split(r, "\n")[0]), true
+		}
+		return "", false
+	case "darwin":
+		// dsconfigad prints the bound AD domain when the Mac is AD-joined.
+		for _, line := range strings.Split(run("dsconfigad", "-show"), "\n") {
+			if i := strings.Index(line, "="); i >= 0 && strings.Contains(strings.ToLower(line), "domain") {
+				if v := strings.TrimSpace(line[i+1:]); v != "" {
+					return v, true
+				}
+			}
+		}
+		return "", false
+	}
+	return "", false
+}
+
 type sw struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -311,9 +344,11 @@ func enroll() (string, error) {
 	}
 	host, _ := os.Hostname()
 	ip, _ := netInfo()
+	dom, joined := detectDomain()
 	rb, code, err := post(base()+"/api/agents/enroll", "", map[string]any{
 		"enrollment_token": tok, "hostname": host, "os_family": runtime.GOOS,
 		"agent_version": agentVersion, "ip_address": ip,
+		"domain": dom, "part_of_domain": joined,
 	})
 	if err != nil {
 		return "", err
@@ -400,17 +435,27 @@ type cisOscap struct {
 	Datastream string `json:"datastream"`
 	Profile    string `json:"profile"`
 }
+type cisWin struct {
+	Shell   string `json:"shell"`
+	Command string `json:"command"`
+	Timeout int    `json:"timeout"`
+}
 type cisJob struct {
 	RunID      int       `json:"run_id"`
 	RuleID     string    `json:"rule_id"`
 	RunnerType string    `json:"runner_type"`
 	Oscap      *cisOscap `json:"oscap"`
+	Win        *cisWin   `json:"win"` // windows: run the check locally, ship raw stdout
 }
 type cisResult struct {
 	RunID     int            `json:"run_id"`
-	Status    string         `json:"status"`
-	Summary   string         `json:"summary"`
+	Status    string         `json:"status,omitempty"`
+	Summary   string         `json:"summary,omitempty"`
 	RawOutput map[string]any `json:"raw_output,omitempty"`
+	// Windows: raw command output — the server scores it (no local verdict).
+	Stdout     string `json:"stdout,omitempty"`
+	ExitStatus *int   `json:"exit_status,omitempty"`
+	Stderr     string `json:"stderr,omitempty"`
 }
 
 // mapOscap mirrors oscap_runner._STATUS_MAP exactly so agent verdicts score
@@ -507,7 +552,7 @@ func runOscap(apiToken, datastream, profile string) map[string]string {
 // cisRun pulls this agent's pending CIS rules, runs the benchmark locally with
 // oscap, and posts verdicts back. Linux only for now (Windows CIS is WinRM-based).
 func cisRun(apiToken string) {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
 		return
 	}
 	rb, code, err := get(base()+"/api/agents/jobs", apiToken)
@@ -520,11 +565,74 @@ func cisRun(apiToken string) {
 	if json.Unmarshal(rb, &jr) != nil || len(jr.Jobs) == 0 {
 		return
 	}
-	// Group by (datastream, profile): oscap evaluates the whole profile once and
-	// returns every rule's verdict, so we never run it per-rule.
+	var results []cisResult
+	if runtime.GOOS == "windows" {
+		results = runWindowsChecks(jr.Jobs)
+	} else {
+		results = runLinuxOscap(apiToken, jr.Jobs)
+	}
+	if len(results) > 0 {
+		if _, c, _ := post(base()+"/api/agents/jobs/results", apiToken,
+			map[string]any{"results": results}); c == 200 {
+			fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
+		}
+	}
+}
+
+// runWindowsChecks runs each job's CIS check locally (the command was already
+// read-only-safety-gated server-side) and returns the RAW output — the server
+// scores it, so the agent never duplicates the verdict logic.
+func runWindowsChecks(jobs []cisJob) []cisResult {
+	cut := func(s string, n int) string {
+		if len(s) > n {
+			return s[:n]
+		}
+		return s
+	}
+	var results []cisResult
+	for _, j := range jobs {
+		if j.Win == nil || j.Win.Command == "" {
+			continue
+		}
+		to := j.Win.Timeout
+		if to <= 0 {
+			to = 60
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(to)*time.Second)
+		var cmd *exec.Cmd
+		if strings.EqualFold(j.Win.Shell, "cmd") {
+			cmd = exec.CommandContext(ctx, "cmd", "/c", j.Win.Command)
+		} else {
+			cmd = exec.CommandContext(ctx, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", j.Win.Command)
+		}
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		cancel()
+		rc := 0
+		if err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				rc = ee.ExitCode()
+			} else {
+				rc = -1 // couldn't start / timed out — server treats as no-evidence
+			}
+		}
+		rcCopy := rc
+		results = append(results, cisResult{
+			RunID: j.RunID, ExitStatus: &rcCopy,
+			Stdout: cut(stdout.String(), 65536), Stderr: cut(stderr.String(), 8192),
+		})
+	}
+	return results
+}
+
+// runLinuxOscap groups jobs by (datastream, profile) — oscap evaluates the whole
+// profile once and returns every rule's verdict, so we never run it per-rule.
+func runLinuxOscap(apiToken string, jobs []cisJob) []cisResult {
 	type key struct{ ds, prof string }
 	groups := map[key][]cisJob{}
-	for _, j := range jr.Jobs {
+	for _, j := range jobs {
 		if j.Oscap == nil || j.Oscap.Datastream == "" {
 			continue
 		}
@@ -532,9 +640,9 @@ func cisRun(apiToken string) {
 		groups[k] = append(groups[k], j)
 	}
 	var results []cisResult
-	for k, jobs := range groups {
+	for k, js := range groups {
 		verdicts := runOscap(apiToken, k.ds, k.prof)
-		for _, j := range jobs {
+		for _, j := range js {
 			v, ok := verdicts[j.Oscap.RuleID]
 			st := mapOscap(v)
 			if !ok {
@@ -547,12 +655,7 @@ func cisRun(apiToken string) {
 			})
 		}
 	}
-	if len(results) > 0 {
-		if _, c, _ := post(base()+"/api/agents/jobs/results", apiToken,
-			map[string]any{"results": results}); c == 200 {
-			fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
-		}
-	}
+	return results
 }
 
 // reEnroll swaps a revoked/invalid api_token for a fresh one using AVA_ENROLL

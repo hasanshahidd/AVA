@@ -65,6 +65,7 @@ def _agent_dict(a: ComplianceAgent, now: datetime) -> Dict[str, Any]:
         "last_result_at": a.last_result_at.isoformat() if a.last_result_at else None,
         "enrolled_at": a.enrolled_at.isoformat() if a.enrolled_at else None,
         "created_at": a.created_at.isoformat() if a.created_at else None,
+        "allowed_domain": a.allowed_domain,
     }
 
 
@@ -84,6 +85,7 @@ class EnrollIn(BaseModel):
     mode: Optional[str] = "collector"
     asset_id: Optional[int] = None
     os_family: Optional[str] = None
+    allowed_domain: Optional[str] = None   # AD domain the enrolling PC must be joined to; blank = any
 
 
 class BulkHost(BaseModel):
@@ -100,7 +102,8 @@ class BulkEnrollIn(BaseModel):
 
 def _new_agent(db: Session, tenant_id: int, *, name: str, mode: str,
                os_family: Optional[str], asset_id: Optional[int],
-               user_id: Optional[int], hostname: Optional[str] = None) -> tuple[ComplianceAgent, str]:
+               user_id: Optional[int], hostname: Optional[str] = None,
+               allowed_domain: Optional[str] = None) -> tuple[ComplianceAgent, str]:
     now = datetime.utcnow()
     enr = "enr_" + secrets.token_urlsafe(32)
     # agent_name is UNIQUE per tenant. The console auto-names by OS ("windows
@@ -118,6 +121,7 @@ def _new_agent(db: Session, tenant_id: int, *, name: str, mode: str,
         status="pending", kind="single",
         enrollment_token_hash=_hash(enr), enrollment_max_uses=1, enrollment_uses=0,
         enrollment_expires_at=now + ENROLLMENT_TTL,
+        allowed_domain=(allowed_domain.strip() or None) if allowed_domain else None,
         created_by_user_id=user_id, created_at=now, updated_at=now,
     )
     db.add(agent)
@@ -143,7 +147,8 @@ def enroll_agent(body: EnrollIn, request: Request,
     tenant_id = get_user_primary_tenant(current_user, db)
     agent, enr = _new_agent(db, tenant_id, name=body.agent_name.strip(),
                             mode=body.mode or "collector", os_family=body.os_family,
-                            asset_id=body.asset_id, user_id=current_user.id)
+                            asset_id=body.asset_id, user_id=current_user.id,
+                            allowed_domain=body.allowed_domain)
     db.commit(); db.refresh(agent)
     slug = getattr(request.state, "tenant_slug", None) or ""
     return {"id": agent.id, "agent_name": agent.agent_name, "status": agent.status,
@@ -196,6 +201,8 @@ class AgentEnrollIn(BaseModel):
     os_family: Optional[str] = None
     agent_version: Optional[str] = None
     ip_address: Optional[str] = None
+    domain: Optional[str] = None            # AD/DNS domain the machine is joined to (WORKGROUP if none)
+    part_of_domain: Optional[bool] = None   # true only when actually AD-joined
 
 
 class ReportIn(BaseModel):
@@ -220,6 +227,23 @@ def _agent_by_api_token(db: Session, authorization: Optional[str]) -> Compliance
     return agent
 
 
+def _domain_allowed(allowed_domain: Optional[str], reported: Optional[str],
+                    part_of_domain: Optional[bool]) -> bool:
+    """Whether a machine reporting (reported, part_of_domain) may enrol under
+    allowed_domain. No binding (None/blank) → always allowed. Match is
+    case-insensitive; a dotted AD domain additionally requires a real domain
+    join, so merely renaming a workgroup to the domain name won't pass."""
+    if not allowed_domain or not allowed_domain.strip():
+        return True
+    want = allowed_domain.strip().lower()
+    got = (reported or "").strip().lower()
+    if got != want:
+        return False
+    if "." in want and not part_of_domain:
+        return False
+    return True
+
+
 @router.post("/enroll")
 def agent_enroll(body: AgentEnrollIn, db: Session = Depends(get_db)):
     """The installed agent exchanges its one-time enrollment token for a
@@ -233,6 +257,16 @@ def agent_enroll(body: AgentEnrollIn, db: Session = Depends(get_db)):
         raise HTTPException(401, "Enrollment token expired")
     if agent.enrollment_max_uses is not None and (agent.enrollment_uses or 0) >= agent.enrollment_max_uses:
         raise HTTPException(401, "Enrollment token already used")
+    # Domain binding: refuse a machine that isn't joined to the required domain,
+    # even with a valid token — this is what stops a leaked install command from
+    # onboarding an outside PC (it reports WORKGROUP / a different domain).
+    # shortcut: trusts the agent's self-reported domain; upgrade to a machine-cert
+    # / AD-attested join proof if spoofing by a token-holder becomes a concern.
+    if not _domain_allowed(agent.allowed_domain, body.domain, body.part_of_domain):
+        raise HTTPException(
+            403,
+            f"This machine is not joined to the required domain "
+            f"('{agent.allowed_domain}'); enrollment refused.")
     api_token = "aak_" + secrets.token_urlsafe(32)
     agent.api_token_hash = _hash(api_token)
     agent.status = "active"
@@ -281,6 +315,17 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
         asset.ip_address = body.ip_address
     if body.os_family:
         asset.os_family = body.os_family
+    # Normalize the reported OS caption to the benchmark key (e.g. "Microsoft
+    # Windows 11 Pro" → "windows-11"). Without os_normalized the CIS scan's
+    # per-asset benchmark filter skips every plugin for an agent host (the
+    # pinned-asset NO-OS guard), so local CIS would silently run nothing.
+    if body.os_name:
+        from grc.modules.compliance_plugins.services.os_detector import normalize_os_string
+        _fam, _norm, _build, _edition = normalize_os_string(body.os_name)
+        if _norm:
+            asset.os_normalized = _norm
+            if not asset.os_version:
+                asset.os_version = body.os_name
     pp = dict(asset.platform_properties or {})
     pp["agent"] = {
         "provenance": "agent", "agent_id": agent.id,
@@ -343,13 +388,20 @@ def _ensure_agent_connection(db: Session, agent: ComplianceAgent, asset: ITAsset
     the agent (run_service.execute_plugin collector branch) rather than attempting
     an agentless SSH reach we don't have for a NAT'd / firewalled endpoint.
 
-    Linux only: the agent runs `oscap` locally, so its connection uses the
-    oscap-eligible ``linux_ssh`` family and the scan's per-plugin filter accepts
-    it. Windows local CIS is not built yet, so Windows agents get inventory only.
-    The connection's console_url is the asset host, so it matches ONLY this asset
+    The connection's integration_type is the transport family the scan's
+    per-plugin filter requires: ``linux_ssh`` for Linux (oscap runs locally) and
+    ``windows_winrm`` for Windows (the agent runs the plugin's PowerShell check
+    locally and ships raw stdout; the server scores it). Either way the collector
+    tag (assigned_collector_agent_id) makes execute_plugin create a PENDING agent
+    job instead of a remote reach we don't have for a NAT'd / firewalled endpoint.
+    macOS has no local CIS engine yet → inventory only. The connection's
+    console_url is the asset host, so it matches ONLY this asset
     (connection_matcher) and never another host. Idempotent on the agent id."""
     from grc.models import IntegrationConnection
-    if (agent.os_family or "").lower() not in ("linux", "unix"):
+    fam = (agent.os_family or "").lower()
+    itype = ("linux_ssh" if fam in ("linux", "unix")
+             else "windows_winrm" if fam == "windows" else None)
+    if itype is None:
         return
     host = (asset.host_name or asset.ip_address or "").strip()
     if not host:
@@ -360,13 +412,14 @@ def _ensure_agent_connection(db: Session, agent: ComplianceAgent, asset: ITAsset
                 .first())
     if existing is not None:
         existing.console_url = host  # asset IP/name can drift; keep it current
+        existing.integration_type = itype  # OS could be learned after first report
         existing.is_active = True
         existing.status = "connected"
         existing.updated_at = now
         return
     db.add(IntegrationConnection(
         tenant_id=agent.tenant_id,
-        integration_type="linux_ssh",            # oscap-eligible transport family
+        integration_type=itype,                  # transport family the scan filter accepts
         category="collector",
         connection_name=f"Agent · {agent.agent_name} (#{agent.id})"[:200],
         console_url=host,
@@ -436,9 +489,14 @@ def agent_heartbeat(authorization: Optional[str] = Header(default=None),
 # ── Agent CIS jobs (local compliance execution) ─────────────────────────────
 class CisResultIn(BaseModel):
     run_id: int
-    status: str                       # passed | failed | error | skipped
+    status: Optional[str] = None      # final verdict (oscap path); None for windows raw
     summary: Optional[str] = ""
     raw_output: Optional[Dict[str, Any]] = None
+    # Windows checks: the agent ships the RAW command output and the server
+    # scores it with the same evaluator the credentialed WinRM path uses.
+    stdout: Optional[str] = None
+    exit_status: Optional[int] = None
+    stderr: Optional[str] = None
 
 
 class CisResultsIn(BaseModel):
@@ -453,6 +511,7 @@ def agent_jobs(authorization: Optional[str] = Header(default=None),
     posts verdicts to /agents/jobs/results. These rows were created as 'pending'
     by the agentless executor's collector branch (run_service.execute_plugin)."""
     from grc.models import CompliancePlugin, CompliancePluginRun
+    from grc.modules.compliance_plugins.runners.winrm_runner import is_command_safe
     agent = _agent_by_api_token(db, authorization)
     rows = (db.query(CompliancePluginRun, CompliancePlugin)
             .join(CompliancePlugin, CompliancePlugin.id == CompliancePluginRun.plugin_id)
@@ -461,11 +520,25 @@ def agent_jobs(authorization: Optional[str] = Header(default=None),
     jobs = []
     for run, plugin in rows:
         cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
+        # Windows CIS: the agent runs the plugin's PowerShell/cmd check locally
+        # (as SYSTEM, no creds) and ships raw stdout — the server scores it with
+        # the SAME evaluator the credentialed WinRM path uses. Only ship a command
+        # that passes the read-only safety gate, so a mutating command never runs
+        # on the endpoint. Unsafe curated content (rare) is left pending.
+        win = None
+        if plugin.runner_type == "windows_winrm":
+            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else None
+            cmd = (wcd or {}).get("command")
+            if wcd and isinstance(cmd, str) and is_command_safe(cmd)[0]:
+                win = {"shell": (wcd.get("shell") or "powershell"),
+                       "command": cmd,
+                       "timeout": int(wcd.get("timeout_seconds") or 30)}
         jobs.append({
             "run_id": run.id, "plugin_id": plugin.id,
             "rule_id": plugin.rule_id, "plugin_key": plugin.plugin_key,
             "benchmark": plugin.benchmark, "runner_type": plugin.runner_type,
             "oscap": cd.get("oscap"),  # {rule_id, datastream, profile} for linux oscap rules
+            "win": win,                # {shell, command, timeout} for windows checks
         })
     if agent.pending_scan_at is not None:  # work pulled — clear the nudge
         agent.pending_scan_at = None
@@ -495,11 +568,20 @@ def agent_jobs_results(body: CisResultsIn,
         if plugin is None:
             skipped += 1
             continue
-        status = r.status if r.status in ("passed", "failed", "error", "skipped") else "error"
-        result = RunnerResult(
-            status=status, summary=(r.summary or "")[:4000],
-            raw_output=r.raw_output or {},
-            error_message=(r.summary or "")[:500] if status == "error" else None)
+        if plugin.runner_type == "windows_winrm" and r.exit_status is not None:
+            # Windows: score the agent's raw output server-side with the SAME
+            # evaluator (expect kinds + no-evidence guard) the WinRM runner uses,
+            # so an agent verdict is identical to a credentialed-scan verdict.
+            from grc.modules.compliance_plugins.runners.winrm_runner import evaluate_windows_result
+            cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
+            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else {}
+            result = evaluate_windows_result(wcd, r.stdout or "", int(r.exit_status), r.stderr or "")
+        else:
+            status = r.status if r.status in ("passed", "failed", "error", "skipped") else "error"
+            result = RunnerResult(
+                status=status, summary=(r.summary or "")[:4000],
+                raw_output=r.raw_output or {},
+                error_message=(r.summary or "")[:500] if status == "error" else None)
         _finalize_run(db, run, result, plugin=plugin, tenant_id=agent.tenant_id,
                       user_id=None, triggered_by="agent")
         applied += 1
@@ -737,6 +819,16 @@ if __name__ == "__main__":  # self-check — pure logic, no DB
     assert "/api/agents/installer/linux/bin" in lin and "systemctl enable --now ava-agent" in lin
     win = _windows_installer("https://app.caiva.io", "enr_xyz", "ava")
     assert '$AvaEnroll = "enr_xyz"' in win and '$AvaTenant = "ava"' in win
+
+    # Domain binding gate.
+    assert _domain_allowed(None, "WORKGROUP", False)          # no binding → any machine
+    assert _domain_allowed("", "anything", False)             # blank binding → any machine
+    assert _domain_allowed("bank.local", "bank.local", True)  # joined to the right AD domain
+    assert _domain_allowed("bank.local", "BANK.LOCAL", True)  # case-insensitive
+    assert not _domain_allowed("bank.local", "WORKGROUP", False)   # home/off-domain PC refused
+    assert not _domain_allowed("bank.local", "other.local", True)  # wrong domain refused
+    assert not _domain_allowed("bank.local", "bank.local", False)  # dotted domain requires real join
+    assert _domain_allowed("WORKGROUP", "WORKGROUP", False)   # non-dotted name (e.g. test box) matches by name
     assert "ava-agent.exe" in win and "schtasks" in win and "AVA_TENANT" in win
     assert _BIN["linux"] == "ava-agent-linux" and _BIN["windows"] == "ava-agent-windows.exe"
     print("agents_router self-check PASSED")

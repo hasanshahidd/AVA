@@ -357,6 +357,10 @@ function InstallAgent({
 }) {
   const [busy, setBusy] = useState(false);
   const [cmd, setCmd] = useState<string | null>(null);
+  // Optional AD-domain lock: when set, the backend refuses enrollment of any PC
+  // not joined to this domain — a leaked install command can't onboard an
+  // outside/home machine (it reports WORKGROUP or a different domain).
+  const [domain, setDomain] = useState('');
   const runner = os === 'windows' ? 'an elevated PowerShell' : 'a terminal as root (sudo)';
 
   const copyText = async (text: string) => {
@@ -400,7 +404,7 @@ function InstallAgent({
     try {
       // Mint a one-time token; the backend returns the full install command with
       // the cloud URL + tenant + token baked in (one command per OS family).
-      const enr = await agentsApi.enroll({ agent_name: enrollName ?? `${os} agent`, os_family: os });
+      const enr = await agentsApi.enroll({ agent_name: enrollName ?? `${os} agent`, os_family: os, allowed_domain: domain.trim() || undefined });
       const data = enr.data as { commands?: Record<string, string> };
       const command = data.commands?.[os];
       if (!command) throw new Error('No install command returned by the server');
@@ -416,15 +420,25 @@ function InstallAgent({
 
   if (!cmd) {
     return (
-      <button
-        type="button"
-        onClick={generate}
-        disabled={busy}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
-      >
-        <Download className="h-3.5 w-3.5" />
-        {busy ? 'Preparing…' : 'Get install command'}
-      </button>
+      <div className="space-y-1.5">
+        <input
+          type="text"
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+          placeholder="Lock to AD domain (e.g. bank.local) — optional"
+          title="Only machines joined to this domain can enrol with this command. Leave blank to allow any machine."
+          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-[11px] text-slate-800 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={generate}
+          disabled={busy}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {busy ? 'Preparing…' : 'Get install command'}
+        </button>
+      </div>
     );
   }
 
