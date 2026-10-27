@@ -1,23 +1,20 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createPortal } from 'react-dom';
 import {
   Plug, Plus, RefreshCw, CheckCircle, AlertCircle, Loader2, X, ExternalLink,
   Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2, Mic, Cpu, Fingerprint, Globe,
-  Cloud, ChevronLeft,
+  Cloud,
 } from 'lucide-react';
-import { connectorsApi, integrationsApi, type ConnectorProviderMeta, type ConnectorRow } from '@/lib/api';
+import {
+  connectorsApi, integrationsApi, cloudConnectorsApi,
+  type ConnectorProviderMeta, type ConnectorRow, type CloudConnector,
+} from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { AwsIcon, AzureIcon, GcpIcon, NessusIcon } from '@/components/integrations/ProviderIcons';
-// The vulnerability-scanner (Nessus) and cloud-posture connectors keep their own
-// add/test/sync flows — we mount those real pages whole in a drill-in rather than
-// re-implement them, so this stays one consolidated page with no behaviour change.
-import ConnectionsPage from '../../integrations/connections/page';
-import CloudConnectorsPage from '../cloud-connectors/page';
 
-// Visual metadata per category — drives the tab pills and icon per card.
+// Visual metadata per category — drives the section header + icon per card.
 const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; description: string; }> = {
   ticketing:  { label: 'Ticketing',     icon: Ticket,         description: 'Push vulnerabilities and exceptions to your ITSM. Two-way status sync.' },
   siem:       { label: 'SIEM',          icon: Activity,       description: 'Pull active-exploitation signals to enrich vulnerability priority.' },
@@ -62,12 +59,15 @@ function ProviderLogo({ provider }: { provider: ConnectorProviderMeta }) {
   );
 }
 
+const CLOUD_PROVIDERS = [
+  { provider: 'aws_inspector', label: 'AWS Inspector v2', icon: AwsIcon, description: 'Cross-account assume-role — we never store an AWS access key.' },
+  { provider: 'azure_defender', label: 'Microsoft Defender for Cloud', icon: AzureIcon, description: 'Service principal scoped to Security Reader; secret encrypted at rest.' },
+  { provider: 'gcp_scc', label: 'Google Cloud SCC', icon: GcpIcon, description: 'Service-account JSON key, scoped to org-level read-only roles.' },
+] as const;
+
 export default function ConnectorsAdminPage() {
   const [openSetupFor, setOpenSetupFor] = useState<ConnectorProviderMeta | null>(null);
   const [editingConnector, setEditingConnector] = useState<ConnectorRow | null>(null);
-  // Drill-ins to the real scanner / cloud management pages (mounted whole).
-  const [showScanner, setShowScanner] = useState(false);
-  const [showCloud, setShowCloud] = useState(false);
 
   const { data: catalog, isLoading: catalogLoading } = useQuery({
     queryKey: ['connectors', 'providers'],
@@ -78,13 +78,6 @@ export default function ConnectorsAdminPage() {
     queryKey: ['connectors', 'list'],
     queryFn: async () => (await connectorsApi.list()).data.items,
   });
-
-  // Nessus connection count for the injected pentest card (shares ConnectionsPage's cache key).
-  const { data: scannerConns } = useQuery({
-    queryKey: ['connections'],
-    queryFn: () => integrationsApi.listConnections({ scanners_only: true }),
-  });
-  const scannerCount = scannerConns?.data?.connections?.length ?? 0;
 
   // Group existing connections by provider so each provider card can show
   // how many connections of that kind the tenant already has.
@@ -152,23 +145,14 @@ export default function ConnectorsAdminPage() {
                   onEdit={(c) => setEditingConnector(c)}
                 />
               ))}
-              {/* Nessus sits with the offensive-security tools; its real add/sync lives in the scanner drill-in. */}
-              {category === 'pentest' && (
-                <StaticCard
-                  icon={NessusIcon}
-                  label="Tenable Nessus"
-                  description="Authenticated vulnerability scanner. Pull findings into the register; two-way sync and auto-close on re-scan."
-                  count={scannerCount}
-                  buttonLabel="Manage scanner"
-                  onClick={() => setShowScanner(true)}
-                />
-              )}
+              {/* Nessus sits with the offensive-security tools; its connections show inline. */}
+              {category === 'pentest' && <ScannerCard />}
             </div>
           </section>
         );
       })}
 
-      {/* Cloud posture — its own section; real add/test/sync lives in the cloud drill-in. */}
+      {/* Cloud posture — each provider shows its own connectors inline. */}
       {catalog && (
         <section className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -177,9 +161,9 @@ export default function ConnectorsAdminPage() {
             <span className="text-xs text-slate-400">— Pull vulnerability findings from your cloud security posture (AWS / Azure / GCP).</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            <StaticCard icon={AwsIcon} label="AWS Inspector v2" description="Cross-account assume-role — we never store an AWS access key." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
-            <StaticCard icon={AzureIcon} label="Microsoft Defender for Cloud" description="Service principal scoped to Security Reader; secret encrypted at rest." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
-            <StaticCard icon={GcpIcon} label="Google Cloud SCC" description="Service-account JSON key, scoped to org-level read-only roles." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
+            {CLOUD_PROVIDERS.map((p) => (
+              <CloudProviderCard key={p.provider} provider={p.provider} label={p.label} icon={p.icon} description={p.description} />
+            ))}
           </div>
         </section>
       )}
@@ -204,31 +188,124 @@ export default function ConnectorsAdminPage() {
           );
         })()
       )}
-
-      {showScanner && (
-        <DrillIn title="Vulnerability scanner — Tenable Nessus" onBack={() => setShowScanner(false)}>
-          <ConnectionsPage />
-        </DrillIn>
-      )}
-      {showCloud && (
-        <DrillIn title="Cloud security posture" onBack={() => setShowCloud(false)}>
-          <CloudConnectorsPage />
-        </DrillIn>
-      )}
     </div>
   );
 }
 
-// Static entry card for the scanner/cloud connectors whose real add flows live in
-// a drill-in (they don't fit the registry's generic field form).
-function StaticCard({ icon: Icon, label, description, count, buttonLabel, onClick }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  label: string;
-  description: string;
-  count?: number;
-  buttonLabel: string;
-  onClick: () => void;
+// ─── Inline connection row (shared by scanner + cloud cards) ─────────
+
+function ConnRow({ name, status, onTest, testing, onSync, syncing, onRemove }: {
+  name: string; status: string;
+  onTest: () => void; testing?: boolean;
+  onSync: () => void; syncing?: boolean;
+  onRemove: () => void;
 }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <StatusDot status={status} />
+      <span className="flex-1 truncate text-left text-slate-700" title={status}>{name}</span>
+      <button type="button" onClick={onTest} disabled={testing} className="text-slate-400 hover:text-primary-600" title="Test / health-check">
+        {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookOpenCheck className="h-3 w-3" />}
+      </button>
+      <button type="button" onClick={onSync} disabled={syncing} className="text-slate-400 hover:text-primary-600" title="Sync now">
+        {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      </button>
+      <button type="button" onClick={onRemove} className="text-slate-400 hover:text-rose-600" title="Remove">
+        <Trash2 className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Nessus (vulnerability scanner) card — inline connections ────────
+
+type ScannerConn = { id: number; connection_name: string; status: string };
+
+function ScannerCard() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [addOpen, setAddOpen] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ['connections'],
+    queryFn: () => integrationsApi.listConnections({ scanners_only: true }),
+  });
+  const conns: ScannerConn[] = (data?.data?.connections ?? []) as ScannerConn[];
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['connections'] });
+
+  const testM = useMutation({
+    mutationFn: (id: number) => integrationsApi.testConnection(id),
+    onSuccess: (r) => { toast({ title: r?.data?.success ? 'Connection OK' : 'Connection failed', message: r?.data?.message }); invalidate(); },
+  });
+  const syncM = useMutation({ mutationFn: (id: number) => integrationsApi.triggerSync(id), onSuccess: () => { toast({ title: 'Sync queued' }); invalidate(); } });
+  const delM = useMutation({ mutationFn: (id: number) => integrationsApi.deleteConnection(id, true), onSuccess: () => { toast({ title: 'Connection removed' }); invalidate(); } });
+
+  return (
+    <div className="group rounded-xl border border-slate-200 bg-white p-3 transition-all hover:border-[var(--color-base)] hover:shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <NessusIcon size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="truncate text-sm font-semibold text-slate-900">Tenable Nessus</h4>
+            {conns.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                <CheckCircle className="h-2.5 w-2.5" />{conns.length} connected
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Authenticated vulnerability scanner. Pull findings into the register; two-way sync and auto-close on re-scan.</p>
+        </div>
+      </div>
+
+      {conns.length > 0 && (
+        <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+          {conns.map((c) => (
+            <ConnRow key={c.id} name={c.connection_name} status={c.status}
+              onTest={() => testM.mutate(c.id)} testing={testM.isPending}
+              onSync={() => syncM.mutate(c.id)} syncing={syncM.isPending}
+              onRemove={() => { if (confirm(`Remove "${c.connection_name}"?`)) delM.mutate(c.id); }} />
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={() => setAddOpen(true)}
+        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-primary-400 hover:text-primary-600 transition-colors">
+        <Plus className="h-3.5 w-3.5" /> Add Nessus connection
+      </button>
+
+      {addOpen && <ScannerAddModal onClose={() => setAddOpen(false)} onSaved={() => { invalidate(); setAddOpen(false); }} />}
+    </div>
+  );
+}
+
+// ─── Cloud posture card (per provider) — inline connectors ───────────
+
+function CloudProviderCard({ provider, label, icon: Icon, description }: {
+  provider: string; label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  description: string;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [addOpen, setAddOpen] = useState(false);
+
+  const { data } = useQuery({ queryKey: ['cloud-connectors'], queryFn: () => cloudConnectorsApi.list() });
+  const all: CloudConnector[] = data?.data ?? [];
+  const conns = all.filter((c) => c.provider === provider);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['cloud-connectors'] });
+
+  const statusOf = (c: CloudConnector): string =>
+    !c.is_active ? 'disconnected'
+      : c.last_health_status === 'healthy' ? 'connected'
+      : c.last_health_status ? 'error'
+      : 'pending';
+
+  const hcM = useMutation({ mutationFn: (id: number) => cloudConnectorsApi.healthCheck(id), onSuccess: (r) => { toast({ title: `Health: ${r?.data?.status ?? 'checked'}`, message: r?.data?.detail }); invalidate(); } });
+  const syncM = useMutation({ mutationFn: (id: number) => cloudConnectorsApi.sync(id), onSuccess: () => { toast({ title: 'Sync queued' }); invalidate(); } });
+  const delM = useMutation({ mutationFn: (id: number) => cloudConnectorsApi.delete(id), onSuccess: () => { toast({ title: 'Connector removed' }); invalidate(); } });
+
   return (
     <div className="group rounded-xl border border-slate-200 bg-white p-3 transition-all hover:border-[var(--color-base)] hover:shadow-sm">
       <div className="flex items-start gap-2.5">
@@ -238,49 +315,221 @@ function StaticCard({ icon: Icon, label, description, count, buttonLabel, onClic
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <h4 className="truncate text-sm font-semibold text-slate-900">{label}</h4>
-            {count ? (
+            {conns.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                <CheckCircle className="h-2.5 w-2.5" />{count} connected
+                <CheckCircle className="h-2.5 w-2.5" />{conns.length} connected
               </span>
-            ) : null}
+            )}
           </div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:border-primary-400 hover:text-primary-600 transition-colors"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        {buttonLabel}
+
+      {conns.length > 0 && (
+        <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+          {conns.map((c) => (
+            <ConnRow key={c.id} name={c.display_name} status={statusOf(c)}
+              onTest={() => hcM.mutate(c.id)} testing={hcM.isPending}
+              onSync={() => syncM.mutate(c.id)} syncing={syncM.isPending}
+              onRemove={() => { if (confirm(`Delete connector "${c.display_name}"? This won't remove assets or vulns it has synced.`)) delM.mutate(c.id); }} />
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={() => setAddOpen(true)}
+        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-primary-400 hover:text-primary-600 transition-colors">
+        <Plus className="h-3.5 w-3.5" /> Add {label} connection
       </button>
+
+      {addOpen && <CloudAddModal provider={provider} label={label} onClose={() => setAddOpen(false)} onSaved={() => { invalidate(); setAddOpen(false); }} />}
     </div>
   );
 }
 
-// Full-screen drill-in that mounts a real management page. Portalled to body so the
-// admin page's zoom:0.85 wrapper doesn't shrink/offset the fixed overlay.
-function DrillIn({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" /> Connectors
-        </button>
-        <span className="text-sm font-semibold text-slate-800">{title}</span>
+function StatusDot({ status }: { status: string }) {
+  const color =
+    status === 'connected' ? 'bg-emerald-500' :
+    status === 'error' ? 'bg-rose-500' :
+    status === 'disconnected' ? 'bg-slate-400' :
+    'bg-amber-400';
+  return <span className={`h-1.5 w-1.5 rounded-full ${color} shrink-0`} title={status} />;
+}
+
+// ─── Modal shell (shared by the scanner + cloud add modals) ──────────
+
+function ModalShell({ title, subtitle, onClose, children }: {
+  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-xl bg-white shadow-2xl flex flex-col">
+        <header className="flex items-start justify-between gap-2 border-b border-slate-200 px-5 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        {children}
       </div>
-      <div className="flex-1 overflow-auto">{children}</div>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
-// ─── Provider card ────────────────────────────────────────────────
+const INPUT_CLS = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500';
+
+// ─── Scanner (Nessus) add modal ──────────────────────────────────────
+
+function ScannerAddModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { toast } = useToast();
+  const m = useMutation({
+    mutationFn: (data: Record<string, unknown>) => integrationsApi.createConnection(data),
+    onSuccess: (r) => {
+      const res = r?.data?.test_result ?? r?.data;
+      toast({ title: 'Nessus connection created', message: res?.message });
+      onSaved();
+    },
+    onError: (err: any) => toast({ title: 'Create failed', message: err?.response?.data?.detail || String(err) }),
+  });
+
+  const submit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    // Payload copied verbatim from the old scanner page's handleCreate.
+    m.mutate({
+      connection_name: f.get('connection_name') as string,
+      integration_type: 'nessus',
+      console_url: f.get('console_url') as string,
+      console_port: parseInt(f.get('console_port') as string) || 8834,
+      access_key: (f.get('access_key') as string) || undefined,
+      secret_key: (f.get('secret_key') as string) || undefined,
+      api_key: (f.get('api_key') as string) || undefined,
+      username: (f.get('username') as string) || undefined,
+      password: (f.get('password') as string) || undefined,
+      sync_schedule: (f.get('sync_schedule') as string) || '0 */4 * * *',
+    });
+  };
+
+  return (
+    <ModalShell title="Add Tenable Nessus connection" subtitle="Authenticated scanner — credentials encrypted at rest." onClose={onClose}>
+      <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Connection name <span className="text-rose-500">*</span></label>
+            <input name="connection_name" required className={INPUT_CLS} placeholder="Production Nessus" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Console URL <span className="text-rose-500">*</span></label>
+            <input name="console_url" type="url" required className={INPUT_CLS} placeholder="https://nessus.company.com" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Console port</label>
+            <input name="console_port" defaultValue="8834" className={INPUT_CLS} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Access key <span className="ml-1 text-[10px] font-normal text-slate-400">(Tenable API)</span></label>
+              <input name="access_key" type="password" className={INPUT_CLS} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Secret key</label>
+              <input name="secret_key" type="password" className={INPUT_CLS} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Username <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span></label>
+              <input name="username" className={INPUT_CLS} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Password <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span></label>
+              <input name="password" type="password" className={INPUT_CLS} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Sync schedule (cron)</label>
+            <input name="sync_schedule" defaultValue="0 */4 * * *" className={INPUT_CLS} />
+          </div>
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose} disabled={m.isPending} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={m.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-[#0a0a0a] hover:bg-primary-700 disabled:opacity-50">
+            {m.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating + testing…</> : <><CheckCircle className="h-4 w-4" /> Create connection</>}
+          </button>
+        </footer>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ─── Cloud add modal ─────────────────────────────────────────────────
+
+function CloudAddModal({ provider, label, onClose, onSaved }: {
+  provider: string; label: string; onClose: () => void; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [displayName, setDisplayName] = useState('');
+  const [creds, setCreds] = useState('{}');
+  const [hours, setHours] = useState(6);
+
+  // Prefill the credentials JSON with the provider's template (stamps the
+  // tenant's stable External ID etc.) so the user only fills their own values.
+  const { data: setup } = useQuery({
+    queryKey: ['cloud-setup', provider],
+    queryFn: () => cloudConnectorsApi.setupInfo(provider).then((r) => r.data),
+  });
+  useEffect(() => {
+    if (setup?.credentials_template) setCreds(JSON.stringify(setup.credentials_template, null, 2));
+  }, [setup]);
+
+  const m = useMutation({
+    mutationFn: (payload: Parameters<typeof cloudConnectorsApi.create>[0]) => cloudConnectorsApi.create(payload),
+    onSuccess: () => { toast({ title: `${label} connector created` }); onSaved(); },
+    onError: (err: any) => toast({ title: 'Create failed', message: err?.response?.data?.detail || String(err) }),
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    let parsed: Record<string, unknown>;
+    try { parsed = JSON.parse(creds); } catch { toast({ title: 'Credentials must be valid JSON.' }); return; }
+    m.mutate({ provider, display_name: displayName, credentials: parsed, sync_schedule_seconds: hours * 3600 });
+  };
+
+  return (
+    <ModalShell title={`Add ${label} connection`} subtitle="Read-only cloud posture — credentials encrypted at rest." onClose={onClose}>
+      <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Display name <span className="text-rose-500">*</span></label>
+            <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={INPUT_CLS} placeholder={`${label} (primary)`} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Credentials (JSON)</label>
+            <textarea value={creds} onChange={(e) => setCreds(e.target.value)} rows={8}
+              className={`${INPUT_CLS} font-mono text-xs`} spellCheck={false} />
+            {setup?.security_summary && (
+              <p className="mt-1 text-[11px] text-slate-500">{setup.security_summary}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Sync schedule (hours)</label>
+            <input type="number" min={1} value={hours} onChange={(e) => setHours(parseInt(e.target.value) || 6)} className={INPUT_CLS} />
+          </div>
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose} disabled={m.isPending} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" disabled={m.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-[#0a0a0a] hover:bg-primary-700 disabled:opacity-50">
+            {m.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating…</> : <><CheckCircle className="h-4 w-4" /> Create connector</>}
+          </button>
+        </footer>
+      </form>
+    </ModalShell>
+  );
+}
+
+// ─── Provider card (registry connectors) ──────────────────────────────
 
 interface ProviderCardProps {
   provider: ConnectorProviderMeta;
@@ -295,7 +544,7 @@ function ProviderCard({ provider, connections, onAdd, onEdit }: ProviderCardProp
 
   const testMutation = useMutation({
     mutationFn: (id: number) => connectorsApi.test(id),
-    onSuccess: (resp, id) => {
+    onSuccess: (resp) => {
       toast({
         title: resp.data.success ? 'Connection OK' : 'Connection failed',
         message: resp.data.message,
@@ -411,15 +660,7 @@ function ProviderCard({ provider, connections, onAdd, onEdit }: ProviderCardProp
   );
 }
 
-function StatusDot({ status }: { status: string }) {
-  const color =
-    status === 'connected' ? 'bg-emerald-500' :
-    status === 'error' ? 'bg-rose-500' :
-    'bg-amber-400';
-  return <span className={`h-1.5 w-1.5 rounded-full ${color} shrink-0`} title={status} />;
-}
-
-// ─── Setup modal ──────────────────────────────────────────────────
+// ─── Setup modal (registry connectors) ────────────────────────────────
 
 interface SetupModalProps {
   provider: ConnectorProviderMeta;
