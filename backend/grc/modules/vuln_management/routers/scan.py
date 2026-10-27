@@ -57,6 +57,16 @@ def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
     if result is None:
         raise HTTPException(status_code=404, detail="asset not found")
 
+    # Agent-managed hosts are reached THROUGH their installed agent (typically on a network the cloud
+    # can't route to) — a remote scan can't reach them and just hangs. Their vulnerabilities come from
+    # the agent's own telemetry, not a remote scan. Refuse the remote scan with a clear message.
+    if service._is_agent_managed(db, asset_id, user_tenants):
+        raise HTTPException(
+            status_code=409,
+            detail=("This asset is managed by an installed agent (reachable only via the agent). Its "
+                    "vulnerabilities come from the agent's telemetry — a remote scan can't reach it, so "
+                    "it was skipped."))
+
     creds = result["credentials"]
     routing = result["routing"]
     # Creds-required lane with none configured -> refuse by default (don't scan blind),

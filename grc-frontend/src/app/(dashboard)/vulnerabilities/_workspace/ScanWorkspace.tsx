@@ -34,7 +34,7 @@ const FAILED = new Set(['failed', 'error']);
 
 type ScanJob = {
   job_id: number; asset_id: number; asset_name: string; target?: string; adhoc?: boolean;
-  lane?: string; find_mcp?: string; status?: string; progress?: number; findings_count?: number;
+  lane?: string; lane_label?: string; find_mcp?: string; scanner_label?: string; status?: string; progress?: number; findings_count?: number;
   created_at?: string; started_at?: string; finished_at?: string;
 };
 const fmtWhen = (s?: string) => { if (!s) return '—'; const d = new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z'); return isNaN(+d) ? '—' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -198,7 +198,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                             <div style={{ fontWeight: 600, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.asset_name}{j.adhoc && <span style={{ fontSize: 9, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '1px 5px', marginLeft: 6 }}>AD-HOC</span>}</div>
                             {j.target && j.target !== j.asset_name && <div style={{ fontSize: 10, color: FAINT, fontFamily: 'ui-monospace,Consolas,monospace' }}>{j.target}</div>}
                           </td>
-                          <td style={{ padding: '9px 12px', color: SEC, whiteSpace: 'nowrap' }}>{j.lane || '—'}{j.find_mcp ? <span style={{ color: FAINT }}> · {j.find_mcp}</span> : null}</td>
+                          <td style={{ padding: '9px 12px', color: SEC, whiteSpace: 'nowrap' }}>{j.lane_label || j.lane || '—'}{(j.scanner_label || j.find_mcp) ? <span style={{ color: FAINT }}> · {j.scanner_label || j.find_mcp}</span> : null}</td>
                           <td style={{ padding: '9px 12px' }}><span style={{ fontSize: 10, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 999, padding: '2px 8px', textTransform: 'capitalize' }}>{sk}</span></td>
                           <td style={{ padding: '9px 12px', width: 110, textAlign: 'right' }}>
                             {active ? (
@@ -235,13 +235,13 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <span style={{ display: 'grid', placeItems: 'center', height: 34, width: 34, borderRadius: 9, background: ACSOFT, color: AC }}>{selMeta?.adhoc ? <Globe size={17} /> : <Server size={17} />}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: INK }}>{plan?.asset?.name || selMeta?.label || `Asset ${selected}`}{selMeta?.adhoc && <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '2px 6px', marginLeft: 8 }}>AD-HOC</span>}</h2>
+                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: INK }}>{plan?.asset?.name || selMeta?.label || `Asset ${selected}`}{selMeta?.adhoc && <span style={{ fontSize: 9.5, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '2px 6px', marginLeft: 8 }}>AD-HOC</span>}{plan?.asset?.agent_managed && <span style={{ fontSize: 9.5, fontWeight: 700, color: '#1F7A54', background: '#E7F5EE', borderRadius: 5, padding: '2px 6px', marginLeft: 8 }}>AGENT-MANAGED</span>}</h2>
                   <div style={{ fontSize: 11, color: MUTED, fontFamily: 'ui-monospace,Consolas,monospace' }}>{[plan?.asset?.ip, plan?.asset?.hostname, plan?.asset?.asset_type].filter(Boolean).join(' · ') || '—'}</div>
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
                 <Meta icon={<Target size={13} />} label="Routed lane" value={routing.lane_label || routing.lane || '—'} />
-                <Meta icon={<ScanLine size={13} />} label="Scanner (auto)" value={routing.selected_find || '—'} />
+                <Meta icon={<ScanLine size={13} />} label="Scanner (auto)" value={routing.scanner_label || routing.selected_find || '—'} />
                 <Meta icon={<KeyRound size={13} />} label="Credentials" value={creds.action === 'reuse' ? `reuse · ${creds.profile_label || 'saved'}` : creds.action === 'available' ? 'available' : creds.action === 'prompt' ? 'none (required)' : creds.action === 'uncredentialed' ? 'uncredentialed' : (creds.mode || '—')} />
                 <Meta icon={<ShieldCheck size={13} />} label="Findings" value={String(summary.total ?? planVulns.length ?? 0)} />
               </div>
