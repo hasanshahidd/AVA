@@ -206,6 +206,7 @@ class ReportIn(BaseModel):
     agent_version: Optional[str] = None
     software: Optional[List[Dict[str, Any]]] = None   # [{name, version, ...}]
     inventory: Optional[Dict[str, Any]] = None         # hardware/os/network block
+    deep: Optional[str] = None                         # raw stdout of the deep probe (JSON on win, sectioned on linux)
 
 
 def _agent_by_api_token(db: Session, authorization: Optional[str]) -> ComplianceAgent:
@@ -287,6 +288,28 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
         "agent_version": body.agent_version, "reported_at": now.isoformat(),
         "inventory": body.inventory or {},
     }
+    # Rich local telemetry: the agent runs the SAME deep probe the credentialed
+    # path uses, but locally (LocalSystem/root — no creds), so we parse it with
+    # the SAME parser and merge the {status,data} domains (os/cpu/memory/storage/
+    # defender/firewall/security_products/bitlocker/…) at the top level. The
+    # Overview then renders an agent host exactly like an agentless credentialed
+    # scan. A parse hiccup must never fail the report.
+    if body.deep:
+        fam = (body.os_family or "").lower()
+        try:
+            from grc.modules.compliance_plugins.services.agentless_inventory import (
+                _parse_deep_windows, _parse_deep_linux,
+            )
+            if fam == "windows":
+                sections = _parse_deep_windows(body.deep)
+            elif fam in ("linux", "unix"):
+                sections = _parse_deep_linux(body.deep)
+            else:
+                sections = {}
+            for k, v in (sections or {}).items():
+                pp[k] = v
+        except Exception:
+            pass
     asset.platform_properties = pp
     if body.software:
         asset.detected_software_json = body.software
@@ -356,6 +379,25 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
     agent.updated_at = now
     db.commit()
     return {"ok": True, "asset_id": asset_id}
+
+
+@router.get("/collect-script/{os_family}", response_class=PlainTextResponse)
+def agent_collect_script(os_family: str, authorization: Optional[str] = Header(default=None),
+                         db: Session = Depends(get_db)):
+    """The deep inventory probe the agent runs LOCALLY (as LocalSystem/root, so no
+    credentials are needed). It is the SAME script the agentless credentialed path
+    runs over WinRM/SSH — served whole here because local execution has no command-
+    line size limit. Token-gated: only an enrolled agent fetches it."""
+    _agent_by_api_token(db, authorization)  # authz: must be a valid agent token
+    from grc.modules.compliance_plugins.services.agentless_inventory import (
+        _WIN_DEEP_PS, _LINUX_DEEP_SH,
+    )
+    fam = (os_family or "").lower()
+    if fam == "windows":
+        return _WIN_DEEP_PS
+    if fam in ("linux", "unix"):
+        return _LINUX_DEEP_SH
+    raise HTTPException(404, "No deep probe for this OS")
 
 
 @router.post("/heartbeat")

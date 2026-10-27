@@ -21,6 +21,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -335,6 +336,7 @@ func report(apiToken string) error {
 		"hostname": host, "os_name": osName(), "os_family": runtime.GOOS,
 		"ip_address": ip, "agent_version": agentVersion,
 		"software": software(), "inventory": inv,
+		"deep": deepCollect(apiToken),
 	})
 	if err != nil {
 		return err
@@ -343,6 +345,49 @@ func report(apiToken string) error {
 		return fmt.Errorf("report failed (%d): %s", code, string(rb))
 	}
 	return nil
+}
+
+// deepCollect runs the server's deep inventory probe LOCALLY and returns its raw
+// stdout (JSON on Windows, sectioned text on Linux). It is the SAME script the
+// agentless credentialed path uses, but here it runs as LocalSystem/root, so no
+// credentials are needed for the hardware/security telemetry. Best-effort: any
+// failure returns "" and the report still carries the basic inventory.
+func deepCollect(apiToken string) string {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		return "" // no deep probe for darwin yet
+	}
+	body, code, err := get(base()+"/api/agents/collect-script/"+runtime.GOOS, apiToken)
+	if err != nil || code != 200 || len(body) == 0 {
+		return ""
+	}
+	ext := ".sh"
+	if runtime.GOOS == "windows" {
+		ext = ".ps1"
+	}
+	f, err := os.CreateTemp("", "ava-deep-*"+ext)
+	if err != nil {
+		return ""
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp)
+	if _, err := f.Write(body); err != nil {
+		f.Close()
+		return ""
+	}
+	f.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.CommandContext(ctx, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp)
+	} else {
+		cmd = exec.CommandContext(ctx, "sh", tmp)
+	}
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = io.Discard
+	_ = cmd.Run() // partial output is fine — the server-side parser degrades gracefully
+	return strings.TrimSpace(out.String())
 }
 
 func heartbeat(apiToken string) {
