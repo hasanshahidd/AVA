@@ -324,6 +324,16 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
         asset.detected_software_json = _sw
     asset.last_seen_at = now
     asset.last_seen_source = "agent"
+    # Recompute the security posture from the fresh deep data + software, so the
+    # agent host's antivirus/EDR/endpoint-protected summary reflects what the
+    # agent just reported — the agentless path does this via apply_posture, and
+    # without it an enriched agent host stays stuck at its pre-enrichment
+    # "unprotected" summary even though Defender/EDR data is now present.
+    try:
+        from grc.modules.compliance_plugins.services.security_classifier import apply_posture
+        apply_posture(asset)
+    except Exception:
+        pass
     return asset.id
 
 
