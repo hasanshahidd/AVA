@@ -139,6 +139,23 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     finally { setDeleting(null); }
   };
 
+  // On opening an asset, reconcile the detail view to its LATEST scan job — so an already-running scan
+  // (started from the launcher or earlier) shows its live progress bar + polls here too, not only in the
+  // sessions table. Clears any prior poll so we don't double-poll.
+  useEffect(() => {
+    if (selected == null) return;
+    let cancelled = false;
+    vulnManagementApi.scan.latest(selected).then(({ data }: any) => {
+      if (cancelled || !data || data.status === 'none') return;
+      if (!TERMINAL.has(String(data.status))) {
+        setJob(data);
+        if (pollRef.current) clearTimeout(pollRef.current);
+        if (data.job_id) poll(data.job_id);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [selected]);
+
   const scanning = job != null && !TERMINAL.has(String(job.status));
   const planVulns: any[] = plan?.vulns ?? [];
   const routing = plan?.routing ?? {}; const creds = plan?.credentials ?? {}; const summary = plan?.summary ?? {};
