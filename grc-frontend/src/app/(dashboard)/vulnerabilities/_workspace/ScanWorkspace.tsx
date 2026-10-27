@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ScanLine, Play, Loader2, ShieldCheck, Server, Globe, KeyRound, Target, Plus } from 'lucide-react';
 import apiClient, { vulnManagementApi } from '@/lib/api';
 import { AssetCveSidebar, type SidebarAsset } from '@/components/scan/AssetCveSidebar';
+import ScanLauncher from './ScanLauncher';
 import { shortenVulnTitle, type Vulnerability } from './lib';
 
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA', BORDER = '#E8ECEE', INK = '#0F1F2B', MUTED = '#8A95A1', FAINT = '#AEB8C2', SEC = '#3A4653';
@@ -37,9 +38,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
-  const [adhocTarget, setAdhocTarget] = useState('');
-  const [adhocAuth, setAdhocAuth] = useState(false);
-  const [showAdhoc, setShowAdhoc] = useState(false);
+  const [showLauncher, setShowLauncher] = useState(false);
   const [job, setJob] = useState<{ status?: string; progress?: number; stage?: string; findings_count?: number; error?: string } | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
@@ -98,18 +97,14 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     onSuccess: (res) => { const id = res.data?.job_id; if (id) poll(id); else setJob({ status: 'failed', error: 'scan did not start' }); },
     onError: (e: any) => setJob({ status: 'failed', error: e?.response?.data?.detail || 'could not start scan' }),
   });
-  const adhocMut = useMutation({
-    mutationFn: () => vulnManagementApi.scan.adhoc({ target: adhocTarget.trim(), authorized: adhocAuth }),
-    onMutate: () => setJob({ status: 'queued', stage: 'starting' }),
-    onSuccess: (res) => {
-      const { job_id, asset_id } = res.data || {};
-      setAdhocTarget(''); setAdhocAuth(false); setShowAdhoc(false);
-      if (asset_id) setSelected(asset_id);
-      qc.invalidateQueries({ queryKey: ['register', 'scanned-assets'] });
-      if (job_id) poll(job_id); else setJob({ status: 'failed', error: 'scan did not start' });
-    },
-    onError: (e: any) => setJob({ status: 'failed', error: e?.response?.data?.detail || 'could not start ad-hoc scan' }),
-  });
+  // The rich launcher started one or more scans; focus the first scanned asset and poll its job.
+  const onLauncherStarted = (assetId: number, jobId: number) => {
+    setShowLauncher(false);
+    setSelected(assetId);
+    setJob({ status: 'queued', stage: 'starting' });
+    qc.invalidateQueries({ queryKey: ['register', 'scanned-assets'] });
+    poll(jobId);
+  };
 
   const scanning = job != null && !TERMINAL.has(String(job.status));
   const planVulns: any[] = plan?.vulns ?? [];
@@ -118,25 +113,12 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
 
   const header = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button style={{ ...btnGreen, justifyContent: 'center' }} onClick={() => setShowLauncher(true)}><Plus size={14} />New scan</button>
       <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 9, padding: 3, gap: 2 }}>
         {(['all', 'inventory', 'adhoc'] as Filter[]).map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, height: 26, border: 0, borderRadius: 7, background: filter === f ? '#fff' : 'none', color: filter === f ? ACS : '#6B7787', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{f === 'adhoc' ? 'Ad-hoc' : f}</button>
         ))}
       </div>
-      {!showAdhoc ? (
-        <button style={{ ...btn, justifyContent: 'center' }} onClick={() => setShowAdhoc(true)}><Plus size={14} />Add ad-hoc target</button>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: `1px solid ${BORDER}`, borderRadius: 9, padding: 9 }}>
-          <input value={adhocTarget} onChange={(e) => setAdhocTarget(e.target.value)} placeholder="host, IP, URL or git repo" style={{ height: 30, border: `1px solid ${BORDER}`, borderRadius: 7, padding: '0 9px', fontSize: 11.5, outline: 'none', fontFamily: 'ui-monospace,Consolas,monospace' }} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: SEC }}>
-            <input type="checkbox" checked={adhocAuth} onChange={(e) => setAdhocAuth(e.target.checked)} />I am authorized to test this target
-          </label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={{ ...btn, flex: 1, justifyContent: 'center', fontSize: 11 }} onClick={() => { setShowAdhoc(false); setAdhocTarget(''); setAdhocAuth(false); }}>Cancel</button>
-            <button style={{ ...btnGreen, flex: 1, justifyContent: 'center', fontSize: 11, opacity: adhocTarget.trim() && adhocAuth && !adhocMut.isPending ? 1 : 0.5, cursor: adhocTarget.trim() && adhocAuth ? 'pointer' : 'not-allowed' }} disabled={!adhocTarget.trim() || !adhocAuth || adhocMut.isPending} onClick={() => adhocMut.mutate()}>{adhocMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <ScanLine size={13} />}Scan</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -207,6 +189,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
           </div>
         )}
       </div>
+      {showLauncher && <ScanLauncher onClose={() => setShowLauncher(false)} onStarted={onLauncherStarted} />}
     </div>
   );
 }

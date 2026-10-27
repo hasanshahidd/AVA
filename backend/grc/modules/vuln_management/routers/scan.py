@@ -15,6 +15,8 @@ auto-routed from the asset's type by assess()):
 Plan/recon preview is a per-asset read (assess()), no run needed: GET /assets/{id}/scan-plan.
 Poll progress via GET /scan-jobs/{job_id} or /assets/{asset_id}/scan-latest.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -34,13 +36,17 @@ class AdhocScanIn(BaseModel):
     authorized: bool = False          # REQUIRED scope gate: operator confirms authorization
     allow_uncredentialed: bool = False
     coverage: str = "auto"
+    lane: str | None = None           # operator's chosen engine lane (overrides assess() auto-route)
+    find_mcp: str | None = None       # operator's chosen scanner within the lane (optional)
 
 
 def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
-                      allow_uncredentialed: bool, coverage: str) -> dict:
+                      allow_uncredentialed: bool, coverage: str,
+                      lane: str | None = None, find_mcp: str | None = None) -> dict:
     """Shared body for both scan modes: assess() (auto-route) → credential gate → start_scan()
-    (find-only, run_id=None). Raises HTTPException (404/409/422) the router surfaces as-is.
-    Returns the queued job {job_id, status}."""
+    (find-only, run_id=None). The operator MAY override the engine: `lane` pins the engine lane and
+    `find_mcp` the scanner within it; when neither is given the asset's assess() auto-route is used.
+    Raises HTTPException (404/409/422) the router surfaces as-is. Returns the queued job."""
     coverage = (coverage or "auto").lower()
     if coverage not in service._COVERAGE_MODES:
         raise HTTPException(status_code=422,
@@ -54,13 +60,23 @@ def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
     # Creds-required lane with none configured -> refuse by default (don't scan blind),
     # unless the operator explicitly opted into an uncredentialed run.
     if creds["action"] == "prompt" and creds["mode"] == "required" and not allow_uncredentialed:
-        lane = routing.get("lane_label") or routing.get("lane") or "this"
+        lane_lbl = routing.get("lane_label") or routing.get("lane") or "this"
         raise HTTPException(
             status_code=409,
-            detail=(f"The {lane} lane requires credentials and none are configured for this "
+            detail=(f"The {lane_lbl} lane requires credentials and none are configured for this "
                     f"asset. Add a credential profile, or re-run with allow_uncredentialed=true."))
 
-    chosen = routing.get("selected_find")           # auto-routed scanner for this asset's lane
+    lane_key = routing.get("lane")                   # assess() auto-routed lane (default)
+    chosen = routing.get("selected_find")            # auto-routed scanner for that lane (default)
+    if lane:
+        # Operator picked the engine lane explicitly -> honour it: use the chosen scanner within that
+        # lane (find_mcp if valid for the lane, else the lane's first find tool), and scan in that lane.
+        lane_key = lane
+        lane_finds = [t.get("id") for l in service.get_fleet().get("lanes", [])
+                      if l.get("key") == lane_key for t in (l.get("find") or [])]
+        chosen = find_mcp if (find_mcp and find_mcp in lane_finds) else (lane_finds[0] if lane_finds else chosen)
+    elif find_mcp:
+        chosen = find_mcp                            # explicit scanner, asset's auto-routed lane
     if coverage in ("nessus", "openvas"):            # CONTRACT C force pins the internal scanner
         chosen = coverage
     if not chosen:
@@ -76,7 +92,7 @@ def _launch_find_scan(db: Session, asset_id: int, user_tenants: list, *,
     cred_available = bool(creds.get("have_profile")) or creds.get("action") in ("reuse", "available")
     return service.start_scan(
         db, tenant_id=user_tenants[0], asset_id=asset_id, target=target,
-        lane=routing.get("lane"), find_mcp=chosen,
+        lane=lane_key, find_mcp=chosen,
         credentialed=cred_available and not allow_uncredentialed,
         coverage=coverage,
         # run_id defaults to None -> find-only, no exploit (register-owned scan).
@@ -88,16 +104,20 @@ def scan_register_asset(
     asset_id: int,
     allow_uncredentialed: bool = False,  # opt-in: scan WITHOUT creds on a creds-required lane
     coverage: str = "auto",              # auto | all | nessus | openvas (passthrough to engine)
+    lane: Optional[str] = None,          # operator's chosen engine lane (else assess() auto-route)
+    find_mcp: Optional[str] = None,      # operator's chosen scanner within the lane (optional)
     db: Session = Depends(get_db),
     current_user=Depends(require_auth),
 ):
-    """Launch a LIVE find-scan of ONE inventory asset FROM the register. Lane is auto-routed by
-    assess() (no manual pick). Findings land in the register; this does NOT create a pentest run."""
+    """Launch a LIVE find-scan of ONE inventory asset FROM the register. The engine lane is the
+    operator's `lane`/`find_mcp` when given, else auto-routed by assess(). Findings land in the
+    register; this does NOT create a pentest run."""
     user_tenants = get_user_tenants(current_user, db)
     if not user_tenants:
         raise HTTPException(status_code=404, detail="asset not found")
     return _launch_find_scan(db, asset_id, user_tenants,
-                             allow_uncredentialed=allow_uncredentialed, coverage=coverage)
+                             allow_uncredentialed=allow_uncredentialed, coverage=coverage,
+                             lane=lane, find_mcp=find_mcp)
 
 
 @router.post("/scan/adhoc", dependencies=[Depends(_require_scan)])
@@ -122,7 +142,8 @@ def scan_register_adhoc(
     except ValueError as e:  # empty / loopback / unparseable target
         raise HTTPException(status_code=400, detail=str(e))
     res = _launch_find_scan(db, asset.id, user_tenants,
-                            allow_uncredentialed=body.allow_uncredentialed, coverage=body.coverage)
+                            allow_uncredentialed=body.allow_uncredentialed, coverage=body.coverage,
+                            lane=body.lane, find_mcp=body.find_mcp)
     return {**res, "asset_id": asset.id, "adhoc": True}
 
 

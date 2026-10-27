@@ -2319,9 +2319,9 @@ export const vulnManagementApi = {
   // Register-owned scanning: launch a live find-scan of ONE inventory asset FROM the
   // register (no pentest run, no exploit). Findings land in this register. Poll the job.
   scan: {
-    start: (assetId: number, params?: { allow_uncredentialed?: boolean; coverage?: string }) =>
+    start: (assetId: number, params?: { allow_uncredentialed?: boolean; coverage?: string; lane?: string; find_mcp?: string }) =>
       apiClient.post(`/vuln-management/assets/${assetId}/scan`, null, { params }),
-    adhoc: (body: { target: string; authorized: boolean; allow_uncredentialed?: boolean; coverage?: string }) =>
+    adhoc: (body: { target: string; authorized: boolean; allow_uncredentialed?: boolean; coverage?: string; lane?: string; find_mcp?: string }) =>
       apiClient.post(`/vuln-management/scan/adhoc`, body),
     plan: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-plan`),
     job: (jobId: number) => apiClient.get(`/vuln-management/scan-jobs/${jobId}`),
