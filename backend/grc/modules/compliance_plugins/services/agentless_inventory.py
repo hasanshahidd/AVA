@@ -586,7 +586,7 @@ $out.network = S {
       gateway      = @($c.DefaultIPGateway)
       dns          = @($c.DNSServerSearchOrder)
       dhcp_enabled = [bool]$c.DHCPEnabled
-      speed_bps    = $(if ($ad.Speed) { [int64]$ad.Speed } else { 0 })
+      speed_bps    = $(if ($ad.Speed -and $ad.Speed -gt 0 -and $ad.Speed -lt 1000000000000) { [int64]$ad.Speed } else { $null })
       status       = "$($ad.NetConnectionStatus)"
     }
   })

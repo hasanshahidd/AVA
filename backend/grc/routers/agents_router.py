@@ -312,7 +312,16 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
             pass
     asset.platform_properties = pp
     if body.software:
-        asset.detected_software_json = body.software
+        # Windows registers some products under more than one uninstall key, so
+        # the raw list can carry the same (name, version) twice. Collapse to one.
+        _seen, _sw = set(), []
+        for s in body.software:
+            k = (s.get("name"), s.get("version"))
+            if k in _seen:
+                continue
+            _seen.add(k)
+            _sw.append(s)
+        asset.detected_software_json = _sw
     asset.last_seen_at = now
     asset.last_seen_source = "agent"
     return asset.id
