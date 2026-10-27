@@ -527,7 +527,10 @@ def agent_jobs(authorization: Optional[str] = Header(default=None),
         # on the endpoint. Unsafe curated content (rare) is left pending.
         win = None
         if plugin.runner_type == "windows_winrm":
-            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else None
+            # check_definition is usually FLAT ({shell,command,expect,...}); some
+            # may nest it under a "windows_winrm" key. Prefer the nested form,
+            # else use cd itself — mirrors run_service's effective_check handling.
+            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else cd
             cmd = (wcd or {}).get("command")
             if wcd and isinstance(cmd, str) and is_command_safe(cmd)[0]:
                 win = {"shell": (wcd.get("shell") or "powershell"),
@@ -574,7 +577,7 @@ def agent_jobs_results(body: CisResultsIn,
             # so an agent verdict is identical to a credentialed-scan verdict.
             from grc.modules.compliance_plugins.runners.winrm_runner import evaluate_windows_result
             cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
-            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else {}
+            wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else cd
             result = evaluate_windows_result(wcd, r.stdout or "", int(r.exit_status), r.stderr or "")
         else:
             status = r.status if r.status in ("passed", "failed", "error", "skipped") else "error"
