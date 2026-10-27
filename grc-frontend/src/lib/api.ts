@@ -2321,6 +2321,9 @@ export const vulnManagementApi = {
   scan: {
     start: (assetId: number, params?: { allow_uncredentialed?: boolean; coverage?: string }) =>
       apiClient.post(`/vuln-management/assets/${assetId}/scan`, null, { params }),
+    adhoc: (body: { target: string; authorized: boolean; allow_uncredentialed?: boolean; coverage?: string }) =>
+      apiClient.post(`/vuln-management/scan/adhoc`, body),
+    plan: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-plan`),
     job: (jobId: number) => apiClient.get(`/vuln-management/scan-jobs/${jobId}`),
     latest: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-latest`),
   },

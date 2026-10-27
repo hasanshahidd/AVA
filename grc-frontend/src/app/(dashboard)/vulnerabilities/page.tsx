@@ -625,53 +625,6 @@ export default function VulnerabilitiesPage() {
     onError: (e: any) => alert(e?.response?.data?.detail || e?.message || 'Could not create tickets.'),
   });
 
-  // Register-owned scan: launch a live find-scan of one asset, poll the job to a terminal
-  // state, then refresh the register so the new findings appear. Progress shows in the toolbar.
-  const [scanMsg, setScanMsg] = useState<string | null>(null);
-  const [scanBusy, setScanBusy] = useState(false);
-  const scanPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (scanPollRef.current) clearTimeout(scanPollRef.current); }, []);
-  const pollScanJob = (jobId: number, label: string) => {
-    scanPollRef.current = setTimeout(async () => {
-      try {
-        const { data: job } = await vulnManagementApi.scan.job(jobId);
-        const st = job?.status;
-        if (st === 'done' || st === 'failed') {
-          setScanBusy(false);
-          queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
-          queryClient.invalidateQueries({ queryKey: ['vuln-dashboard'] });
-          setScanMsg(st === 'failed'
-            ? `Scan of ${label} failed: ${job?.error || 'see pentest logs'}.`
-            : `Scan of ${label} complete — ${job?.findings_count ?? 0} finding(s) now in the register.`);
-          setTimeout(() => setScanMsg(null), 9000);
-          return;
-        }
-        setScanMsg(`Scanning ${label}… ${job?.stage || st || ''} ${job?.progress != null ? `(${job.progress}%)` : ''}`.trim());
-        pollScanJob(jobId, label);
-      } catch {
-        setScanBusy(false);
-        setScanMsg(`Lost track of the scan of ${label}. Reload to see its latest state.`);
-        setTimeout(() => setScanMsg(null), 9000);
-      }
-    }, 3000);
-  };
-  const scanAssetMutation = useMutation({
-    mutationFn: (assetId: number) => vulnManagementApi.scan.start(assetId),
-    onMutate: () => { setScanBusy(true); setScanMsg('Starting scan…'); },
-    onSuccess: (res, assetId) => {
-      const jobId = res.data?.job_id;
-      const label = (assetOptions ?? []).find((a) => a.id === assetId)?.name || `asset ${assetId}`;
-      if (!jobId) { setScanBusy(false); setScanMsg('Scan did not start.'); return; }
-      setScanMsg(`Scanning ${label}…`);
-      pollScanJob(jobId, label);
-    },
-    onError: (e: any) => {
-      setScanBusy(false);
-      setScanMsg(null);
-      alert(e?.response?.data?.detail || e?.message || 'Could not start the scan.');
-    },
-  });
-
   const handleSelectVuln = (id: number) => {
     const newSelected = new Set(selectedVulnIds);
     if (newSelected.has(id)) {
@@ -1149,10 +1102,6 @@ export default function VulnerabilitiesPage() {
           }}
           bulkUploadState={bulkUploadState}
           bulkUploadMsg={bulkUploadMsg}
-          onScanAsset={hasPermission('vulnerabilities:vulnerability_register:create')
-            ? (assetId) => scanAssetMutation.mutate(assetId) : undefined}
-          scanBusy={scanBusy}
-          scanMsg={scanMsg}
         />
         </div>
 
