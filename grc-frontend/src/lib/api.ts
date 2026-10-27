@@ -2315,6 +2315,42 @@ export const advancedErmApi = {
     apiClient.get(`/advanced-erm/risks/${riskId}/score-history`, { params: { days } }),
 };
 
+export const advisoriesApi = {
+  getAll: () => apiClient.get('/advisories'),
+  getById: (id: number) => apiClient.get(`/advisories/${id}`),
+  create: (data: {
+    title: string;
+    external_id?: string;
+    summary?: string;
+    severity?: string;
+    url?: string;
+    cves: { cve_id: string; affected_product?: string; affected_versions?: string }[];
+  }) => apiClient.post('/advisories', data),
+  recheck: (id: number, scope?: { mode?: string; ctem_scope_id?: number; asset_ids?: number[] }) =>
+    apiClient.post(`/advisories/${id}/recheck`, scope ?? {}),
+  upload: (formData: FormData) =>
+    apiClient.post('/advisories/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  confirm: (
+    id: number,
+    data: {
+      severity?: string;
+      cves: { cve_id: string; affected_product?: string; affected_versions?: string }[];
+    },
+  ) => apiClient.post(`/advisories/${id}/confirm`, data),
+  listSources: () => apiClient.get('/advisories/sources'),
+  syncSource: (key: string, limit?: number) =>
+    apiClient.post(`/advisories/sources/${key}/sync${limit ? `?limit=${limit}` : ''}`),
+  listPdfSources: () => apiClient.get('/advisories/pdf-sources'),
+  scrapePdfSource: (key: string, limit?: number) =>
+    apiClient.post(`/advisories/pdf-sources/${key}/scrape${limit ? `?limit=${limit}` : ''}`),
+  affectedAssets: () => apiClient.get('/advisories/affected-assets'),
+  listRegions: () => apiClient.get('/advisories/regions'),
+  setRegion: (id: number, region: string) => apiClient.post(`/advisories/${id}/region`, { region }),
+  delete: (id: number) => apiClient.delete(`/advisories/${id}`),
+};
+
 export const vulnManagementApi = {
   // Register-owned scanning: launch a live find-scan of ONE inventory asset FROM the
   // register (no pentest run, no exploit). Findings land in this register. Poll the job.

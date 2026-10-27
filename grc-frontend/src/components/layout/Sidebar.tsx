@@ -120,6 +120,7 @@ const navigation: NavEntry[] = [
     icon: ShieldCheck,
     items: [
       { name: 'Vulnerabilities',           href: '/vulnerabilities',               icon: Bug,           requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
+      { name: 'Advisories',                href: '/advisories',                    icon: AlertCircle,   requiredPermissions: ['vulnerabilities:vulnerability_register:*'], requiredModules: ['vulnerabilities'] },
       { name: 'AI Pentest',                href: '/pentest',                       icon: Bot,           activeMatch: '/pentest' },
     ],
   },

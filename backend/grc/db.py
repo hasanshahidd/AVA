@@ -556,6 +556,12 @@ def _init_tenant_schema(engine: Engine, slug: str) -> None:
             _ensure_identity_for_engine(engine)
         except Exception:
             logger.exception("identity schema self-heal failed for slug=%s", slug)
+        try:
+            from .modules.advisories.schema import ensure_advisory_columns
+
+            ensure_advisory_columns(engine)
+        except Exception:
+            logger.exception("advisory schema self-heal failed for slug=%s", slug)
 
 
 def get_tenant_engine(slug: str) -> Engine:

@@ -14,6 +14,7 @@ const ROUTE_PERMS: { prefix: string; perms: string[] }[] = [
   { prefix: '/licenses', perms: ['assets:asset_inventory:*'] },
   { prefix: '/risk-posture', perms: ['erm:risks:*'] },
   { prefix: '/vulnerabilities', perms: ['vulnerabilities:vulnerability_register:*'] },
+  { prefix: '/advisories', perms: ['vulnerabilities:vulnerability_register:*'] },
   { prefix: '/pentest', perms: ['vulnerabilities:vulnerability_register:*'] },
   { prefix: '/reports', perms: ['assets:asset_inventory:*'] },
   // Help Desk — three areas (coordinated with the Help Desk session's nav perms). Longest-prefix

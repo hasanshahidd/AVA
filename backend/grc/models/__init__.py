@@ -39,3 +39,7 @@ from ._asset_risk_snapshot import AssetRiskSnapshot  # noqa: F401 - AVA risk pos
 from ._60_helpdesk_native_models import *  # noqa: F401,F403 - AVA-native Help Desk engine models
 from ._61_helpdesk_mail_models import *  # noqa: F401,F403 - AVA-native Help Desk email model
 from ._62_helpdesk_itsm_models import *  # noqa: F401,F403 - AVA-native Help Desk ITSM foundation (workbook ingest)
+
+# Advisory module tables live in their own feature folder (modules/advisories)
+# to stay isolated from other work; register them here so create_all builds them.
+from ..modules.advisories.models import *  # noqa: F401,F403 - Advisory ingestion/applicability tables

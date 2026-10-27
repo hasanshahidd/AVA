@@ -42,6 +42,7 @@ from .routers.admin_router import router as admin_router
 # Kept: vuln_management, chatbot, workflow_engine, integrations, risk_posture,
 # onboarding, asset_discovery, compliance_plugins (+ shared platform/models).
 from .modules.vuln_management import vuln_management_router
+from .modules.advisories.router import router as advisories_router
 from .modules.helpdesk_native.router import helpdesk_native_router as helpdesk_router
 from .modules.chatbot import (
     chatbot_router,
@@ -245,6 +246,7 @@ app.include_router(audit_plan_router)
 app.include_router(is_projects_router)
 app.include_router(tasks_router)
 app.include_router(vuln_management_router)
+app.include_router(advisories_router)  # Advisory module (modules/advisories)
 app.include_router(helpdesk_router)
 app.include_router(chatbot_router)
 # Business Continuity Management — unique /bcm prefix, order-independent.
