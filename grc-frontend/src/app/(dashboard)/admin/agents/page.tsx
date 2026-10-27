@@ -95,7 +95,7 @@ export default function AgentsAdminPage() {
         <p className="mt-1 max-w-3xl text-sm text-slate-500">
           Install a lightweight agent on a host — it enrols, inventories the machine, and runs
           CIS benchmarks locally, then reports to CAIVA. Built for endpoints you can&apos;t reach
-          over the network: roaming laptops, NAT&apos;d or firewalled boxes. Pick an OS to download.
+          over the network: roaming laptops, NAT&apos;d or firewalled boxes, and cloud VMs. Pick an OS or a cloud provider to install.
         </p>
       </div>
 
@@ -152,6 +152,46 @@ export default function AgentsAdminPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Cloud agents — the SAME collector, run on a cloud VM. Cloud hosts are
+          Linux, so these install the Linux agent (os="linux"); the only thing
+          that differs per provider is WHERE you run the one-liner. Labelled by
+          provider via enrollName so each shows up as "aws agent" etc. */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">Cloud</h2>
+          <span className="text-xs text-slate-500">— run the agent on a cloud instance; it inventories that VM like any host.</span>
+        </div>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {([
+            { key: 'aws', title: 'AWS', meta: 'EC2 · Amazon Linux / Ubuntu', enrollName: 'aws agent',
+              hint: 'Run on an EC2 instance, or paste into the instance User data (runs at first boot).' },
+            { key: 'azure', title: 'Microsoft Azure', meta: 'Azure VM · Linux', enrollName: 'azure agent',
+              hint: 'Run on an Azure VM, or add it as a Custom Script Extension.' },
+            { key: 'digitalocean', title: 'DigitalOcean', meta: 'Droplet · Linux', enrollName: 'digitalocean agent',
+              hint: 'Run on your Droplet, or paste into the Droplet User data (cloud-init).' },
+            { key: 'gcp', title: 'Google Cloud', meta: 'Compute Engine · Linux', enrollName: 'gcp agent',
+              hint: 'Run on a Compute Engine VM, or set it as a startup-script.' },
+          ]).map((c) => (
+            <div
+              key={c.key}
+              className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-primary-300 hover:shadow"
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-50 text-2xl">☁️</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">{c.title}</div>
+                  <div className="text-[11px] text-slate-500">{c.meta}</div>
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-slate-600">{c.hint}</p>
+              <div className="mt-auto pt-4">
+                <InstallAgent os="linux" enrollName={c.enrollName} canManage={canManageAgents} toast={toast} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Installed agents */}
@@ -297,11 +337,14 @@ export default function AgentsAdminPage() {
 // The backend bakes the tenant (?tenant_slug) into the command so it works even
 // though the target host has no browser session.
 function InstallAgent({
-  os, canManage, toast,
+  os, canManage, toast, enrollName,
 }: {
   os: 'windows' | 'linux' | 'macos';
   canManage: boolean;
   toast: ReturnType<typeof useToast>;
+  // Overrides the auto name ("linux agent"). Cloud cards pass "aws agent" etc.
+  // so a cloud VM's agent is labelled by provider even though its OS is Linux.
+  enrollName?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [cmd, setCmd] = useState<string | null>(null);
@@ -348,7 +391,7 @@ function InstallAgent({
     try {
       // Mint a one-time token; the backend returns the full install command with
       // the cloud URL + tenant + token baked in (one command per OS family).
-      const enr = await agentsApi.enroll({ agent_name: `${os} agent`, os_family: os });
+      const enr = await agentsApi.enroll({ agent_name: enrollName ?? `${os} agent`, os_family: os });
       const data = enr.data as { commands?: Record<string, string> };
       const command = data.commands?.[os];
       if (!command) throw new Error('No install command returned by the server');
