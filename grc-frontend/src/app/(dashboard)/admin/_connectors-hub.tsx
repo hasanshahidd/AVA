@@ -1,26 +1,28 @@
 'use client';
 
 // One Connectors page with category filter-tabs. Each tab reuses the existing
-// screen for that connector type — the fragmentation (separate Identity
-// Providers / Vulnerability Scanners admin tabs + standalone connectors/cloud
-// pages) collapses into a single entry point. SSO stays a distinct category
-// (it's sign-in config, not a data connector) but lives here like the rest.
+// screen for that connector type.
+//
+// Scope (verified against the connector registry to avoid duplication):
+//  • External Connectors already carries Identity (Entra, Okta), SIEM, EDR,
+//    Ticketing, Pen-test, Collab, Transcription, EASM — so there is NO separate
+//    "Identity / SSO" category here (that was a duplicate of the identity one).
+//  • Cloud (AWS/Azure/GCP) and Vulnerability Scanners (Nessus/Nexpose) have no
+//    providers in External Connectors, so they are genuine, non-duplicated tabs.
+//  • Discovery Hosts (SSH/WinRM/SNMP) is the IT Asset Discovery → Connections
+//    flow — it lives there, not on this admin page.
 import { useState } from 'react';
-import { Plug, Server, Cloud, Network, KeyRound, type LucideIcon } from 'lucide-react';
+import { Plug, Server, Cloud, type LucideIcon } from 'lucide-react';
 import ConnectorsPage from './connectors/page';
 import IntegrationsConnectionsPage from '../integrations/connections/page';
 import CloudConnectorsPage from './cloud-connectors/page';
-import ConnectWizardPage from './integrations/connect/page';
-import { IdentityProvidersCard } from '@/components/integrations/IdentityProvidersCard';
 
-export type ConnectorCategory = 'external' | 'scanners' | 'cloud' | 'hosts' | 'identity';
+export type ConnectorCategory = 'external' | 'scanners' | 'cloud';
 
 const CATEGORIES: { id: ConnectorCategory; label: string; icon: LucideIcon }[] = [
   { id: 'external', label: 'External Connectors', icon: Plug },
   { id: 'scanners', label: 'Vulnerability Scanners', icon: Server },
   { id: 'cloud', label: 'Cloud', icon: Cloud },
-  { id: 'hosts', label: 'Discovery Hosts', icon: Network },
-  { id: 'identity', label: 'Identity / SSO', icon: KeyRound },
 ];
 
 export default function ConnectorsHub({ initialCategory = 'external' }: { initialCategory?: ConnectorCategory }) {
@@ -56,8 +58,6 @@ export default function ConnectorsHub({ initialCategory = 'external' }: { initia
         {cat === 'external' && <ConnectorsPage />}
         {cat === 'scanners' && <IntegrationsConnectionsPage />}
         {cat === 'cloud' && <CloudConnectorsPage />}
-        {cat === 'hosts' && <ConnectWizardPage embedded />}
-        {cat === 'identity' && <IdentityProvidersCard />}
       </div>
     </div>
   );

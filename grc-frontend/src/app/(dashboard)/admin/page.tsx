@@ -14,10 +14,10 @@ import ConnectorsHub, { type ConnectorCategory } from './_connectors-hub';
 
 type AdminTab = 'company' | 'users' | 'roles' | 'teams' | 'departments' | 'connectors' | 'password-policy' | 'audit';
 
-// Legacy deep-links (the Entra SSO consent callback lands on ?tab=identity, and
-// cloud-connectors links back to ?tab=integrations) now resolve to the unified
-// Connectors tab with the matching category preselected.
-const LEGACY_TAB_CATEGORY: Record<string, ConnectorCategory> = { identity: 'identity', integrations: 'scanners' };
+// Legacy deep-links resolve to the unified Connectors tab with the matching
+// category preselected. ?tab=identity → External Connectors (Entra/Okta live
+// there); ?tab=integrations (cloud-connectors back-links) → Vulnerability Scanners.
+const LEGACY_TAB_CATEGORY: Record<string, ConnectorCategory> = { identity: 'external', integrations: 'scanners' };
 
 const VALID_ADMIN_TABS = new Set<AdminTab>([
   'company','users','roles','teams','departments','connectors','password-policy','audit',
