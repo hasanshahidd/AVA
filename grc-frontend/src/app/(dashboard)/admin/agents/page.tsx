@@ -113,14 +113,17 @@ export default function AgentsAdminPage() {
           { os: 'windows' as const, glyph: '🪟', title: 'Windows agent',
             meta: 'x64 · runs as LocalSystem',
             caps: ['Full hardware + software inventory', 'Auto-enrols, heartbeats & reports on schedule'],
+            run: 'Run in Windows PowerShell as Administrator — not Command Prompt.',
             support: 'Windows 10 / 11 · Server 2016 – 2022' },
           { os: 'linux' as const, glyph: '🐧', title: 'Linux agent',
             meta: 'x64 · systemd service',
             caps: ['Full hardware + software inventory', 'Runs CIS benchmarks locally (OpenSCAP)', 'Auto-enrols, heartbeats & re-scans on schedule'],
+            run: 'Run in a terminal as root (sudo).',
             support: 'Ubuntu 20/22/24 · Debian 11/12 · RHEL/Alma 8/9 · Amazon Linux' },
           { os: 'macos' as const, glyph: '💻', title: 'macOS agent',
             meta: 'Apple Silicon + Intel · LaunchDaemon',
             caps: ['Full hardware + software inventory', 'Auto-enrols, heartbeats & reports on schedule'],
+            run: 'Run in Terminal as root (sudo).',
             support: 'macOS 12 Monterey and later' },
         ]).map((c) => (
           <div
@@ -142,6 +145,9 @@ export default function AgentsAdminPage() {
                 </li>
               ))}
             </ul>
+            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800">
+              {c.run}
+            </p>
             <div className="mt-auto pt-4">
               <InstallAgent
                 os={c.os}
@@ -186,6 +192,9 @@ export default function AgentsAdminPage() {
                 </div>
               </div>
               <p className="mt-4 text-xs text-slate-600">{c.hint}</p>
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800">
+                Run on the cloud VM as root (sudo).
+              </p>
               <div className="mt-auto pt-4">
                 <InstallAgent os="linux" enrollName={c.enrollName} canManage={canManageAgents} toast={toast} />
               </div>
