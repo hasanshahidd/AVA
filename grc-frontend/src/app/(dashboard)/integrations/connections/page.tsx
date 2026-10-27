@@ -316,7 +316,6 @@ export default function ConnectionsPage() {
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="nessus">Tenable Nessus</option>
-                <option value="nexpose">Rapid7 Nexpose / InsightVM</option>
               </select>
             </div>
             <div>
