@@ -2363,6 +2363,9 @@ export const vulnManagementApi = {
     job: (jobId: number) => apiClient.get(`/vuln-management/scan-jobs/${jobId}`),
     list: (limit = 50) => apiClient.get(`/vuln-management/scan-jobs`, { params: { limit } }),
     remove: (jobId: number) => apiClient.delete(`/vuln-management/scan-jobs/${jobId}`),
+    matchedCredentials: (assetIds: number[]) =>
+      apiClient.post<Record<string, { cred_id: number; cred_name: string; cred_kind: string; cred_username: string }>>(
+        `/vuln-management/assets/matched-credentials`, { asset_ids: assetIds }),
     latest: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-latest`),
   },
   reports: {

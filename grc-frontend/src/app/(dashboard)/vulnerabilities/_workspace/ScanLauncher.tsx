@@ -73,6 +73,8 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const [draft, setDraft] = useState('');
   const [authorized, setAuthorized] = useState(false);
   const [credId, setCredId] = useState<number | null>(null);
+  // Inventory flow: assets the operator UNticked (scan surface-only). Default = use the matched login.
+  const [credOff, setCredOff] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -82,8 +84,8 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const effKey = subLane ? subLane.key : top.key;
   const laneName = subLane ? `${top.label} · ${subLane.label}` : top.label;
   const laneOverride = effFleet[0];                               // e.g. 'web' | 'windows' | 'linux' | …
-  const pickTop = (k: string) => { setLane(k); setPicked(new Set()); setCredId(null); const t = TOP_LANES.find((l) => l.key === k); if (t?.subs) setSub(t.subs[0].key); };
-  const pickSub = (k: string) => { setSub(k); setPicked(new Set()); setCredId(null); };
+  const pickTop = (k: string) => { setLane(k); setPicked(new Set()); setCredId(null); setCredOff(new Set()); const t = TOP_LANES.find((l) => l.key === k); if (t?.subs) setSub(t.subs[0].key); };
+  const pickSub = (k: string) => { setSub(k); setPicked(new Set()); setCredId(null); setCredOff(new Set()); };
 
   // Credentials — restored from the old pentest RunLauncher: a creds-capable lane (host/cloud/repo)
   // shows the asset's saved logins so one can be ATTACHED to the scan (threaded as credential_id).
@@ -96,6 +98,15 @@ export default function ScanLauncher({ onClose, onStarted }: {
   });
   const laneCreds = useMemo(() => allCreds.filter((c) => credKinds.includes(c.kind)), [allCreds, credKinds]);
   const list = useMemo(() => assets.filter((a) => a.fleet_lane && effFleet.includes(a.fleet_lane)), [assets, effFleet]);
+  // Per-asset matched login (inventory rows) — each host's OWN CIDR-matched credential, shown inline,
+  // so there's no global dropdown to hand-pick: tick a host to scan it with its own login, untick for surface.
+  const listIds = useMemo(() => list.map((a) => a.id), [list]);
+  const { data: matchedCreds = {} } = useQuery<Record<string, { cred_id: number; cred_name: string; cred_kind: string; cred_username: string }>>({
+    queryKey: ['scan-matched-creds', effKey, listIds.join(',')],
+    queryFn: async () => (await vulnManagementApi.scan.matchedCredentials(listIds)).data ?? {},
+    enabled: flow === 'inventory' && usesCreds && listIds.length > 0,
+  });
+  const credToggle = (id: number) => setCredOff((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const hint = LANE_TARGET_HINT[effKey] ?? LANE_TARGET_HINT.external;
   const toggle = (id: number) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const addTargets = (raw: string) => {
@@ -123,7 +134,11 @@ export default function ScanLauncher({ onClose, onStarted }: {
         const ids = Array.from(picked);
         let firstJob: number | null = null;
         for (const id of ids) {
-          const { data } = await vulnManagementApi.scan.start(id, { lane: laneOverride, ...(credId ? { credential_id: credId } : {}) });
+          // Each host uses its OWN matched login when ticked; unticked (or no login) -> surface scan.
+          const mc = matchedCreds[String(id)];
+          const useCred = usesCreds && !!mc && !credOff.has(id);
+          const credArgs = useCred ? { credential_id: mc.cred_id } : (usesCreds ? { allow_uncredentialed: true } : {});
+          const { data } = await vulnManagementApi.scan.start(id, { lane: laneOverride, ...credArgs });
           if (firstJob == null && data?.job_id) firstJob = data.job_id;
         }
         if (firstJob != null) onStarted(ids[0], firstJob);
@@ -174,14 +189,23 @@ export default function ScanLauncher({ onClose, onStarted }: {
           </div>
           {flow === 'inventory' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {list.length ? list.map((a) => { const sel = picked.has(a.id); return (
-              <button key={a.id} onClick={() => toggle(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, border: `1px solid ${sel ? '#9cc3de' : 'var(--line)'}`, background: sel ? '#f0f7fc' : '#fff', borderRadius: 10, padding: '9px 11px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                <span style={{ display: 'grid', placeItems: 'center', height: 20, width: 20, borderRadius: 6, border: `2px solid ${sel ? 'var(--base)' : '#cbd5e1'}`, background: sel ? 'var(--base)' : '#fff', color: '#fff', flexShrink: 0 }}>{sel && <Check width={13} height={13} />}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.label}</div>
-                  {(a.ip || a.type) && <div className="mono" style={{ fontSize: 9.5, color: 'var(--faint)' }}>{[a.ip, a.type].filter(Boolean).join(' · ')}</div>}
-                </div>
-              </button>
+            {list.length ? list.map((a) => { const sel = picked.has(a.id); const mc = matchedCreds[String(a.id)]; const credOn = sel && usesCreds && !!mc && !credOff.has(a.id); return (
+              <div key={a.id} style={{ border: `1px solid ${sel ? '#9cc3de' : 'var(--line)'}`, background: sel ? '#f0f7fc' : '#fff', borderRadius: 10, overflow: 'hidden' }}>
+                <button onClick={() => toggle(a.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, border: 'none', background: 'transparent', padding: '9px 11px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <span style={{ display: 'grid', placeItems: 'center', height: 20, width: 20, borderRadius: 6, border: `2px solid ${sel ? 'var(--base)' : '#cbd5e1'}`, background: sel ? 'var(--base)' : '#fff', color: '#fff', flexShrink: 0 }}>{sel && <Check width={13} height={13} />}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="mono" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.label}</div>
+                    {(a.ip || a.type) && <div className="mono" style={{ fontSize: 9.5, color: 'var(--faint)' }}>{[a.ip, a.type].filter(Boolean).join(' · ')}</div>}
+                  </div>
+                </button>
+                {sel && usesCreds && mc && (
+                  <button onClick={() => credToggle(a.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderTop: '1px solid #d7e7f2', background: credOn ? '#e6f3ea' : '#fff', padding: '7px 11px 7px 42px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                    <span style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 4, border: `2px solid ${credOn ? '#2f9e5a' : '#cbd5e1'}`, background: credOn ? '#2f9e5a' : '#fff', color: '#fff', flexShrink: 0 }}>{credOn && <Check width={11} height={11} />}</span>
+                    <KeyRound width={12} height={12} style={{ color: credOn ? '#2f9e5a' : 'var(--faint)', flexShrink: 0 }} />
+                    <span className="mono" style={{ fontSize: 10.5, color: credOn ? '#1e7a42' : 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mc.cred_username}<span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {mc.cred_name} ({mc.cred_kind})</span></span>
+                  </button>
+                )}
+              </div>
             ); }) : <div style={{ padding: '24px 8px', textAlign: 'center', fontSize: 12, color: 'var(--faint)' }}>No inventory assets in the {laneName} lane — use <b>Add a target</b>.</div>}
           </div>
           ) : (
@@ -209,9 +233,9 @@ export default function ScanLauncher({ onClose, onStarted }: {
             </label>
           </div>
           )}
-          {usesCreds && (
+          {flow === 'target' && usesCreds && (
             <div style={{ marginTop: 16 }}>
-              <div className="lbl" style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6 }}><KeyRound width={13} height={13} />Credentials <span style={{ fontWeight: 400, color: 'var(--faint)' }}>— optional, for an authenticated scan</span></div>
+              <div className="lbl" style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6 }}><KeyRound width={13} height={13} />Credentials <span style={{ fontWeight: 400, color: 'var(--faint)' }}>— optional, for this ad-hoc target</span></div>
               {credsLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px', fontSize: 12, color: 'var(--muted)' }}><Loader2 width={14} height={14} className="spin" />Loading saved credentials…</div>
               ) : laneCreds.length ? (

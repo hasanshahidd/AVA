@@ -231,6 +231,25 @@ def register_scan_delete(
     return {"deleted": True, "job_id": job_id}
 
 
+class MatchedCredsIn(BaseModel):
+    asset_ids: list[int]
+
+
+@router.post("/assets/matched-credentials")
+def assets_matched_credentials(
+    body: MatchedCredsIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    """Per-asset CIDR-matched credential for the launcher's inventory rows: {str(asset_id): {cred_id,
+    cred_name, cred_kind, cred_username}}. Each host shows its OWN linked login inline with a per-asset
+    toggle instead of one global dropdown — scales to many assets, each scanned with its own credential."""
+    user_tenants = get_user_tenants(current_user, db)
+    if not user_tenants:
+        return {}
+    return service.matched_credentials_for_assets(db, body.asset_ids, user_tenants)
+
+
 @router.get("/assets/{asset_id}/scan-latest")
 def register_scan_latest(
     asset_id: int,

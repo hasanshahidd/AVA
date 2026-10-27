@@ -156,6 +156,24 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     return () => { cancelled = true; };
   }, [selected]);
 
+  // Register auto-sync: when ANY scan session transitions to terminal (incl. one that finished in the
+  // background while the operator was elsewhere), invalidate the register + dashboard + scanned-assets
+  // so the new findings appear WITHOUT a manual refresh. Fires only on a NEW completion (not on mount).
+  const prevDoneRef = useRef<Set<number> | null>(null);
+  useEffect(() => {
+    const nowDone = new Set<number>(jobs.filter((j) => TERMINAL.has(String(j.status))).map((j) => j.job_id));
+    if (prevDoneRef.current !== null) {
+      let newly = false;
+      for (const id of nowDone) if (!prevDoneRef.current.has(id)) { newly = true; break; }
+      if (newly) {
+        qc.invalidateQueries({ queryKey: ['vulnerabilities'] });
+        qc.invalidateQueries({ queryKey: ['vuln-dashboard'] });
+        qc.invalidateQueries({ queryKey: ['register', 'scanned-assets'] });
+      }
+    }
+    prevDoneRef.current = nowDone;
+  }, [jobs, qc]);
+
   const scanning = job != null && !TERMINAL.has(String(job.status));
   const planVulns: any[] = plan?.vulns ?? [];
   const routing = plan?.routing ?? {}; const creds = plan?.credentials ?? {}; const summary = plan?.summary ?? {};
