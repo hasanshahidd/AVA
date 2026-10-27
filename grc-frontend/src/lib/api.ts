@@ -2316,6 +2316,14 @@ export const advancedErmApi = {
 };
 
 export const vulnManagementApi = {
+  // Register-owned scanning: launch a live find-scan of ONE inventory asset FROM the
+  // register (no pentest run, no exploit). Findings land in this register. Poll the job.
+  scan: {
+    start: (assetId: number, params?: { allow_uncredentialed?: boolean; coverage?: string }) =>
+      apiClient.post(`/vuln-management/assets/${assetId}/scan`, null, { params }),
+    job: (jobId: number) => apiClient.get(`/vuln-management/scan-jobs/${jobId}`),
+    latest: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-latest`),
+  },
   reports: {
     getAll: () => apiClient.get('/vuln-management/reports'),
     create: (formData: FormData) => 

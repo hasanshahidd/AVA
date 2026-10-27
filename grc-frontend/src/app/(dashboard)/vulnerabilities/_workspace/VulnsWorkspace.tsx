@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, PriorityBeforeAfter, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
@@ -78,6 +78,8 @@ export interface VulnsWorkspaceProps {
   onBulkCreateTickets?: (ids: number[]) => void;
   onTemplate: () => void; onBulkUpload: () => void; onImport: () => void; onAdd: () => void;
   bulkUploadState?: 'idle' | 'uploading' | 'done' | 'error'; bulkUploadMsg?: string | null;
+  /** Register-owned scan: launch a live find-scan of one inventory asset. Omitted → control hidden. */
+  onScanAsset?: (assetId: number) => void; scanBusy?: boolean; scanMsg?: string | null;
 }
 
 type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unassigned' | `sev-${SevKey}` | `dom-${string}`;
@@ -131,8 +133,11 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     registerType, setRegisterType, renderNcaRegister,
     searchTerm, setSearchTerm, canCreate, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
     bulkUploadState = 'idle', bulkUploadMsg, onBulkCreateTickets,
+    assetItems = [], onScanAsset, scanBusy = false, scanMsg,
   } = props;
 
+  const [scanOpen, setScanOpen] = useState(false);     // "Scan asset ▾" picker menu
+  const [scanPick, setScanPick] = useState('');        // chosen asset id (string)
   const [view, setView] = useState<TriageView>('all');
   // Two-flow filter — surface (unauthenticated) vs authenticated findings.
   // Client-side only, layered on top of the page's already-filtered list.
@@ -240,6 +245,33 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
           <select value={registerType} onChange={(e) => setRegisterType(e.target.value as 'standard' | 'nca')} style={{ ...btn, cursor: 'pointer' }} title="Switch register">
             <option value="standard">Standard register</option><option value="nca">NCA Template</option>
           </select>
+          {onScanAsset && assetItems.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button style={btn} onClick={() => setScanOpen((o) => !o)} aria-haspopup="menu" aria-expanded={scanOpen} title="Scan an asset for vulnerabilities" disabled={scanBusy}>
+                {scanBusy ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}Scan asset<ChevronDown size={14} style={{ marginLeft: 1, opacity: 0.55 }} />
+              </button>
+              {scanOpen && (
+                <>
+                  <div onClick={() => setScanOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                  <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 41, width: 280, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, boxShadow: '0 14px 34px -10px rgba(16,24,40,.32)', padding: 12 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: INK, marginBottom: 2 }}>Scan an asset</div>
+                    <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 9 }}>Runs a live find-scan; new findings land in this register. No pentest or exploit runs.</div>
+                    <select value={scanPick} onChange={(e) => setScanPick(e.target.value)} style={{ ...btn, width: '100%', height: 34, cursor: 'pointer', marginBottom: 9 }}>
+                      <option value="">Select an asset…</option>
+                      {assetItems.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                    </select>
+                    <button
+                      style={{ ...btnGreen, width: '100%', justifyContent: 'center', opacity: scanPick ? 1 : 0.5, cursor: scanPick ? 'pointer' : 'not-allowed' }}
+                      disabled={!scanPick}
+                      onClick={() => { const id = Number(scanPick); setScanOpen(false); setScanPick(''); onScanAsset(id); }}
+                    >
+                      <ScanLine size={14} /> Start scan
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {canCreate && (
             <>
               <span aria-hidden style={{ width: 1, height: 22, background: BORDER, flex: 'none' }} />
@@ -267,6 +299,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
       )}
 
       {pane !== 'ctem' && bulkUploadMsg && <div style={{ marginBottom: 12, borderRadius: 9, padding: '9px 14px', fontSize: 12.5, fontWeight: 500, background: bulkUploadState === 'error' ? '#FBEAEA' : '#E7F5EE', color: bulkUploadState === 'error' ? '#B23A3A' : '#1F7A54' }}>{bulkUploadMsg}</div>}
+      {pane !== 'ctem' && scanMsg && <div style={{ marginBottom: 12, borderRadius: 9, padding: '9px 14px', fontSize: 12.5, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8, background: ACSOFT, color: ACS }}>{scanBusy && <Loader2 size={14} className="animate-spin" />}{scanMsg}</div>}
 
       {isNca ? (
         <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, flex: 1, minHeight: 0, overflow: 'auto' }}>{renderNcaRegister()}</div>
