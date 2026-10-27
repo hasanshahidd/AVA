@@ -290,6 +290,9 @@ def get_dashboard(
         internet_exposed_count=internet_exposed_count,
         patch_count=patch_count,
         contextual_priority=contextual_priority,
+        # The ONE deduped-open metric, identical to the IT Asset + AI Pentest surfaces, so the
+        # register Overview "Open" tile reconciles instead of counting the raw list.
+        open_vulnerabilities=distinct_vuln_count(db, user_tenants, open_only=True, inventory_only=True),
     )
 
 

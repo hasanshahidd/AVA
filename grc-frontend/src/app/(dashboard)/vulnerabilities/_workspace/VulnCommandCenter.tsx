@@ -134,6 +134,7 @@ interface DomainRow { family: string; total: number; worst_severity: string; }
 // narrower `dashboard` passed by the workspace stays structurally assignable.
 interface OverviewDashboard {
   total_vulnerabilities?: number;
+  open_vulnerabilities?: number;              // deduped-distinct OPEN count (shared metric)
   by_severity?: Record<string, number>;
   by_status?: Record<string, number>;
   contextual_priority?: { urgent?: number; moderate?: number; low?: number };
@@ -176,7 +177,10 @@ export default function VulnCommandCenter({
   const m = useMemo(() => {
     const all = vulns || [];
     const open = all.filter((v) => !RESOLVED.has((v.status || '').toLowerCase()));
-    const totalOpen = open.length;
+    // The headline "Open" count is the DEDUPED-distinct open number (shared distinct_vuln_count),
+    // so it reconciles with the IT Asset Inventory and AI Pentest surfaces — not the raw register list.
+    // `open` (the raw-list array) still drives the severity composition breakdown below.
+    const totalOpen = dashboard?.open_vulnerabilities ?? open.length;
 
     // ── Severity composition of open findings (the lead story) ──
     const sevDist = SEV_ORDER.map((k) => ({ k, label: SEV[k].label, c: SEV[k].c, n: open.filter((v) => normSev(v.severity) === k).length }));
