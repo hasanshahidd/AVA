@@ -30,6 +30,20 @@ const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC,
 
 type Filter = 'all' | 'inventory' | 'adhoc';
 const TERMINAL = new Set(['done', 'failed', 'complete', 'completed', 'error', 'none']);
+const FAILED = new Set(['failed', 'error']);
+
+type ScanJob = {
+  job_id: number; asset_id: number; asset_name: string; target?: string; adhoc?: boolean;
+  lane?: string; find_mcp?: string; status?: string; progress?: number; findings_count?: number;
+  created_at?: string; started_at?: string; finished_at?: string;
+};
+const fmtWhen = (s?: string) => { if (!s) return '—'; const d = new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z'); return isNaN(+d) ? '—' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const fmtDur = (a?: string, b?: string) => { if (!a || !b) return '—'; const ms = +new Date(b + (b.endsWith('Z') ? '' : 'Z')) - +new Date(a + (a.endsWith('Z') ? '' : 'Z')); if (!(ms > 0)) return '—'; const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return m ? `${m}m ${s}s` : `${s}s`; };
+const STATUSC: Record<string, { c: string; bg: string }> = {
+  running: { c: '#005B96', bg: '#EAF2F9' }, queued: { c: '#6B7787', bg: '#EEF1F3' },
+  done: { c: '#1F7A54', bg: '#E7F5EE' }, failed: { c: '#B23A3A', bg: '#FBEAEA' },
+};
+const statusKey = (s?: string) => { const k = (s || '').toLowerCase(); if (FAILED.has(k)) return 'failed'; if (k === 'done' || k === 'complete' || k === 'completed') return 'done'; if (k === 'running') return 'running'; return 'queued'; };
 
 export function ScanWorkspace({ assetItems = [], vulns = [] }: {
   assetItems?: { value: string; label: string }[];
@@ -50,6 +64,20 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     refetchInterval: 8000,
   });
   const countMap = useMemo(() => { const m = new Map<number, number>(); (scanned?.assets ?? []).forEach((a) => m.set(a.asset_id, a.finding_count)); return m; }, [scanned]);
+
+  // Scan SESSIONS — the default (no-asset-selected) view: aggregated, live-polled history of every
+  // scan launched (inventory + ad-hoc). Reuses GET /vuln-management/scan-jobs (grc_pentest_scan_jobs).
+  const { data: jobsData } = useQuery<{ jobs: ScanJob[] }>({
+    queryKey: ['register', 'scan-jobs'],
+    queryFn: async () => (await vulnManagementApi.scan.list(100)).data ?? { jobs: [] },
+    refetchInterval: 4000,
+  });
+  const jobs = jobsData?.jobs ?? [];
+  const jobStats = useMemo(() => {
+    let running = 0, done = 0, failed = 0, findings = 0;
+    for (const j of jobs) { const k = statusKey(j.status); if (k === 'running' || k === 'queued') running++; else if (k === 'done') done++; else if (k === 'failed') failed++; findings += j.findings_count ?? 0; }
+    return { total: jobs.length, running, done, failed, findings };
+  }, [jobs]);
   // CVE chips per asset — derived from the already-fetched register list by linked-asset NAME (cosmetic).
   const cvesByName = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -121,8 +149,63 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
       <AssetCveSidebar assets={sidebarAssets} selectedId={selected} onSelect={(id) => { setSelected(id); setJob(null); }} title="Assets & CVEs" emptyText="No assets in this view." headerExtra={header} />
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
         {selected == null ? (
-          <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: FAINT, textAlign: 'center' }}>
-            <div><ScanLine size={30} style={{ opacity: 0.5 }} /><p style={{ marginTop: 8, fontSize: 13 }}>Select an asset to plan &amp; scan it, or add an ad-hoc target.</p></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* summary header */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10 }}>
+              <Stat label="Scans" value={jobStats.total} />
+              <Stat label="Running" value={jobStats.running} tone={jobStats.running ? AC : undefined} />
+              <Stat label="Done" value={jobStats.done} tone={jobStats.done ? '#1F7A54' : undefined} />
+              <Stat label="Failed" value={jobStats.failed} tone={jobStats.failed ? '#B23A3A' : undefined} />
+              <Stat label="Findings" value={jobStats.findings} />
+            </div>
+            {/* sessions table */}
+            <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${BORDER}` }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>Scan sessions</h3>
+                <span style={{ fontSize: 11.5, color: MUTED }}>newest first · live</span>
+              </div>
+              {jobs.length === 0 ? (
+                <div style={{ padding: 30, textAlign: 'center', color: FAINT }}>
+                  <ScanLine size={28} style={{ opacity: 0.5 }} /><p style={{ marginTop: 8, fontSize: 13 }}>No scans yet. Start one with <b>New scan</b>, or pick an asset to plan &amp; scan it.</p>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 560, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: '#FAFBFC' }}>
+                        {['Target / asset', 'Lane', 'Status', 'Progress', 'Findings', 'Started', 'Finished / duration'].map((h, i) => (
+                          <th key={h} style={{ textAlign: i >= 3 && i <= 4 ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jobs.map((j) => { const sk = statusKey(j.status); const sc = STATUSC[sk]; const active = sk === 'running' || sk === 'queued'; return (
+                        <tr key={j.job_id} onClick={() => { setSelected(j.asset_id); setJob(null); }} style={{ borderBottom: `1px solid #F0F3F5`, cursor: 'pointer' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#F7FAFC')} onMouseLeave={(e) => (e.currentTarget.style.background = '')}>
+                          <td style={{ padding: '9px 12px', maxWidth: 240 }}>
+                            <div style={{ fontWeight: 600, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.asset_name}{j.adhoc && <span style={{ fontSize: 9, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '1px 5px', marginLeft: 6 }}>AD-HOC</span>}</div>
+                            {j.target && j.target !== j.asset_name && <div style={{ fontSize: 10, color: FAINT, fontFamily: 'ui-monospace,Consolas,monospace' }}>{j.target}</div>}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: SEC, whiteSpace: 'nowrap' }}>{j.lane || '—'}{j.find_mcp ? <span style={{ color: FAINT }}> · {j.find_mcp}</span> : null}</td>
+                          <td style={{ padding: '9px 12px' }}><span style={{ fontSize: 10, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 999, padding: '2px 8px', textTransform: 'capitalize' }}>{sk}</span></td>
+                          <td style={{ padding: '9px 12px', width: 110, textAlign: 'right' }}>
+                            {active ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                                <div style={{ width: 54, height: 6, borderRadius: 4, background: '#EAEEF1', overflow: 'hidden' }}><div style={{ width: `${j.progress ?? 5}%`, height: '100%', background: AC }} /></div>
+                                <span style={{ fontSize: 10.5, color: MUTED, fontFamily: 'ui-monospace,Consolas,monospace' }}>{j.progress ?? 0}%</span>
+                              </div>
+                            ) : <span style={{ fontSize: 11, color: FAINT }}>{sk === 'done' ? '100%' : '—'}</span>}
+                          </td>
+                          <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'ui-monospace,Consolas,monospace', color: INK }}>{j.findings_count ?? 0}</td>
+                          <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{fmtWhen(j.started_at || j.created_at)}</td>
+                          <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{active ? <span style={{ color: FAINT }}>running…</span> : (j.finished_at ? fmtDur(j.started_at || j.created_at, j.finished_at) : '—')}</td>
+                        </tr>
+                      ); })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -181,6 +264,15 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
         )}
       </div>
       {showLauncher && <ScanLauncher onClose={() => setShowLauncher(false)} onStarted={onLauncherStarted} />}
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, padding: '11px 14px' }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: tone || INK, marginTop: 2 }}>{value}</div>
     </div>
   );
 }

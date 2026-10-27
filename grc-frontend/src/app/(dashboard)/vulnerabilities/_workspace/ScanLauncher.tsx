@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Globe, Server, KeyRound, Cloud, Code2, Boxes, Radar, Database, X, Check, Loader2, ArrowRight } from 'lucide-react';
-import { assetsApi, vulnManagementApi } from '@/lib/api';
+import { assetsApi, discoveryApi, vulnManagementApi } from '@/lib/api';
 import '../../pentest/_components/pentest-redesign.css';
 
 type SubLane = { key: string; label: string; Icon: any; fleet: string[]; tools: string };
@@ -42,7 +42,15 @@ const LANE_TARGET_HINT: Record<string, { label: string; ph: string }> = {
   container: { label: 'Image or cluster host', ph: 'image:tag or cluster host — Enter to add' },
 };
 
+// Lane (fleet key) → the saved-credential kinds that lane can scan with. Web/K8s scan unauthenticated,
+// so they have no credential step. Mirrors the old pentest RunLauncher's laneCredBackendKinds.
+const LANE_CRED_KINDS: Record<string, string[]> = {
+  windows: ['winrm', 'ssh'], linux: ['ssh'], network: ['ssh', 'winrm'],
+  database: ['ssh', 'winrm'], ad: ['winrm', 'ssh'], cloud: ['aws', 'azure', 'gcp'], repo: ['github'],
+};
+
 type AssetLite = { id: number; label: string; ip: string | null; type: string | null; fleet_lane: string | null };
+type CredLite = { id: number; name: string; kind: string; username?: string };
 
 export default function ScanLauncher({ onClose, onStarted }: {
   onClose: () => void;
@@ -64,6 +72,7 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const [targets, setTargets] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
   const [authorized, setAuthorized] = useState(false);
+  const [credId, setCredId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -73,8 +82,19 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const effKey = subLane ? subLane.key : top.key;
   const laneName = subLane ? `${top.label} · ${subLane.label}` : top.label;
   const laneOverride = effFleet[0];                               // e.g. 'web' | 'windows' | 'linux' | …
-  const pickTop = (k: string) => { setLane(k); setPicked(new Set()); const t = TOP_LANES.find((l) => l.key === k); if (t?.subs) setSub(t.subs[0].key); };
-  const pickSub = (k: string) => { setSub(k); setPicked(new Set()); };
+  const pickTop = (k: string) => { setLane(k); setPicked(new Set()); setCredId(null); const t = TOP_LANES.find((l) => l.key === k); if (t?.subs) setSub(t.subs[0].key); };
+  const pickSub = (k: string) => { setSub(k); setPicked(new Set()); setCredId(null); };
+
+  // Credentials — restored from the old pentest RunLauncher: a creds-capable lane (host/cloud/repo)
+  // shows the asset's saved logins so one can be ATTACHED to the scan (threaded as credential_id).
+  const credKinds = LANE_CRED_KINDS[laneOverride] ?? [];
+  const usesCreds = credKinds.length > 0;
+  const { data: allCreds = [], isLoading: credsLoading } = useQuery<CredLite[]>({
+    queryKey: ['disc-creds'],
+    queryFn: async () => ((await discoveryApi.listCredentials()).data?.credentials ?? []) as CredLite[],
+    enabled: usesCreds,
+  });
+  const laneCreds = useMemo(() => allCreds.filter((c) => credKinds.includes(c.kind)), [allCreds, credKinds]);
   const list = useMemo(() => assets.filter((a) => a.fleet_lane && effFleet.includes(a.fleet_lane)), [assets, effFleet]);
   const hint = LANE_TARGET_HINT[effKey] ?? LANE_TARGET_HINT.external;
   const toggle = (id: number) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -94,7 +114,7 @@ export default function ScanLauncher({ onClose, onStarted }: {
         if (!t.length) { setBusy(false); return; }
         let first: { asset_id: number; job_id: number } | null = null;
         for (const target of t) {
-          const { data } = await vulnManagementApi.scan.adhoc({ target, authorized, lane: laneOverride });
+          const { data } = await vulnManagementApi.scan.adhoc({ target, authorized, lane: laneOverride, ...(credId ? { credential_id: credId } : {}) });
           if (!first && data?.asset_id && data?.job_id) first = { asset_id: data.asset_id, job_id: data.job_id };
         }
         if (first) onStarted(first.asset_id, first.job_id);
@@ -103,7 +123,7 @@ export default function ScanLauncher({ onClose, onStarted }: {
         const ids = Array.from(picked);
         let firstJob: number | null = null;
         for (const id of ids) {
-          const { data } = await vulnManagementApi.scan.start(id, { lane: laneOverride });
+          const { data } = await vulnManagementApi.scan.start(id, { lane: laneOverride, ...(credId ? { credential_id: credId } : {}) });
           if (firstJob == null && data?.job_id) firstJob = data.job_id;
         }
         if (firstJob != null) onStarted(ids[0], firstJob);
@@ -188,6 +208,27 @@ export default function ScanLauncher({ onClose, onStarted }: {
               I am authorized to test {targets.length > 1 ? 'these targets' : 'this target'}.
             </label>
           </div>
+          )}
+          {usesCreds && (
+            <div style={{ marginTop: 16 }}>
+              <div className="lbl" style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6 }}><KeyRound width={13} height={13} />Credentials <span style={{ fontWeight: 400, color: 'var(--faint)' }}>— optional, for an authenticated scan</span></div>
+              {credsLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px', fontSize: 12, color: 'var(--muted)' }}><Loader2 width={14} height={14} className="spin" />Loading saved credentials…</div>
+              ) : laneCreds.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {laneCreds.map((c) => { const on = credId === c.id; return (
+                    <button key={c.id} onClick={() => setCredId(on ? null : c.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, border: `1px solid ${on ? 'var(--base)' : 'var(--line)'}`, background: on ? 'var(--base-soft)' : '#fff', borderRadius: 9, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                      <span style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 5, border: `2px solid ${on ? 'var(--base)' : '#cbd5e1'}`, background: on ? 'var(--base)' : '#fff', color: '#fff', flexShrink: 0 }}>{on && <Check width={11} height={11} />}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: on ? 'var(--base)' : '#475569' }}>{c.name}</span>
+                      <span className="mono" style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--faint)', background: 'var(--subtle)', borderRadius: 5, padding: '1px 6px' }}>{c.kind}</span>
+                      {c.username && <span className="mono" style={{ fontSize: 10, color: 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.username}</span>}
+                    </button>
+                  ); })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--faint)' }}>No saved credentials for this lane — the scan runs unauthenticated.</div>
+              )}
+            </div>
           )}
           {err && <div style={{ marginTop: 12, fontSize: 12, color: 'var(--danger)' }}>{err}</div>}
         </div>
