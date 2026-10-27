@@ -581,6 +581,16 @@ def _purge_asset_references(db: Session, asset: "ITAsset") -> None:
         ("grc_infra_asset_criticality_items", "linked_asset_id"),
     ):
         db.execute(_sql(f"UPDATE {table} SET {col} = NULL WHERE {col} = :aid"), {"aid": aid})
+    # The agents pinned to this asset get deleted in the PURGE step below; first
+    # clear the collector FK on any connection pointing at them, or that DELETE
+    # raises a ForeignKeyViolation (grc_integration_connections
+    # .assigned_collector_agent_id). Detach, not delete — the connection is a real
+    # entity, and the host-pinned one is already deactivated further down.
+    db.execute(_sql(
+        "UPDATE grc_integration_connections SET assigned_collector_agent_id = NULL "
+        "WHERE assigned_collector_agent_id IN "
+        "(SELECT id FROM grc_compliance_agents WHERE asset_id = :aid)"),
+        {"aid": aid})
     # PURGE — pure association rows that cannot exist without the asset.
     for table, col in (
         ("grc_vulnerability_asset_links", "asset_id"),
