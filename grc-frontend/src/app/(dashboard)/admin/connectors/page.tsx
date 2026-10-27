@@ -2,12 +2,20 @@
 
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createPortal } from 'react-dom';
 import {
   Plug, Plus, RefreshCw, CheckCircle, AlertCircle, Loader2, X, ExternalLink,
   Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2, Mic, Cpu, Fingerprint, Globe,
+  Cloud, ChevronLeft,
 } from 'lucide-react';
-import { connectorsApi, type ConnectorProviderMeta, type ConnectorRow } from '@/lib/api';
+import { connectorsApi, integrationsApi, type ConnectorProviderMeta, type ConnectorRow } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
+import { AwsIcon, AzureIcon, GcpIcon, NessusIcon } from '@/components/integrations/ProviderIcons';
+// The vulnerability-scanner (Nessus) and cloud-posture connectors keep their own
+// add/test/sync flows — we mount those real pages whole in a drill-in rather than
+// re-implement them, so this stays one consolidated page with no behaviour change.
+import ConnectionsPage from '../../integrations/connections/page';
+import CloudConnectorsPage from '../cloud-connectors/page';
 
 // Visual metadata per category — drives the tab pills and icon per card.
 const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; description: string; }> = {
@@ -42,13 +50,13 @@ function ProviderLogo({ provider }: { provider: ConnectorProviderMeta }) {
   const file = PROVIDER_LOGO[provider.provider];
   const Fallback = CATEGORY_META[provider.category]?.icon ?? Plug;
   return (
-    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
       {file && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/logos/connectors/${file}`} alt=""
-          className="h-6 w-6 object-contain" onError={() => setFailed(true)} />
+          className="h-5 w-5 object-contain" onError={() => setFailed(true)} />
       ) : (
-        <Fallback className="h-5 w-5 text-slate-400" strokeWidth={1.75} />
+        <Fallback className="h-4 w-4 text-slate-400" strokeWidth={1.75} />
       )}
     </div>
   );
@@ -57,6 +65,9 @@ function ProviderLogo({ provider }: { provider: ConnectorProviderMeta }) {
 export default function ConnectorsAdminPage() {
   const [openSetupFor, setOpenSetupFor] = useState<ConnectorProviderMeta | null>(null);
   const [editingConnector, setEditingConnector] = useState<ConnectorRow | null>(null);
+  // Drill-ins to the real scanner / cloud management pages (mounted whole).
+  const [showScanner, setShowScanner] = useState(false);
+  const [showCloud, setShowCloud] = useState(false);
 
   const { data: catalog, isLoading: catalogLoading } = useQuery({
     queryKey: ['connectors', 'providers'],
@@ -67,6 +78,13 @@ export default function ConnectorsAdminPage() {
     queryKey: ['connectors', 'list'],
     queryFn: async () => (await connectorsApi.list()).data.items,
   });
+
+  // Nessus connection count for the injected pentest card (shares ConnectionsPage's cache key).
+  const { data: scannerConns } = useQuery({
+    queryKey: ['connections'],
+    queryFn: () => integrationsApi.listConnections({ scanners_only: true }),
+  });
+  const scannerCount = scannerConns?.data?.connections?.length ?? 0;
 
   // Group existing connections by provider so each provider card can show
   // how many connections of that kind the tenant already has.
@@ -81,16 +99,16 @@ export default function ConnectorsAdminPage() {
   const isLoading = catalogLoading || connsLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <Plug className="h-5 w-5 text-primary-600" strokeWidth={1.75} />
-            External Connectors
+          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <Plug className="h-4 w-4 text-primary-600" strokeWidth={1.75} />
+            Connectors
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Wire ServiceNow, Splunk, MS Teams and more. Credentials are encrypted at rest;
-            OAuth2 connectors authorise per-tenant through their vendor's consent screen.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Every integration in one place — ticketing, SIEM, EDR, identity, pen-test, vulnerability
+            scanners and cloud. Credentials are encrypted at rest; OAuth2 authorises per-tenant.
           </p>
         </div>
         {catalog && !catalog.encryption_enabled && (
@@ -116,15 +134,15 @@ export default function ConnectorsAdminPage() {
         const meta = CATEGORY_META[category];
         const Icon = meta.icon;
         return (
-          <section key={category} className="space-y-2">
+          <section key={category} className="space-y-1.5">
             <div className="flex items-center gap-2">
               <Icon className="h-4 w-4 text-slate-500" />
-              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+              <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
                 {meta.label}
               </h3>
               <span className="text-xs text-slate-400">— {meta.description}</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
               {providers.map((p) => (
                 <ProviderCard
                   key={p.provider}
@@ -134,10 +152,37 @@ export default function ConnectorsAdminPage() {
                   onEdit={(c) => setEditingConnector(c)}
                 />
               ))}
+              {/* Nessus sits with the offensive-security tools; its real add/sync lives in the scanner drill-in. */}
+              {category === 'pentest' && (
+                <StaticCard
+                  icon={NessusIcon}
+                  label="Tenable Nessus"
+                  description="Authenticated vulnerability scanner. Pull findings into the register; two-way sync and auto-close on re-scan."
+                  count={scannerCount}
+                  buttonLabel="Manage scanner"
+                  onClick={() => setShowScanner(true)}
+                />
+              )}
             </div>
           </section>
         );
       })}
+
+      {/* Cloud posture — its own section; real add/test/sync lives in the cloud drill-in. */}
+      {catalog && (
+        <section className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Cloud className="h-4 w-4 text-slate-500" />
+            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Cloud</h3>
+            <span className="text-xs text-slate-400">— Pull vulnerability findings from your cloud security posture (AWS / Azure / GCP).</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <StaticCard icon={AwsIcon} label="AWS Inspector v2" description="Cross-account assume-role — we never store an AWS access key." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
+            <StaticCard icon={AzureIcon} label="Microsoft Defender for Cloud" description="Service principal scoped to Security Reader; secret encrypted at rest." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
+            <StaticCard icon={GcpIcon} label="Google Cloud SCC" description="Service-account JSON key, scoped to org-level read-only roles." buttonLabel="Manage cloud" onClick={() => setShowCloud(true)} />
+          </div>
+        </section>
+      )}
 
       {openSetupFor && (
         <SetupModal
@@ -159,7 +204,79 @@ export default function ConnectorsAdminPage() {
           );
         })()
       )}
+
+      {showScanner && (
+        <DrillIn title="Vulnerability scanner — Tenable Nessus" onBack={() => setShowScanner(false)}>
+          <ConnectionsPage />
+        </DrillIn>
+      )}
+      {showCloud && (
+        <DrillIn title="Cloud security posture" onBack={() => setShowCloud(false)}>
+          <CloudConnectorsPage />
+        </DrillIn>
+      )}
     </div>
+  );
+}
+
+// Static entry card for the scanner/cloud connectors whose real add flows live in
+// a drill-in (they don't fit the registry's generic field form).
+function StaticCard({ icon: Icon, label, description, count, buttonLabel, onClick }: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  description: string;
+  count?: number;
+  buttonLabel: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className="group rounded-xl border border-slate-200 bg-white p-3 transition-all hover:border-[var(--color-base)] hover:shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <Icon size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="truncate text-sm font-semibold text-slate-900">{label}</h4>
+            {count ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                <CheckCircle className="h-2.5 w-2.5" />{count} connected
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:border-primary-400 hover:text-primary-600 transition-colors"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+// Full-screen drill-in that mounts a real management page. Portalled to body so the
+// admin page's zoom:0.85 wrapper doesn't shrink/offset the fixed overlay.
+function DrillIn({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" /> Connectors
+        </button>
+        <span className="text-sm font-semibold text-slate-800">{title}</span>
+      </div>
+      <div className="flex-1 overflow-auto">{children}</div>
+    </div>,
+    document.body,
   );
 }
 
