@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus } from 'lucide-react';
+import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus, Trash2, ArrowLeft } from 'lucide-react';
 import apiClient, { vulnManagementApi } from '@/lib/api';
 import { AssetCveSidebar, type SidebarAsset } from '@/components/scan/AssetCveSidebar';
 import ScanLauncher from './ScanLauncher';
@@ -128,6 +128,17 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     poll(jobId);
   };
 
+  // Delete a scan SESSION (history row). Findings stay in the register; a still-running scan is refused.
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const delJob = async (e: React.MouseEvent, jobId: number) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this scan session? The findings it produced stay in the register.')) return;
+    setDeleting(jobId);
+    try { await vulnManagementApi.scan.remove(jobId); qc.invalidateQueries({ queryKey: ['register', 'scan-jobs'] }); }
+    catch (err: any) { window.alert(err?.response?.data?.detail || 'Failed to delete the scan session.'); }
+    finally { setDeleting(null); }
+  };
+
   const scanning = job != null && !TERMINAL.has(String(job.status));
   const planVulns: any[] = plan?.vulns ?? [];
   const routing = plan?.routing ?? {}; const creds = plan?.credentials ?? {}; const summary = plan?.summary ?? {};
@@ -146,7 +157,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
 
   return (
     <div style={{ display: 'flex', gap: 12, height: '100%', minHeight: 0 }}>
-      <AssetCveSidebar assets={sidebarAssets} selectedId={selected} onSelect={(id) => { setSelected(id); setJob(null); }} title="Assets & CVEs" emptyText="No assets in this view." headerExtra={header} />
+      <AssetCveSidebar assets={sidebarAssets} selectedId={selected} onSelect={(id) => { setSelected(id); setJob(null); }} title="Assets & CVEs" emptyText="No assets in this view." headerExtra={header} groupByDomain />
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
         {selected == null ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -176,6 +187,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                         {['Target / asset', 'Lane', 'Status', 'Progress', 'Findings', 'Started', 'Finished / duration'].map((h, i) => (
                           <th key={h} style={{ textAlign: i >= 3 && i <= 4 ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
+                        <th aria-label="actions" style={{ borderBottom: `1px solid ${BORDER}`, width: 40 }} />
                       </tr>
                     </thead>
                     <tbody>
@@ -199,6 +211,13 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                           <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'ui-monospace,Consolas,monospace', color: INK }}>{j.findings_count ?? 0}</td>
                           <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{fmtWhen(j.started_at || j.created_at)}</td>
                           <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{active ? <span style={{ color: FAINT }}>running…</span> : (j.finished_at ? fmtDur(j.started_at || j.created_at, j.finished_at) : '—')}</td>
+                          <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                            <button onClick={(e) => delJob(e, j.job_id)} disabled={deleting === j.job_id || active}
+                              title={active ? 'Wait for the scan to finish' : 'Delete this scan session'}
+                              style={{ border: 'none', background: 'none', cursor: active ? 'not-allowed' : 'pointer', color: active ? FAINT : '#B23A3A', opacity: active ? 0.4 : 1, padding: 4, borderRadius: 6, display: 'inline-flex' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ); })}
                     </tbody>
@@ -209,6 +228,8 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <button onClick={() => { setSelected(null); setJob(null); }}
+              style={{ ...btn, alignSelf: 'flex-start', padding: '6px 11px' }}><ArrowLeft size={14} /> Back to scan sessions</button>
             {/* plan / recon preview */}
             <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, padding: '13px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>

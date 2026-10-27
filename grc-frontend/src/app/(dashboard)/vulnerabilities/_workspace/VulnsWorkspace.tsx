@@ -228,7 +228,10 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     // Bounded panes (register/CTEM/NCA) are height:100%, which would only fill 80% once zoomed,
     // so they compensate to 100%/0.8 = 125% layout height → exactly one viewport after zoom.
     <div className="inv2" style={{ background: '#F4F6F7', zoom: 0.8, height: pageScroll ? 'auto' : 'calc(100% / 0.8)', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: pageScroll ? 'visible' : 'auto', overflowX: pageScroll ? 'visible' : 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
-      {/* header — hidden on the CTEM pane (mock: CTEM carries its own header) */}
+      {/* ONE shared pane toggle, pinned at the top of every pane (non-NCA) so the four tabs
+          never move or disappear — always in the same place, whichever pane is open. */}
+      {!isNca && <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>}
+      {/* header — hidden on the CTEM/Scan panes (they carry their own) */}
       {pane !== 'ctem' && pane !== 'scan' && (
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
@@ -277,21 +280,14 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
         <>
           {pane === 'scan' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>
               <div style={{ flex: 1, minHeight: 0 }}><ScanWorkspace vulns={all} assetItems={assetItems} /></div>
             </div>
           ) : pane === 'ctem' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              {/* mock: the CTEM view carries its own two-option toggle */}
-              <div style={{ display: 'inline-flex', alignSelf: 'flex-start', flexShrink: 0, background: '#EAEEF1', borderRadius: 11, padding: 3, gap: 2, margin: '2px 0 8px' }}>
-                <button onClick={() => setPane('reg')} style={{ height: 34, padding: '0 16px', border: 0, borderRadius: 9, background: 'none', color: '#6B7787', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Vulnerability Register</button>
-                <button style={{ height: 34, padding: '0 16px', border: 0, borderRadius: 9, background: '#fff', color: ACS, fontSize: 12.5, fontWeight: 600, cursor: 'default', boxShadow: '0 1px 2px rgba(16,24,40,.06)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Target size={14} /> CTEM Scopes</button>
-              </div>
               <div style={{ flex: 1, minHeight: 0 }}><CtemScopesRedesign /></div>
             </div>
           ) : pane === 'cmd' ? (
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>
               <div><VulnCommandCenter vulns={all} dashboard={dashboard} onView={onView} /></div>
             </div>
           ) : (
@@ -355,7 +351,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
             {/* main */}
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
-                <PaneToggle pane={pane} setPane={setPane} />
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />

@@ -2326,6 +2326,7 @@ export const vulnManagementApi = {
     plan: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-plan`),
     job: (jobId: number) => apiClient.get(`/vuln-management/scan-jobs/${jobId}`),
     list: (limit = 50) => apiClient.get(`/vuln-management/scan-jobs`, { params: { limit } }),
+    remove: (jobId: number) => apiClient.delete(`/vuln-management/scan-jobs/${jobId}`),
     latest: (assetId: number) => apiClient.get(`/vuln-management/assets/${assetId}/scan-latest`),
   },
   reports: {

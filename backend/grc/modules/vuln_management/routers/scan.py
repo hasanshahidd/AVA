@@ -200,6 +200,27 @@ def register_scan_status(
     return job
 
 
+@router.delete("/scan-jobs/{job_id}", dependencies=[Depends(_require_scan)])
+def register_scan_delete(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    """Delete a scan SESSION (history row) from the register's Scan page. Removes only the scan-job
+    record; the findings it produced stay in the register (manage those there). Refuses a scan that
+    is still running (409)."""
+    user_tenants = get_user_tenants(current_user, db)
+    if not user_tenants:
+        raise HTTPException(status_code=404, detail="scan job not found")
+    outcome = service.delete_scan_job(db, job_id, user_tenants)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail="scan job not found")
+    if outcome == "running":
+        raise HTTPException(status_code=409,
+                            detail="This scan is still running — wait for it to finish before deleting it.")
+    return {"deleted": True, "job_id": job_id}
+
+
 @router.get("/assets/{asset_id}/scan-latest")
 def register_scan_latest(
     asset_id: int,

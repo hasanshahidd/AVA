@@ -215,16 +215,15 @@ export default function ScanLauncher({ onClose, onStarted }: {
               {credsLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px', fontSize: 12, color: 'var(--muted)' }}><Loader2 width={14} height={14} className="spin" />Loading saved credentials…</div>
               ) : laneCreds.length ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {laneCreds.map((c) => { const on = credId === c.id; return (
-                    <button key={c.id} onClick={() => setCredId(on ? null : c.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, border: `1px solid ${on ? 'var(--base)' : 'var(--line)'}`, background: on ? 'var(--base-soft)' : '#fff', borderRadius: 9, padding: '8px 11px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                      <span style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 5, border: `2px solid ${on ? 'var(--base)' : '#cbd5e1'}`, background: on ? 'var(--base)' : '#fff', color: '#fff', flexShrink: 0 }}>{on && <Check width={11} height={11} />}</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: on ? 'var(--base)' : '#475569' }}>{c.name}</span>
-                      <span className="mono" style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--faint)', background: 'var(--subtle)', borderRadius: 5, padding: '1px 6px' }}>{c.kind}</span>
-                      {c.username && <span className="mono" style={{ fontSize: 10, color: 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.username}</span>}
-                    </button>
-                  ); })}
-                </div>
+                // Dropdown, not an open list: pick the saved login to authenticate with, or run
+                // unauthenticated (the default). The chosen credential is threaded as credential_id.
+                <select value={credId ?? ''} onChange={(e) => setCredId(e.target.value ? Number(e.target.value) : null)}
+                  style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 11px', fontSize: 12.5, outline: 'none', fontFamily: 'inherit', background: '#fff', cursor: 'pointer' }}>
+                  <option value="">Unauthenticated — no login (surface scan)</option>
+                  {laneCreds.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} · {c.kind}{c.username ? ` · ${c.username}` : ''}</option>
+                  ))}
+                </select>
               ) : (
                 <div style={{ fontSize: 11, color: 'var(--faint)' }}>No saved credentials for this lane — the scan runs unauthenticated.</div>
               )}
