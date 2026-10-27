@@ -45,7 +45,7 @@ function ProviderLogo({ provider }: { provider: ConnectorProviderMeta }) {
     <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
       {file && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/logos/connectors/${file}`} alt="" loading="lazy"
+        <img src={`/logos/connectors/${file}`} alt=""
           className="h-6 w-6 object-contain" onError={() => setFailed(true)} />
       ) : (
         <Fallback className="h-5 w-5 text-slate-400" strokeWidth={1.75} />

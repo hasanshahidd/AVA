@@ -94,16 +94,6 @@ export default function CloudConnectorsAdminPage() {
     queryFn: () => cloudConnectorsApi.list().then((r) => r.data),
   });
 
-  // Unified read — cloud connectors + legacy scanner integrations in one
-  // list, so the admin sees the full integration surface here.
-  const { data: unified } = useQuery({
-    queryKey: ['cloud-connectors-unified'],
-    queryFn: () => cloudConnectorsApi.unified().then((r) => r.data),
-  });
-  const legacyScannerRows = (unified?.connectors || []).filter(
-    (c) => c.framework === 'legacy_scanner',
-  );
-
   const syncMutation = useMutation({
     mutationFn: (id: number) => cloudConnectorsApi.sync(id),
     onSuccess: (r, id) => {
@@ -322,74 +312,6 @@ export default function CloudConnectorsAdminPage() {
           )}
         </div>
       </div>
-
-      {/* Legacy scanner connections (Nessus / Nexpose) live in a different
-          table but are surfaced here so admins see the full integration
-          surface in one place. Read-only — manage in Integrations tab. */}
-      {legacyScannerRows.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-card">
-          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Activity size={16} className="text-slate-600" />
-              Scanner connections (legacy)
-            </h2>
-            <span className="text-xs text-slate-500">
-              {legacyScannerRows.length} legacy scanner row{legacyScannerRows.length === 1 ? '' : 's'}
-            </span>
-          </div>
-          <div className="p-6 space-y-2">
-            <p className="text-xs text-slate-500 -mt-2 mb-2">
-              These connectors live in the legacy scanner-integrations table.
-              They keep syncing on their own schedule; manage them in the
-              Vulnerability Scanners tab.
-            </p>
-            {legacyScannerRows.map((c) => {
-              const lastSync = c.last_sync_at ? new Date(c.last_sync_at).toLocaleString() : 'Never';
-              const syncStyle = STATUS_STYLES[c.last_sync_status || ''] || 'border-slate-200 bg-slate-50 text-slate-600';
-              return (
-                <div key={`legacy-${c.id}`} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-900">{c.display_name}</h3>
-                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                          {c.provider}
-                        </span>
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                          Legacy
-                        </span>
-                        {!c.is_active && (
-                          <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
-                            Disabled
-                          </span>
-                        )}
-                      </div>
-                      {c.description && (
-                        <p className="text-xs text-slate-600 mb-1">{c.description}</p>
-                      )}
-                      <div className="text-xs text-slate-700">
-                        Last sync: <span className="text-slate-900">{lastSync}</span>
-                        {c.last_sync_status && (
-                          <span className={`ml-2 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${syncStyle}`}>
-                            {c.last_sync_status}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <a
-                      href="/admin?tab=integrations"
-                      className="px-2 py-1 border border-slate-300 bg-white text-slate-700 rounded text-xs hover:bg-slate-50"
-                      title="Manage in Vulnerability Scanners tab"
-                    >
-                      Manage →
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {showAdd && providers && (
         <AddConnectorModal
