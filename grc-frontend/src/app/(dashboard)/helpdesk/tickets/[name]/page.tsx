@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, ShieldCheck, Activity, Mail, Paperclip, Download, ExternalLink } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, ShieldCheck, Activity, Mail, Paperclip, Download, ExternalLink, ChevronDown } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd, utcDate } from "../../_ui";
 import { AffectedCiPicker, inventoryUrl } from "../../_ci";
@@ -44,7 +44,7 @@ const md: Components = {
 
 // Stacked label-over-control field for the editable Properties rail.
 function PropField({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="w-full"><div className="mb-1 truncate text-[11px] font-medium text-slate-400">{label}</div>{children}</div>;
+  return <div className="min-w-0"><div className="mb-1 truncate text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>{children}</div>;
 }
 
 export default function TicketDetail() {
@@ -68,6 +68,7 @@ export default function TicketDetail() {
   const [showAssign, setShowAssign] = useState(false);
   const [savedReply, setSavedReply] = useState("");
   const [composerOpen, setComposerOpen] = useState(false); // on-demand reply/note composer
+  const [showMore, setShowMore] = useState(false); // Customer/Contact popover in the toolbar
 
   const { data: canned } = useHd<any>("/helpdesk/canned-responses");
   const { data: attachData, reload: reloadAttachments } = useHd<any>(`${base}/attachments`);
@@ -168,7 +169,6 @@ export default function TicketDetail() {
     </div>
   );
 
-  const btn = "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm";
   const agents: any[] = agentsData?.agents || [];
   const teams: any[] = teamsData?.teams || [];
   const departments: any[] = (deptData?.departments || []).filter((d: any) => d.enabled);
@@ -181,34 +181,36 @@ export default function TicketDetail() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-6 py-3">
-        <Link href="/helpdesk/tickets" className="mb-2 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600"><ArrowLeft size={13} /> Tickets</Link>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/helpdesk/tickets" className="mb-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-slate-400 hover:text-slate-600"><ArrowLeft size={13} /> Tickets</Link>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-slate-400">#{t.name || name}</span>
+            <div className="font-mono text-[11.5px] text-slate-400">
+              #{t.name || name}{t.process ? ` · ${t.process === "service_request" ? "Service request" : t.process.charAt(0).toUpperCase() + t.process.slice(1)}` : ""}
+            </div>
+            <h1 className="mt-0.5 truncate text-[16.5px] font-semibold tracking-[-0.01em] text-[var(--color-text)]" title={t.subject || undefined}>{t.subject || `Ticket ${name}`}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Chip value={t.status} />
               <Chip value={t.priority} map={PRIORITY_CHIP} />
               {(t.severity || t.cve_id) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                  <ShieldAlert size={12} />{[t.severity, t.cve_id].filter(Boolean).join(" · ")}
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700">
+                  <ShieldAlert size={11} />{[t.severity, t.cve_id].filter(Boolean).join(" · ")}
                 </span>
               )}
             </div>
-            <h1 className="mt-1 truncate text-lg font-semibold text-[var(--color-text)]">{t.subject || `Ticket ${name}`}</h1>
           </div>
-          <div className="relative flex items-center gap-2">
-            <button onClick={() => { setTab("reply"); resetDraft(); setComposerOpen(true); }} className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}><MessageSquare size={15} /> Reply</button>
+          <div className="relative flex shrink-0 items-center gap-2">
+            <button onClick={() => { setTab("reply"); resetDraft(); setComposerOpen(true); }} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3 text-[13px] font-medium text-white hover:opacity-90"><MessageSquare size={14} /> Reply</button>
             {statuses.length > 0 ? (
               <select value="" onChange={(e) => { if (e.target.value) act("update", { status: e.target.value }, `Status → ${e.target.value}.`); }}
-                className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}>
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] text-slate-600 hover:bg-slate-50 focus:outline-none">
                 <option value="">Set status…</option>
                 {statuses.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
               </select>
             ) : (
-              <button onClick={() => act("status", { status: "Resolved" }, "Ticket resolved.")} className={`${btn} border-emerald-200 bg-emerald-50 font-medium text-emerald-700 hover:bg-emerald-100`}><CheckCircle2 size={15} /> Resolve</button>
+              <button onClick={() => act("status", { status: "Resolved" }, "Ticket resolved.")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-[13px] font-medium text-emerald-700 hover:bg-emerald-100"><CheckCircle2 size={14} /> Resolve</button>
             )}
-            <button onClick={() => act("status", { status: "Closed" }, "Ticket closed.")} className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}><XCircle size={15} /> Close</button>
-            <button onClick={() => setShowAssign((v) => !v)} className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}><UserPlus size={15} /> Assign</button>
+            <button onClick={() => act("status", { status: "Closed" }, "Ticket closed.")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-600 hover:bg-slate-50"><XCircle size={14} /> Close</button>
+            <button onClick={() => setShowAssign((v) => !v)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-600 hover:bg-slate-50"><UserPlus size={14} /> Assign</button>
             {showAssign && (
               <div className="absolute right-0 top-11 z-10 w-64 space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
                 <div>
@@ -234,11 +236,14 @@ export default function TicketDetail() {
         {note && <div className="mt-2 rounded-md bg-slate-50 px-3 py-1.5 text-xs text-slate-500">{note}</div>}
       </div>
 
-      {/* Top property toolbar — the quick-edit dropdowns, one wrapping lane so an
-          agent can set routing/triage without hunting the side rail. Each is wired
-          to the same update/assign actions as before. */}
-      <div className="flex items-start gap-x-3 border-b border-slate-200 bg-slate-50/60 px-6 py-2.5">
-        <div className="min-w-0 flex-1">
+      {/* Property toolbar — ONE non-scrolling line of quick-edit fields. Weighted
+          columns (minmax(0,fr)) so long values (Department, Assignee) get the width
+          they need and short ones (Priority) stay tight — never clipped, never
+          horizontally scrollable. The two long-valued, least-triaged fields
+          (Customer, Contact) fold into "More" so all 8 stay editable without
+          crowding — the spacious one-line treatment of the Vulnerability Register. */}
+      <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-2.5">
+        <div className="grid items-start gap-x-3" style={{ gridTemplateColumns: "minmax(0,2.3fr) minmax(0,1.9fr) minmax(0,2.9fr) minmax(0,3.3fr) minmax(0,3.2fr) minmax(0,3.4fr) max-content" }}>
           <PropField label="Status">
             {statuses.length > 0 ? (
               <ComboBoxInput ariaLabel="Status" value={t.status || ""} allowCustom={false} placeholder="— Select —"
@@ -246,8 +251,6 @@ export default function TicketDetail() {
                 onChange={(v) => { if (v) act("update", { status: v }, "Status updated."); }} />
             ) : <Chip value={t.status} />}
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
           <PropField label="Priority">
             {priorities.length > 0 ? (
               <ComboBoxInput ariaLabel="Priority" value={t.priority || ""} allowCustom={false} placeholder="— Select —"
@@ -255,8 +258,6 @@ export default function TicketDetail() {
                 onChange={(v) => { if (v) act("update", { priority: v }, "Priority updated."); }} />
             ) : <Chip value={t.priority} map={PRIORITY_CHIP} />}
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
           <PropField label="Ticket type">
             {types.length > 0 ? (
               <ComboBoxInput ariaLabel="Ticket type" value={t.ticket_type || ""} allowCustom={false} placeholder="Unset"
@@ -264,46 +265,48 @@ export default function TicketDetail() {
                 onChange={(v) => act("update", { ticket_type: v }, "Type updated.")} />
             ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
           <PropField label="Department">
             <ComboBoxInput ariaLabel="Department" value={t.department_id ? String(t.department_id) : ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!departments.length} placeholder={departments.length ? "— Select —" : "No departments"}
               options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
               onChange={(v) => act("update", { department_id: v ? Number(v) : null }, "Department updated.")} />
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
           <PropField label="Team">
             <ComboBoxInput ariaLabel="Team" value={t.team || ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!teams.length} placeholder={teams.length ? "Unassigned" : "No teams"}
               options={teams.filter((tm) => !tm.disabled).map((tm) => ({ value: tm.name, label: tm.team_name || tm.name }))}
               onChange={(v) => assign(undefined, v || null)} />
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
           <PropField label="Assignee">
             <ComboBoxInput ariaLabel="Assignee" value={t.agent || ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!agents.length} placeholder="Unassigned"
               options={agents.map((a) => ({ value: a.email || a.name || "", label: a.agent_name || a.email || a.name || "" }))}
               onChange={(v) => assign(v || null, undefined)} />
           </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
-          <PropField label="Customer">
-            <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
-              disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
-              options={customers.map((c) => ({ value: String(c.name), label: c.customer_name || c.name }))}
-              onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
-          </PropField>
-        </div>
-        <div className="min-w-0 flex-1">
-          <PropField label="Contact">
-            <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (t.contact || "")) act("update", { contact: v || null }, "Contact updated."); }}
-              className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--color-base)]" />
-          </PropField>
+          {/* Customer + Contact (longest values, rarely retriaged) — kept editable
+              in a popover so the inline lane never scrolls or clips. */}
+          <div className="relative self-end">
+            <button onClick={() => setShowMore((v) => !v)}
+              className={`inline-flex h-[34px] items-center gap-1 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors ${showMore ? "border-[var(--color-base)] text-[var(--color-base)]" : "border-slate-200 bg-white text-slate-600 hover:bg-white"}`}>
+              More <ChevronDown size={13} className={`transition-transform ${showMore ? "rotate-180" : ""}`} />
+            </button>
+            {showMore && (
+              <div className="absolute right-0 top-10 z-30 w-64 space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                <PropField label="Customer">
+                  <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
+                    disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
+                    options={customers.map((c) => ({ value: String(c.name), label: c.customer_name || c.name }))}
+                    onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
+                </PropField>
+                <PropField label="Contact">
+                  <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    onBlur={(e) => { const v = e.target.value.trim(); if (v !== (t.contact || "")) act("update", { contact: v || null }, "Contact updated."); }}
+                    className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--color-base)]" />
+                </PropField>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

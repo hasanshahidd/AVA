@@ -16,6 +16,7 @@ import Link from "next/link";
 import { BookOpen, Plus, Sparkles, X } from "lucide-react";
 import { useHd } from "../../_ui";
 import { hdCall } from "../../_admin";
+import { ComboBoxInput } from "@/components/ui/ComboBoxInput";
 
 type Article = { name: string; title?: string | null; category?: string | null; status?: string | null; url?: string | null };
 
@@ -55,7 +56,6 @@ export function Knowledge({ name, kbLinks, onChanged }: {
   const links = kbLinks || [];
   const suggestions = useHd<{ suggestions: Article[] }>(`/helpdesk/tickets/${id}/kb-suggestions`);
   const all = useHd<{ articles: Article[] }>("/helpdesk/articles");
-  const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -68,7 +68,7 @@ export function Knowledge({ name, kbLinks, onChanged }: {
     const r = await hdCall("post", `/helpdesk/tickets/${id}/kb-links`, { article_id });
     setBusy(false);
     if (!r.ok) { setErr(r.error || "Could not attach that article."); return; }
-    setQ(""); onChanged?.();
+    onChanged?.();
   };
   const detach = async (articleName: string) => {
     setBusy(true); setErr(null);
@@ -79,15 +79,14 @@ export function Knowledge({ name, kbLinks, onChanged }: {
   };
 
   const suggs = (suggestions.data?.suggestions || []).filter((a) => !linkedIds.has(String(a.name)));
-  const needle = q.trim().toLowerCase();
-  const suggIds = useMemo(() => new Set(suggs.map((a) => String(a.name))), [suggs]);
-  const results = useMemo(() => {
-    const pool = (all.data?.articles || []).filter((a) => !linkedIds.has(String(a.name)));
-    // No query → browse the available articles (minus ones already offered as
-    // suggestions) so you can pick one directly; with a query → filter by it.
-    if (!needle) return pool.filter((a) => !suggIds.has(String(a.name))).slice(0, 8);
-    return pool.filter((a) => `${a.title || ""} ${a.category || ""}`.toLowerCase().includes(needle)).slice(0, 8);
-  }, [needle, all.data, linkedIds, suggIds]);
+  // Every attachable (unlinked) article, for the manual searchable dropdown — so
+  // you can pick one even if you don't remember the exact title.
+  const options = useMemo(
+    () => (all.data?.articles || [])
+      .filter((a) => !linkedIds.has(String(a.name)))
+      .map((a) => ({ value: String(a.name), label: a.title || `Article #${a.name}`, hint: a.category || undefined })),
+    [all.data, linkedIds],
+  );
 
   return (
     <div>
@@ -112,16 +111,17 @@ export function Knowledge({ name, kbLinks, onChanged }: {
         </div>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or browse knowledge base…"
-        className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-[12px] focus:border-[var(--color-base)] focus:outline-none" />
-      <div className="mt-1 space-y-1">
-        {!needle && results.length > 0 && (
-          <div className="inline-flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wide text-slate-400">Browse</div>
-        )}
-        {needle && results.length === 0 ? (
-          <p className="px-1 py-1.5 text-[11.5px] text-slate-400">No articles match “{q}”.</p>
-        ) : results.map((a) => <ArticleLine key={a.name} a={a} onAttach={() => attach(a.name)} busy={busy} />)}
-      </div>
+      {/* Manual picker — searchable dropdown of ALL attachable articles, so one
+          can be chosen even without remembering the exact title. */}
+      <ComboBoxInput
+        ariaLabel="Attach knowledge article"
+        value=""
+        onChange={(v) => { if (v) attach(v); }}
+        options={options}
+        placeholder={options.length ? "Search or pick an article…" : "No articles available"}
+        allowCustom={false}
+        disabled={busy || options.length === 0}
+      />
       {err && <p className="mt-1 text-[11px] text-rose-600">{err}</p>}
     </div>
   );
