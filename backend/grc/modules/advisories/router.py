@@ -23,7 +23,7 @@ from ...routers.auth_router import (
     get_user_tenants,
 )
 from .models import Advisory, AdvisoryCve, AdvisorySource, AdvisoryAssetApplicability
-from .service import bridge_cve, normalise_severity
+from .service import normalise_severity
 from .applicability import recheck_advisory
 from .extraction import extract_from_pdf
 from .sources import list_sources
@@ -281,13 +281,9 @@ def create_advisory(
         )
         db.add(cve_row)
         db.flush()
-        bridge_cve(advisory, cve_row, db)
 
     record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="ingested", actor=user,
                  detail={"origin": "manual", "cves": len(seen)})
-    if seen:
-        record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="bridged", actor=user,
-                     detail={"count": len(seen)})
     db.commit()
     db.refresh(advisory)
     return _advisory_to_dict(advisory, with_cves=True)
@@ -583,14 +579,10 @@ def confirm_advisory(
         )
         db.add(row)
         db.flush()
-        bridge_cve(advisory, row, db)
 
     advisory.status = "open"
     record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="confirmed", actor=user,
                  detail={"cves": len(seen), "severity": advisory.severity})
-    if seen:
-        record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="bridged", actor=user,
-                     detail={"count": len(seen)})
     db.commit()
     db.refresh(advisory)
     return _advisory_to_dict(advisory, with_cves=True)

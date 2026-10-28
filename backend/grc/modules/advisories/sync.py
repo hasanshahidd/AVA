@@ -13,7 +13,7 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from .models import Advisory, AdvisoryCve, AdvisorySource
-from .service import bridge_cve, normalise_severity
+from .service import normalise_severity
 from .events import record_event
 from .sources import SOURCE_REGISTRY, get_fetcher
 
@@ -108,12 +108,8 @@ def sync_source(db: Session, *, tenant_id: int, key: str, limit: int = 50,
             )
             db.add(row)
             db.flush()
-            bridge_cve(advisory, row, db)
         record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="ingested", actor=actor,
                      detail={"origin": "api", "source": meta["name"], "cves": len(seen)})
-        if seen:
-            record_event(db, tenant_id=tenant_id, advisory_id=advisory.id, event="bridged",
-                         actor=actor, detail={"count": len(seen)})
         created += 1
 
     db.commit()

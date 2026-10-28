@@ -14,8 +14,8 @@ advisory → register is the one source of truth.
 
 Matching is run against a **scope** of assets the operator chooses: all assets
 we have scan data for (default), a saved CTEM scope, or a hand-picked set.
-Affected assets are also linked to the bridged ``Vulnerability`` so they flow
-into the existing SLA / ticket / remediation path.
+Match-only: the advisory records applicability against the real finding and
+never writes its own rows into the register, so advisory CVEs can't inflate it.
 """
 from __future__ import annotations
 
@@ -72,25 +72,6 @@ def _register_finding_assets(
     return {r[0] for r in rows}
 
 
-def _ensure_link(db: Session, vulnerability_id: int, asset_id: int) -> None:
-    """Link an affected asset to its bridged Vulnerability so it enters the
-    existing fix flow. Idempotent against the (vuln, asset) unique constraint."""
-    exists = (
-        db.query(VulnerabilityAssetLink.id)
-        .filter(
-            VulnerabilityAssetLink.vulnerability_id == vulnerability_id,
-            VulnerabilityAssetLink.asset_id == asset_id,
-        )
-        .first()
-    )
-    if exists:
-        return
-    db.add(VulnerabilityAssetLink(
-        vulnerability_id=vulnerability_id, asset_id=asset_id,
-        link_source="advisory", auto_linked=True,
-    ))
-
-
 def recheck_advisory(
     advisory: Advisory, db: Session, scope_ids: Optional[Set[int]] = None
 ) -> Dict[str, Any]:
@@ -123,8 +104,6 @@ def recheck_advisory(
                 evidence={"cve": cve.cve_id, "matched": True, "source": "register-finding"},
                 checked_at=datetime.utcnow(),
             ))
-            if cve.bridged_vulnerability_id:
-                _ensure_link(db, cve.bridged_vulnerability_id, asset_id)
         affected_all |= hits
         per_cve.append({"cve_id": cve.cve_id, "evaluated": True,
                         "affected": len(hits), "not_affected": len(scope) - len(hits)})

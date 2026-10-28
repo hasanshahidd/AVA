@@ -206,22 +206,19 @@ export default function AdvisoriesPage() {
   const uploadedDocs = advisories.filter((a) => a.origin === 'upload');
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-3xl">
-          <h1 className="text-xl font-bold cw-text-default">Security advisories</h1>
-          <p className="mt-1 text-sm cw-text-muted">
-            An <span className="font-medium cw-text-default">advisory</span> is a published security bulletin from a CERT or vendor. Each one names one or more{' '}
-            <span className="font-medium cw-text-default">CVEs — the actual vulnerabilities</span>. Open an advisory to see which of your assets are affected and track the fix.
-          </p>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold cw-text-default">Security advisories</h1>
+          <p className="truncate text-xs cw-text-muted">CERT/vendor bulletins — each names the CVEs to check against your assets.</p>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex shrink-0 gap-2">
           <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
-          <button onClick={() => setSourcesOpen(true)} className="btn-secondary flex items-center gap-2">
-            <Database size={16} /> Sources
+          <button onClick={() => setSourcesOpen(true)} className="btn-secondary flex items-center gap-2 text-sm">
+            <Database size={15} /> Sources
           </button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-primary flex items-center gap-2">
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Upload advisory
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-primary flex items-center gap-2 text-sm">
+            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Upload advisory
           </button>
         </div>
       </div>
@@ -235,9 +232,9 @@ export default function AdvisoriesPage() {
           { l: 'Sources', v: sourceCount, hint: 'manage', onClick: () => setSourcesOpen(true) },
         ].map((k) => (
           <button key={k.l} onClick={k.onClick}
-            className="cw-card p-4 text-left transition-colors hover:border-[var(--color-primary)]">
+            className="cw-card p-3 text-left transition-colors hover:border-[var(--color-primary)]">
             <p className="text-xs cw-text-muted">{k.l}</p>
-            <p className="mt-1 text-2xl font-bold cw-text-default">{k.v}</p>
+            <p className="mt-0.5 text-xl font-bold cw-text-default">{k.v}</p>
             <p className="mt-0.5 text-[11px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
           </button>
         ))}
@@ -291,7 +288,7 @@ export default function AdvisoriesPage() {
           )}
         </div>
 
-        <div className="cw-card p-5">
+        <div className="cw-card p-4">
           {!detail ? (
             <p className="text-sm cw-text-muted">Select an advisory to see which assets are affected.</p>
           ) : (
@@ -327,11 +324,11 @@ export default function AdvisoriesPage() {
 
               <div className="mt-4 flex flex-wrap items-end gap-8">
                 <div title="Assets found to run the affected software (or confirmed by a scan), and how many were affected.">
-                  <p className="text-2xl font-bold cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
+                  <p className="text-xl font-bold cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
                   <p className="text-xs cw-text-muted">assets affected / checked</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold cw-text-default">{detail.cve_count}</p>
+                  <p className="text-xl font-bold cw-text-default">{detail.cve_count}</p>
                   <p className="text-xs cw-text-muted">CVEs</p>
                 </div>
                 {detail.url && (
