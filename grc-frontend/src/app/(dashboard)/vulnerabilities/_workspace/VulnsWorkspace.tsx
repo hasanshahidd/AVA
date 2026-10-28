@@ -454,7 +454,10 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                     <span style={{ fontSize: 11.5, color: MUTED }}><b className="num" style={{ color: SEC }}>{rows.length}</b> shown · {agg.total} total</span>
                   </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
+                    {/* The dashboard shell's global `.governance-light thead th` repaints headers light/muted
+                        and overrides our inline blue, so force the brand-blue header bar with a scoped rule. */}
+                    <style dangerouslySetInnerHTML={{ __html: '.inv2 .vreg-tbl thead th{background:#005B96!important;color:#fff!important;border-bottom-color:#0A4C84!important;font-weight:700!important}' }} />
+                    <table className="vreg-tbl" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
                       <thead><tr>{HEADS.map((h) => (
                         <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none' }}
                           onClick={h.sortable ? () => sortBy(h.key) : undefined}
