@@ -227,8 +227,27 @@ def register_scan_delete(
         raise HTTPException(status_code=404, detail="scan job not found")
     if outcome == "running":
         raise HTTPException(status_code=409,
-                            detail="This scan is still running — wait for it to finish before deleting it.")
+                            detail="This scan is still running — stop it first, then delete it.")
     return {"deleted": True, "job_id": job_id}
+
+
+@router.post("/scan-jobs/{job_id}/cancel", dependencies=[Depends(_require_scan)])
+def register_scan_cancel(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_auth),
+):
+    """Stop a queued/running scan SESSION. Marks it 'cancelled' so a stuck/frozen 'running' row
+    clears and becomes deletable; findings already written to the register are kept."""
+    user_tenants = get_user_tenants(current_user, db)
+    if not user_tenants:
+        raise HTTPException(status_code=404, detail="scan job not found")
+    outcome = service.cancel_scan_job(db, job_id, user_tenants)
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail="scan job not found")
+    if outcome == "not_running":
+        raise HTTPException(status_code=409, detail="This scan has already finished.")
+    return {"cancelled": True, "job_id": job_id}
 
 
 class MatchedCredsIn(BaseModel):

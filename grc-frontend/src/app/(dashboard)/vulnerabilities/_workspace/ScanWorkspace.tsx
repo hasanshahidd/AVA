@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus, Trash2, ArrowLeft, Ban } from 'lucide-react';
 import apiClient, { vulnManagementApi } from '@/lib/api';
 import { AssetCveSidebar, type SidebarAsset } from '@/components/scan/AssetCveSidebar';
 import ScanLauncher from './ScanLauncher';
@@ -139,6 +139,19 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
     finally { setDeleting(null); }
   };
 
+  // Stop a stuck/running scan — marks the job cancelled so a frozen 'running' row clears
+  // (a restart does NOT clear orphaned scan-jobs) and becomes deletable. Findings already
+  // written to the register are kept.
+  const [cancelling, setCancelling] = useState<number | null>(null);
+  const cancelJob = async (e: React.MouseEvent, jobId: number) => {
+    e.stopPropagation();
+    if (!window.confirm('Stop this scan? It is marked cancelled; any findings already produced stay in the register.')) return;
+    setCancelling(jobId);
+    try { await vulnManagementApi.scan.cancel(jobId); qc.invalidateQueries({ queryKey: ['register', 'scan-jobs'] }); }
+    catch (err: any) { window.alert(err?.response?.data?.detail || 'Failed to stop the scan.'); }
+    finally { setCancelling(null); }
+  };
+
   // On opening an asset, reconcile the detail view to its LATEST scan job — so an already-running scan
   // (started from the launcher or earlier) shows its live progress bar + polls here too, not only in the
   // sessions table. Clears any prior poll so we don't double-poll.
@@ -247,11 +260,19 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                           <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{fmtWhen(j.started_at || j.created_at)}</td>
                           <td style={{ padding: '9px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{active ? <span style={{ color: FAINT }}>running…</span> : (j.finished_at ? fmtDur(j.started_at || j.created_at, j.finished_at) : '—')}</td>
                           <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                            <button onClick={(e) => delJob(e, j.job_id)} disabled={deleting === j.job_id || active}
-                              title={active ? 'Wait for the scan to finish' : 'Delete this scan session'}
-                              style={{ border: 'none', background: 'none', cursor: active ? 'not-allowed' : 'pointer', color: active ? FAINT : '#B23A3A', opacity: active ? 0.4 : 1, padding: 4, borderRadius: 6, display: 'inline-flex' }}>
-                              <Trash2 size={14} />
-                            </button>
+                            {active ? (
+                              <button onClick={(e) => cancelJob(e, j.job_id)} disabled={cancelling === j.job_id}
+                                title="Stop this scan"
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#B23A3A', opacity: cancelling === j.job_id ? 0.4 : 1, padding: 4, borderRadius: 6, display: 'inline-flex' }}>
+                                <Ban size={14} />
+                              </button>
+                            ) : (
+                              <button onClick={(e) => delJob(e, j.job_id)} disabled={deleting === j.job_id}
+                                title="Delete this scan session"
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#B23A3A', opacity: deleting === j.job_id ? 0.4 : 1, padding: 4, borderRadius: 6, display: 'inline-flex' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ); })}

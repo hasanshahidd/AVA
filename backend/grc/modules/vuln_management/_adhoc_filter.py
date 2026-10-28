@@ -14,7 +14,7 @@ to an ad-hoc target. One helper, applied at every Vulnerability query site, so
 the register list, the dashboard counts and every finding list reconcile against
 the same definition of "in the register".
 """
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ...models import Vulnerability, VulnerabilityAssetLink, ITAsset
@@ -35,14 +35,21 @@ def inventory_assets_only(A=ITAsset):
 
 
 def exclude_adhoc(db: Session):
-    """A SQLAlchemy filter condition keeping ONLY vulnerabilities linked to a
-    managed inventory asset (drops unlinked findings AND ad-hoc-only findings).
-    Apply with ``.filter(exclude_adhoc(db))`` on any query that selects or joins
-    ``Vulnerability``.
+    """A SQLAlchemy filter condition keeping a vulnerability that is EITHER linked to a
+    managed inventory asset OR has NO asset link at all (a deliberate MANUAL register
+    entry — the Add-Vulnerability form never links an asset). Only findings linked
+    EXCLUSIVELY to an ad-hoc pentest target are dropped. Apply with
+    ``.filter(exclude_adhoc(db))`` on any query that selects or joins ``Vulnerability``.
 
-    ponytail: re-runs the ``IN`` sub-select per query (register sizes are
-    hundreds–thousands of rows, well within budget); push to a cached id set
-    if a tenant's register ever grows large enough to matter.
+    Why keep unlinked: scan findings always link to an asset (managed or ad-hoc), so a
+    vuln with NO link is a hand-added entry the operator expects to see and have counted;
+    silently dropping it hid manual adds from the register and the KPI counts. (Advisory
+    CVEs no longer create unlinked rows — bridging was removed for match-only — so this
+    does not re-admit advisory pollution.)
+
+    ponytail: re-runs the sub-selects per query (register sizes are hundreds–thousands of
+    rows, well within budget); push to a cached id set if a tenant's register ever grows
+    large enough to matter.
     """
     # Reuse the EXACT tags the pentest engine stamps — imported lazily so this
     # module never pulls the heavy pentest.service at import time / risks a cycle.
@@ -59,4 +66,10 @@ def exclude_adhoc(db: Session):
             func.coalesce(ITAsset.last_seen_source, "") != ADHOC_SOURCE,
         )
     )
-    return Vulnerability.id.in_(managed_vuln_ids)
+    # Any vuln that carries at least one asset link (managed OR ad-hoc). A vuln absent
+    # from this set has NO link at all -> manual entry -> keep.
+    linked_vuln_ids = db.query(VulnerabilityAssetLink.vulnerability_id)
+    return or_(
+        Vulnerability.id.in_(managed_vuln_ids),
+        Vulnerability.id.notin_(linked_vuln_ids),
+    )

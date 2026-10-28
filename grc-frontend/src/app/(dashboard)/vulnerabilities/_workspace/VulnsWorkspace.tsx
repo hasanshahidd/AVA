@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2 } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, PriorityBeforeAfter, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
@@ -131,7 +131,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const {
     vulns, filteredVulns, dashboard, domains = [], loading = false, scoped = false,
     registerType, setRegisterType, renderNcaRegister,
-    searchTerm, setSearchTerm, canCreate, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
+    searchTerm, setSearchTerm, canCreate, canDelete, onDelete, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
     bulkUploadState = 'idle', bulkUploadMsg, onBulkCreateTickets,
     assetItems = [],
   } = props;
@@ -385,12 +385,12 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                   </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
-                      <thead><tr>{['ID', 'Title', 'Linked asset', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · before → after', 'Status', 'SLA / Due', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                      <thead><tr>{['ID', 'Title', 'Linked asset', 'CVE', 'Severity', 'CVSS', 'EPSS', 'Exploit', 'Priority · before → after', 'Status', 'SLA / Due', 'Assigned to'].map((h) => <th key={h} style={th}>{h}</th>)}{canDelete && <th style={th}></th>}</tr></thead>
                       <tbody>
                         {loading ? (
-                          <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
+                          <tr><td colSpan={canDelete ? 13 : 12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
                         ) : rows.length === 0 ? (
-                          <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
+                          <tr><td colSpan={canDelete ? 13 : 12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
                         ) : rows.map((v) => {
                           const sev = normSev(v.severity); const sm = SEV[sev];
                           const exp = hasExploit(v); const due = dueLabel(v);
@@ -426,6 +426,14 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                                   </span>
                                 ) : owner ? <span style={{ color: SEC }}>{owner}</span> : <span style={{ color: FAINT }}>Unassigned</span>}
                               </td>
+                              {canDelete && (
+                                <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={() => onDelete?.(v)} title="Delete from register"
+                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#B23A3A', padding: 4, borderRadius: 6, display: 'inline-flex' }}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           );
                         })}

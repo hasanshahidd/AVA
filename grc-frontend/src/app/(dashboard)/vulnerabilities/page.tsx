@@ -513,6 +513,18 @@ export default function VulnerabilitiesPage() {
     },
   });
 
+  // Delete a vulnerability from the register (row trash action). Invalidates the list,
+  // the dashboard counts and the domain buckets so every surface drops it at once.
+  const deleteVulnMutation = useMutation({
+    mutationFn: (id: number) => vulnManagementApi.vulnerabilities.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+      queryClient.invalidateQueries({ queryKey: ['vuln-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['vuln-domains'] });
+    },
+    onError: (err: any) => { window.alert(err?.response?.data?.detail || 'Failed to delete the vulnerability.'); },
+  });
+
   const addMemberMutation = useMutation({
     mutationFn: ({ deptId, data }: { deptId: number; data: { user_id: number; role?: string; email_notifications_enabled?: boolean; escalation_order?: number } }) =>
       vulnManagementApi.departments.addMember(deptId, data),
@@ -1083,6 +1095,7 @@ export default function VulnerabilitiesPage() {
           canCreate={hasPermission('vulnerabilities:vulnerability_register:create')}
           canEdit={hasPermission('vulnerabilities:vulnerability_register:edit')}
           canDelete={hasPermission('vulnerabilities:vulnerability_register:delete')}
+          onDelete={(v) => { if (window.confirm(`Delete ${v.cve_id || v.title || ('VULN-' + v.id)} from the register? This cannot be undone.`)) deleteVulnMutation.mutate(v.id); }}
           onView={(v) => router.push(`/vulnerabilities/${v.id}`)}
           onOpenFull={(id) => router.push(`/vulnerabilities/${id}`)}
           onBulkAssign={(ids) => { setSelectedVulnIds(new Set(ids)); setShowBulkAssignModal(true); }}
