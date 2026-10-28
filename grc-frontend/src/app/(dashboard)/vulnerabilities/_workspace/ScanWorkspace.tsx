@@ -29,8 +29,9 @@ const btn: React.CSSProperties = { border: `1px solid #E4E8EC`, background: '#ff
 const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 };
 
 type Filter = 'all' | 'inventory' | 'adhoc';
-const TERMINAL = new Set(['done', 'failed', 'complete', 'completed', 'error', 'none']);
+const TERMINAL = new Set(['done', 'failed', 'complete', 'completed', 'error', 'none', 'cancelled', 'canceled']);
 const FAILED = new Set(['failed', 'error']);
+const CANCELLED = new Set(['cancelled', 'canceled']);
 
 type ScanJob = {
   job_id: number; asset_id: number; asset_name: string; target?: string; adhoc?: boolean;
@@ -42,8 +43,9 @@ const fmtDur = (a?: string, b?: string) => { if (!a || !b) return '—'; const m
 const STATUSC: Record<string, { c: string; bg: string }> = {
   running: { c: '#005B96', bg: '#EAF2F9' }, queued: { c: '#6B7787', bg: '#EEF1F3' },
   done: { c: '#1F7A54', bg: '#E7F5EE' }, failed: { c: '#B23A3A', bg: '#FBEAEA' },
+  cancelled: { c: '#6B7787', bg: '#EEF1F3' },
 };
-const statusKey = (s?: string) => { const k = (s || '').toLowerCase(); if (FAILED.has(k)) return 'failed'; if (k === 'done' || k === 'complete' || k === 'completed') return 'done'; if (k === 'running') return 'running'; return 'queued'; };
+const statusKey = (s?: string) => { const k = (s || '').toLowerCase(); if (CANCELLED.has(k)) return 'cancelled'; if (FAILED.has(k)) return 'failed'; if (k === 'done' || k === 'complete' || k === 'completed') return 'done'; if (k === 'running') return 'running'; return 'queued'; };
 
 export function ScanWorkspace({ assetItems = [], vulns = [] }: {
   assetItems?: { value: string; label: string }[];
