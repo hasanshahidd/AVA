@@ -11,7 +11,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Globe, Server, KeyRound, Cloud, Code2, Boxes, Radar, Database, X, Check, Loader2, ArrowRight } from 'lucide-react';
+import { Globe, Server, KeyRound, Cloud, Code2, Boxes, Radar, Database, X, Check, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { assetsApi, discoveryApi, vulnManagementApi } from '@/lib/api';
 import '../../pentest/_components/pentest-redesign.css';
 
@@ -135,9 +135,11 @@ export default function ScanLauncher({ onClose, onStarted }: {
         let firstJob: number | null = null;
         for (const id of ids) {
           // Each host uses its OWN matched login when ticked; unticked (or no login) -> surface scan.
+          // Agent-managed host -> no credential at all (the agent is inside; it's always a depth scan).
           const mc = matchedCreds[String(id)];
-          const useCred = usesCreds && !!mc && !credOff.has(id);
-          const credArgs = useCred ? { credential_id: mc.cred_id } : (usesCreds ? { allow_uncredentialed: true } : {});
+          const isAgent = mc?.cred_kind === 'agent';
+          const useCred = usesCreds && !!mc && !isAgent && !credOff.has(id);
+          const credArgs = isAgent ? {} : (useCred ? { credential_id: mc.cred_id } : (usesCreds ? { allow_uncredentialed: true } : {}));
           const { data } = await vulnManagementApi.scan.start(id, { lane: laneOverride, ...credArgs });
           if (firstJob == null && data?.job_id) firstJob = data.job_id;
         }
@@ -198,12 +200,28 @@ export default function ScanLauncher({ onClose, onStarted }: {
                     {(a.ip || a.type) && <div className="mono" style={{ fontSize: 9.5, color: 'var(--faint)' }}>{[a.ip, a.type].filter(Boolean).join(' · ')}</div>}
                   </div>
                 </button>
-                {sel && usesCreds && mc && (
-                  <button onClick={() => credToggle(a.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderTop: '1px solid #d7e7f2', background: credOn ? '#e6f3ea' : '#fff', padding: '7px 11px 7px 42px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                    <span style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 4, border: `2px solid ${credOn ? '#2f9e5a' : '#cbd5e1'}`, background: credOn ? '#2f9e5a' : '#fff', color: '#fff', flexShrink: 0 }}>{credOn && <Check width={11} height={11} />}</span>
-                    <KeyRound width={12} height={12} style={{ color: credOn ? '#2f9e5a' : 'var(--faint)', flexShrink: 0 }} />
-                    <span className="mono" style={{ fontSize: 10.5, color: credOn ? '#1e7a42' : 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mc.cred_username}<span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {mc.cred_name} ({mc.cred_kind})</span></span>
-                  </button>
+                {sel && usesCreds && (
+                  mc?.cred_kind === 'agent' ? (
+                    // Agent-managed host: the agent is inside the box, so it's always a depth scan with
+                    // NO credential — never a borrowed login. Informational, not a toggle.
+                    <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid #cfe8da', background: '#eafaf1', padding: '7px 11px 7px 42px' }}>
+                      <ShieldCheck width={13} height={13} style={{ color: '#1e7a42', flexShrink: 0 }} />
+                      <span className="mono" style={{ fontSize: 10.5, color: '#1e7a42', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Agent · always depth scan<span style={{ color: 'var(--faint)', fontWeight: 400 }}> · no password (agent runs inside the host)</span></span>
+                    </div>
+                  ) : mc ? (
+                    // The host's OWN stored login (the credential that promoted it in Discovery).
+                    <button onClick={() => credToggle(a.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderTop: '1px solid #d7e7f2', background: credOn ? '#e6f3ea' : '#fff', padding: '7px 11px 7px 42px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                      <span style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 4, border: `2px solid ${credOn ? '#2f9e5a' : '#cbd5e1'}`, background: credOn ? '#2f9e5a' : '#fff', color: '#fff', flexShrink: 0 }}>{credOn && <Check width={11} height={11} />}</span>
+                      <KeyRound width={12} height={12} style={{ color: credOn ? '#2f9e5a' : 'var(--faint)', flexShrink: 0 }} />
+                      <span className="mono" style={{ fontSize: 10.5, color: credOn ? '#1e7a42' : 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mc.cred_username}<span style={{ color: 'var(--faint)', fontWeight: 400 }}> · {mc.cred_name} ({mc.cred_kind})</span></span>
+                    </button>
+                  ) : (
+                    // No stored login for this host → honest surface scan (we don't borrow another host's).
+                    <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--line)', background: '#fff', padding: '7px 11px 7px 42px' }}>
+                      <Radar width={12} height={12} style={{ color: 'var(--faint)', flexShrink: 0 }} />
+                      <span className="mono" style={{ fontSize: 10.5, color: 'var(--faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Surface scan<span style={{ fontWeight: 400 }}> · no saved login for this host</span></span>
+                    </div>
+                  )
                 )}
               </div>
             ); }) : <div style={{ padding: '24px 8px', textAlign: 'center', fontSize: 12, color: 'var(--faint)' }}>No inventory assets in the {laneName} lane — use <b>Add a target</b>.</div>}

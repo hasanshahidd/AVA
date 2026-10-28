@@ -231,6 +231,14 @@ class ITAsset(Base):
     # (operator-confirmed) | NULL (pre-existing / manually created).
     discovery_state = Column(String(30), nullable=True, index=True)
 
+    # The credential that ACTUALLY authenticated this host when Discovery
+    # promoted it to inventory — a direct per-asset link stored AT THAT MOMENT
+    # (set in promote_observation). This is the asset's OWN login, used by the
+    # launcher + scan for THIS host only; it replaces borrowing a CIDR-scoped
+    # profile that merely covers the IP. NULL = never credential-promoted
+    # (manual/surface/agent host) → no login to show.
+    credential_profile_id = Column(Integer, ForeignKey("grc_credential_profiles.id"), nullable=True, index=True)
+
     # Endpoint security posture derived from detected_software_json by the
     # security_classifier: { has_antivirus, antivirus_products, has_edr,
     # edr_products, endpoint_protected, categories, ... }. Recomputed every time

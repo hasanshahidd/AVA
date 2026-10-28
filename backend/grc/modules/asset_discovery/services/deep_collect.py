@@ -383,6 +383,14 @@ def promote_observation(db: Session, obs: DiscoveryObservation,
         asset.discovery_state = "managed"
     except Exception:
         pass
+    # Store the EXACT login that just authenticated this host as the asset's own
+    # per-PC credential link — the launcher + scan use this for THIS host only,
+    # instead of borrowing a CIDR profile that merely covers its IP. Best-effort
+    # (older schemas may lack the column).
+    try:
+        asset.credential_profile_id = profile.id
+    except Exception:
+        pass
     obs.resolution = "created" if created else "merged"
     obs.resolved_asset_id = asset.id
     obs.resolution_note = f"credential '{profile.name}' succeeded — {'promoted to' if created else 'linked to existing'} asset #{asset.id}"
