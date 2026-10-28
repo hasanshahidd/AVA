@@ -591,31 +591,47 @@ func cisRun(apiToken string) {
 	if json.Unmarshal(rb, &jr) != nil || len(jr.Jobs) == 0 {
 		return
 	}
-	var results []cisResult
 	if runtime.GOOS == "windows" {
-		results = runWindowsChecks(jr.Jobs)
+		runWindowsChecks(apiToken, jr.Jobs) // posts in batches as it goes
 	} else {
-		results = runLinuxOscap(apiToken, jr.Jobs)
+		postResults(apiToken, runLinuxOscap(apiToken, jr.Jobs)) // oscap is one shot
 	}
-	if len(results) > 0 {
-		if _, c, _ := post(base()+"/api/agents/jobs/results", apiToken,
-			map[string]any{"results": results}); c == 200 {
-			fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
-		}
+}
+
+// postResults ships a batch of verdicts; the server scores + finalizes them.
+func postResults(apiToken string, results []cisResult) {
+	if len(results) == 0 {
+		return
+	}
+	if _, c, _ := post(base()+"/api/agents/jobs/results", apiToken,
+		map[string]any{"results": results}); c == 200 {
+		fmt.Printf("CIS: reported %d rule result(s)\n", len(results))
 	}
 }
 
 // runWindowsChecks runs each job's CIS check locally (the command was already
-// read-only-safety-gated server-side) and returns the RAW output — the server
-// scores it, so the agent never duplicates the verdict logic.
-func runWindowsChecks(jobs []cisJob) []cisResult {
+// read-only-safety-gated server-side) and ships RAW output in BATCHES as it goes.
+// Batching means a big benchmark shows live progress, the agent heartbeats between
+// batches so it never goes STALE mid-grind, results already sent survive a crash,
+// and the next poll resumes ONLY the still-pending rules (the server's /jobs returns
+// pending only). The server scores each batch, so the agent never duplicates verdicts.
+func runWindowsChecks(apiToken string, jobs []cisJob) {
 	cut := func(s string, n int) string {
 		if len(s) > n {
 			return s[:n]
 		}
 		return s
 	}
-	var results []cisResult
+	const batchN = 25
+	var batch []cisResult
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		postResults(apiToken, batch)
+		batch = batch[:0]
+		heartbeat(apiToken) // stay alive + advance liveness during a long grind
+	}
 	for _, j := range jobs {
 		if j.Win == nil || j.Win.Command == "" {
 			continue
@@ -645,12 +661,15 @@ func runWindowsChecks(jobs []cisJob) []cisResult {
 			}
 		}
 		rcCopy := rc
-		results = append(results, cisResult{
+		batch = append(batch, cisResult{
 			RunID: j.RunID, ExitStatus: &rcCopy,
 			Stdout: cut(stdout.String(), 65536), Stderr: cut(stderr.String(), 8192),
 		})
+		if len(batch) >= batchN {
+			flush()
+		}
 	}
-	return results
+	flush() // remainder
 }
 
 // runLinuxOscap groups jobs by (datastream, profile) — oscap evaluates the whole
