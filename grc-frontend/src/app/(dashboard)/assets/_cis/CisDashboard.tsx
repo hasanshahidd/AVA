@@ -12,7 +12,6 @@
  *     4. What do we fix first (most-failed controls, worst assets)?
  *
  * Layout mirrors that C-level order, top to bottom:
- *     [executive summary band]  — one confident sentence over live numbers
  *     [posture · coverage · estate-by-hardening]   ← answer + trust
  *     [pass rate by OS family · by benchmark]       ← where it concentrates
  *     [remediation priorities · worst assets]       ← what to do next
@@ -36,13 +35,13 @@
  * A panel with no backing data shows an empty state, never a zero dressed up as a score.
  */
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { AlertTriangle, ClipboardCheck, ServerCog, ShieldCheck } from 'lucide-react';
 import { compliancePluginsApi } from '@/lib/api';
 import {
-  T, SEV, SEV_ORDER, type Sev, type Tone, FONT, CARD_SHADOW,
+  T, SEV, SEV_ORDER, type Sev, type Tone, FONT,
   Card, Empty, Loading, Unavailable, Figure, Pill, Eyebrow,
   nfmt, pctOf, plural,
 } from '../../dashboard/_components/kit';
@@ -92,14 +91,6 @@ const toMs = (iso?: string | null): number => {
   const t = new Date(/[zZ]$|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`).getTime();
   return Number.isNaN(t) ? 0 : t;
 };
-function fmtAgo(ms: number): string {
-  if (!ms) return 'never';
-  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 /** CIS_Microsoft_Windows_11_Enterprise_Benchmark_v5.0.1 → "Microsoft Windows 11 Enterprise v5.0.1" */
 function prettyBenchmark(raw?: string | null): string {
   if (!raw) return '—';
@@ -130,39 +121,6 @@ function Ring({ pct, size = 86 }: { pct: number | null; size?: number }) {
       </div>
     </div>
   );
-}
-
-/* ---------- confident executive sentence (plain template over live numbers) ----------
-   States posture, concentration, remediation size and coverage honesty. Claims NO
-   direction (no CIS time-series exists). `critHigh` is null until the coverage fan-out
-   that carries severity has settled; that clause simply waits for it. */
-const B = ({ children }: { children: ReactNode }) => <b style={{ fontWeight: 600, color: T.text }}>{children}</b>;
-function postureSentence(p: {
-  passRate: number | null; scannedAssets: number; failed: number; critHigh: number | null;
-  total: number; withBenchmark: number; unscanned: number;
-  worstLabel: string | null; worstRate: number | null;
-}): ReactNode {
-  // Pre-scan: nothing evaluated yet (handled before the dashboard body, but the band
-  // still renders, so keep an honest line here too).
-  if (p.scannedAssets === 0) {
-    return (
-      <>No CIS scan has run yet — <B>{nfmt(p.total)}</B> {p.total === 1 ? 'asset is' : 'assets are'} in inventory
-        {p.withBenchmark ? <>, <B>{nfmt(p.withBenchmark)}</B> matched to a benchmark and ready to scan</> : null}.
-        {' '}Hardening is <B>unmeasured</B>, not passing.</>
-    );
-  }
-  const lead = p.passRate == null
-    ? <>CIS checks have run but none could be evaluated yet across <B>{plural(p.scannedAssets, 'scanned asset')}</B></>
-    : <>The estate is <B>{p.passRate >= 85 ? 'strongly hardened' : p.passRate >= 55 ? 'moderately hardened' : 'weakly hardened'}</B> — <B>{p.passRate}%</B> of evaluated CIS checks pass across <B>{plural(p.scannedAssets, 'scanned asset')}</B></>;
-  const concentration = p.worstLabel && p.worstRate != null
-    ? <> Hardening is weakest on <B>{p.worstLabel}</B> (<B>{p.worstRate}%</B>).</> : <>.</>;
-  const remediation = p.failed > 0
-    ? <> <B>{nfmt(p.failed)}</B> {p.failed === 1 ? 'check is' : 'checks are'} failing{p.critHigh != null && p.critHigh > 0 ? <>, <B>{nfmt(p.critHigh)}</B> critical or high</> : null}.</>
-    : <> No evaluated check is failing.</>;
-  const coverage = p.unscanned > 0
-    ? <> <B>{nfmt(p.unscanned)}</B> of <B>{nfmt(p.total)}</B> assets are not yet scanned — their hardening is <B>unmeasured</B>.</>
-    : <> Every asset in inventory has been scanned.</>;
-  return <>{lead}{concentration}{remediation}{coverage}</>;
 }
 
 /* ---------- remediation: most-failed controls (biggest-win fixes first) ---------- */
@@ -330,9 +288,6 @@ export default function CisDashboard() {
     .sort((x, y) => (x.r as number) - (y.r as number))
     .slice(0, 8), [allAssets]);
 
-  // Weakest MEASURED family, for the executive sentence.
-  const worstFamily = useMemo(() => familyRows.find((r) => r.n != null) ?? null, [familyRows]);
-
   const checkParts: Part[] = [
     { key: 'passed', label: 'Passed', n: roll.passed, c: T.success },
     { key: 'failed', label: 'Failed', n: roll.failed, c: SEV.critical.c },
@@ -355,34 +310,8 @@ export default function CisDashboard() {
   const unmeasured = roll.awaiting + roll.unmapped;
   const grid = 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12';
 
-  /* --- executive summary band (header + confident sentence + coverage stat) --- */
-  const summaryBand = (
-    <section aria-label="CIS executive summary"
-      className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[12px] border border-[#E2E5EC] bg-white px-3.5 py-2.5 ${CARD_SHADOW}`}
-      style={{ borderLeft: `3px solid ${T.base}` }}>
-      <h2 className="sr-only">CIS benchmark compliance</h2>
-      <div className="min-w-0 flex-1 basis-[280px]">
-        <Eyebrow>Executive summary · CIS hardening</Eyebrow>
-        <p className="m-0 mt-0.5 text-[12px] leading-[1.45] text-[#0F172A]" aria-live="polite">
-          {postureSentence({
-            passRate: roll.passRate, scannedAssets: roll.scannedAssets, failed: roll.failed,
-            critHigh: fail.haveData ? fail.critHigh : null,
-            total: roll.total, withBenchmark: roll.withBenchmark, unscanned: roll.total - roll.scannedAssets,
-            worstLabel: typeof worstFamily?.label === 'string' ? worstFamily.label : null,
-            worstRate: worstFamily?.n ?? null,
-          })}
-        </p>
-      </div>
-      <div className="text-[11.5px] leading-[1.6] text-[#64748B]" style={{ textAlign: 'right' }}>
-        <b className="text-[#0F172A]">{nfmt(roll.scannedAssets)}</b> of {nfmt(roll.total)} assets scanned<br />
-        {roll.lastScan ? `last scan ${fmtAgo(roll.lastScan)}` : 'no scans yet'}
-        {overviewQ.data?.totals?.total_rules ? <> · {nfmt(overviewQ.data.totals.total_rules)} rules in library</> : null}
-      </div>
-    </section>
-  );
-
   return (
-    <div className="flex flex-col gap-2.5" style={{ background: '#EDF0F5', padding: '12px 16px', minHeight: 'calc(100vh - 46px)', fontFamily: FONT, color: T.text }}>
+    <div className="flex flex-col gap-2.5" style={{ zoom: 0.8, background: '#EDF0F5', padding: '12px 16px', minHeight: 'calc((100vh - 46px) / 0.8)', fontFamily: FONT, color: T.text }}>
       {overviewQ.isLoading ? (
         <Loading rows={6} note="Loading CIS scan results across the estate…" />
       ) : overviewQ.isError ? (
@@ -390,9 +319,8 @@ export default function CisDashboard() {
       ) : roll.total === 0 ? (
         <Empty icon={<ServerCog size={18} />} title="No assets in inventory yet" body="Discover or import assets, connect a scanner, then run a CIS benchmark scan to see hardening across the estate." href="/asset-discovery" cta="Bring assets in" />
       ) : !scanned ? (
-        // Mapped-but-unscanned: the summary band + the coverage breakdown + one honest CTA.
+        // Mapped-but-unscanned: the coverage breakdown + one honest CTA.
         <>
-          {summaryBand}
           <div className={grid}>
             <Card title="Scan coverage" sub="Assets ready vs scanned" className="xl:col-span-5">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 22px', marginBottom: 6 }}>
@@ -411,8 +339,6 @@ export default function CisDashboard() {
         </>
       ) : (
         <>
-          {summaryBand}
-
           {/* ── Answer + trust: posture · coverage honesty · estate by hardening ── */}
           <div className={grid}>
             <Card title="Overall CIS compliance" sub="Passed ÷ (passed + failed)" busy={overviewQ.isFetching} className="xl:col-span-4">
