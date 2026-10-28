@@ -601,6 +601,7 @@ def _purge_asset_references(db: Session, asset: "ITAsset") -> None:
         ("grc_asset_risk_assessments", "asset_id"),
         ("grc_asset_external_identities", "asset_id"),
         ("grc_asset_security_compliance_selections", "asset_id"),
+        ("grc_advisory_asset_applicability", "asset_id"),
         ("grc_asset_alert_states", "asset_id"),
         ("grc_risk_asset_links", "asset_id"),
         ("grc_document_asset_links", "asset_id"),

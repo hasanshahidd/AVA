@@ -198,8 +198,11 @@ export default function AssetsPage() {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assets-dashboard'] });
     },
+    // Never swallow a failed delete again — the 409 ("still referenced …") is why
+    // the row silently stayed and the button "did nothing".
+    onError: (e: any) => alert(e?.response?.data?.detail || 'Could not delete this asset.'),
   });
-  
+
   const handleEdit = (e: React.MouseEvent, asset: ITAsset) => {
     e.stopPropagation();
     setEditingAsset(asset);

@@ -48,7 +48,12 @@ const canConnect = (a: ITAsset) => !!a.host_name && a.discovery_state !== 'unman
 // credentialed scan OR manual/import; scan_mode null folds into Credential).
 const modeOf = (a: ITAsset): 'easm' | 'credential' | 'uncredential' =>
   a.scan_mode === 'easm' ? 'easm' : a.scan_mode === 'uncredential' ? 'uncredential' : 'credential';
-const MODE_LABEL: Record<'all' | 'easm' | 'credential' | 'uncredential' | 'pci', string> = { all: 'All', easm: 'EASM', credential: 'Credential', uncredential: 'Uncredential', pci: 'PCI' };
+// Agent-managed = born from an installed Ava agent. origin_source is provenance
+// (a host discovered first and given an agent later keeps its origin), which is
+// accurate for how agents are deployed here; upgrade to a server agent_managed
+// flag if a mid-life agent install must reclassify the row.
+const agentManaged = (a: ITAsset) => (a as any).origin_source === 'agent';
+const MODE_LABEL: Record<'all' | 'easm' | 'credential' | 'uncredential' | 'agent' | 'pci', string> = { all: 'All', easm: 'EASM', credential: 'Credential', uncredential: 'Uncredential', agent: 'Agent', pci: 'PCI' };
 
 const TILE: Record<string, { bg: string; fg: string }> = {
   application: { bg: '#DBE8FA', fg: '#28578F' }, infrastructure: { bg: '#CFF2E7', fg: '#014A81' },
@@ -60,6 +65,9 @@ const CRIT: Record<string, { bg: string; fg: string }> = {
 };
 const CRIT_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
+// Uniform pill — nowrap + flex:none so a row's tag line never wraps and every
+// row stays the same height (was: verbose tags wrapping unevenly).
+const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', flex: 'none' });
 const td: React.CSSProperties = { padding: '11px 12px', borderBottom: '1px solid #F0F3F5', color: '#3A4653' };
 const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', borderBottom: '1px solid #E8ECEE', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: '#0F1F2B', fontWeight: 700, position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1, whiteSpace: 'nowrap' };
 
@@ -81,9 +89,9 @@ export default function InventoryRedesign(p: Props) {
   // 3-mode toggle — EASM / Credential / Uncredential (scan_mode from the discovery
   // backend; null folds into Credential via modeOf). Default Credential (the
   // full-depth bucket, incl. manual/import).
-  const [mode, setMode] = useState<'all' | 'easm' | 'credential' | 'uncredential' | 'pci'>(() => {
+  const [mode, setMode] = useState<'all' | 'easm' | 'credential' | 'uncredential' | 'agent' | 'pci'>(() => {
     const m = initialMode || '';
-    return m === 'easm' || m === 'credential' || m === 'uncredential' || m === 'pci' ? m : 'all';
+    return m === 'easm' || m === 'credential' || m === 'uncredential' || m === 'agent' || m === 'pci' ? m : 'all';
   });
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
@@ -122,6 +130,7 @@ export default function InventoryRedesign(p: Props) {
       easmN: logical.filter((a) => modeOf(a) === 'easm').length,
       credN: logical.filter((a) => modeOf(a) === 'credential').length,
       uncredN: logical.filter((a) => modeOf(a) === 'uncredential').length,
+      agentN: logical.filter(agentManaged).length,
       byType: (k: string) => logical.filter((a) => typeKey(a) === k).length,
       mix: { critical: logical.filter((a) => critOf(a) === 'critical').length, high: logical.filter((a) => critOf(a) === 'high').length, medium: logical.filter((a) => critOf(a) === 'medium').length, low: logical.filter((a) => critOf(a) === 'low').length },
     };
@@ -145,7 +154,7 @@ export default function InventoryRedesign(p: Props) {
     const r = assets.filter((a) =>
       match(a) &&
       (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
-      (mode === 'all' ? true : mode === 'pci' ? !!a.cde_environment : modeOf(a) === mode));
+      (mode === 'all' ? true : mode === 'pci' ? !!a.cde_environment : mode === 'agent' ? agentManaged(a) : modeOf(a) === mode));
     const s = [...r];
     if (sort === 'crit') s.sort((a, b) => (CRIT_ORDER[critOf(b)] || 0) - (CRIT_ORDER[critOf(a)] || 0));
     else if (sort === 'scan') s.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
@@ -292,9 +301,9 @@ export default function InventoryRedesign(p: Props) {
             {/* 5-tab view — All, EASM (external), Credential (full depth incl. manual),
                 Uncredential (credential-free sweep, grouped by CIDR), PCI (in-scope). */}
             <div className="segwrap" title="View — All · EASM (external) · Credential (full depth) · Uncredential (credential-free sweep) · PCI (in scope)">
-              {(['all', 'easm', 'credential', 'uncredential', 'pci'] as const).map((m) => (
+              {(['all', 'easm', 'credential', 'uncredential', 'agent', 'pci'] as const).map((m) => (
                 <button key={m} className={'seg' + (mode === m ? ' on' : '')} onClick={() => { setMode(m); setSel(new Set()); }}>
-                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'all' ? c.total : m === 'easm' ? c.easmN : m === 'credential' ? c.credN : m === 'uncredential' ? c.uncredN : c.cde}</span>
+                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'all' ? c.total : m === 'easm' ? c.easmN : m === 'credential' ? c.credN : m === 'uncredential' ? c.uncredN : m === 'agent' ? c.agentN : c.cde}</span>
                 </button>
               ))}
             </div>
@@ -355,14 +364,16 @@ export default function InventoryRedesign(p: Props) {
                               <span style={{ width: 26, height: 26, borderRadius: 7, fontSize: 12, background: tl.bg, color: tl.fg, display: 'grid', placeItems: 'center', fontWeight: 600, flex: 'none' }}>{(a.name || '?').match(/[a-z0-9]/i)?.[0]?.toUpperCase() || '?'}</span>
                               <div style={{ minWidth: 0 }}>
                                 <span style={{ fontWeight: 600, color: '#0F1F2B' }}>{a.name}</span>
-                                <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
-                                  {(a.scan_depth ?? 'credentialed') === 'surface'
-                                    ? <span title="Discovered by an agentless sweep — no credentials" style={{ background: '#EEF1F3', color: '#6B7787', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Surface / Agentless</span>
-                                    : <span title="Collected with credentials (deep)" style={{ background: '#E7F0F8', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Managed / Credentialed</span>}
-                                  {nSubs > 0 ? <span style={{ background: '#E4EDF6', color: '#3A5A80', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>{nSubs} sub{nSubs > 1 ? 's' : ''}</span> : null}
-                                  {a.internet_facing ? <span style={{ background: '#DBE8FA', color: '#28578F', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>Internet-facing</span> : null}
-                                  {a.cde_environment ? <span title="In PCI scope" style={{ background: '#F7D8D8', color: '#A32B2B', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>PCI</span> : null}
-                                  {(a.open_findings ?? 0) > 0 ? <span style={{ background: '#F2D3C6', color: '#6B2412', borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600 }}>{a.open_findings} vuln{(a.open_findings ?? 0) > 1 ? 's' : ''}</span> : null}
+                                <span style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, marginTop: 3 }}>
+                                  {agentManaged(a)
+                                    ? <span title="Managed by an installed Ava agent (local collector)" style={chip('#CFF2E7', '#0B6B4F')}>Agent</span>
+                                    : (a.scan_depth ?? 'credentialed') === 'surface'
+                                      ? <span title="Discovered by an agentless sweep — no credentials" style={chip('#EEF1F3', '#6B7787')}>Agentless</span>
+                                      : <span title="Credentialed remote scan (deep)" style={chip('#E7F0F8', '#28578F')}>Credentialed</span>}
+                                  {nSubs > 0 ? <span style={chip('#E4EDF6', '#3A5A80')}>{nSubs} sub{nSubs > 1 ? 's' : ''}</span> : null}
+                                  {a.internet_facing ? <span title="Internet-facing" style={chip('#DBE8FA', '#28578F')}>Internet</span> : null}
+                                  {a.cde_environment ? <span title="In PCI scope" style={chip('#F7D8D8', '#A32B2B')}>PCI</span> : null}
+                                  {(a.open_findings ?? 0) > 0 ? <span style={chip('#F2D3C6', '#6B2412')}>{a.open_findings} vuln{(a.open_findings ?? 0) > 1 ? 's' : ''}</span> : null}
                                 </span>
                                 {a.environment ? <span style={{ display: 'block', fontSize: 10.5, color: '#78838F', textTransform: 'capitalize' }}>{a.environment}</span> : null}
                               </div>
