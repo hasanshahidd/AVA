@@ -80,13 +80,14 @@ export function Knowledge({ name, kbLinks, onChanged }: {
 
   const suggs = (suggestions.data?.suggestions || []).filter((a) => !linkedIds.has(String(a.name)));
   const needle = q.trim().toLowerCase();
+  const suggIds = useMemo(() => new Set(suggs.map((a) => String(a.name))), [suggs]);
   const results = useMemo(() => {
-    if (!needle) return [];
-    return (all.data?.articles || [])
-      .filter((a) => !linkedIds.has(String(a.name)))
-      .filter((a) => `${a.title || ""} ${a.category || ""}`.toLowerCase().includes(needle))
-      .slice(0, 8);
-  }, [needle, all.data, linkedIds]);
+    const pool = (all.data?.articles || []).filter((a) => !linkedIds.has(String(a.name)));
+    // No query → browse the available articles (minus ones already offered as
+    // suggestions) so you can pick one directly; with a query → filter by it.
+    if (!needle) return pool.filter((a) => !suggIds.has(String(a.name))).slice(0, 8);
+    return pool.filter((a) => `${a.title || ""} ${a.category || ""}`.toLowerCase().includes(needle)).slice(0, 8);
+  }, [needle, all.data, linkedIds, suggIds]);
 
   return (
     <div>
@@ -111,15 +112,16 @@ export function Knowledge({ name, kbLinks, onChanged }: {
         </div>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search knowledge base…"
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or browse knowledge base…"
         className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-[12px] focus:border-[var(--color-base)] focus:outline-none" />
-      {needle && (
-        <div className="mt-1 space-y-1">
-          {results.length === 0 ? (
-            <p className="px-1 py-1.5 text-[11.5px] text-slate-400">No articles match “{q}”.</p>
-          ) : results.map((a) => <ArticleLine key={a.name} a={a} onAttach={() => attach(a.name)} busy={busy} />)}
-        </div>
-      )}
+      <div className="mt-1 space-y-1">
+        {!needle && results.length > 0 && (
+          <div className="inline-flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wide text-slate-400">Browse</div>
+        )}
+        {needle && results.length === 0 ? (
+          <p className="px-1 py-1.5 text-[11.5px] text-slate-400">No articles match “{q}”.</p>
+        ) : results.map((a) => <ArticleLine key={a.name} a={a} onAttach={() => attach(a.name)} busy={busy} />)}
+      </div>
       {err && <p className="mt-1 text-[11px] text-rose-600">{err}</p>}
     </div>
   );
