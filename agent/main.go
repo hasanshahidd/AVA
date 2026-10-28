@@ -40,7 +40,7 @@ import (
 	"time"
 )
 
-const agentVersion = "1.1.0"
+const agentVersion = "1.2.0"
 
 type state struct {
 	APIToken string `json:"api_token"`
@@ -840,16 +840,24 @@ func runAgent(stop <-chan struct{}) {
 	if os.Getenv("AVA_ONCE") == "1" {
 		return
 	}
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
+	// Two cadences: a tight scan-pickup poll so a "Rescan" click starts within
+	// ~15s (agents are behind NAT — often a link-local IP — so the server can't
+	// push; the agent must pull), and a 5-min heartbeat for liveness + the hourly
+	// inventory re-report. cisRun is a cheap GET when nothing is pending, and it
+	// runs to completion before the next tick is received, so polls never overlap.
+	scanTick := time.NewTicker(15 * time.Second)
+	hbTick := time.NewTicker(5 * time.Minute)
+	defer scanTick.Stop()
+	defer hbTick.Stop()
 	elapsed := 0
 	for {
 		select {
 		case <-stop:
 			return
-		case <-ticker.C:
-			heartbeat(st.APIToken)
+		case <-scanTick.C:
 			cisRun(st.APIToken)
+		case <-hbTick.C:
+			heartbeat(st.APIToken)
 			elapsed += 5
 			if elapsed >= 60 {
 				elapsed = 0

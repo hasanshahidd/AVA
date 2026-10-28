@@ -3806,8 +3806,13 @@ function ComplianceTab({ asset }: { asset: AssetDetailData }) {
         try {
           const r = await compliancePluginsApi.listRuns({ limit: 5000 });
           const list = Array.isArray(r.data) ? r.data : (r.data?.runs || []);
+          // Count only runs that actually REACHED a verdict. A freshly-created
+          // run is 'pending' until the agent (or a direct scan) executes it;
+          // counting created runs as done made the banner declare "complete"
+          // while the agent hadn't run anything yet (0 pass / 0 fail).
           done = list.filter((run: any) =>
-            (run.id ?? 0) > baselineMaxId && attribIds.has(run.asset_id)
+            (run.id ?? 0) > baselineMaxId && attribIds.has(run.asset_id) &&
+            !['pending', 'running', 'queued', 'dispatched', 'in_progress'].includes(String(run.status || '').toLowerCase())
           ).length;
         } catch { /* transient — keep polling */ }
 

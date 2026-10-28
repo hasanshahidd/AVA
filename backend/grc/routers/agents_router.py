@@ -42,7 +42,7 @@ STALE_AFTER = timedelta(minutes=10)
 # The agent version currently shipped in agent-dist. Returned on heartbeat so a
 # running agent self-updates when it differs (bump this AND the Go agentVersion
 # together, and rebuild the binaries, to roll a new version to the fleet).
-AGENT_VERSION = "1.1.0"
+AGENT_VERSION = "1.2.0"
 ENROLLMENT_TTL = timedelta(hours=24)
 
 
