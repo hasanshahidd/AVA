@@ -281,10 +281,10 @@ export default function AdvisoriesPage() {
           { l: 'Sources', v: sourceCount, hint: 'manage', onClick: () => setSourcesOpen(true) },
         ].map((k) => (
           <button key={k.l} onClick={k.onClick}
-            className="cw-card p-3 text-left transition-colors hover:border-[var(--color-primary)]">
-            <p className="text-xs cw-text-muted">{k.l}</p>
-            <p className="mt-0.5 text-xl font-bold cw-text-default">{k.v}</p>
-            <p className="mt-0.5 text-[11px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
+            className="cw-card p-2.5 text-left transition-colors hover:border-[var(--color-primary)]">
+            <p className="text-[11px] cw-text-muted">{k.l}</p>
+            <p className="text-lg font-bold leading-tight cw-text-default">{k.v}</p>
+            <p className="text-[11px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
           </button>
         ))}
       </div>
@@ -368,7 +368,7 @@ export default function AdvisoriesPage() {
           )}
         </div>
 
-        <div className="cw-card p-4 overflow-y-auto">
+        <div className="cw-card p-3 overflow-y-auto">
           {panelMode === 'match' ? (
             <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
               onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
@@ -395,7 +395,7 @@ export default function AdvisoriesPage() {
                     </div>
                   )}
                   <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-bold cw-text-default">{detail.title}</h2>
+                    <h2 className="text-base font-bold cw-text-default">{detail.title}</h2>
                     <SeverityBadge severity={detail.severity} />
                     <StatusBadge status={detail.status} />
                   </div>
@@ -412,13 +412,13 @@ export default function AdvisoriesPage() {
 
               {detail.summary && <div className="mt-3"><RichText text={detail.summary} /></div>}
 
-              <div className="mt-4 flex flex-wrap items-end gap-8">
+              <div className="mt-3 flex flex-wrap items-end gap-6">
                 <div title="Assets found to run the affected software (or confirmed by a scan), and how many were affected.">
-                  <p className="text-xl font-bold cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
+                  <p className="text-lg font-bold leading-tight cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
                   <p className="text-xs cw-text-muted">assets affected / checked</p>
                 </div>
                 <div>
-                  <p className="text-xl font-bold cw-text-default">{detail.cve_count}</p>
+                  <p className="text-lg font-bold leading-tight cw-text-default">{detail.cve_count}</p>
                   <p className="text-xs cw-text-muted">CVEs</p>
                 </div>
                 {detail.url && (

@@ -502,6 +502,24 @@ def _match_scope_ids(db: Session, tenant_id: int, req: "MatchRequest") -> Set[in
     return _default_scope_ids(db, tenant_id)
 
 
+def _match_label(advisory_ids, cve_ids, mode, asset_ids) -> str:
+    """A descriptive heading for a saved match run (vs a generic 'Match #N')."""
+    n_adv = len(set(advisory_ids or []))
+    n_cve = len(set(cve_ids or []))
+    parts = []
+    if n_adv:
+        parts.append(f"{n_adv} advisor{'y' if n_adv == 1 else 'ies'}")
+    if n_cve:
+        parts.append(f"{n_cve} CVE{'' if n_cve == 1 else 's'}")
+    sel = " + ".join(parts) or "selection"
+    if mode == "assets" and asset_ids:
+        na = len(asset_ids)
+        scope = f"{na} selected asset{'' if na == 1 else 's'}"
+    else:
+        scope = "all scanned assets"
+    return f"{sel} → {scope}"
+
+
 @router.post("/match")
 def run_match(
     req: MatchRequest,
@@ -567,7 +585,8 @@ def run_match(
     report = {"summary": summary, "matched": matched, "not_found": not_found}
 
     sess = AdvisoryMatchSession(
-        tenant_id=tenant_id, label=req.label,
+        tenant_id=tenant_id,
+        label=req.label or _match_label(req.advisory_ids, req.cve_ids, req.mode, req.asset_ids),
         scope_mode=req.mode, scope_asset_ids=list(req.asset_ids or []),
         advisory_ids=list(req.advisory_ids or []), cve_ids=list(req.cve_ids or []),
         summary=summary, result=report,
@@ -594,7 +613,9 @@ def list_match_sessions(
             .order_by(AdvisoryMatchSession.created_at.desc())
             .limit(100).all())
     return {"sessions": [{
-        "id": s.id, "label": s.label, "actor": s.actor_name,
+        "id": s.id,
+        "label": s.label or _match_label(s.advisory_ids, s.cve_ids, s.scope_mode, s.scope_asset_ids),
+        "actor": s.actor_name,
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "summary": s.summary or {},
     } for s in rows]}
@@ -613,7 +634,9 @@ def get_match_session(
                  AdvisoryMatchSession.tenant_id == tenant_id).first())
     if not s:
         raise HTTPException(status_code=404, detail="Match session not found")
-    return {"id": s.id, "label": s.label, "actor": s.actor_name,
+    return {"id": s.id,
+            "label": s.label or _match_label(s.advisory_ids, s.cve_ids, s.scope_mode, s.scope_asset_ids),
+            "actor": s.actor_name,
             "created_at": s.created_at.isoformat() if s.created_at else None,
             "scope_mode": s.scope_mode, "summary": s.summary or {}, "report": s.result or {}}
 

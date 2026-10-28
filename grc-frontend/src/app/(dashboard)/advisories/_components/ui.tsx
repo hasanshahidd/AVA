@@ -225,7 +225,7 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
       </div>
     </>
   );
-  const cls = 'block flex-1 rounded-lg border border-[var(--color-border)] p-4';
+  const cls = 'block flex-1 rounded-lg border border-[var(--color-border)] p-3';
   const card = linked ? (
     <Link href={`/vulnerabilities/${cve.bridged_vulnerability_id}`}
       className={`${cls} transition-colors hover:border-[var(--color-primary)]`}>{body}</Link>
@@ -571,7 +571,7 @@ export function MatchPanel({ selection, onRun, onCancel, isPending }: {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-bold cw-text-default">Run match</h2>
+        <h2 className="text-sm font-bold cw-text-default">Run match</h2>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="text-xs cw-text-muted hover:cw-text-default">Cancel</button>
           <button
@@ -641,49 +641,44 @@ export function MatchReport({ report, title, onBack, onDownload }: {
         )}
       </div>
 
-      <h2 className="mt-2 text-base font-bold cw-text-default">{title || 'Match report'}</h2>
-      <div className="mt-2 flex flex-wrap gap-5">
-        <div><p className="text-xl font-bold cw-text-default">{s.cves_checked}</p><p className="text-xs cw-text-muted">CVEs checked</p></div>
-        <div><p className="text-xl font-bold text-red-600">{s.matched}</p><p className="text-xs cw-text-muted">matched</p></div>
-        <div><p className="text-xl font-bold cw-text-default">{s.not_found}</p><p className="text-xs cw-text-muted">not found</p></div>
-        <div><p className="text-xl font-bold cw-text-default">{s.scope_size}</p><p className="text-xs cw-text-muted">assets in scope</p></div>
+      <h2 className="mt-1.5 text-sm font-bold cw-text-default">{title || 'Match report'}</h2>
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+        <div><span className="text-base font-bold cw-text-default">{s.cves_checked}</span> <span className="text-xs cw-text-muted">CVEs checked</span></div>
+        <div><span className="text-base font-bold text-red-600">{s.matched}</span> <span className="text-xs cw-text-muted">matched</span></div>
+        <div><span className="text-base font-bold cw-text-default">{s.not_found}</span> <span className="text-xs cw-text-muted">not found</span></div>
+        <div><span className="text-base font-bold cw-text-default">{s.scope_size}</span> <span className="text-xs cw-text-muted">assets in scope</span></div>
       </div>
 
-      {report.matched.length > 0 && (
-        <div className="mt-5">
-          <h3 className="text-sm font-semibold text-red-600">Matched — found on your assets</h3>
+      {report.matched.length === 0 ? (
+        <p className="mt-4 text-sm cw-text-muted">No selected CVE was found on any asset in the chosen scope.</p>
+      ) : (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-red-600">Matched — found on your assets</h3>
           <div className="mt-2 space-y-2">
             {report.matched.map((m) => (
-              <div key={`${m.advisory_id}-${m.cve_id}`} className="rounded-lg border border-red-200 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold cw-text-default">{m.cve_id}</span>
-                  {m.advisory_title && <span className="truncate text-xs cw-text-muted">· {m.advisory_title}</span>}
+              <div key={`${m.advisory_id}-${m.cve_id}`} className="rounded-lg border border-red-200 p-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs font-semibold cw-text-default">{m.cve_id}</span>
+                    {m.advisory_title && <span className="truncate text-xs cw-text-muted">· {m.advisory_title}</span>}
+                  </div>
+                  <a href={`/advisories/${m.advisory_id}`} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 text-xs font-medium text-[var(--color-primary)] hover:underline">Open advisory →</a>
                 </div>
-                <div className="mt-2 flex flex-col gap-1">
+                <div className="mt-1.5 flex flex-col gap-1">
                   {m.assets.map((a) => (
                     <div key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
-                      <Link href={`/assets/${a.id}`} className="font-medium text-[var(--color-primary)] hover:underline">{a.name}</Link>
+                      <a href={`/assets/${a.id}`} target="_blank" rel="noopener noreferrer"
+                        className="font-medium text-[var(--color-primary)] hover:underline">{a.name}</a>
                       <SeverityBadge severity={a.severity} />
                       {a.vulnerability_id && (
-                        <Link href={`/vulnerabilities/${a.vulnerability_id}`} className="cw-text-muted hover:underline">finding →</Link>
+                        <a href={`/vulnerabilities/${a.vulnerability_id}`} target="_blank" rel="noopener noreferrer"
+                          className="text-[var(--color-primary)] hover:underline">Open vulnerability →</a>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {report.not_found.length > 0 && (
-        <div className="mt-5">
-          <h3 className="text-sm font-semibold cw-text-default">Not found in scope</h3>
-          <p className="text-xs cw-text-muted">No scanned asset in the chosen scope has a finding for these CVEs.</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {report.not_found.map((n) => (
-              <span key={`${n.advisory_id}-${n.cve_id}`} title={n.advisory_title || ''}
-                className="inline-flex rounded-md bg-[var(--color-subtle)] px-2 py-0.5 font-mono text-xs cw-text-default">{n.cve_id}</span>
             ))}
           </div>
         </div>
@@ -713,7 +708,7 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
       <button onClick={onBack} className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default">
         <ArrowLeft size={15} /> Back
       </button>
-      <h2 className="mt-2 flex items-center gap-2 text-base font-bold cw-text-default"><History size={16} /> Match history</h2>
+      <h2 className="mt-2 flex items-center gap-2 text-sm font-bold cw-text-default"><History size={15} /> Match history</h2>
       <p className="mt-0.5 text-xs cw-text-muted">Every match run is saved here. Open one to see its full report, or download it.</p>
       {sessions.length === 0 ? (
         <p className="mt-3 text-sm cw-text-muted">No match runs yet. Select advisories or CVEs and run a match.</p>
