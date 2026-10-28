@@ -30,6 +30,24 @@ interface EditableCve {
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 
+// Absolute date with year; '—' when absent.
+function fmtDate(at?: string | null): string {
+  if (!at) return '—';
+  const dt = new Date(at);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Uploads are labelled by their parsed issuer (external_id prefix), not a generic
+// "Uploaded document"; synced advisories keep their source name.
+function sourceLabel(a: AdvisoryView): string {
+  if (a.origin === 'upload') {
+    const ext = (a.external_id || '').trim();
+    const issuer = ext.replace(/\d.*$/, '').replace(/[-_.:\s]+$/, '').trim();
+    return issuer || ext || 'Uploaded document';
+  }
+  return a.source_name || 'Unknown source';
+}
+
 export default function AdvisoryDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -189,6 +207,29 @@ export default function AdvisoryDetailPage() {
           </div>
         )}
       </div>
+
+      <section className="cw-card p-3">
+        <h3 className="mb-2 text-sm font-semibold cw-text-default">Details</h3>
+        <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+          <table className="w-full text-xs">
+            <tbody>
+              {([
+                ['Published', fmtDate(advisory.published_at)],
+                ['Last updated', fmtDate(advisory.updated_at)],
+                [advisory.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(advisory.created_at)],
+                ['External ID', advisory.external_id || '—'],
+                ['Source', sourceLabel(advisory)],
+                ['Region', advisory.region || 'Unclassified'],
+              ] as [string, string][]).map(([k, v]) => (
+                <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
+                  <th scope="row" className="w-40 bg-primary-700 px-3 py-1.5 text-left text-[11px] font-bold text-white">{k}</th>
+                  <td className="px-3 py-1.5 cw-text-default">{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {advisory.extraction && <ExtractionPipeline report={advisory.extraction} />}
 

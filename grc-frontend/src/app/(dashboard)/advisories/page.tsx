@@ -413,7 +413,7 @@ export default function AdvisoriesPage() {
                             className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] py-2 pl-10 pr-3 transition-colors ${selectedId === a.id ? 'bg-[var(--color-base-soft)]' : 'hover:bg-[var(--color-hover)]'}`}>
                             <input type="checkbox" className="shrink-0"
                               checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
-                            <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
+                            <button onClick={() => router.push(`/advisories/${a.id}`)}
                               className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
                               <p className="min-w-0 flex-1 truncate text-[11px] font-normal cw-text-default">{a.title}</p>
                               <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -448,8 +448,8 @@ export default function AdvisoriesPage() {
           ) : !detail ? (
             <div className="flex flex-col items-center justify-center px-4 py-14 text-center cw-text-muted">
               <ShieldAlert className="mb-2 h-8 w-8" />
-              <p className="text-xs">Select an advisory to see its details and CVEs,</p>
-              <p className="text-xs">or tick advisories and CVEs, then click Match.</p>
+              <p className="text-xs">Click any advisory to open its full detail page.</p>
+              <p className="text-xs">Or tick advisories and CVEs, then click Match.</p>
             </div>
           ) : (
             <>
