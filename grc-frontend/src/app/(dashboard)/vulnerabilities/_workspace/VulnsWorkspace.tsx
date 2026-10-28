@@ -14,12 +14,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, Filter, ArrowUpDown, Check, X, List } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, ArrowUpDown, Check, X, List } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, PriorityRawCell, PriorityContextualCell, enrichmentPriority, type Vulnerability } from './lib';
 import RowActionsMenu from '../../assets/_workspace/RowActionsMenu';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
 import ScanWorkspace from './ScanWorkspace';
+import { ColumnFilter, type ColSection } from './ColumnFilter';
+
+// Sentinels for the two "absence" column-filter choices (no real value collides).
+const NO_ASSET = '__none__', UNASSIGNED_OWNER = '__unassigned__';
 
 // ── mock palette (kept literal so the register reads exactly like the mock) ──
 const AC = '#005B96', ACS = '#014A81', ACSOFT = '#EFF5FA';
@@ -43,7 +47,6 @@ const ctxScore = (v: Vulnerability) => Math.round((v.composite_priority ?? 0) * 
 const band = (score: number) => (score >= 55 ? 'urgent' : score >= 25 ? 'moderate' : 'low');
 const BAND_META = { urgent: { c: '#C2453F', label: 'Urgent' }, moderate: { c: '#9A6410', label: 'Mod' }, low: { c: '#1F7A54', label: 'Low' } } as const;
 const isUnassigned = (v: Vulnerability) => !v.assigned_to && !(v as any).assignee_name && !((v as any).assigned_departments?.length);
-const isLinked = (v: Vulnerability) => (((v as any).linked_assets?.length ?? 0) > 0);
 const isExposed = (v: Vulnerability) => !!(v as any).internet_facing || !!(v as any).internet_exposed;
 // MUST mirror the backend domains bucket (null plugin_family => "Uncategorized"): the sidebar
 // counts come from the backend while the row filter runs here, so any divergence (e.g. the old
@@ -160,14 +163,19 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     assetItems = [],
   } = props;
 
-  // Independent filter axes, AND-combined — one named top-bar control each (was a single lumped
-  // "Triage views" select). fFlag is single-select across the non-column flags (KEV / exploit / …).
-  const [fSev, setFSev] = useState('');
-  const [fDom, setFDom] = useState('');
-  const [fStatus, setFStatus] = useState('');
-  const [fFlag, setFFlag] = useState('');
-  // Two-flow filter — surface (unauthenticated) vs authenticated findings.
-  // Client-side only, layered on top of the page's already-filtered list.
+  // Independent filter axes, AND-combined — each surfaced as a column-header funnel
+  // (Excel / Airtable style). Every dimension lives on a column; '' means "all".
+  const [fSev, setFSev] = useState('');        // Severity column
+  const [fDom, setFDom] = useState('');        // folded into the CVE column funnel (pen-test domain)
+  const [fStatus, setFStatus] = useState('');  // Status column
+  const [fAsset, setFAsset] = useState('');    // Linked-asset column ('' | asset name | NO_ASSET)
+  const [fExposed, setFExposed] = useState(''); // folded into Linked-asset funnel ('' | 'yes')
+  const [fCve, setFCve] = useState('');        // CVE column ('' | 'has' | 'no')
+  const [fExploit, setFExploit] = useState(''); // Exploit column ('' | 'exploit' | 'kev' | 'none')
+  const [fEpss, setFEpss] = useState('');      // EPSS column ('' | 'high' | 'low')
+  const [fOwner, setFOwner] = useState('');    // Assigned-to column ('' | owner | UNASSIGNED_OWNER)
+  // Scan provenance — surface (unauthenticated) vs authenticated. Folded into the Title
+  // column funnel (where the Surface / Auth pills render). Client-side only.
   const [scanMode, setScanMode] = useState<'all' | 'surface' | 'credentialed'>('all');
   const [importOpen, setImportOpen] = useState(false); // "Import ▾" overflow menu
   // Overview ("Command") is the default landing pane — the act-now worklist —
@@ -176,17 +184,17 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const [pane, setPane] = useState<Pane>(scoped ? 'reg' : 'cmd');
   const [sort, setSort] = useState('after');
   const [dir, setDir] = useState<1 | -1>(-1); // -1 = desc (highest priority / newest first)
-  const [filtersOpen, setFiltersOpen] = useState(false); // right-side filter slide-over
   const [sortOpen, setSortOpen] = useState(false); // sort field/direction menu
   const isNca = registerType === 'nca';
 
-  // Esc closes the filter drawer / sort menu (outside-click handled by their backdrops).
+  // Esc closes the sort menu (outside-click handled by its backdrop; column funnels
+  // own their own Esc / outside-click handling in ColumnFilter).
   useEffect(() => {
-    if (!filtersOpen && !sortOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setFiltersOpen(false); setSortOpen(false); } };
+    if (!sortOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSortOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [filtersOpen, sortOpen]);
+  }, [sortOpen]);
 
   const all = vulns ?? [];
   const count = (f: (v: Vulnerability) => boolean) => all.filter(f).length;
@@ -206,22 +214,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     };
   }, [dashboard, all]);
 
-  // Triage rail (counts from the full list).
-  // Rail counts are the TRUE totals from the server dashboard (same source as the ribbon's
-  // "Actively exploited"), so they never under-count the fetched page; client tally is only a
-  // fallback when an aggregate is absent.
-  const dcount = (agg: number | undefined, f: (v: Vulnerability) => boolean) => (agg != null ? agg : count(f));
-  const RAIL: { key: TriageView; label: string; n: number; dot?: string; sw?: string }[] = [
-    { key: 'all', label: 'All findings', n: dashboard?.total_vulnerabilities ?? all.length },
-    { key: 'kev', label: 'Fix first · KEV', n: dcount(dashboard?.kev_count, (v) => !!v.kev_flag), dot: '#C2453F' },
-    { key: 'exploit', label: 'Public exploit', n: dcount(dashboard?.exploit_count, hasExploit), dot: '#DB7B45' },
-    { key: 'cve', label: 'With CVE', n: dcount(dashboard?.with_cve_count, (v) => !!v.cve_id), dot: '#2E63A8' },
-    { key: 'epss', label: 'High EPSS', n: dcount(dashboard?.high_epss_count, (v) => (v.epss_score ?? 0) >= 0.1), dot: '#9A6410' },
-    { key: 'exposed', label: 'Internet-exposed', n: dcount(dashboard?.internet_exposed_count, isExposed), dot: '#6A54C9' },
-    { key: 'unassigned', label: 'Unassigned', n: count(isUnassigned), dot: '#8A95A1' },
-    { key: 'linked', label: 'Asset-linked', n: count(isLinked), dot: '#2F9E5A' },
-    { key: 'unlinked', label: 'Unlinked', n: count((v) => !isLinked(v)), dot: '#B98900' },
-  ];
   // De-brand engine/tool names → assessment type, then MERGE families that
   // collapse to the same label (so the rail shows one "Penetration test", not five).
   const SEV_RANK: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
@@ -235,47 +227,103 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const DOM_RAIL = Array.from(domGroups.entries()).sort((a, b) => b[1].n - a[1].n).slice(0, 6)
     .map(([label, e]) => ({ key: `dom-${label}` as TriageView, label, n: e.n, sw: SEV[e.worst].dot }));
 
-  const flagOk = (v: Vulnerability) =>
-    !fFlag
-    || (fFlag === 'kev' ? !!v.kev_flag
-      : fFlag === 'exploit' ? hasExploit(v)
-      : fFlag === 'cve' ? !!v.cve_id
-      : fFlag === 'epss' ? (v.epss_score ?? 0) >= 0.1
-      : fFlag === 'exposed' ? isExposed(v)
-      : fFlag === 'unassigned' ? isUnassigned(v)
-      : fFlag === 'linked' ? isLinked(v)
-      : fFlag === 'unlinked' ? !isLinked(v)
-      : true);
   const rows = useMemo(() => {
     const r = (filteredVulns ?? []).filter((v) =>
       (!fSev || normSev(v.severity) === fSev) &&
       (!fDom || deBrandDomain(domainOf(v)) === fDom) &&
       (!fStatus || (v.status || 'open').toLowerCase() === fStatus) &&
       (scanMode === 'all' || (v.scan_mode ?? null) === scanMode) &&
-      flagOk(v));
+      (!fAsset || (fAsset === NO_ASSET ? !((v.linked_assets?.length ?? 0) > 0) : (v.linked_assets ?? []).includes(fAsset))) &&
+      (!fExposed || isExposed(v)) &&
+      (!fCve || (fCve === 'has' ? !!v.cve_id : !v.cve_id)) &&
+      (!fExploit || (fExploit === 'exploit' ? hasExploit(v) : fExploit === 'kev' ? !!v.kev_flag : !hasExploit(v))) &&
+      (!fEpss || (fEpss === 'high' ? (v.epss_score ?? 0) >= 0.1 : (v.epss_score ?? 0) < 0.1)) &&
+      (!fOwner || (fOwner === UNASSIGNED_OWNER ? isUnassigned(v) : _ownerOf(v) === fOwner)));
     const cmp = SORTERS[sort] || SORTERS.after;
     return [...r].sort((a, b) => cmp(a, b) * dir);
-  }, [filteredVulns, fSev, fDom, fStatus, scanMode, fFlag, sort, dir]);
+  }, [filteredVulns, fSev, fDom, fStatus, scanMode, fAsset, fExposed, fCve, fExploit, fEpss, fOwner, sort, dir]);
   // Click a header: same column flips direction; a new column sorts text A→Z, metrics high→low.
   const sortBy = (k: string) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(TEXT_SORTS.has(k) ? 1 : -1); } };
 
-  const anyFilter = !!(fSev || fDom || fStatus || fFlag) || scanMode !== 'all';
-  const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (fFlag ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
-  const sevOpts = (['critical', 'high', 'medium', 'low', 'info'] as SevKey[]).map((k) => ({ k, label: SEV[k].label, n: count((v) => normSev(v.severity) === k) }));
-  const statusOpts = Array.from(new Set(all.map((v) => (v.status || 'open').toLowerCase()))).sort();
+  const anyFilter = !!(fSev || fDom || fStatus || fAsset || fExposed || fCve || fExploit || fEpss || fOwner) || scanMode !== 'all';
+  const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (fAsset ? 1 : 0) + (fExposed ? 1 : 0) + (fCve ? 1 : 0) + (fExploit ? 1 : 0) + (fEpss ? 1 : 0) + (fOwner ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
 
-  // Filter-drawer building blocks — every option is a custom click control (native <select>
-  // dropdowns don't render under the .inv2 zoom:0.8 on Chrome). Single-select per group, cleared
-  // by re-clicking the active option; AND-combined across groups; filtering applies live.
-  const grpWrap: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8 };
-  const grpTitle = (t: string) => <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#000', margin: '16px 0 8px' }}>{t}</div>;
-  const optPill = (key: string, active: boolean, label: string, n: number | undefined, onClick: () => void) => (
-    <button key={key} type="button" role="checkbox" aria-checked={active} onClick={onClick}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', border: `1px solid ${active ? AC : '#E4E8EC'}`, background: active ? AC : '#fff', color: active ? '#fff' : SEC, borderRadius: 999, fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer', textTransform: 'capitalize' }}>
-      {active && <Check size={13} />}{label}{n != null && <span style={{ opacity: 0.75, fontWeight: 500 }}>{n}</span>}
-    </button>
-  );
-  const clearAll = () => { setFSev(''); setFDom(''); setFStatus(''); setFFlag(''); setScanMode('all'); };
+  // Distinct column values + counts, computed once over the fetched list (`all`). Every option
+  // counts the same population, so the numbers stay internally consistent within a funnel.
+  const colOpts = useMemo(() => {
+    const list = all;
+    const sev = (['critical', 'high', 'medium', 'low', 'info'] as SevKey[])
+      .map((k) => ({ value: k as string, label: SEV[k].label, count: list.filter((v) => normSev(v.severity) === k).length }))
+      .filter((o) => o.count > 0);
+
+    const assetCounts = new Map<string, number>(); let noAsset = 0;
+    for (const v of list) {
+      const a = v.linked_assets ?? [];
+      if (!a.length) noAsset++; else for (const name of Array.from(new Set(a))) assetCounts.set(name, (assetCounts.get(name) || 0) + 1);
+    }
+    const asset = Array.from(assetCounts.entries()).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+      .map(([name, c]) => ({ value: name, label: name, count: c }));
+    if (noAsset) asset.push({ value: NO_ASSET, label: 'No linked asset', count: noAsset });
+
+    const hasCve = list.filter((v) => !!v.cve_id).length;
+    const cve = [{ value: 'has', label: 'Has CVE', count: hasCve }, { value: 'no', label: 'No CVE', count: list.length - hasCve }].filter((o) => o.count > 0);
+
+    const expPub = list.filter(hasExploit).length; const kev = list.filter((v) => !!v.kev_flag).length;
+    const exploit = [
+      { value: 'exploit', label: 'Public exploit', count: expPub },
+      { value: 'kev', label: 'KEV · actively exploited', count: kev },
+      { value: 'none', label: 'No known exploit', count: list.length - expPub },
+    ].filter((o) => o.count > 0);
+
+    const hiEpss = list.filter((v) => (v.epss_score ?? 0) >= 0.1).length;
+    const epss = [{ value: 'high', label: 'High EPSS (≥10%)', count: hiEpss }, { value: 'low', label: 'Lower EPSS', count: list.length - hiEpss }].filter((o) => o.count > 0);
+
+    const statusMap = new Map<string, number>();
+    for (const v of list) { const s = (v.status || 'open').toLowerCase(); statusMap.set(s, (statusMap.get(s) || 0) + 1); }
+    const status = Array.from(statusMap.entries()).sort((x, y) => x[0].localeCompare(y[0]))
+      .map(([s, c]) => ({ value: s, label: s.replace(/_/g, ' '), count: c }));
+
+    const ownerMap = new Map<string, number>(); let unassigned = 0;
+    for (const v of list) { if (isUnassigned(v)) unassigned++; const o = _ownerOf(v); if (o) ownerMap.set(o, (ownerMap.get(o) || 0) + 1); }
+    const owner = Array.from(ownerMap.entries()).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+      .map(([name, c]) => ({ value: name, label: name, count: c }));
+    if (unassigned) owner.push({ value: UNASSIGNED_OWNER, label: 'Unassigned', count: unassigned });
+
+    const exposed = [{ value: 'yes', label: 'Internet-exposed', count: list.filter(isExposed).length }].filter((o) => o.count > 0);
+    const provenance = [
+      { value: 'credentialed', label: 'Authenticated', count: list.filter((v) => (v.scan_mode ?? null) === 'credentialed').length },
+      { value: 'surface', label: 'Surface / Unauthenticated', count: list.filter((v) => (v.scan_mode ?? null) === 'surface').length },
+    ].filter((o) => o.count > 0);
+
+    return { sev, asset, cve, exploit, epss, status, owner, exposed, provenance };
+  }, [all]);
+
+  const domainOpts = DOM_RAIL.map((r) => ({ value: r.label, label: r.label, count: r.n }));
+
+  // Column-header funnel wiring. Each column gets zero or more independent sections;
+  // the three dimensions with no namesake column fold in as a labeled section:
+  // Scan provenance → Title, Internet-exposed → Linked asset, pen-test Domain → CVE.
+  const colFilters: Record<string, { sections: ColSection[]; align?: 'left' | 'right' }> = {
+    title: { sections: [{ key: 'prov', title: 'Scan provenance', value: scanMode === 'all' ? '' : scanMode, onChange: (v) => setScanMode((v || 'all') as 'all' | 'surface' | 'credentialed'), options: colOpts.provenance }] },
+    asset: { sections: [
+      { key: 'asset', title: 'By linked asset', value: fAsset, onChange: setFAsset, options: colOpts.asset },
+      { key: 'exposed', title: 'Exposure', value: fExposed, onChange: setFExposed, options: colOpts.exposed },
+    ] },
+    cve: { sections: [
+      { key: 'cve', title: 'CVE', value: fCve, onChange: setFCve, options: colOpts.cve },
+      { key: 'dom', title: 'Domain', value: fDom, onChange: setFDom, options: domainOpts },
+    ] },
+    sev: { sections: [{ key: 'sev', value: fSev, onChange: setFSev, options: colOpts.sev }] },
+    epss: { sections: [{ key: 'epss', value: fEpss, onChange: setFEpss, options: colOpts.epss }] },
+    exploit: { sections: [{ key: 'exploit', value: fExploit, onChange: setFExploit, options: colOpts.exploit }] },
+    status: { sections: [{ key: 'status', value: fStatus, onChange: setFStatus, options: colOpts.status }], align: 'right' },
+    owner: { sections: [{ key: 'owner', value: fOwner, onChange: setFOwner, options: colOpts.owner }], align: 'right' },
+  };
+
+  const clearAll = () => {
+    setFSev(''); setFDom(''); setFStatus(''); setScanMode('all');
+    setFAsset(''); setFExposed(''); setFCve(''); setFExploit(''); setFEpss(''); setFOwner('');
+  };
 
   // Overview (cmd) flows at natural height so the whole page scrolls with the
   // shell's <main> — like every other page, no contained inner scrollbar.
@@ -390,19 +438,21 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
               filters now live in the single top-bar <select> below (same `view` state). */}
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', flexShrink: 0, overflow: 'hidden' }}>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-              {/* Clean one-row toolbar: Search · Filters (drawer) · Sort (menu) · Create tickets.
-                  The old 4 selects + 8 chips + Dept/SLA links moved into the filter drawer; native
-                  <select>s were also broken by the .inv2 zoom:0.8, so everything is custom now. */}
+              {/* Clean one-row toolbar: Search · [N filters · Clear] chip · Sort (menu) · Create tickets.
+                  Every filter now lives in a column-header funnel (see the table), so there's no
+                  Filters drawer or More button — only a running count + Clear-all chip here. */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexShrink: 0 }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />
                 </div>
-                <button type="button" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog" aria-expanded={filtersOpen} title="Filter findings"
-                  style={{ ...btn, height: 34, cursor: 'pointer', ...(activeCount ? { borderColor: AC, color: AC, background: ACSOFT, fontWeight: 600 } : {}) }}>
-                  <Filter size={15} />Filters
-                  {activeCount > 0 && <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: AC, color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'inline-grid', placeItems: 'center' }}>{activeCount}</span>}
-                </button>
+                {anyFilter && (
+                  <button type="button" onClick={clearAll} title="Clear every column filter"
+                    style={{ ...btn, height: 34, cursor: 'pointer', borderColor: AC, color: AC, background: ACSOFT, fontWeight: 600 }}>
+                    <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: AC, color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'inline-grid', placeItems: 'center' }}>{activeCount}</span>
+                    {activeCount === 1 ? 'filter' : 'filters'}<X size={13} style={{ marginLeft: 1 }} />
+                  </button>
+                )}
                 <div style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setSortOpen((o) => !o)} aria-haspopup="menu" aria-expanded={sortOpen} title="Change sort field and direction"
                     style={{ ...btn, height: 34, cursor: 'pointer' }}>
@@ -433,6 +483,9 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                     </>
                   )}
                 </div>
+                <span aria-hidden style={{ width: 1, height: 20, background: BORDER, flex: 'none' }} />
+                <Link href="/vulnerabilities/departments" title="Manage department routing" style={{ ...btn, height: 34, color: SEC, textDecoration: 'none' }}><Building2 size={14} />Departments</Link>
+                <Link href="/vulnerabilities/sla" title="SLA policies & compliance" style={{ ...btn, height: 34, color: SEC, textDecoration: 'none' }}><Clock size={14} />SLA</Link>
                 {onBulkCreateTickets && rows.length > 0 && (
                   <button
                     style={{ ...btnGreen, height: 34 }}
@@ -456,13 +509,19 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                         and overrides our inline blue, so force the brand-blue header bar with a scoped rule. */}
                     <style dangerouslySetInnerHTML={{ __html: '.inv2 .vreg-tbl thead th{background:#005B96!important;color:#fff!important;border-bottom-color:#0A4C84!important;font-weight:700!important}' }} />
                     <table className="vreg-tbl" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
-                      <thead><tr>{HEADS.map((h) => (
+                      <thead><tr>{HEADS.map((h) => {
+                        const cf = colFilters[h.key];
+                        return (
                         <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none' }}
                           onClick={h.sortable ? () => sortBy(h.key) : undefined}
                           title={h.sortable ? `Sort by ${h.label}` : undefined}>
-                          {h.label}{sort === h.key ? <span style={{ marginLeft: 5, fontWeight: 800 }} title={dir === -1 ? 'Descending' : 'Ascending'}>{dir === -1 ? '↓' : '↑'}</span> : null}
+                          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            <span>{h.label}{sort === h.key ? <span style={{ marginLeft: 5, fontWeight: 800 }} title={dir === -1 ? 'Descending' : 'Ascending'}>{dir === -1 ? '↓' : '↑'}</span> : null}</span>
+                            {cf && <ColumnFilter columnLabel={h.label} sections={cf.sections} align={cf.align} />}
+                          </span>
                         </th>
-                      ))}{canDelete && <th style={th}></th>}</tr></thead>
+                        );
+                      })}{canDelete && <th style={th}></th>}</tr></thead>
                       <tbody>
                         {loading ? (
                           <tr><td colSpan={canDelete ? 14 : 13} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
@@ -523,44 +582,11 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
               )}
             </div>
           </div>
-
-          {/* Filter slide-over — all dimensions as custom click controls (native <select> is broken
-              under .inv2 zoom:0.8). Single-select per group, AND-combined, live. Esc + backdrop close. */}
-          {filtersOpen && (
-            <>
-              <div onClick={() => setFiltersOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,40,.28)', zIndex: 50 }} />
-              <aside role="dialog" aria-modal="true" aria-label="Filter findings" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 372, maxWidth: '92vw', background: '#fff', zIndex: 51, boxShadow: '-16px 0 40px -16px rgba(16,24,40,.4)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: `1px solid ${BORDER}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Filter size={16} color={AC} /><h3 style={{ margin: 0, fontSize: 15 }}>Filters</h3>{activeCount > 0 && <span style={{ fontSize: 11.5, color: MUTED }}>{activeCount} active</span>}</div>
-                  <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters" style={{ border: 0, background: 'none', cursor: 'pointer', color: SEC, padding: 4, borderRadius: 6, display: 'inline-flex' }}><X size={18} /></button>
-                </div>
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px 18px 18px' }}>
-                  {grpTitle('Severity')}
-                  <div style={grpWrap}>{sevOpts.map((o) => optPill(o.k, fSev === o.k, o.label, o.n, () => setFSev(fSev === o.k ? '' : o.k)))}</div>
-                  {DOM_RAIL.length > 0 && (<>{grpTitle('Domain')}<div style={grpWrap}>{DOM_RAIL.map((r) => optPill(r.key as string, fDom === r.label, r.label, r.n, () => setFDom(fDom === r.label ? '' : r.label)))}</div></>)}
-                  {grpTitle('Status')}
-                  <div style={grpWrap}>{statusOpts.map((s) => optPill(s, fStatus === s, s.replace(/_/g, ' '), count((v) => (v.status || 'open').toLowerCase() === s), () => setFStatus(fStatus === s ? '' : s)))}</div>
-                  {grpTitle('Scan provenance')}
-                  <div style={grpWrap}>{([['all', 'All'], ['credentialed', 'Authenticated'], ['surface', 'Surface / Unauth']] as const).map(([v, l]) => optPill(v, scanMode === v, l, v === 'all' ? all.length : count((x) => (x.scan_mode ?? null) === v), () => setScanMode(v)))}</div>
-                  {grpTitle('Triage flags')}
-                  <div style={grpWrap}>{RAIL.filter((r) => r.key !== 'all').map((r) => optPill(r.key as string, fFlag === r.key, r.label, r.n, () => setFFlag(fFlag === r.key ? '' : (r.key as string))))}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderTop: `1px solid ${BORDER}` }}>
-                  <div style={{ display: 'flex', gap: 14 }}>
-                    <Link href="/vulnerabilities/departments" style={{ fontSize: 12, color: AC, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Building2 size={14} />Departments</Link>
-                    <Link href="/vulnerabilities/sla" style={{ fontSize: 12, color: AC, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Clock size={14} />SLA</Link>
-                  </div>
-                  <button type="button" disabled={!anyFilter} onClick={clearAll}
-                    style={{ ...btn, height: 32, opacity: anyFilter ? 1 : 0.5, cursor: anyFilter ? 'pointer' : 'default' }}>Clear all</button>
-                </div>
-              </aside>
-            </>
-          )}
           </>
           )}
         </>
       )}
-      <style>{`.inv2 .vrow:hover{background:#F7FBFA}.inv2 .imp-item:hover{background:#F2F7FB}`}</style>
+      <style>{`.inv2 .vrow:hover{background:#F7FBFA}.inv2 .imp-item:hover{background:#F2F7FB}.inv2 .colf-opt:hover{background:#F2F7FB}`}</style>
     </div>
   );
 }
