@@ -58,6 +58,7 @@ const MODE_LABEL: Record<'all' | 'easm' | 'credential' | 'uncredential' | 'agent
 const TILE: Record<string, { bg: string; fg: string }> = {
   application: { bg: '#DBE8FA', fg: '#28578F' }, infrastructure: { bg: '#CFF2E7', fg: '#014A81' },
   data: { bg: '#F6E7C2', fg: '#8A5A0C' }, cloud: { bg: '#E0DAF6', fg: '#5A45B5' }, thirdparty: { bg: '#F6E7C2', fg: '#8A5A0C' },
+  repository: { bg: '#D9E7E3', fg: '#0B6B4F' },
 };
 const CRIT: Record<string, { bg: string; fg: string }> = {
   critical: { bg: '#F7D8D8', fg: '#A32B2B' }, high: { bg: '#F6E7C2', fg: '#8A5A0C' },

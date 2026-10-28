@@ -366,7 +366,7 @@ export interface DocumentVersion {
   created_at: string;
 }
 
-export type AssetType = 'application' | 'infrastructure' | 'data' | 'cloud' | 'third_party';
+export type AssetType = 'application' | 'infrastructure' | 'data' | 'cloud' | 'third_party' | 'repository';
 
 export type LifecycleState =
   | 'planned'

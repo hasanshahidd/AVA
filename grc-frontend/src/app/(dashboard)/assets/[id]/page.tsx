@@ -94,6 +94,7 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   data: 'Data',
   cloud: 'Cloud Resource',
   third_party: 'Third-Party System',
+  repository: 'Code / Repository',
 };
 
 type TabType = 'overview' | 'details' | 'compliance' | 'controls' | 'evidence' | 'risks' | 'vulnerabilities' | 'criticality' | 'trajectory' | 'mapping-recommendations'
