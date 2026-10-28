@@ -323,6 +323,7 @@ const EVENT_META: Record<string, { label: string; dot: string }> = {
   confirmed: { label: 'Confirmed', dot: 'bg-green-500' },
   bridged: { label: 'Tracked in register', dot: 'bg-green-500' },
   rechecked: { label: 'Re-checked', dot: 'bg-purple-500' },
+  updated: { label: 'Updated', dot: 'bg-amber-500' },
   status_change: { label: 'Status changed', dot: 'bg-gray-500' },
 };
 
@@ -360,6 +361,11 @@ function eventSummary(e: AdvisoryEventView): string {
     case 'rechecked': {
       if (!d.evaluated) return 'no inventory match yet';
       return `${num(d.affected) ?? 0} of ${num(d.total) ?? 0} assets affected`;
+    }
+    case 'updated': {
+      const fields = Array.isArray(d.fields) ? (d.fields as string[]).join(', ') : '';
+      const src = str(d.source);
+      return [fields && `changed: ${fields}`, src && `from ${src}`].filter(Boolean).join(' · ');
     }
     default:
       return '';

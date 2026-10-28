@@ -75,12 +75,24 @@ def sync_source(db: Session, *, tenant_id: int, key: str, limit: int = 50,
             .first()
         )
         if existing is not None:
-            existing.title = d.title or existing.title
-            if d.summary is not None:
+            # Record an 'updated' event only when a field actually changed upstream.
+            changed = []
+            new_title = d.title or existing.title
+            if new_title != existing.title:
+                existing.title = new_title
+                changed.append("title")
+            if d.summary is not None and d.summary != existing.summary:
                 existing.summary = d.summary
+                changed.append("summary")
             if d.severity:
-                existing.severity = normalise_severity(d.severity)
-            updated += 1
+                new_sev = normalise_severity(d.severity)
+                if new_sev != existing.severity:
+                    existing.severity = new_sev
+                    changed.append("severity")
+            if changed:
+                record_event(db, tenant_id=tenant_id, advisory_id=existing.id, event="updated",
+                             actor=actor, detail={"source": meta["name"], "fields": changed})
+                updated += 1
             continue
 
         advisory = Advisory(
