@@ -207,20 +207,15 @@ export default function AdvisoriesPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold cw-text-default">Security advisories</h1>
-          <p className="truncate text-xs cw-text-muted">CERT/vendor bulletins — each names the CVEs to check against your assets.</p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
-          <button onClick={() => setSourcesOpen(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <Database size={15} /> Sources
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-primary flex items-center gap-2 text-sm">
-            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Upload advisory
-          </button>
-        </div>
+      {/* Title lives in the global app bar (PAGE_TITLES['/advisories']); here we keep just the actions. */}
+      <div className="flex justify-end gap-2">
+        <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
+        <button onClick={() => setSourcesOpen(true)} className="btn-secondary flex items-center gap-2 text-sm">
+          <Database size={15} /> Sources
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-primary flex items-center gap-2 text-sm">
+          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Upload advisory
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

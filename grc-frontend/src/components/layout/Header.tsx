@@ -57,6 +57,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: 
   '/licenses': { title: 'Licenses', subtitle: 'Software entitlements vs what is installed — compliance, exposure and renewals.' },
   '/risk-posture': { title: 'Assets Risk Posture', subtitle: 'Risk = weighted blend of vulnerabilities, hardening, control gap and business impact' },
   '/pentest': { title: 'AI Pentest' },
+  '/advisories': { title: 'Security advisories', subtitle: 'CERT/vendor bulletins — each names the CVEs to check against your assets.' },
   '/integrations': { title: 'Integrations', subtitle: 'Configure and manage third-party integrations.' },
   '/integrations/connections': { title: 'Scanner Connections', subtitle: 'Manage vulnerability scanner connections and sync schedules.' },
   '/integrations/exceptions': { title: 'Integration Exceptions', subtitle: 'Review and manage integration exceptions.' },
