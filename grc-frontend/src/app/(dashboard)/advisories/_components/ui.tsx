@@ -136,7 +136,7 @@ const VERDICT_STYLE: Record<string, string> = {
 
 function Pill({ label, cls }: { label: string; cls: string }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
       {label}
     </span>
   );

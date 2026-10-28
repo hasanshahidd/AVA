@@ -203,44 +203,29 @@ export default function AdvisoryDetailPage() {
         )}
 
         {!isPending && (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
-              <p className="text-xl font-semibold leading-tight cw-text-default">
-                {advisory.asset_affected_count}
-                <span className="text-sm cw-text-muted"> / {advisory.asset_total_count}</span>
-              </p>
-              <p className="mt-0.5 text-[11px] cw-text-muted">Assets affected / running the software</p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
-              <p className="text-xl font-semibold leading-tight cw-text-default">{advisory.cve_count}</p>
-              <p className="mt-0.5 text-[11px] cw-text-muted">CVEs</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <section className="cw-card p-3">
-        <h3 className="mb-2 text-sm font-semibold cw-text-default">Details</h3>
-        <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-          <table className="w-full text-xs">
-            <tbody>
+          <>
+            {/* Metadata as compact cards (dashboard/inventory style), not a table. */}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
               {([
                 ['Published', fmtDate(advisory.published_at)],
-                ['Last updated', fmtDate(advisory.updated_at)],
+                ['Updated', fmtDate(advisory.updated_at)],
                 [ENTRY_LABEL[advisory.origin ?? ''] ?? 'Synced', fmtDate(advisory.created_at)],
-                ['External ID', advisory.external_id || '—'],
+                ['CVEs', String(advisory.cve_count)],
+                ['Assets affected', `${advisory.asset_affected_count} / ${advisory.asset_total_count}`],
                 ['Source', sourceLabel(advisory)],
-                ['Region', advisory.region || 'Unclassified'],
-              ] as [string, string][]).map(([k, v]) => (
-                <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
-                  <th scope="row" className="w-40 bg-primary-700 px-3 py-1.5 text-left text-[11px] font-bold text-white">{k}</th>
-                  <td className="px-3 py-1.5 cw-text-default">{v}</td>
-                </tr>
+              ] as [string, string][]).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide cw-text-muted">{label}</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold cw-text-default" title={value}>{value}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            </div>
+            <p className="mt-2 text-[11px] cw-text-muted">
+              ID <span className="font-mono cw-text-default">{advisory.external_id || '—'}</span>
+            </p>
+          </>
+        )}
+      </div>
 
       {isPending ? (
         <div className="cw-card space-y-3 p-3">
