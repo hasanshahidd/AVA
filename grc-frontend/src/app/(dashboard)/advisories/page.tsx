@@ -82,6 +82,7 @@ export default function AdvisoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sourcesSeeded = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [affectedOpen, setAffectedOpen] = useState(false);
@@ -226,6 +227,17 @@ export default function AdvisoriesPage() {
     }
   }, [filtered, selectedId]);
 
+  // Collapse every source on first load so the list opens short (region → sources);
+  // the user expands a source to see its advisories. Keeps scrolling down.
+  useEffect(() => {
+    if (!sourcesSeeded.current && advisories.length > 0) {
+      const keys = new Set<string>();
+      for (const a of advisories) keys.add(srcKey(a.region || 'Other', sourceLabel(a)));
+      setCollapsed(keys);
+      sourcesSeeded.current = true;
+    }
+  }, [advisories]);
+
   const toggleKey = (key: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -312,10 +324,12 @@ export default function AdvisoriesPage() {
           { l: 'Sources', v: sourceCount, hint: 'Manage', onClick: () => setSourcesOpen(true) },
         ].map((k) => (
           <button key={k.l} onClick={k.onClick}
-            className="cw-card group p-3 text-left transition-colors hover:border-[var(--color-primary)]">
-            <p className="text-[11px] font-medium cw-text-muted">{k.l}</p>
-            <p className="mt-1 text-2xl font-semibold leading-none cw-text-default">{k.v}</p>
-            <p className="mt-1.5 text-[11px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
+            className="cw-card group flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:border-[var(--color-primary)]">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium cw-text-muted">{k.l}</p>
+              <p className="mt-0.5 text-[10px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
+            </div>
+            <p className="text-xl font-semibold leading-none cw-text-default">{k.v}</p>
           </button>
         ))}
       </div>
@@ -327,35 +341,32 @@ export default function AdvisoriesPage() {
       ) : (
       <>
       <div className="cw-card p-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
-              className="btn-primary flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
-              <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
-            </button>
-            {(selAdv.size > 0 || selCve.size > 0) && (
-              <span className="flex shrink-0 items-center gap-2 text-xs cw-text-default">
-                <span><span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
-                  {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected</span>
-                <button onClick={clearSel} className="font-medium text-[var(--color-primary)] hover:underline">Clear</button>
-              </span>
-            )}
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+          <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
+            className="btn-primary mb-0.5 flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+            <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
+          </button>
+          {(selAdv.size > 0 || selCve.size > 0) && (
+            <span className="mb-1.5 flex shrink-0 items-center gap-2 text-xs cw-text-default">
+              <span><span className="font-semibold">{selAdv.size}</span> adv
+                {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> CVE</> : null}</span>
+              <button onClick={clearSel} className="font-medium text-[var(--color-primary)] hover:underline">Clear</button>
+            </span>
+          )}
+          <div className="flex flex-1 flex-wrap items-end gap-x-4 gap-y-2">
+            <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
+            <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+            <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
+            <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
+            <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
+            <span className="mb-1.5 text-[11px] cw-text-muted">
+              <span className="font-semibold cw-text-default">{filtered.length}</span>/{advisories.length}
+            </span>
           </div>
           <button onClick={() => setPanelMode('history')}
-            className="btn-secondary flex shrink-0 items-center gap-1.5 text-sm">
+            className="btn-secondary mb-0.5 flex shrink-0 items-center gap-1.5 text-sm">
             <History size={15} /> History
           </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3 border-t border-[var(--color-border)] pt-3">
-          <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
-          <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
-          <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
-          <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
-          <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-          <span className="ml-auto pb-1.5 text-[11px] cw-text-muted">
-            Showing <span className="font-semibold cw-text-default">{filtered.length}</span> of {advisories.length}
-          </span>
         </div>
       </div>
 
@@ -376,8 +387,8 @@ export default function AdvisoriesPage() {
                       checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
                       onChange={() => toggleRegionSel(items)} />
                     <button onClick={() => toggleKey(region)} className="flex flex-1 items-center gap-2 text-left">
-                      {regionCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                      <span className="text-[11px] font-bold uppercase tracking-wider cw-text-default">{region}</span>
+                      {regionCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                      <span className="text-sm font-bold uppercase tracking-wide cw-text-default">{region}</span>
                       <span className="rounded bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] font-medium cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
                       <span className="ml-auto text-xs font-semibold cw-text-muted">{items.length}</span>
                     </button>
@@ -392,8 +403,8 @@ export default function AdvisoriesPage() {
                             checked={sItems.length > 0 && sItems.every((a) => selAdv.has(a.id))}
                             onChange={() => toggleRegionSel(sItems)} />
                           <button onClick={() => toggleKey(key)} className="flex flex-1 items-center gap-1.5 text-left">
-                            {srcCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium cw-text-default">{source}</span>
+                            {srcCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold cw-text-default">{source}</span>
                             <span className="ml-auto text-[11px] cw-text-muted">{sItems.length}</span>
                           </button>
                         </div>
@@ -404,7 +415,7 @@ export default function AdvisoriesPage() {
                               checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
                             <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
                               className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
-                              <p className="min-w-0 flex-1 truncate text-xs font-medium cw-text-default">{a.title}</p>
+                              <p className="min-w-0 flex-1 truncate text-[11px] font-normal cw-text-default">{a.title}</p>
                               <div className="ml-auto flex shrink-0 items-center gap-1.5">
                                 {a.status === 'pending' ? (
                                   <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700">review</span>
@@ -494,7 +505,7 @@ export default function AdvisoriesPage() {
                   <table className="w-full text-xs">
                     <tbody>
                       {([
-                        ['Published', fmtDate(detail.published_at), detail.origin === 'upload' && !detail.published_at ? 'No date stated in the document' : ''],
+                        ['Published', fmtDate(detail.published_at || detail.created_at), ''],
                         ['Last updated', fmtDate(detail.updated_at), ''],
                         [detail.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(detail.created_at), ''],
                         ['External ID', detail.external_id || '—', ''],
@@ -502,7 +513,8 @@ export default function AdvisoriesPage() {
                         ['Region', detail.region || 'Unclassified', ''],
                       ] as [string, string, string][]).map(([k, v, hint]) => (
                         <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
-                          <th scope="row" className="w-32 bg-[var(--color-primary)] px-3 py-1.5 text-left font-bold text-white">{k}</th>
+                          <th scope="row" className="w-32 px-3 py-1.5 text-left text-[11px] font-bold"
+                            style={{ background: 'var(--color-primary)', color: '#fff' }}>{k}</th>
                           <td className="px-3 py-1.5 cw-text-default">{hint || v}</td>
                         </tr>
                       ))}

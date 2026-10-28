@@ -393,6 +393,10 @@ function formatWhen(at?: string | null): string {
   });
 }
 
+// Blue table-header cell. Inline style (not a class) so it beats the global
+// `.cw-dashboard thead th` rule that forces a grey background + muted text.
+export const BLUE_TH = { background: 'var(--color-primary)', color: '#fff' } as const;
+
 // The advisory's event history as a clean Event | When | By table: ingested →
 // confirmed → re-checked, each with an absolute date and the actor.
 export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
@@ -406,10 +410,10 @@ export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[var(--color-primary)] text-left text-[11px] font-bold uppercase tracking-wide text-white">
-              <th className="px-3 py-2 font-bold">Event</th>
-              <th className="px-3 py-2 font-bold">When</th>
-              <th className="px-3 py-2 font-bold">By</th>
+            <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
+              <th className="px-3 py-2 font-bold" style={BLUE_TH}>Event</th>
+              <th className="px-3 py-2 font-bold" style={BLUE_TH}>When</th>
+              <th className="px-3 py-2 font-bold" style={BLUE_TH}>By</th>
             </tr>
           </thead>
           <tbody>
@@ -687,10 +691,10 @@ export function MatchReport({ report, title, onBack, onDownload }: {
           <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-[var(--color-primary)] text-left text-[11px] font-bold uppercase tracking-wide text-white">
-                  <th className="px-3 py-2 font-bold">CVE</th>
-                  <th className="px-3 py-2 font-bold">Affected assets</th>
-                  <th className="px-3 py-2 text-right font-bold">Advisory</th>
+                <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
+                  <th className="px-3 py-2 font-bold" style={BLUE_TH}>CVE</th>
+                  <th className="px-3 py-2 font-bold" style={BLUE_TH}>Affected assets</th>
+                  <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Advisory</th>
                 </tr>
               </thead>
               <tbody>
@@ -759,15 +763,15 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
         <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border)]">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[var(--color-primary)] text-left text-[11px] font-bold uppercase tracking-wide text-white">
-                <th className="px-3 py-2 font-bold">Run</th>
-                <th className="px-3 py-2 font-bold">When</th>
-                <th className="px-3 py-2 font-bold">By</th>
-                <th className="px-3 py-2 text-right font-bold">CVEs</th>
-                <th className="px-3 py-2 text-right font-bold">Matched</th>
-                <th className="px-3 py-2 text-right font-bold">Not found</th>
-                <th className="px-3 py-2 text-right font-bold">Scope</th>
-                <th className="px-3 py-2 text-right font-bold">Export</th>
+              <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
+                <th className="px-3 py-2 font-bold" style={BLUE_TH}>Run</th>
+                <th className="px-3 py-2 font-bold" style={BLUE_TH}>When</th>
+                <th className="px-3 py-2 font-bold" style={BLUE_TH}>By</th>
+                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>CVEs</th>
+                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Matched</th>
+                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Not found</th>
+                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Scope</th>
+                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Export</th>
               </tr>
             </thead>
             <tbody>
