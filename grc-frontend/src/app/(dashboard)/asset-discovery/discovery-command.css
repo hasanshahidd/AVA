@@ -36,6 +36,7 @@
 .disc-cc .ovtop p{font-size:13px;color:var(--muted);margin-top:8px;max-width:58ch}
 .disc-cc .ovhero{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:stretch;margin-bottom:16px}
 .disc-cc .ovhero-l{display:grid}
+.disc-cc .ovhero-r{display:grid}
 .disc-cc .radar-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px 17px 14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .disc-cc .radar-card::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,rgba(0,91,150,.05),transparent 60%);pointer-events:none}
 .disc-cc .rc-head{display:flex;justify-content:space-between;align-items:center}
@@ -46,7 +47,7 @@
 .disc-cc .rc-foot{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line2);padding-top:10px}
 .disc-cc .rc-foot b{color:var(--ink);font-family:var(--disp);font-weight:700}
 /* estate breakdown (replaces the decorative radar) — real proportions of the observed estate */
-.disc-cc .estate-card{display:flex;flex-direction:column}
+.disc-cc .estate-card{display:flex;flex-direction:column;height:100%}
 .disc-cc .estate-eyebrow{font-size:11px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em}
 .disc-cc .estate{display:flex;flex-direction:column;justify-content:space-between;gap:14px;flex:1;margin:16px 0}
 .disc-cc .estate-row{display:flex;flex-direction:column;gap:6px}
