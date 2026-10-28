@@ -101,13 +101,14 @@ def kev_entry_to_draft(entry: Dict[str, Any]) -> Optional[AdvisoryDraft]:
 
 
 def fetch_cisa_kev(limit: int = 50) -> List[AdvisoryDraft]:
+    # The FULL KEV catalogue — every entry across all years (2021 → present), so
+    # the year hierarchy is populated end-to-end. `limit` is ignored: a re-sync
+    # re-pulls the whole catalogue, picking up newly-added CVEs (future years
+    # included) automatically. Published date comes from each entry's dateAdded.
     resp = requests.get(_KEV_URL, headers=_UA, timeout=_TIMEOUT)
     resp.raise_for_status()
     vulns = resp.json().get("vulnerabilities") or []
-    # Catalogue is append-ordered; most-recently-added last → take the tail.
-    drafts = [d for d in (kev_entry_to_draft(v) for v in vulns[-limit:]) if d]
-    drafts.reverse()
-    return drafts
+    return [d for d in (kev_entry_to_draft(v) for v in vulns) if d]
 
 
 # ── GitHub advisory database (GHSA) ─────────────────────────────────────────
