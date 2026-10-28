@@ -17,6 +17,7 @@ import apiClient from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import { RowActionsMenu } from './RowActionsMenu';
+import { FilterSelect } from './FilterSelect';
 import type { ITAsset } from '@/types';
 import { Search, Download, Plus, AlertTriangle, Eye, Pencil, Trash2, Plug, X } from 'lucide-react';
 import '../inventory-redesign.css';
@@ -337,36 +338,40 @@ export default function InventoryRedesign(p: Props) {
             {/* One named control per filter dimension — no lumped "Views" grab-bag.
                 Column-backed filters (Type/Criticality/Status) sit beside the
                 non-column ones (Scan posture, and the Internet/PCI flag chips). */}
-            <select className="sel" value={fType} onChange={(e) => { setFType(e.target.value); setTab('reg'); }} title="Filter by type (scan lane)">
-              <option value="">All types ({c.total})</option>
-              <option value="web">External / Web ({c.byLane('web')})</option>
-              <option value="host">Host ({c.byLane('host')})</option>
-              <option value="database">Database ({c.byLane('database')})</option>
-              <option value="ad">Active Directory ({c.byLane('ad')})</option>
-              <option value="cloud">Cloud ({c.byLane('cloud')})</option>
-              <option value="repo">Code / Repo ({c.byLane('repo')})</option>
-              <option value="container">Container / K8s ({c.byLane('container')})</option>
-            </select>
-            <select className="sel" value={fCrit} onChange={(e) => { setFCrit(e.target.value); setTab('reg'); }} title="Filter by criticality">
-              <option value="">All criticality</option>
-              <option value="critical">Critical ({c.mix.critical})</option>
-              <option value="high">High ({c.mix.high})</option>
-              <option value="medium">Medium ({c.mix.medium})</option>
-              <option value="low">Low ({c.mix.low})</option>
-            </select>
-            <select className="sel" value={fStatus} onChange={(e) => { setFStatus(e.target.value); setTab('reg'); }} title="Filter by status">
-              <option value="">All status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="decommissioned">Decommissioned</option>
-            </select>
-            <select className="sel" value={mode} onChange={(e) => { setMode(e.target.value as any); setSel(new Set()); setTab('reg'); }} title="Filter by scan posture">
-              <option value="all">All scans ({c.total})</option>
-              <option value="easm">EASM · external ({c.easmN})</option>
-              <option value="credential">Credentialed ({c.credN})</option>
-              <option value="uncredential">Agentless ({c.uncredN})</option>
-              <option value="agent">Agent ({c.agentN})</option>
-            </select>
+            <FilterSelect title="Filter by type (scan lane)" value={fType} onChange={(v) => { setFType(v); setTab('reg'); }}
+              options={[
+                { value: '', label: `All types (${c.total})` },
+                { value: 'web', label: `External / Web (${c.byLane('web')})` },
+                { value: 'host', label: `Host (${c.byLane('host')})` },
+                { value: 'database', label: `Database (${c.byLane('database')})` },
+                { value: 'ad', label: `Active Directory (${c.byLane('ad')})` },
+                { value: 'cloud', label: `Cloud (${c.byLane('cloud')})` },
+                { value: 'repo', label: `Code / Repo (${c.byLane('repo')})` },
+                { value: 'container', label: `Container / K8s (${c.byLane('container')})` },
+              ]} />
+            <FilterSelect title="Filter by criticality" value={fCrit} onChange={(v) => { setFCrit(v); setTab('reg'); }}
+              options={[
+                { value: '', label: 'All criticality' },
+                { value: 'critical', label: `Critical (${c.mix.critical})` },
+                { value: 'high', label: `High (${c.mix.high})` },
+                { value: 'medium', label: `Medium (${c.mix.medium})` },
+                { value: 'low', label: `Low (${c.mix.low})` },
+              ]} />
+            <FilterSelect title="Filter by status" value={fStatus} onChange={(v) => { setFStatus(v); setTab('reg'); }}
+              options={[
+                { value: '', label: 'All status' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'decommissioned', label: 'Decommissioned' },
+              ]} />
+            <FilterSelect title="Filter by scan posture" value={mode} onChange={(v) => { setMode(v as any); setSel(new Set()); setTab('reg'); }}
+              options={[
+                { value: 'all', label: `All scans (${c.total})` },
+                { value: 'easm', label: `EASM · external (${c.easmN})` },
+                { value: 'credential', label: `Credentialed (${c.credN})` },
+                { value: 'uncredential', label: `Agentless (${c.uncredN})` },
+                { value: 'agent', label: `Agent (${c.agentN})` },
+              ]} />
             <button type="button" className={'fchip' + (fFlag === 'internet' ? ' on' : '')} onClick={() => { setFFlag(fFlag === 'internet' ? '' : 'internet'); setTab('reg'); }} title="Internet-facing only">Internet-facing ({c.internet})</button>
             <button type="button" className={'fchip' + (fFlag === 'cde' ? ' on' : '')} onClick={() => { setFFlag(fFlag === 'cde' ? '' : 'cde'); setTab('reg'); }} title="PCI scope only">PCI scope ({c.cde})</button>
             {(fType || fCrit || fStatus || mode !== 'all' || fFlag) && (

@@ -361,10 +361,6 @@ export default function AssetsPage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ fontSize: 19, letterSpacing: '-.025em' }}>IT Asset Inventory</h1>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ac)' }} />
-              Authoritative ownership, valuation &amp; assurance coverage · {(assets as ITAsset[] | undefined)?.length ?? 0} assets
-            </div>
           </div>
           {/* View switch (Overview / Inventory / CIS) + Add/Import folded into one
               labeled top-right menu (owner request — "a clickable word" box). */}
