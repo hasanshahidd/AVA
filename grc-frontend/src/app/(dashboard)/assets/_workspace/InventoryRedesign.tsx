@@ -210,6 +210,7 @@ export default function InventoryRedesign(p: Props) {
       agentN: logical.filter(agentManaged).length,
       byType: (k: string) => logical.filter((a) => typeKey(a) === k).length,
       byLane: (k: string) => logical.filter((a) => laneOf(a) === k).length,
+      withVulns: logical.filter((a) => (a.open_findings || 0) > 0).length,
       mix: { critical: logical.filter((a) => critOf(a) === 'critical').length, high: logical.filter((a) => critOf(a) === 'high').length, medium: logical.filter((a) => critOf(a) === 'medium').length, low: logical.filter((a) => critOf(a) === 'low').length },
     };
   }, [assets]);
@@ -274,7 +275,6 @@ export default function InventoryRedesign(p: Props) {
     : 'linear-gradient(90deg,#A32B2B,#DB4A4A)';
   const gradeLbl = grade || (score == null ? '—' : score >= 80 ? 'STRONG' : score >= 55 ? 'FAIR' : 'WEAK');
   const scorePct = score == null ? 0 : Math.round(score);
-  const attnTotal = openVulns + c.unowned + c.needcia + c.stale + advAssetCount;
 
   const toggle = (id: number) => setSel((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allChecked = rows.length > 0 && rows.every((r) => sel.has(r.id));
@@ -325,9 +325,9 @@ export default function InventoryRedesign(p: Props) {
           <div><div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>PCI scope</div><div style={{ margin: '3px 0' }}><b className="num" style={{ fontSize: 17, fontWeight: 600, color: '#28578F' }}>{c.cde}</b></div><div style={{ fontSize: 10.5, color: 'var(--faint)' }}>marked PCI</div></div>
         </div>
         <div className="rib-att">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} style={{ color: '#8A5A0C' }} /><span style={{ fontSize: 12, color: '#7A4E0A', fontWeight: 500 }}>Needs attention</span><b className="num" style={{ marginLeft: 'auto', fontSize: 15, color: '#8A5A0C' }}>{attnTotal}</b></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} style={{ color: '#8A5A0C' }} /><span style={{ fontSize: 12, color: '#7A4E0A', fontWeight: 500 }}>Needs attention</span></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-            <button className="att" onClick={() => { setFFlag('vulns'); setTab('reg'); }}>{openVulns} open vulns</button>
+            <button className="att" title="Assets with at least one open linked vulnerability" onClick={() => { setFFlag('vulns'); setTab('reg'); }}>{c.withVulns} with vulns</button>
             <button className="att" onClick={() => { setFFlag('unowned'); setTab('reg'); }}>{c.unowned} unowned</button>
             <button className="att" onClick={() => { setFFlag('needcia'); setTab('reg'); }}>{c.needcia} unassessed</button>
             <button className="att" onClick={() => { setFFlag('stale'); setTab('reg'); }}>{c.stale} stale</button>

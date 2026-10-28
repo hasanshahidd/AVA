@@ -969,17 +969,33 @@ export default function AssetDetailPage() {
               />
             )}
             {activeTab === 'vulnerabilities' && (
-              <VulnerabilitiesPanel
-                assetId={assetId}
-                canEdit={canEdit}
-                asset={asset}
-                allVulnerabilities={allVulnerabilities || []}
-                vulnsLoading={vulnsLoading}
-                onLinkVulnerability={(vulnId) => linkVulnerabilityMutation.mutate(vulnId)}
-                isLinking={linkVulnerabilityMutation.isPending}
-                onUnlinkVulnerability={(vulnId) => unlinkVulnerabilityMutation.mutate(vulnId)}
-                isUnlinking={unlinkVulnerabilityMutation.isPending}
-              />
+              <>
+                {/* Advisory exposure surfaced on the Vulnerabilities tab too — a
+                    CVE match from a published advisory is a finding beyond the
+                    linked register vulns, so flag it here with the match count. */}
+                {advCount > 0 && (
+                  <button type="button" onClick={() => setActiveTab('advisories')}
+                    className="mb-4 flex w-full items-center gap-3 rounded-xl border border-[#F3C0BE] bg-[#FCEDEC] px-4 py-3 text-left transition-colors hover:bg-[#FBE2E0]">
+                    <AlertTriangle className="h-5 w-5 shrink-0 text-[#B42318]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-semibold text-[#B42318]">Also affected by {advCount} published security advisor{advCount > 1 ? 'ies' : 'y'}</span>
+                      <span className="block text-[12px] text-[#9A2A22]">{advCount} advisory CVE match{advCount > 1 ? 'es' : ''} on this asset — beyond the open findings below. Review in the Advisories tab.</span>
+                    </span>
+                    <span className="shrink-0 text-[12.5px] font-medium text-[#B42318]">Advisories &rarr;</span>
+                  </button>
+                )}
+                <VulnerabilitiesPanel
+                  assetId={assetId}
+                  canEdit={canEdit}
+                  asset={asset}
+                  allVulnerabilities={allVulnerabilities || []}
+                  vulnsLoading={vulnsLoading}
+                  onLinkVulnerability={(vulnId) => linkVulnerabilityMutation.mutate(vulnId)}
+                  isLinking={linkVulnerabilityMutation.isPending}
+                  onUnlinkVulnerability={(vulnId) => unlinkVulnerabilityMutation.mutate(vulnId)}
+                  isUnlinking={unlinkVulnerabilityMutation.isPending}
+                />
+              </>
             )}
             {activeTab === 'advisories' && (
               <AdvisoriesPanel assetId={assetId} data={advByAsset} />
