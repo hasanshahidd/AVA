@@ -12,9 +12,9 @@
  * (0–10) ×10 — the same number the server dashboard bands at 55 / 25.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2 } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, Filter, ArrowUpDown, Check, X } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, PriorityBeforeAfter, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
@@ -90,8 +90,6 @@ type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unas
 // Prominent header bar — brand blue, bold white (owner ask). Sticky over the body.
 const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: '#fff', fontWeight: 700, padding: '9px 10px', borderBottom: '1px solid #0A4C84', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#005B96', zIndex: 1 };
 const td: React.CSSProperties = { padding: '9px 10px', borderBottom: `1px solid ${BORDER2}`, verticalAlign: 'middle', whiteSpace: 'nowrap', fontSize: 12 };
-// Filter chip for the non-column flags — brand blue when on (mirrors inventory .fchip).
-const fchip = (on: boolean): React.CSSProperties => ({ height: 34, border: `1px solid ${on ? '#005B96' : '#E4E8EC'}`, borderRadius: 9, background: on ? '#005B96' : '#fff', color: on ? '#fff' : SEC, padding: '0 11px', fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap' });
 const SEV_ORDER: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
 // Click a header to sort by it (replaces the old Sort select). Metrics sort high→low, text A→Z.
 const HEADS: { key: string; label: string; sortable: boolean }[] = [
@@ -118,6 +116,8 @@ const SORTERS: Record<string, (a: Vulnerability, b: Vulnerability) => number> = 
   owner: (a, b) => _ownerOf(a).localeCompare(_ownerOf(b)),
 };
 const TEXT_SORTS = new Set(['title', 'asset', 'cve', 'status', 'owner']);
+// Short labels for the Sort menu button/list (HEADS labels are too long for a button).
+const SORT_LABEL: Record<string, string> = { id: 'ID', title: 'Title', asset: 'Linked asset', cve: 'CVE', sev: 'Severity', cvss: 'CVSS', epss: 'EPSS', exploit: 'Exploit', ctx: 'Priority', status: 'Status', due: 'SLA / Due', owner: 'Assigned to' };
 const btn: React.CSSProperties = { border: `1px solid #E4E8EC`, background: '#fff', color: SEC, borderRadius: 9, padding: '7px 12px', fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' };
 const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 };
 const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999, whiteSpace: 'nowrap', color: c, background: bg });
@@ -183,7 +183,17 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const [pane, setPane] = useState<Pane>(scoped ? 'reg' : 'cmd');
   const [sort, setSort] = useState('ctx');
   const [dir, setDir] = useState<1 | -1>(-1); // -1 = desc (highest priority / newest first)
+  const [filtersOpen, setFiltersOpen] = useState(false); // right-side filter slide-over
+  const [sortOpen, setSortOpen] = useState(false); // sort field/direction menu
   const isNca = registerType === 'nca';
+
+  // Esc closes the filter drawer / sort menu (outside-click handled by their backdrops).
+  useEffect(() => {
+    if (!filtersOpen && !sortOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setFiltersOpen(false); setSortOpen(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [filtersOpen, sortOpen]);
 
   const all = vulns ?? [];
   const count = (f: (v: Vulnerability) => boolean) => all.filter(f).length;
@@ -259,8 +269,22 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const railLabel: Record<string, string> = { kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned', linked: 'Asset-linked', unlinked: 'Unlinked' };
   const title = fFlag ? (railLabel[fFlag] || 'Findings') : fSev ? SEV[fSev as SevKey].label : fDom || 'All findings';
   const anyFilter = !!(fSev || fDom || fStatus || fFlag) || scanMode !== 'all';
+  const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (fFlag ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
   const sevOpts = (['critical', 'high', 'medium', 'low', 'info'] as SevKey[]).map((k) => ({ k, label: SEV[k].label, n: count((v) => normSev(v.severity) === k) }));
   const statusOpts = Array.from(new Set(all.map((v) => (v.status || 'open').toLowerCase()))).sort();
+
+  // Filter-drawer building blocks — every option is a custom click control (native <select>
+  // dropdowns don't render under the .inv2 zoom:0.8 on Chrome). Single-select per group, cleared
+  // by re-clicking the active option; AND-combined across groups; filtering applies live.
+  const grpWrap: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8 };
+  const grpTitle = (t: string) => <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: MUTED, margin: '16px 0 8px' }}>{t}</div>;
+  const optPill = (key: string, active: boolean, label: string, n: number | undefined, onClick: () => void) => (
+    <button key={key} type="button" role="checkbox" aria-checked={active} onClick={onClick}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', border: `1px solid ${active ? AC : '#E4E8EC'}`, background: active ? AC : '#fff', color: active ? '#fff' : SEC, borderRadius: 999, fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer', textTransform: 'capitalize' }}>
+      {active && <Check size={13} />}{label}{n != null && <span style={{ opacity: 0.75, fontWeight: 500 }}>{n}</span>}
+    </button>
+  );
+  const clearAll = () => { setFSev(''); setFDom(''); setFStatus(''); setFFlag(''); setScanMode('all'); };
 
   // Overview (cmd) flows at natural height so the whole page scrolls with the
   // shell's <main> — like every other page, no contained inner scrollbar.
@@ -364,45 +388,49 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
               filters now live in the single top-bar <select> below (same `view` state). */}
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', flexShrink: 0, overflow: 'hidden' }}>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
+              {/* Clean one-row toolbar: Search · Filters (drawer) · Sort (menu) · Create tickets.
+                  The old 4 selects + 8 chips + Dept/SLA links moved into the filter drawer; native
+                  <select>s were also broken by the .inv2 zoom:0.8, so everything is custom now. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexShrink: 0 }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />
                 </div>
-                {/* triage/severity/domain filter — the old left rail, collapsed into one control */}
-                {/* One named control per filter dimension — no lumped grab-bag. Column-backed filters
-                    (Severity / Domain / Status / Scan) sit beside the non-column flag chips. Sort moved
-                    onto the column headers (click to sort), so the old Sort select is gone. */}
-                <select value={fSev} onChange={(e) => { setFSev(e.target.value); setPane('reg'); }} style={{ ...btn, height: 34, cursor: 'pointer' }} title="Filter by severity">
-                  <option value="">All severity</option>
-                  {sevOpts.map((o) => <option key={o.k} value={o.k}>{o.label} ({o.n})</option>)}
-                </select>
-                {DOM_RAIL.length > 0 && (
-                  <select value={fDom} onChange={(e) => { setFDom(e.target.value); setPane('reg'); }} style={{ ...btn, height: 34, cursor: 'pointer', maxWidth: 200 }} title="Filter by domain">
-                    <option value="">All domains</option>
-                    {DOM_RAIL.map((r) => <option key={r.key} value={r.label}>{r.label} ({r.n})</option>)}
-                  </select>
-                )}
-                <select value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPane('reg'); }} style={{ ...btn, height: 34, cursor: 'pointer', textTransform: 'capitalize' }} title="Filter by status">
-                  <option value="">All status</option>
-                  {statusOpts.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-                </select>
-                <select value={scanMode} onChange={(e) => setScanMode(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }} title="Filter by scan provenance">
-                  <option value="all">All scans</option><option value="credentialed">Authenticated</option><option value="surface">Surface / Unauth</option>
-                </select>
-                {RAIL.filter((r) => r.key !== 'all').map((r) => (
-                  <button key={r.key} type="button" style={fchip(fFlag === r.key)} title={r.label}
-                    onClick={() => { setFFlag(fFlag === r.key ? '' : (r.key as string)); setPane('reg'); }}>
-                    {r.label} ({r.n})
+                <button type="button" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog" aria-expanded={filtersOpen} title="Filter findings"
+                  style={{ ...btn, height: 34, cursor: 'pointer', ...(activeCount ? { borderColor: AC, color: AC, background: ACSOFT, fontWeight: 600 } : {}) }}>
+                  <Filter size={15} />Filters
+                  {activeCount > 0 && <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: AC, color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'inline-grid', placeItems: 'center' }}>{activeCount}</span>}
+                </button>
+                <div style={{ position: 'relative' }}>
+                  <button type="button" onClick={() => setSortOpen((o) => !o)} aria-haspopup="menu" aria-expanded={sortOpen} title="Change sort field and direction"
+                    style={{ ...btn, height: 34, cursor: 'pointer' }}>
+                    <ArrowUpDown size={14} />Sort: {SORT_LABEL[sort] || 'Priority'} {dir === -1 ? '↓' : '↑'}
                   </button>
-                ))}
-                {anyFilter && (
-                  <button type="button" style={fchip(false)} title="Clear all filters"
-                    onClick={() => { setFSev(''); setFDom(''); setFStatus(''); setFFlag(''); setScanMode('all'); }}>Clear</button>
-                )}
-                {/* Departments / SLA — were in the cut rail; kept here as compact links so the views stay reachable. */}
-                <Link href="/vulnerabilities/departments" style={{ ...btn, height: 34, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Departments"><Building2 size={14} color="#5B6673" />Departments</Link>
-                <Link href="/vulnerabilities/sla" style={{ ...btn, height: 34, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="SLA config"><Clock size={14} color="#5B6673" />SLA</Link>
+                  {sortOpen && (
+                    <>
+                      <div onClick={() => setSortOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                      <div role="menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 41, minWidth: 224, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 12, boxShadow: '0 14px 34px -10px rgba(16,24,40,.32)', padding: 6 }}>
+                        <div style={{ display: 'flex', gap: 4, padding: '2px 4px 8px' }}>
+                          {([[1, 'Ascending', '↑'], [-1, 'Descending', '↓']] as const).map(([d, lbl, ar]) => (
+                            <button key={d} type="button" onClick={() => setDir(d)}
+                              style={{ flex: 1, height: 30, border: `1px solid ${dir === d ? AC : '#E4E8EC'}`, background: dir === d ? AC : '#fff', color: dir === d ? '#fff' : SEC, borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>{ar} {lbl}</button>
+                          ))}
+                        </div>
+                        <div style={{ borderTop: `1px solid ${BORDER2}`, paddingTop: 4 }}>
+                          {HEADS.filter((h) => h.sortable).map((h) => {
+                            const on = sort === h.key;
+                            return (
+                              <button key={h.key} role="menuitemradio" aria-checked={on} type="button" onClick={() => { setSort(h.key); setSortOpen(false); }}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', border: 0, background: on ? ACSOFT : 'none', color: on ? ACS : SEC, borderRadius: 8, padding: '7px 9px', fontSize: 12, fontWeight: on ? 600 : 500, cursor: 'pointer', textAlign: 'left' }}>
+                                {SORT_LABEL[h.key] || h.label}{on && <Check size={14} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
                 {onBulkCreateTickets && rows.length > 0 && (
                   <button
                     style={{ ...btnGreen, height: 34 }}
@@ -431,7 +459,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                         <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none' }}
                           onClick={h.sortable ? () => sortBy(h.key) : undefined}
                           title={h.sortable ? `Sort by ${h.label}` : undefined}>
-                          {h.label}{sort === h.key ? <span style={{ marginLeft: 4 }}>{dir === -1 ? '▾' : '▴'}</span> : null}
+                          {h.label}{sort === h.key ? <span style={{ marginLeft: 5, fontWeight: 800 }} title={dir === -1 ? 'Descending' : 'Ascending'}>{dir === -1 ? '↓' : '↑'}</span> : null}
                         </th>
                       ))}{canDelete && <th style={th}></th>}</tr></thead>
                       <tbody>
@@ -488,11 +516,44 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ padding: '7px 16px', fontSize: 11, color: MUTED }}>Row → full finding detail · <b>Priority·Contextual</b> = composite of exposure, exploit, EPSS &amp; asset criticality on top of CVSS.</div>
+                  <div style={{ padding: '7px 16px', fontSize: 11, color: MUTED }}>Row → full finding detail · click a column header or the <b>Sort</b> button to reorder · <b>Priority·Contextual</b> = composite of exposure, exploit, EPSS &amp; asset criticality on top of CVSS.</div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Filter slide-over — all dimensions as custom click controls (native <select> is broken
+              under .inv2 zoom:0.8). Single-select per group, AND-combined, live. Esc + backdrop close. */}
+          {filtersOpen && (
+            <>
+              <div onClick={() => setFiltersOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,40,.28)', zIndex: 50 }} />
+              <aside role="dialog" aria-modal="true" aria-label="Filter findings" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 372, maxWidth: '92vw', background: '#fff', zIndex: 51, boxShadow: '-16px 0 40px -16px rgba(16,24,40,.4)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Filter size={16} color={AC} /><h3 style={{ margin: 0, fontSize: 15 }}>Filters</h3>{activeCount > 0 && <span style={{ fontSize: 11.5, color: MUTED }}>{activeCount} active</span>}</div>
+                  <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters" style={{ border: 0, background: 'none', cursor: 'pointer', color: SEC, padding: 4, borderRadius: 6, display: 'inline-flex' }}><X size={18} /></button>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px 18px 18px' }}>
+                  {grpTitle('Severity')}
+                  <div style={grpWrap}>{sevOpts.map((o) => optPill(o.k, fSev === o.k, o.label, o.n, () => setFSev(fSev === o.k ? '' : o.k)))}</div>
+                  {DOM_RAIL.length > 0 && (<>{grpTitle('Domain')}<div style={grpWrap}>{DOM_RAIL.map((r) => optPill(r.key as string, fDom === r.label, r.label, r.n, () => setFDom(fDom === r.label ? '' : r.label)))}</div></>)}
+                  {grpTitle('Status')}
+                  <div style={grpWrap}>{statusOpts.map((s) => optPill(s, fStatus === s, s.replace(/_/g, ' '), count((v) => (v.status || 'open').toLowerCase() === s), () => setFStatus(fStatus === s ? '' : s)))}</div>
+                  {grpTitle('Scan provenance')}
+                  <div style={grpWrap}>{([['all', 'All'], ['credentialed', 'Authenticated'], ['surface', 'Surface / Unauth']] as const).map(([v, l]) => optPill(v, scanMode === v, l, v === 'all' ? all.length : count((x) => (x.scan_mode ?? null) === v), () => setScanMode(v)))}</div>
+                  {grpTitle('Triage flags')}
+                  <div style={grpWrap}>{RAIL.filter((r) => r.key !== 'all').map((r) => optPill(r.key as string, fFlag === r.key, r.label, r.n, () => setFFlag(fFlag === r.key ? '' : (r.key as string))))}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderTop: `1px solid ${BORDER}` }}>
+                  <div style={{ display: 'flex', gap: 14 }}>
+                    <Link href="/vulnerabilities/departments" style={{ fontSize: 12, color: AC, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Building2 size={14} />Departments</Link>
+                    <Link href="/vulnerabilities/sla" style={{ fontSize: 12, color: AC, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Clock size={14} />SLA</Link>
+                  </div>
+                  <button type="button" disabled={!anyFilter} onClick={clearAll}
+                    style={{ ...btn, height: 32, opacity: anyFilter ? 1 : 0.5, cursor: anyFilter ? 'pointer' : 'default' }}>Clear all</button>
+                </div>
+              </aside>
+            </>
+          )}
           </>
           )}
         </>
