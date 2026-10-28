@@ -825,6 +825,9 @@ def update(db: Session, tid: int, name: str, payload: dict,
         "agent_group": ticket.team.name if ticket.team else None,
         "ci_id": ticket.ci_id,
         "business_service_id": ticket.business_service_id,
+        "department_id": ticket.department_id,
+        "customer_id": ticket.customer_id,
+        "contact": ticket.contact,
     }
 
     # flow #2: validate a status change (if any) BEFORE mutating anything, so an
@@ -895,13 +898,28 @@ def update(db: Session, tid: int, name: str, payload: dict,
             if team_id:
                 ticket.agent_group_id = team_id
 
+    # NET-NEW: editable intake department / customer / contact (the detail rail lets
+    # agents correct these post-create). department_id is tenant-validated. Team is
+    # deliberately NOT auto-rerouted here (unlike create) so a manual department
+    # change never silently wipes the assignee — Team/Assignee are edited separately.
+    if "department_id" in payload:
+        did = payload["department_id"]
+        if did is None:
+            ticket.department_id = None
+        elif db.query(HDDepartment).filter(HDDepartment.id == did, HDDepartment.tenant_id == tid).first():
+            ticket.department_id = did
+    if "customer_id" in payload:
+        ticket.customer_id = payload["customer_id"]  # None clears
+    if "contact" in payload:
+        ticket.contact = (payload["contact"] or "").strip() or None
+
     if pending_status is not None:
         _apply_status_change(db, tid, ticket, pending_status)
 
     db.commit()
     _changed = {k: payload[k] for k in ("priority", "ticket_type", "status", "agent_group")
                 if payload.get(k)}
-    for k in ("ci_id", "business_service_id"):
+    for k in ("ci_id", "business_service_id", "department_id", "customer_id", "contact"):
         if k in payload:
             _changed[k] = payload[k]
     if _changed:

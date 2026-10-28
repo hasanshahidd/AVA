@@ -62,6 +62,11 @@ class TicketUpdate(BaseModel):
     ci_id: Optional[int] = None
     business_service_id: Optional[int] = None
     support_group_code: Optional[str] = None
+    # AVA net-new: agents correct the intake department / customer / contact on the
+    # ticket detail rail post-create (explicit null clears; route dumps exclude_unset).
+    department_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    contact: Optional[str] = None
 
 
 class AssignBody(BaseModel):

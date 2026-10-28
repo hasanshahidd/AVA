@@ -239,6 +239,22 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
                 _team = hd_dept.resolve_department_team(db, vuln.tenant_id, _dep.id)
                 if _team:
                     payload["agent_group_id"] = _team
+            # Pre-fill "Affected CI": the finding is already tied to an asset, so
+            # link the CMDB CI mirroring that asset (ava_asset_id). Non-fatal — a
+            # finding with no linked asset / no mirrored CI just creates without one.
+            try:
+                from ..modules.vuln_management.routers.remediation_plans import _primary_asset
+                from ..models import HDConfigurationItem
+                _asset = _primary_asset(vuln, db)
+                if _asset:
+                    _ci = (db.query(HDConfigurationItem)
+                           .filter(HDConfigurationItem.tenant_id == vuln.tenant_id,
+                                   HDConfigurationItem.ava_asset_id == _asset.id)
+                           .first())
+                    if _ci and (_ci.status or "").strip().lower() != "retired":
+                        payload["ci_id"] = _ci.id  # skip retired: create_ticket 400s on those
+            except Exception:
+                logger.exception("affected-CI auto-link failed for vuln %s", vuln.id)
             res = hd_tickets.create_ticket(db, vuln.tenant_id, payload, raised_by=None)
             ext_id = str(res.get("name") or res.get("id") or "")
         else:

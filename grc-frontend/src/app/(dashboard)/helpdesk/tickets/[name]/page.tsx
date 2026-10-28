@@ -1,19 +1,20 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Send, MessageSquare, StickyNote, CheckCircle2, XCircle, UserPlus, ShieldAlert, ShieldCheck, Activity, Mail, Paperclip, Download, ExternalLink } from "lucide-react";
 import { apiClient } from "@/lib/api";
-import { Avatar, Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd, utcDate } from "../../_ui";
+import { Chip, PRIORITY_CHIP, ErrorBanner, Loading, PropRow, SlaBadge, TimelineItem, useHd, utcDate } from "../../_ui";
 import { AffectedCiPicker, inventoryUrl } from "../../_ci";
 import { RichComposer, isEmptyHtml } from "../../RichText";
 import { RelatedTickets } from "./_related";
 import { ImpactedCis } from "./_impacted";
 import { Knowledge } from "./_knowledge";
 import { ChangeActions, ApprovalBadge } from "../../changes/_actions";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ComboBoxInput } from "@/components/ui/ComboBoxInput";
 
 // Backend created/creation are NAIVE UTC (datetime.utcnow(), no zone). new Date()
 // would read them as LOCAL → the date lands a day early west of UTC (QA: a ticket
@@ -21,6 +22,30 @@ import remarkGfm from "remark-gfm";
 const fmt = (v?: string | null) => { const d = utcDate(v); return isNaN(d.getTime()) ? "—" : d.toLocaleString(); };
 const doneRe = /replied|resolved|closed/i;
 type ConvTab = "replies" | "comments" | "activity";
+
+// Markdown renderer for the ticket description. The default `prose` scale blew
+// the finding's `#` heading up to a page-title H1 and dropped list markers
+// (Tailwind preflight strips them); this maps every node to the app's own body
+// scale (~13px) with real numbered steps and monospace shell commands.
+const md: Components = {
+  h1: ({ children }) => <div className="mb-1.5 mt-1 text-[12.5px] font-semibold text-slate-800">{children}</div>,
+  h2: ({ children }) => <div className="mb-1 mt-2.5 text-[12px] font-semibold text-slate-700">{children}</div>,
+  h3: ({ children }) => <div className="mb-1 mt-2 text-[12px] font-semibold text-slate-700">{children}</div>,
+  p: ({ children }) => <p className="my-1.5 text-[13px] leading-relaxed text-slate-600">{children}</p>,
+  ul: ({ children }) => <ul className="my-1.5 list-disc space-y-1 pl-5 text-[13px] text-slate-600 marker:text-slate-400">{children}</ul>,
+  ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-1 pl-5 text-[13px] text-slate-600 marker:font-medium marker:text-[var(--color-base)]">{children}</ol>,
+  li: ({ children }) => <li className="pl-1 leading-relaxed">{children}</li>,
+  code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[12px] text-slate-800">{children}</code>,
+  pre: ({ children }) => <pre className="my-1.5 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-[12px] leading-relaxed text-slate-800">{children}</pre>,
+  a: ({ href, children }) => <a href={href} className="font-medium text-[var(--color-base)] underline hover:no-underline">{children}</a>,
+  strong: ({ children }) => <strong className="font-semibold text-slate-800">{children}</strong>,
+  hr: () => <hr className="my-2.5 border-slate-100" />,
+};
+
+// Stacked label-over-control field for the editable Properties rail.
+function PropField({ label, children }: { label: string; children: ReactNode }) {
+  return <div><div className="mb-1 text-[11px] font-medium text-slate-400">{label}</div>{children}</div>;
+}
 
 export default function TicketDetail() {
   const params = useParams();
@@ -30,6 +55,8 @@ export default function TicketDetail() {
   const { data: meta } = useHd<any>("/helpdesk/meta");
   const { data: agentsData } = useHd<any>("/helpdesk/agents");
   const { data: teamsData } = useHd<any>("/helpdesk/teams");
+  const { data: deptData } = useHd<any>("/helpdesk/departments");
+  const { data: custData } = useHd<any>("/helpdesk/customers");
   const [tab, setTab] = useState<"reply" | "comment">("reply");
   const [convTab, setConvTab] = useState<ConvTab>("replies");
   const [draft, setDraft] = useState("");
@@ -143,6 +170,8 @@ export default function TicketDetail() {
   const btn = "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm";
   const agents: any[] = agentsData?.agents || [];
   const teams: any[] = teamsData?.teams || [];
+  const departments: any[] = (deptData?.departments || []).filter((d: any) => d.enabled);
+  const customers: any[] = custData?.customers || [];
   const priorities: string[] = meta?.priorities || [];
   const types: string[] = meta?.ticket_types || [];
   const statuses: { name: string; category?: string }[] = meta?.statuses || [];
@@ -224,15 +253,25 @@ export default function TicketDetail() {
                     {t.source_kind === "vulnerability" ? "Raised from a vulnerability finding" : (t.contact || t.raised_by || t.customer || "Requester")}
                   </span>
                 </div>
-                <div className="prose prose-sm max-w-none break-words text-slate-700">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.description}</ReactMarkdown>
+                <div className="break-words text-[13px] leading-relaxed text-slate-600">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>{t.description}</ReactMarkdown>
                 </div>
               </div>
             )}
             {shown.length === 0 ? (
               (convTab === "replies" && t.description) ? null : (
-                <div className="py-8 text-center text-xs text-slate-300">
-                  {convTab === "replies" ? "No replies yet." : convTab === "comments" ? "No internal comments." : "No activity yet."}
+                <div className="flex flex-col items-center gap-1.5 py-12 text-center">
+                  <MessageSquare size={22} className="text-slate-300" />
+                  <p className="text-[13px] font-medium text-slate-500">
+                    {convTab === "replies" ? "No replies yet" : convTab === "comments" ? "No internal notes" : "No activity yet"}
+                  </p>
+                  <p className="max-w-xs text-[12px] text-slate-400">
+                    {convTab === "replies"
+                      ? "Use the box below to respond to the requester."
+                      : convTab === "comments"
+                      ? "Add a note your team can see but the requester can't."
+                      : "Status changes and assignments show up here."}
+                  </p>
                 </div>
               )
             ) : shown.map((m, i) => <TimelineItem key={i} m={m} />)}
@@ -254,6 +293,11 @@ export default function TicketDetail() {
                   {cannedList.map((c) => <option key={c.name} value={c.name}>{c.title || c.name}</option>)}
                 </select>
               )}
+            </div>
+            <div className="mb-2 text-[11px] text-slate-400">
+              {tab === "reply"
+                ? <>Reply goes to <span className="font-medium text-slate-600">{t.contact || t.raised_by || t.customer || "the requester"}</span>.</>
+                : "Internal note — visible to agents only, not the requester."}
             </div>
             {tab === "reply" && showCc && (
               <div className="mb-2 space-y-1.5">
@@ -319,32 +363,50 @@ export default function TicketDetail() {
           <RelatedTickets name={t.name || name} process={t.process} related={data?.related} onChanged={reload} />
           <Knowledge name={t.name || name} kbLinks={data?.kb_links} onChanged={reload} />
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Properties</h3>
-          <PropRow label="Status">
+          {/* Editable triage fields — searchable, wired to the same update/assign
+              actions as the header controls (send only the changed field). */}
+          <PropField label="Status">
             {statuses.length > 0 ? (
-              <select value={t.status || ""} onChange={(e) => act("update", { status: e.target.value }, "Status updated.")}
-                className="w-full bg-transparent text-sm focus:outline-none">
-                {statuses.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-              </select>
+              <ComboBoxInput ariaLabel="Status" value={t.status || ""} allowCustom={false} placeholder="— Select —"
+                options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+                onChange={(v) => { if (v) act("update", { status: v }, "Status updated."); }} />
             ) : <Chip value={t.status} />}
-          </PropRow>
-          <PropRow label="Priority">
+          </PropField>
+          <PropField label="Priority">
             {priorities.length > 0 ? (
-              <select value={t.priority || ""} onChange={(e) => act("update", { priority: e.target.value }, "Priority updated.")}
-                className="w-full bg-transparent text-sm focus:outline-none">
-                {priorities.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <ComboBoxInput ariaLabel="Priority" value={t.priority || ""} allowCustom={false} placeholder="— Select —"
+                options={priorities.map((p) => ({ value: p, label: p }))}
+                onChange={(v) => { if (v) act("update", { priority: v }, "Priority updated."); }} />
             ) : <Chip value={t.priority} map={PRIORITY_CHIP} />}
-          </PropRow>
-          <PropRow label="Ticket type">
+          </PropField>
+          <PropField label="Ticket type">
             {types.length > 0 ? (
-              <select value={t.ticket_type || ""} onChange={(e) => act("update", { ticket_type: e.target.value }, "Type updated.")}
-                className="w-full bg-transparent text-sm focus:outline-none">
-                <option value="">Unset</option>
-                {types.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
-              </select>
+              <ComboBoxInput ariaLabel="Ticket type" value={t.ticket_type || ""} allowCustom={false} placeholder="Unset"
+                options={types.map((ty) => ({ value: ty, label: ty }))}
+                onChange={(v) => act("update", { ticket_type: v }, "Type updated.")} />
             ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
-          </PropRow>
-          <PropRow label="Department">{t.department || <span className="text-slate-300">—</span>}</PropRow>
+          </PropField>
+          <PropField label="Team">
+            <ComboBoxInput ariaLabel="Team" value={t.team || ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!teams.length} placeholder={teams.length ? "Unassigned" : "No teams"}
+              options={teams.filter((tm) => !tm.disabled).map((tm) => ({ value: tm.name, label: tm.team_name || tm.name }))}
+              onChange={(v) => assign(undefined, v || null)} />
+          </PropField>
+          <PropField label="Assignee">
+            <ComboBoxInput ariaLabel="Assignee" value={t.agent || ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!agents.length} placeholder="Unassigned"
+              options={agents.map((a) => ({ value: a.email || a.name || "", label: a.agent_name || a.email || a.name || "" }))}
+              onChange={(v) => assign(v || null, undefined)} />
+          </PropField>
+          {/* Department / Customer / Contact are editable (TicketUpdate accepts
+              department_id / customer_id / contact). Changing the department does NOT
+              auto-reroute the team — set Team/Assignee above independently. */}
+          <PropField label="Department">
+            <ComboBoxInput ariaLabel="Department" value={t.department_id ? String(t.department_id) : ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!departments.length} placeholder={departments.length ? "— Select —" : "No departments"}
+              options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+              onChange={(v) => act("update", { department_id: v ? Number(v) : null }, "Department updated.")} />
+          </PropField>
           <PropRow label="Source">
             {t.source_kind === "vulnerability" && t.source_finding_id ? (
               <Link href={`/vulnerabilities/${encodeURIComponent(String(t.source_finding_id))}`} className="font-medium text-[var(--color-base)] hover:underline">
@@ -352,10 +414,18 @@ export default function TicketDetail() {
               </Link>
             ) : (t.source || <span className="text-slate-300">—</span>)}
           </PropRow>
-          <PropRow label="Team">{t.team || <span className="text-slate-300">Unassigned</span>}</PropRow>
-          <PropRow label="Assignee">{t.agent ? <span className="inline-flex items-center gap-1.5"><Avatar name={t.agent} size={20} />{t.agent}</span> : <span className="text-slate-300">Unassigned</span>}</PropRow>
-          <PropRow label="Customer">{t.customer || "—"}</PropRow>
-          <PropRow label="Contact">{t.contact || t.raised_by || "—"}</PropRow>
+          <PropField label="Customer">
+            <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
+              options={customers.map((c) => ({ value: String(c.name), label: c.customer_name || c.name }))}
+              onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
+          </PropField>
+          <PropField label="Contact">
+            <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (t.contact || "")) act("update", { contact: v || null }, "Contact updated."); }}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--color-base)] focus:ring-2 focus:ring-[var(--color-base)]/15" />
+          </PropField>
           {/* Affected CI — agents link/change/clear the configuration item this ticket is about. */}
           <div>
             <div className="mb-1 text-[11px] font-medium text-slate-400">Affected CI</div>
