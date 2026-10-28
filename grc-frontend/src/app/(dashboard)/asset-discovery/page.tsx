@@ -272,7 +272,6 @@ function Overview({ go }: { go: (t?: string) => void }) {
         <div>
           <span className="eyebrow">Command center</span>
           <h2>Discovery posture</h2>
-          <p>What is covered, what changed, and what needs attention now — across owned networks and the public attack surface.</p>
         </div>
         <div className="actions">
           <select className="select" defaultValue="Last 30 days"><option>Last 30 days</option><option>Last 7 days</option><option>Today</option></select>

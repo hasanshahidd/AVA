@@ -392,12 +392,6 @@ export default function InventoryRedesign(p: Props) {
                   <span style={{ flex: 1 }} /><button className="bulkb" onClick={() => setSel(new Set())}>Deselect all</button>
                 </div>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '1px solid var(--bd2)' }}>
-                <h3 style={{ fontSize: 13.5 }}>Asset Register</h3>
-                {/* "shown" counts collapsed register units (an apex + its nested subs = one),
-                    so it reconciles with the rolled-up total — not the flat child-row count. */}
-                <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}><b className="num" style={{ color: 'var(--sec)' }}>{orderedRows.filter((r) => !childApexOf.has(r.id)).length}</b> shown · {c.total} total</span>
-              </div>
               <div style={{ overflowY: 'auto', overflowX: 'auto', maxHeight: '58vh' }}>
                 {mode === 'uncredential' ? (
                   <UncredentialView rows={rows} onOpen={p.onView} />
