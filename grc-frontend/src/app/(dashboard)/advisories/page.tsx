@@ -1,7 +1,7 @@
 'use client';
 
 import { PageLoader } from '@/components/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { advisoriesApi } from '@/lib/api';
@@ -78,6 +78,17 @@ function sourceLabel(a: AdvisoryView): string {
   return a.source_name || 'Unknown source';
 }
 
+// The advisory's year — from its real published date, else the ingest/upload
+// date; 'Undated' when neither parses. Drives the year grouping level.
+function advYear(a: AdvisoryView): string {
+  const d = a.published_at || a.created_at;
+  if (d) {
+    const y = new Date(d).getFullYear();
+    if (!isNaN(y)) return String(y);
+  }
+  return 'Undated';
+}
+
 export default function AdvisoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -103,6 +114,7 @@ export default function AdvisoriesPage() {
   const [fSource, setFSource] = useState(ALL);
   const [fSeverity, setFSeverity] = useState(ALL);
   const [fStatus, setFStatus] = useState(ALL);
+  const [fYear, setFYear] = useState(ALL);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['advisories'],
@@ -192,29 +204,45 @@ export default function AdvisoriesPage() {
   const sourceOptions = useMemo(
     () => Array.from(new Set(advisories.map((a) => sourceLabel(a)).filter(Boolean) as string[])).sort(),
     [advisories]);
+  const yearOptions = useMemo(
+    () => Array.from(new Set(advisories.map((a) => advYear(a)))).sort((a, b) =>
+      (a === 'Undated' ? 1 : b === 'Undated' ? -1 : b.localeCompare(a))),
+    [advisories]);
 
   const filtered = useMemo(() => advisories.filter((a) =>
     (fRegion === ALL || a.region === fRegion) &&
     (fOrigin === ALL || (fOrigin === 'synced' ? a.origin === 'sync' : a.origin !== 'sync')) &&
     (fSource === ALL || sourceLabel(a) === fSource) &&
+    (fYear === ALL || advYear(a) === fYear) &&
     (fSeverity === ALL || (a.severity || '').toLowerCase() === fSeverity) &&
     (fStatus === ALL || a.status === fStatus)
-  ), [advisories, fRegion, fOrigin, fSource, fSeverity, fStatus]);
+  ), [advisories, fRegion, fOrigin, fSource, fYear, fSeverity, fStatus]);
 
   // Group the filtered list hierarchically: region → source → advisories.
   // Region order = REGION_ORDER then name; sources A–Z within a region.
   const grouped = useMemo(() => {
-    const byRegion: Record<string, Record<string, AdvisoryView[]>> = {};
+    const byRegion: Record<string, Record<string, Record<string, AdvisoryView[]>>> = {};
     for (const a of filtered) {
       const r = a.region || 'Other';
       const s = sourceLabel(a);
-      ((byRegion[r] ||= {})[s] ||= []).push(a);
+      const y = advYear(a);
+      (((byRegion[r] ||= {})[s] ||= {})[y] ||= []).push(a);
     }
     return Object.keys(byRegion)
       .sort((x, y) => regionRank(x) - regionRank(y) || x.localeCompare(y))
       .map((region) => {
-        const sources = Object.keys(byRegion[region]).sort()
-          .map((source) => ({ source, items: byRegion[region][source] }));
+        const sources = Object.keys(byRegion[region]).sort().map((source) => {
+          const yearMap = byRegion[region][source];
+          const years = Object.keys(yearMap)
+            .sort((a, b) => (a === 'Undated' ? 1 : b === 'Undated' ? -1 : b.localeCompare(a)))
+            .map((year) => ({
+              year,
+              items: yearMap[year].slice().sort((a, b) =>
+                (b.published_at || b.created_at || '').localeCompare(a.published_at || a.created_at || '')),
+            }));
+          const items = years.flatMap((y) => y.items);
+          return { source, years, items };
+        });
         const items = sources.flatMap((s) => s.items);
         return { region, sources, items };
       });
@@ -245,6 +273,7 @@ export default function AdvisoriesPage() {
       return next;
     });
   const srcKey = (region: string, source: string) => `${region}\u0000${source}`;
+  const yrKey = (region: string, source: string, year: string) => `${region}\u0000${source}\u0000${year}`;
 
   const toggleAdv = (id: number) => setSelAdv((p) => {
     const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -318,7 +347,7 @@ export default function AdvisoriesPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { l: 'Advisories', v: summary.total ?? advisories.length, hint: 'Show all',
-            onClick: () => { setFStatus(ALL); setFRegion(ALL); setFSource(ALL); setFSeverity(ALL); setFOrigin(ALL); } },
+            onClick: () => { setFStatus(ALL); setFRegion(ALL); setFSource(ALL); setFSeverity(ALL); setFOrigin(ALL); setFYear(ALL); } },
           { l: 'Open', v: summary.open ?? 0, hint: 'Filter open', onClick: () => setFStatus('open') },
           { l: 'Assets affected', v: affectedTotal, hint: 'See which', onClick: () => setAffectedOpen(true) },
           { l: 'Sources', v: sourceCount, hint: 'Manage', onClick: () => setSourcesOpen(true) },
@@ -338,6 +367,18 @@ export default function AdvisoriesPage() {
         <div className="cw-card p-3">
           <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
         </div>
+      ) : panelMode === 'match' ? (
+        <div className="cw-card p-3">
+          <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
+            onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
+            isPending={matchMutation.isPending} />
+        </div>
+      ) : panelMode === 'report' && report ? (
+        <div className="cw-card p-3">
+          <MatchReport report={report} title={reportTitle}
+            onBack={() => setPanelMode('detail')}
+            onDownload={reportSessionId !== null ? downloadReport : undefined} />
+        </div>
       ) : (
       <>
       <div className="cw-card p-3">
@@ -356,6 +397,7 @@ export default function AdvisoriesPage() {
           <div className="flex flex-1 flex-nowrap items-end gap-x-3">
             <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
             <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+            <FilterSelect label="Year" value={fYear} options={yearOptions} onChange={setFYear} />
             <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
             <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
             <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
@@ -370,196 +412,120 @@ export default function AdvisoriesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[360px_1fr]">
-        <div className="cw-card overflow-hidden">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-10 text-center cw-text-muted">
-              <ShieldAlert className="mx-auto mb-2 h-8 w-8" />
-              <p className="text-xs">No advisories match these filters.</p>
-            </div>
-          ) : (
-            grouped.map(({ region, sources, items }, ri) => {
-              const regionCollapsed = collapsed.has(region);
-              return (
-                <div key={region} className="first:border-t-0">
-                  <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
-                    <input type="checkbox" className="shrink-0" title="Select all in region"
-                      checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
-                      onChange={() => toggleRegionSel(items)} />
-                    <button onClick={() => toggleKey(region)} className="flex flex-1 items-center gap-2 text-left">
-                      {regionCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-                      <span className="text-sm font-bold uppercase tracking-wide cw-text-default">{region}</span>
-                      <span className="rounded bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] font-medium cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
-                      <span className="ml-auto text-xs font-semibold cw-text-muted">{items.length}</span>
-                    </button>
-                  </div>
-                  {!regionCollapsed && sources.map(({ source, items: sItems }, si) => {
-                    const key = srcKey(region, source);
-                    const srcCollapsed = collapsed.has(key);
-                    return (
-                      <div key={key}>
-                        <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] py-1.5 pl-7 pr-3">
-                          <input type="checkbox" className="shrink-0" title="Select all from this source"
-                            checked={sItems.length > 0 && sItems.every((a) => selAdv.has(a.id))}
-                            onChange={() => toggleRegionSel(sItems)} />
-                          <button onClick={() => toggleKey(key)} className="flex flex-1 items-center gap-1.5 text-left">
-                            {srcCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold cw-text-default">{source}</span>
-                            <span className="ml-auto text-[11px] cw-text-muted">{sItems.length}</span>
-                          </button>
-                        </div>
-                        {!srcCollapsed && sItems.map((a, ai) => (
-                          <div key={a.id}
-                            className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] py-2 pl-10 pr-3 transition-colors ${selectedId === a.id ? 'bg-[var(--color-base-soft)]' : 'hover:bg-[var(--color-hover)]'}`}>
-                            <input type="checkbox" className="shrink-0"
-                              checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
-                            <button onClick={() => router.push(`/advisories/${a.id}`)}
-                              className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
-                              <p className="min-w-0 flex-1 truncate text-[11px] font-normal cw-text-default">{a.title}</p>
-                              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                                {a.status === 'pending' ? (
-                                  <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700">review</span>
-                                ) : a.asset_affected_count > 0 ? (
-                                  <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
-                                ) : null}
-                                <SeverityBadge severity={a.severity} />
-                              </div>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="cw-card p-3">
-          {panelMode === 'match' ? (
-            <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
-              onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
-              isPending={matchMutation.isPending} />
-          ) : panelMode === 'report' && report ? (
-            <MatchReport report={report} title={reportTitle}
-              onBack={() => setPanelMode('detail')}
-              onDownload={reportSessionId !== null ? downloadReport : undefined} />
-          ) : !detail ? (
-            <div className="flex flex-col items-center justify-center px-4 py-14 text-center cw-text-muted">
-              <ShieldAlert className="mb-2 h-8 w-8" />
-              <p className="text-xs">Click any advisory to open its full detail page.</p>
-              <p className="text-xs">Or tick advisories and CVEs, then click Match.</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-primary)]">
-                    Advisory{detail.region && detail.region !== 'Unclassified' ? ` · ${detail.region}` : ''}
-                  </p>
-                  {detail.region === 'Unclassified' && (
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-yellow-700">Region not detected —</span>
-                      <RegionPicker advisoryId={detail.id} current={detail.region} />
-                    </div>
-                  )}
-                  <h2 className="mt-1 text-base font-semibold leading-snug cw-text-default">{detail.title}</h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <SeverityBadge severity={detail.severity} />
-                    <StatusBadge status={detail.status} />
-                    {detail.url && (
-                      <a href={detail.url} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] hover:underline">
-                        <ExternalLink size={12} /> Source
-                      </a>
-                    )}
-                  </div>
-                </div>
-                {detail.status === 'pending' && (
-                  <button onClick={() => router.push(`/advisories/${detail.id}`)} className="btn-primary flex shrink-0 items-center gap-2 text-sm">
-                    Review &amp; confirm
-                  </button>
-                )}
-              </div>
-
-              {detail.summary && <div className="mt-3"><RichText text={detail.summary} /></div>}
-
-              <section className="mt-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2"
-                    title="Assets found to run the affected software (or confirmed by a scan), and how many were affected.">
-                    <p className="text-xl font-semibold leading-tight cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
-                    <p className="mt-0.5 text-[11px] cw-text-muted">Assets affected / checked</p>
-                  </div>
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
-                    <p className="text-xl font-semibold leading-tight cw-text-default">{detail.cve_count}</p>
-                    <p className="mt-0.5 text-[11px] cw-text-muted">CVEs</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="mt-3">
-                <h3 className="mb-2 text-sm font-semibold cw-text-default">Details</h3>
-                <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-                  <table className="w-full text-xs">
-                    <tbody>
-                      {([
-                        ['Published', fmtDate(detail.published_at), ''],
-                        ['Last updated', fmtDate(detail.updated_at), ''],
-                        [detail.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(detail.created_at), ''],
-                        ['External ID', detail.external_id || '—', ''],
-                        ['Source', sourceLabel(detail), ''],
-                        ['Region', detail.region || 'Unclassified', ''],
-                      ] as [string, string, string][]).map(([k, v, hint]) => (
-                        <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
-                          <th scope="row" className="w-32 bg-primary-700 px-3 py-1.5 text-left text-[11px] font-bold text-white">{k}</th>
-                          <td className="px-3 py-1.5 cw-text-default">{hint || v}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              {detail.flow && (
-                <section className="mt-3">
-                  <h3 className="mb-2 text-sm font-semibold cw-text-default">Lifecycle</h3>
-                  <FlowStrip flow={detail.flow} />
-                </section>
-              )}
-
-              {/* Timeline sits high — right under Lifecycle — so it is reachable
-                  without scrolling past the (possibly long) CVE list below. */}
-              {detail.history && detail.history.length > 0 && (
-                <section className="mt-3"><HistoryTimeline events={detail.history} /></section>
-              )}
-
-              {detail.status === 'pending' && (
-                <p className="mt-3 rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
-                  Extracted and awaiting review — open <span className="font-medium">Review &amp; confirm</span> to check the CVEs and the parsing report before it is tracked.
-                </p>
-              )}
-
-              {detail.status !== 'pending' && (
-                <section className="mt-3">
-                  <h3 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h3>
-                  <p className="mb-2 mt-0.5 text-[11px] cw-text-muted">
-                    Tick any CVEs to add them to the match selection, or click a CVE for its full register details.
-                  </p>
-                  <div className="space-y-2">
-                    {(detail.cves ?? []).length === 0
-                      ? <p className="text-xs cw-text-muted">No CVEs on this advisory.</p>
-                      : (detail.cves ?? []).map((cve) => (
-                        <VulnCard key={cve.id} cve={cve}
-                          selected={selCve.has(cve.id)} onToggleSelect={() => toggleCve(cve.id)} />
-                      ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-        </div>
+      <div className="cw-card overflow-x-auto">
+        {filtered.length === 0 ? (
+          <div className="px-4 py-10 text-center cw-text-muted">
+            <ShieldAlert className="mx-auto mb-2 h-8 w-8" />
+            <p className="text-xs">No advisories match these filters.</p>
+          </div>
+        ) : (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide">
+                <th className="w-8 px-3 py-2 !bg-primary-700 !text-white"></th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Advisory</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Published</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Synced</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">CVEs</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Affected</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Severity</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {grouped.map(({ region, sources, items }) => {
+                const regionCollapsed = collapsed.has(region);
+                return (
+                  <Fragment key={region}>
+                    <tr className="border-t border-[var(--color-border)] bg-[var(--color-subtle)]">
+                      <td className="px-3 py-2">
+                        <input type="checkbox" title="Select all in region"
+                          checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
+                          onChange={() => toggleRegionSel(items)} />
+                      </td>
+                      <td colSpan={6} className="px-1 py-2">
+                        <button onClick={() => toggleKey(region)} className="flex items-center gap-2 text-left">
+                          {regionCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                          <span className="text-sm font-bold uppercase tracking-wide cw-text-default">{region}</span>
+                          <span className="rounded bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] font-medium cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs font-semibold cw-text-muted">{items.length}</td>
+                    </tr>
+                    {!regionCollapsed && sources.map(({ source, items: sItems, years }) => {
+                      const key = srcKey(region, source);
+                      const srcCollapsed = collapsed.has(key);
+                      return (
+                        <Fragment key={key}>
+                          <tr className="border-t border-[var(--color-border)]">
+                            <td className="px-3 py-1.5">
+                              <input type="checkbox" title="Select all from this source"
+                                checked={sItems.length > 0 && sItems.every((a) => selAdv.has(a.id))}
+                                onChange={() => toggleRegionSel(sItems)} />
+                            </td>
+                            <td colSpan={6} className="py-1.5 pl-6 pr-3">
+                              <button onClick={() => toggleKey(key)} className="flex items-center gap-1.5 text-left">
+                                {srcCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                                <span className="truncate text-xs font-semibold cw-text-default">{source}</span>
+                                <span className="text-[10px] cw-text-muted">{years.length} year{years.length === 1 ? '' : 's'}</span>
+                              </button>
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-[11px] cw-text-muted">{sItems.length}</td>
+                          </tr>
+                          {!srcCollapsed && years.map(({ year, items: yItems }) => {
+                            const ykey = yrKey(region, source, year);
+                            const yrCollapsed = collapsed.has(ykey);
+                            return (
+                              <Fragment key={ykey}>
+                                <tr className="border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+                                  <td className="px-3 py-1">
+                                    <input type="checkbox" title="Select all in year"
+                                      checked={yItems.length > 0 && yItems.every((a) => selAdv.has(a.id))}
+                                      onChange={() => toggleRegionSel(yItems)} />
+                                  </td>
+                                  <td colSpan={6} className="py-1 pl-10 pr-3">
+                                    <button onClick={() => toggleKey(ykey)} className="flex items-center gap-1.5 text-left">
+                                      {yrCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                                      <span className="text-[11px] font-semibold text-[var(--color-primary)]">{year}</span>
+                                    </button>
+                                  </td>
+                                  <td className="px-3 py-1 text-right text-[11px] cw-text-muted">{yItems.length}</td>
+                                </tr>
+                                {!yrCollapsed && yItems.map((a) => (
+                                  <tr key={a.id} className="border-t border-[var(--color-border)] transition-colors hover:bg-[var(--color-hover)]">
+                                    <td className="px-3 py-2">
+                                      <input type="checkbox" checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
+                                    </td>
+                                    <td className="py-2 pl-[52px] pr-3">
+                                      <button onClick={() => router.push(`/advisories/${a.id}`)}
+                                        className="block max-w-sm truncate text-left text-xs font-medium cw-text-default hover:text-[var(--color-primary)]">
+                                        {a.title}
+                                      </button>
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.published_at)}</td>
+                                    <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.created_at)}</td>
+                                    <td className="px-3 py-2 text-right cw-text-default">{a.cve_count}</td>
+                                    <td className="px-3 py-2 text-right">
+                                      {a.asset_affected_count > 0
+                                        ? <span className="font-semibold text-red-600">{a.asset_affected_count}</span>
+                                        : <span className="cw-text-muted">0</span>}
+                                    </td>
+                                    <td className="px-3 py-2"><SeverityBadge severity={a.severity} /></td>
+                                    <td className="px-3 py-2"><StatusBadge status={a.status} /></td>
+                                  </tr>
+                                ))}
+                              </Fragment>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
       </>
       )}
