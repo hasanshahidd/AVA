@@ -89,6 +89,16 @@ function advYear(a: AdvisoryView): string {
   return 'Undated';
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+// The advisory's month name (within its year); 'Undated' when no date parses.
+function advMonth(a: AdvisoryView): string {
+  const d = a.published_at || a.created_at;
+  if (d) { const m = new Date(d).getMonth(); if (!isNaN(m)) return MONTHS[m]; }
+  return 'Undated';
+}
+const monthRank = (m: string) => (m === 'Undated' ? 99 : MONTHS.indexOf(m));
+
 export default function AdvisoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -221,13 +231,16 @@ export default function AdvisoriesPage() {
   // Group the filtered list hierarchically: region → source → advisories.
   // Region order = REGION_ORDER then name; sources A–Z within a region.
   const grouped = useMemo(() => {
-    const byRegion: Record<string, Record<string, Record<string, AdvisoryView[]>>> = {};
+    const byRegion: Record<string, Record<string, Record<string, Record<string, AdvisoryView[]>>>> = {};
     for (const a of filtered) {
       const r = a.region || 'Other';
       const s = sourceLabel(a);
       const y = advYear(a);
-      (((byRegion[r] ||= {})[s] ||= {})[y] ||= []).push(a);
+      const m = advMonth(a);
+      ((((byRegion[r] ||= {})[s] ||= {})[y] ||= {})[m] ||= []).push(a);
     }
+    const newestFirst = (a: AdvisoryView, b: AdvisoryView) =>
+      (b.published_at || b.created_at || '').localeCompare(a.published_at || a.created_at || '');
     return Object.keys(byRegion)
       .sort((x, y) => regionRank(x) - regionRank(y) || x.localeCompare(y))
       .map((region) => {
@@ -236,11 +249,13 @@ export default function AdvisoriesPage() {
           const years = Object.keys(yearMap)
             // Oldest year first (2021 at the top), counting up; 'Undated' last.
             .sort((a, b) => (a === 'Undated' ? 1 : b === 'Undated' ? -1 : a.localeCompare(b)))
-            .map((year) => ({
-              year,
-              items: yearMap[year].slice().sort((a, b) =>
-                (b.published_at || b.created_at || '').localeCompare(a.published_at || a.created_at || '')),
-            }));
+            .map((year) => {
+              const monthMap = yearMap[year];
+              const months = Object.keys(monthMap)
+                .sort((a, b) => monthRank(a) - monthRank(b))  // Jan→Dec, Undated last
+                .map((month) => ({ month, items: monthMap[month].slice().sort(newestFirst) }));
+              return { year, months, items: months.flatMap((m) => m.items) };
+            });
           const items = years.flatMap((y) => y.items);
           return { source, years, items };
         });
@@ -256,17 +271,19 @@ export default function AdvisoriesPage() {
     }
   }, [filtered, selectedId]);
 
-  // Collapse every source AND every year on first load so the list opens short:
-  // region → sources, each source → its years (with counts). The user opens a
-  // source, then a year, then its advisories — nothing is auto-expanded.
+  // Collapse every source, year AND month on first load so the list opens short:
+  // region → sources → years → months, nothing auto-expanded. The user opens a
+  // source, then a year, then a month, then its advisories.
   useEffect(() => {
     if (!sourcesSeeded.current && advisories.length > 0) {
       const keys = new Set<string>();
       for (const a of advisories) {
         const region = a.region || 'Other';
         const source = sourceLabel(a);
+        const year = advYear(a);
         keys.add(srcKey(region, source));
-        keys.add(yrKey(region, source, advYear(a)));
+        keys.add(yrKey(region, source, year));
+        keys.add(mKey(region, source, year, advMonth(a)));
       }
       setCollapsed(keys);
       sourcesSeeded.current = true;
@@ -281,6 +298,7 @@ export default function AdvisoriesPage() {
     });
   const srcKey = (region: string, source: string) => `${region}\u0000${source}`;
   const yrKey = (region: string, source: string, year: string) => `${region}\u0000${source}\u0000${year}`;
+  const mKey = (region: string, source: string, year: string, month: string) => `${region}\u0000${source}\u0000${year}\u0000${month}`;
 
   const toggleAdv = (id: number) => setSelAdv((p) => {
     const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -370,24 +388,6 @@ export default function AdvisoriesPage() {
         ))}
       </div>
 
-      {panelMode === 'history' ? (
-        <div className="cw-card p-3">
-          <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
-        </div>
-      ) : panelMode === 'match' ? (
-        <div className="cw-card p-3">
-          <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
-            onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
-            isPending={matchMutation.isPending} />
-        </div>
-      ) : panelMode === 'report' && report ? (
-        <div className="cw-card p-3">
-          <MatchReport report={report} title={reportTitle}
-            onBack={() => setPanelMode('detail')}
-            onDownload={reportSessionId !== null ? downloadReport : undefined} />
-        </div>
-      ) : (
-      <>
       <div className="cw-card p-3">
         <div className="flex flex-nowrap items-end gap-x-3 overflow-x-auto">
           <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
@@ -408,9 +408,6 @@ export default function AdvisoriesPage() {
             <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
             <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
             <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-            <span className="mb-1.5 shrink-0 whitespace-nowrap text-[11px] cw-text-muted">
-              <span className="font-semibold cw-text-default">{filtered.length}</span>/{advisories.length}
-            </span>
           </div>
           <button onClick={() => setPanelMode('history')}
             className="btn-secondary mb-0.5 flex shrink-0 items-center gap-1.5 text-sm">
@@ -419,7 +416,7 @@ export default function AdvisoriesPage() {
         </div>
       </div>
 
-      <div className="cw-card overflow-x-auto">
+      <div className="cw-card">
         {filtered.length === 0 ? (
           <div className="px-4 py-10 text-center cw-text-muted">
             <ShieldAlert className="mx-auto mb-2 h-8 w-8" />
@@ -427,7 +424,7 @@ export default function AdvisoriesPage() {
           </div>
         ) : (
           <table className="w-full text-xs">
-            <thead>
+            <thead className="sticky top-0 z-20">
               <tr className="text-left text-[11px] uppercase tracking-wide">
                 <th className="w-8 px-3 py-2 !bg-primary-700 !text-white"></th>
                 <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Advisory</th>
@@ -478,7 +475,7 @@ export default function AdvisoriesPage() {
                             </td>
                             <td className="px-3 py-1.5 text-right text-[11px] cw-text-muted">{sItems.length}</td>
                           </tr>
-                          {!srcCollapsed && years.map(({ year, items: yItems }) => {
+                          {!srcCollapsed && years.map(({ year, months, items: yItems }) => {
                             const ykey = yrKey(region, source, year);
                             const yrCollapsed = collapsed.has(ykey);
                             return (
@@ -497,29 +494,51 @@ export default function AdvisoriesPage() {
                                   </td>
                                   <td className="px-3 py-1 text-right text-[11px] cw-text-muted">{yItems.length}</td>
                                 </tr>
-                                {!yrCollapsed && yItems.map((a) => (
-                                  <tr key={a.id} className="border-t border-[var(--color-border)] transition-colors hover:bg-[var(--color-hover)]">
-                                    <td className="px-3 py-2">
-                                      <input type="checkbox" checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
-                                    </td>
-                                    <td className="py-2 pl-[52px] pr-3">
-                                      <button onClick={() => router.push(`/advisories/${a.id}`)}
-                                        className="block max-w-sm truncate text-left text-xs font-medium cw-text-default hover:text-[var(--color-primary)]">
-                                        {a.title}
-                                      </button>
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.published_at)}</td>
-                                    <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.created_at)}</td>
-                                    <td className="px-3 py-2 text-right cw-text-default">{a.cve_count}</td>
-                                    <td className="px-3 py-2 text-right">
-                                      {a.asset_affected_count > 0
-                                        ? <span className="font-semibold text-red-600">{a.asset_affected_count}</span>
-                                        : <span className="cw-text-muted">0</span>}
-                                    </td>
-                                    <td className="px-3 py-2"><SeverityBadge severity={a.severity} /></td>
-                                    <td className="px-3 py-2"><StatusBadge status={a.status} /></td>
-                                  </tr>
-                                ))}
+                                {!yrCollapsed && months.map(({ month, items: mItems }) => {
+                                  const mkey = mKey(region, source, year, month);
+                                  const mCollapsed = collapsed.has(mkey);
+                                  return (
+                                    <Fragment key={mkey}>
+                                      <tr className="border-t border-[var(--color-border)]">
+                                        <td className="px-3 py-1">
+                                          <input type="checkbox" title="Select all in month"
+                                            checked={mItems.length > 0 && mItems.every((a) => selAdv.has(a.id))}
+                                            onChange={() => toggleRegionSel(mItems)} />
+                                        </td>
+                                        <td colSpan={6} className="py-1 pl-14 pr-3">
+                                          <button onClick={() => toggleKey(mkey)} className="flex items-center gap-1.5 text-left">
+                                            {mCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                                            <span className="text-[11px] font-medium cw-text-muted">{month}</span>
+                                          </button>
+                                        </td>
+                                        <td className="px-3 py-1 text-right text-[11px] cw-text-muted">{mItems.length}</td>
+                                      </tr>
+                                      {!mCollapsed && mItems.map((a) => (
+                                        <tr key={a.id} className="border-t border-[var(--color-border)] transition-colors hover:bg-[var(--color-hover)]">
+                                          <td className="px-3 py-2">
+                                            <input type="checkbox" checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
+                                          </td>
+                                          <td className="py-2 pl-[72px] pr-3">
+                                            <button onClick={() => router.push(`/advisories/${a.id}`)}
+                                              className="block max-w-sm truncate text-left text-xs font-medium cw-text-default hover:text-[var(--color-primary)]">
+                                              {a.title}
+                                            </button>
+                                          </td>
+                                          <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.published_at)}</td>
+                                          <td className="whitespace-nowrap px-3 py-2 cw-text-muted">{fmtDate(a.created_at)}</td>
+                                          <td className="px-3 py-2 text-right cw-text-default">{a.cve_count}</td>
+                                          <td className="px-3 py-2 text-right">
+                                            {a.asset_affected_count > 0
+                                              ? <span className="font-semibold text-red-600">{a.asset_affected_count}</span>
+                                              : <span className="cw-text-muted">0</span>}
+                                          </td>
+                                          <td className="px-3 py-2"><SeverityBadge severity={a.severity} /></td>
+                                          <td className="px-3 py-2"><StatusBadge status={a.status} /></td>
+                                        </tr>
+                                      ))}
+                                    </Fragment>
+                                  );
+                                })}
                               </Fragment>
                             );
                           })}
@@ -533,7 +552,34 @@ export default function AdvisoriesPage() {
           </table>
         )}
       </div>
-      </>
+
+      {/* Match flow as a modal: pick scope, Run, then the rich results — the list
+          stays behind, blurred. Opened by the Match / History buttons. */}
+      {panelMode !== 'detail' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPanelMode('detail')} />
+          <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-xl">
+            <div className="flex items-center justify-between bg-[var(--color-primary)] px-5 py-4 text-white">
+              <h2 className="text-base font-bold">
+                {panelMode === 'history' ? 'Match history' : panelMode === 'report' ? 'Match results' : 'Run match'}
+              </h2>
+              <button onClick={() => setPanelMode('detail')} className="rounded p-1 hover:bg-white/20"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {panelMode === 'history' ? (
+                <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
+              ) : panelMode === 'report' && report ? (
+                <MatchReport report={report} title={reportTitle}
+                  onBack={() => setPanelMode('detail')}
+                  onDownload={reportSessionId !== null ? downloadReport : undefined} />
+              ) : (
+                <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
+                  onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
+                  isPending={matchMutation.isPending} />
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {sourcesOpen && (

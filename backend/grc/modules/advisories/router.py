@@ -316,19 +316,31 @@ async def upload_advisory(
 
     content = await file.read()
     stored_path = store_pdf(content)
-    extracted = extract_from_pdf(content, filename=file.filename or "")
 
-    # Classify the issuing region — an upload can be from any country. Stored in
-    # extraction_meta so grouping/filtering has it; no match → Unclassified and
-    # the operator picks it on the advisory.
-    region = classify_region(
-        title=extracted.get("title") or "", summary=extracted.get("summary") or "",
-        external_id=extracted.get("external_id") or "", filename=file.filename or "",
-        text=extracted.get("text_sample") or "",
-    )
-    if isinstance(extracted.get("extraction"), dict):
-        extracted["extraction"]["region"] = region.get("region")
-        extracted["extraction"]["region_confidence"] = region.get("confidence")
+    # The parser must never fail an upload. extract_from_pdf is built not to raise,
+    # but on ANY extraction/classification error we still file a minimal pending
+    # advisory (title from the filename, no CVEs) the operator can complete by
+    # hand — so an upload always lands and flows through the same region/year/month
+    # hierarchy as a synced one, never a 500.
+    try:
+        extracted = extract_from_pdf(content, filename=file.filename or "")
+        region = classify_region(
+            title=extracted.get("title") or "", summary=extracted.get("summary") or "",
+            external_id=extracted.get("external_id") or "", filename=file.filename or "",
+            text=extracted.get("text_sample") or "",
+        )
+        if isinstance(extracted.get("extraction"), dict):
+            extracted["extraction"]["region"] = region.get("region")
+            extracted["extraction"]["region_confidence"] = region.get("confidence")
+    except Exception:
+        logger.exception("advisory upload: extraction failed; filing a minimal pending advisory")
+        extracted = {
+            "title": os.path.splitext(file.filename or "")[0] or "Uploaded advisory",
+            "summary": None, "severity": None, "external_id": None,
+            "published_at": None, "cves": [], "ai_used": False,
+            "extraction": {"method": "failed", "confidence": "low", "stages": [],
+                           "warnings": ["Automatic parsing failed — review the PDF and add CVEs by hand."]},
+        }
 
     advisory = create_pending_advisory(
         db, tenant_id=tenant_id, extracted=extracted,
