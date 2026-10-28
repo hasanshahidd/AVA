@@ -435,12 +435,63 @@ def _ensure_agent_connection(db: Session, agent: ComplianceAgent, asset: ITAsset
     ))
 
 
+def _auto_cis_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
+    """Enrolment IS the trigger — the agent host shouldn't have to click 'Scan'.
+    On a fresh install's FIRST report we auto-run its CIS sweep in the background
+    (the collector connection + os_normalized are already in place by now, so the
+    scan dispatches to the agent). Fire-once is durable, not just in-memory: we
+    skip if ANY prior compliance run exists for this asset, and the per-asset scan
+    lock stops a concurrent re-fire mid-window (restart, re-report, heartbeat).
+    A later manual 'Scan' re-runs as normal. Never raises into the report path."""
+    import threading
+    import logging
+
+    def _worker():
+        from sqlalchemy.orm import sessionmaker
+        from grc.modules.compliance_plugins.router import (
+            _do_scan_all, _scan_lock_acquire, _scan_lock_release,
+        )
+        from grc.models._37_artifact_catalog_tenant_artifacts import CompliancePluginRun
+        Sess = sessionmaker(bind=tenant_engine, expire_on_commit=False)
+        wdb = Sess()
+        acquired = False
+        try:
+            asset = wdb.get(ITAsset, asset_id)
+            if asset is None or not asset.os_normalized:
+                return  # no OS benchmark key → the scan would run zero plugins
+            prior = (wdb.query(CompliancePluginRun.id)
+                     .filter(CompliancePluginRun.tenant_id == tenant_id,
+                             CompliancePluginRun.asset_id == asset_id).first())
+            if prior is not None:
+                return  # already scanned once (install run done, or a user run)
+            actor = (wdb.query(GRCUser)
+                     .filter(GRCUser.is_active.is_(True))
+                     .order_by(GRCUser.id).first())
+            if actor is None:
+                return
+            if not _scan_lock_acquire(tenant_id, asset_id):
+                return  # a scan is already running for this asset
+            acquired = True
+            _do_scan_all(wdb, tenant_id, asset_id, actor,
+                         benchmark=None, runner_type=None, connection_id=None)
+        except Exception:
+            logging.getLogger(__name__).exception("agent auto-CIS first scan failed (non-fatal)")
+        finally:
+            if acquired:
+                _scan_lock_release(tenant_id, asset_id)
+            wdb.close()
+
+    threading.Thread(target=_worker, daemon=True,
+                     name=f"agent-cis-autoscan-t{tenant_id}-a{asset_id}").start()
+
+
 @router.post("/report")
 def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=None),
                  db: Session = Depends(get_db)):
     """The agent POSTs its locally-collected inventory. Authed by the api_token."""
     agent = _agent_by_api_token(db, authorization)
     now = datetime.utcnow()
+    first_report = agent.last_result_at is None  # capture before we stamp it below
     asset_id = _upsert_asset_from_report(db, agent, body, now)
     agent.asset_id = asset_id
     _asset = db.get(ITAsset, asset_id)
@@ -474,6 +525,9 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
          .filter(IntegrationConnection.assigned_collector_agent_id == old.id)
          .update({"is_active": False, "status": "revoked"}, synchronize_session=False))
     db.commit()
+    # Fresh install → auto-run CIS once, no click needed (guards inside).
+    if first_report and asset_id:
+        _auto_cis_first_scan(db.get_bind(), agent.tenant_id, asset_id)
     return {"ok": True, "asset_id": asset_id}
 
 
