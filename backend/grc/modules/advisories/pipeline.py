@@ -23,15 +23,6 @@ from typing import Any, Dict, List
 
 from .models import Advisory
 
-_STAGE_LABELS = [
-    ("ingest", "Ingest"),
-    ("parse", "Parse"),
-    ("review", "Review"),
-    ("match", "Match"),
-    ("remediate", "Remediate"),
-]
-
-
 def _origin(a: Advisory) -> str:
     if a.raw_file_path:
         return "Document (PDF)"
@@ -52,9 +43,20 @@ def pipeline_view(a: Advisory) -> Dict[str, Any]:
     # non-zero universe/affected count is the signal (0/0 unevaluated reads pending).
     evaluated = a.status in ("resolved", "not_applicable") or total > 0 or affected > 0
 
+    is_doc = bool(a.raw_file_path)
+
     status: Dict[str, tuple] = {}
-    status["ingest"] = ("done", _origin(a))
-    status["parse"] = ("done", f"{cve_count} CVE(s)") if cve_count else ("current", "No CVEs extracted")
+    # A parsed document moves through Ingest→Parse (we read CVEs out of a PDF).
+    # A feed/manual advisory arrives with structured CVEs already — that is one
+    # step: "Synced" (API feed) or "Added" (manual), not ingest-then-parse.
+    if is_doc:
+        first_labels = [("ingest", "Ingest"), ("parse", "Parse")]
+        status["ingest"] = ("done", _origin(a))
+        status["parse"] = ("done", f"{cve_count} CVE(s)") if cve_count else ("current", "No CVEs extracted")
+    else:
+        key, label = ("synced", "Synced") if a.source_id else ("added", "Added")
+        first_labels = [(key, label)]
+        status[key] = ("done", f"{cve_count} CVE(s)" if cve_count else _origin(a))
 
     if pending_review:
         status["review"] = ("current", "Awaiting human confirmation")
@@ -77,9 +79,10 @@ def pipeline_view(a: Advisory) -> Dict[str, Any]:
     else:
         status["remediate"] = ("pending", "After match")
 
+    stage_labels = first_labels + [("review", "Review"), ("match", "Match"), ("remediate", "Remediate")]
     stages: List[Dict[str, str]] = [
         {"key": key, "label": label, "status": status[key][0], "detail": status[key][1]}
-        for key, label in _STAGE_LABELS
+        for key, label in stage_labels
     ]
     current = next((s["key"] for s in stages if s["status"] == "current"),
                    next((s["key"] for s in stages if s["status"] == "pending"), "remediate"))

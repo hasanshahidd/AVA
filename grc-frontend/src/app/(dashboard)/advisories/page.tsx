@@ -234,7 +234,8 @@ export default function AdvisoriesPage() {
         const sources = Object.keys(byRegion[region]).sort().map((source) => {
           const yearMap = byRegion[region][source];
           const years = Object.keys(yearMap)
-            .sort((a, b) => (a === 'Undated' ? 1 : b === 'Undated' ? -1 : b.localeCompare(a)))
+            // Oldest year first (2021 at the top), counting up; 'Undated' last.
+            .sort((a, b) => (a === 'Undated' ? 1 : b === 'Undated' ? -1 : a.localeCompare(b)))
             .map((year) => ({
               year,
               items: yearMap[year].slice().sort((a, b) =>
@@ -255,12 +256,18 @@ export default function AdvisoriesPage() {
     }
   }, [filtered, selectedId]);
 
-  // Collapse every source on first load so the list opens short (region → sources);
-  // the user expands a source to see its advisories. Keeps scrolling down.
+  // Collapse every source AND every year on first load so the list opens short:
+  // region → sources, each source → its years (with counts). The user opens a
+  // source, then a year, then its advisories — nothing is auto-expanded.
   useEffect(() => {
     if (!sourcesSeeded.current && advisories.length > 0) {
       const keys = new Set<string>();
-      for (const a of advisories) keys.add(srcKey(a.region || 'Other', sourceLabel(a)));
+      for (const a of advisories) {
+        const region = a.region || 'Other';
+        const source = sourceLabel(a);
+        keys.add(srcKey(region, source));
+        keys.add(yrKey(region, source, advYear(a)));
+      }
       setCollapsed(keys);
       sourcesSeeded.current = true;
     }
@@ -467,7 +474,6 @@ export default function AdvisoriesPage() {
                               <button onClick={() => toggleKey(key)} className="flex items-center gap-1.5 text-left">
                                 {srcCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                                 <span className="truncate text-xs font-semibold cw-text-default">{source}</span>
-                                <span className="text-[10px] cw-text-muted">{years.length} year{years.length === 1 ? '' : 's'}</span>
                               </button>
                             </td>
                             <td className="px-3 py-1.5 text-right text-[11px] cw-text-muted">{sItems.length}</td>

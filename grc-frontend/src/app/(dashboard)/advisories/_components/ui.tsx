@@ -383,6 +383,18 @@ function eventSummary(e: AdvisoryEventView): string {
   }
 }
 
+// The ingest event is recorded for every origin, but the word should match how
+// the advisory actually arrived: a feed is "Synced", not "Ingested".
+const INGEST_LABEL: Record<string, string> = {
+  upload: 'Uploaded', scrape: 'Ingested', api: 'Synced', manual: 'Added',
+};
+function eventLabel(e: AdvisoryEventView): string {
+  if (e.event === 'ingested') {
+    return INGEST_LABEL[str(e.detail?.origin) ?? ''] ?? 'Synced';
+  }
+  return EVENT_META[e.event]?.label ?? e.event;
+}
+
 // Absolute date + time with the year, so an event is never ambiguous.
 function formatWhen(at?: string | null): string {
   if (!at) return '';
@@ -393,47 +405,35 @@ function formatWhen(at?: string | null): string {
   });
 }
 
-// The advisory's event history as a clean Event | When | By table: ingested →
-// confirmed → re-checked, each with an absolute date and the actor.
+// The advisory's event history as a stack of cards (same card language as the
+// CVE cards): ingested → confirmed → re-checked, each with an absolute date and
+// the actor. Oldest first.
 export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
   if (!events || events.length === 0) return null;
   return (
-    <div className="cw-card overflow-hidden">
-      <div className="border-b border-[var(--color-border)] px-3 py-2.5">
-        <h2 className="text-sm font-semibold cw-text-default">Timeline</h2>
-        <p className="mt-0.5 text-[11px] cw-text-muted">Everything that has happened to this advisory, oldest first.</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
-              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Event</th>
-              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">When</th>
-              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => {
-              const m = EVENT_META[e.event] || { label: e.event, dot: 'bg-gray-400' };
-              const summary = eventSummary(e);
-              return (
-                <tr key={e.id} className="border-b border-[var(--color-border)] align-top last:border-0">
-                  <td className="px-3 py-1.5">
-                    <div className="flex items-start gap-2">
-                      <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${m.dot}`} />
-                      <div className="min-w-0">
-                        <p className="font-medium cw-text-default">{m.label}</p>
-                        {summary ? <p className="mt-0.5 text-[11px] cw-text-muted">{summary}</p> : null}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 cw-text-muted">{formatWhen(e.at) || '—'}</td>
-                  <td className="px-3 py-1.5 cw-text-muted">{e.actor || '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <div className="cw-card p-3">
+      <h2 className="text-sm font-semibold cw-text-default">Timeline</h2>
+      <p className="mt-0.5 text-[11px] cw-text-muted">Everything that has happened to this advisory, oldest first.</p>
+      <div className="mt-3 space-y-2">
+        {events.map((e) => {
+          const dot = EVENT_META[e.event]?.dot ?? 'bg-gray-400';
+          const summary = eventSummary(e);
+          return (
+            <div key={e.id} className="rounded-lg border border-[var(--color-border)] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold cw-text-default">{eventLabel(e)}</p>
+                    {summary ? <p className="mt-0.5 text-[11px] cw-text-muted">{summary}</p> : null}
+                  </div>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-[11px] cw-text-muted">{formatWhen(e.at) || '—'}</span>
+              </div>
+              {e.actor && <p className="mt-1.5 border-t border-[var(--color-border)] pt-1.5 text-[11px] cw-text-muted">by {e.actor}</p>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

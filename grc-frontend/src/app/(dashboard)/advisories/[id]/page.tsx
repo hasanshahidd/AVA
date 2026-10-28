@@ -30,6 +30,15 @@ interface EditableCve {
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 
+// What to call the "entered the system" date, by how the advisory arrived.
+// Feeds are synced, not ingested/parsed, so the KEV/RSS case reads "Synced".
+const ENTRY_LABEL: Record<string, string> = {
+  upload: 'Uploaded',
+  scrape: 'Ingested',
+  api: 'Synced',
+  manual: 'Added',
+};
+
 // Absolute date with year; '—' when absent.
 function fmtDate(at?: string | null): string {
   if (!at) return '—';
@@ -84,8 +93,14 @@ export default function AdvisoryDetailPage() {
 
   const [report, setReport] = useState<MatchReportData | null>(null);
   const [reportSessionId, setReportSessionId] = useState<number | null>(null);
+  // Pick specific CVEs to match, or match the whole advisory when none are picked.
+  const [selCve, setSelCve] = useState<Set<number>>(new Set());
+  const toggleCve = (cid: number) => setSelCve((p) => {
+    const n = new Set(p); if (n.has(cid)) n.delete(cid); else n.add(cid); return n;
+  });
   const matchMutation = useMutation({
-    mutationFn: () => advisoriesApi.match({ advisory_ids: [id], mode: 'all' }),
+    mutationFn: () => advisoriesApi.match(
+      selCve.size > 0 ? { cve_ids: Array.from(selCve), mode: 'all' } : { advisory_ids: [id], mode: 'all' }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['advisory', id] });
       queryClient.invalidateQueries({ queryKey: ['advisories'] });
@@ -175,10 +190,6 @@ export default function AdvisoryDetailPage() {
                 </a>
               )}
             </div>
-            <p className="mt-1.5 text-[11px] cw-text-muted">
-              {advisory.external_id || '—'}
-              {advisory.source_name ? ` · ${advisory.source_name}` : ''}
-            </p>
           </div>
         </div>
 
@@ -216,7 +227,7 @@ export default function AdvisoryDetailPage() {
               {([
                 ['Published', fmtDate(advisory.published_at)],
                 ['Last updated', fmtDate(advisory.updated_at)],
-                [advisory.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(advisory.created_at)],
+                [ENTRY_LABEL[advisory.origin ?? ''] ?? 'Synced', fmtDate(advisory.created_at)],
                 ['External ID', advisory.external_id || '—'],
                 ['Source', sourceLabel(advisory)],
                 ['Region', advisory.region || 'Unclassified'],
@@ -310,19 +321,32 @@ export default function AdvisoryDetailPage() {
               <div>
                 <h2 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h2>
                 <p className="mt-0.5 text-[11px] cw-text-muted">
-                  The CVEs this advisory warns about — each is tracked in your register and matched against your assets.
+                  The CVEs this advisory warns about — tick any to match just those, or run the match on all of them.
                 </p>
               </div>
               <button onClick={() => matchMutation.mutate()} disabled={matchMutation.isPending}
                 className="btn-primary flex shrink-0 items-center gap-2 text-sm">
-                {matchMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
+                {matchMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
+                {selCve.size > 0 ? `Match ${selCve.size} CVE${selCve.size === 1 ? '' : 's'}` : 'Run match'}
               </button>
             </div>
+            {(advisory.cves ?? []).length > 0 && (
+              <div className="mt-2 flex items-center gap-3 text-[11px] cw-text-muted">
+                <button onClick={() => setSelCve(new Set((advisory.cves ?? []).map((c) => c.id)))}
+                  className="hover:cw-text-default">Select all</button>
+                {selCve.size > 0 && (
+                  <button onClick={() => setSelCve(new Set())} className="hover:cw-text-default">Clear</button>
+                )}
+              </div>
+            )}
             <div className="mt-3 space-y-2">
               {(advisory.cves ?? []).length === 0 ? (
                 <p className="text-xs cw-text-muted">No CVEs on this advisory.</p>
               ) : (
-                (advisory.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)
+                (advisory.cves ?? []).map((cve) => (
+                  <VulnCard key={cve.id} cve={cve}
+                    selected={selCve.has(cve.id)} onToggleSelect={() => toggleCve(cve.id)} />
+                ))
               )}
             </div>
           </div>
