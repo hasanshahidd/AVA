@@ -237,8 +237,8 @@ export default function TicketDetail() {
       {/* Top property toolbar — the quick-edit dropdowns, one wrapping lane so an
           agent can set routing/triage without hunting the side rail. Each is wired
           to the same update/assign actions as before. */}
-      <div className="flex flex-nowrap items-start gap-x-3 overflow-x-auto border-b border-slate-200 bg-slate-50/60 px-6 py-2.5">
-        <div className="w-44 shrink-0">
+      <div className="flex items-start gap-x-3 border-b border-slate-200 bg-slate-50/60 px-6 py-2.5">
+        <div className="min-w-0 flex-1">
           <PropField label="Status">
             {statuses.length > 0 ? (
               <ComboBoxInput ariaLabel="Status" value={t.status || ""} allowCustom={false} placeholder="— Select —"
@@ -247,7 +247,7 @@ export default function TicketDetail() {
             ) : <Chip value={t.status} />}
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Priority">
             {priorities.length > 0 ? (
               <ComboBoxInput ariaLabel="Priority" value={t.priority || ""} allowCustom={false} placeholder="— Select —"
@@ -256,7 +256,7 @@ export default function TicketDetail() {
             ) : <Chip value={t.priority} map={PRIORITY_CHIP} />}
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Ticket type">
             {types.length > 0 ? (
               <ComboBoxInput ariaLabel="Ticket type" value={t.ticket_type || ""} allowCustom={false} placeholder="Unset"
@@ -265,7 +265,7 @@ export default function TicketDetail() {
             ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Department">
             <ComboBoxInput ariaLabel="Department" value={t.department_id ? String(t.department_id) : ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!departments.length} placeholder={departments.length ? "— Select —" : "No departments"}
@@ -273,7 +273,7 @@ export default function TicketDetail() {
               onChange={(v) => act("update", { department_id: v ? Number(v) : null }, "Department updated.")} />
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Team">
             <ComboBoxInput ariaLabel="Team" value={t.team || ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!teams.length} placeholder={teams.length ? "Unassigned" : "No teams"}
@@ -281,7 +281,7 @@ export default function TicketDetail() {
               onChange={(v) => assign(undefined, v || null)} />
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Assignee">
             <ComboBoxInput ariaLabel="Assignee" value={t.agent || ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!agents.length} placeholder="Unassigned"
@@ -289,7 +289,7 @@ export default function TicketDetail() {
               onChange={(v) => assign(v || null, undefined)} />
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Customer">
             <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
               disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
@@ -297,7 +297,7 @@ export default function TicketDetail() {
               onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
           </PropField>
         </div>
-        <div className="w-44 shrink-0">
+        <div className="min-w-0 flex-1">
           <PropField label="Contact">
             <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}

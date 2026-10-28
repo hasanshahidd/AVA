@@ -118,8 +118,10 @@ export function Table({ head, children }: { head: string[]; children: React.Reac
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <table className="w-full text-sm">
-        <thead className="bg-[#005B96] text-left text-xs uppercase tracking-wide text-white">
-          <tr>{head.map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr>
+        {/* !important beats the global `.governance-light thead th` rule
+            (bg var(--color-subtle), grey text) that otherwise greys this out. */}
+        <thead className="text-left text-xs uppercase tracking-wide">
+          <tr>{head.map((h) => <th key={h} className="!bg-[#005B96] px-4 py-2.5 !font-semibold !text-white">{h}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
       </table>
