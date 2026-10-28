@@ -260,7 +260,7 @@ export default function AdvisoriesPage() {
   const uploadedDocs = advisories.filter((a) => a.origin === 'upload');
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-hidden">
+    <div className="flex h-full flex-col gap-2 overflow-hidden">
       {/* Title lives in the global app bar (PAGE_TITLES['/advisories']); here we keep just the actions. */}
       <div className="flex justify-end gap-2">
         <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
@@ -289,33 +289,31 @@ export default function AdvisoriesPage() {
         ))}
       </div>
 
-      <div className="cw-card flex flex-wrap items-center gap-x-4 gap-y-2 p-3">
-        <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
-        <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
-        <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
-        <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
-        <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-        <span className="ml-auto text-xs cw-text-muted">showing {filtered.length} of {advisories.length}</span>
-      </div>
-
-      <div className="cw-card flex flex-wrap items-center gap-2 p-2.5">
+      <div className="cw-card flex flex-wrap items-center gap-x-3 gap-y-2 p-2.5">
         <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
           className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
           <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
         </button>
         {selCveTotal === 0 ? (
-          <span className="text-xs cw-text-muted">Tick advisories or CVEs on the left, then Match.</span>
+          <span className="text-xs cw-text-muted">Tick advisories/CVEs, then Match.</span>
         ) : (
           <span className="text-xs cw-text-default">
-            <span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
-            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected
+            <span className="font-semibold">{selAdv.size}</span> adv
+            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> CVE</> : null}
           </span>
         )}
         {(selAdv.size > 0 || selCve.size > 0) && (
           <button onClick={clearSel} className="text-xs text-[var(--color-primary)] hover:underline">Clear</button>
         )}
+        <div className="mx-1 hidden h-5 w-px bg-[var(--color-border)] lg:block" />
+        <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
+        <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+        <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
+        <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
+        <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
+        <span className="ml-auto text-xs cw-text-muted">{filtered.length}/{advisories.length}</span>
         <button onClick={() => setPanelMode('history')}
-          className="btn-secondary ml-auto flex items-center gap-1.5 text-sm">
+          className="btn-secondary flex items-center gap-1.5 text-sm">
           <History size={15} /> History
         </button>
       </div>
