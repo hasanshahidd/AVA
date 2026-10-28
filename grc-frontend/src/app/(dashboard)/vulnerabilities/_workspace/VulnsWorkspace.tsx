@@ -89,8 +89,6 @@ type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unas
 
 const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', color: INK, fontWeight: 700, padding: '10px 12px', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1 };
 const td: React.CSSProperties = { padding: '11px 12px', borderBottom: `1px solid ${BORDER2}`, verticalAlign: 'middle', whiteSpace: 'nowrap', fontSize: 12.5 };
-const cap: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, padding: '2px 6px 6px' };
-const railBtn = (active: boolean): React.CSSProperties => ({ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 10px', border: 0, borderRadius: 10, background: active ? ACSOFT : 'none', color: active ? '#0A5A4B' : SEC, fontSize: 12.5, fontWeight: active ? 600 : 500, textAlign: 'left', width: '100%', cursor: 'pointer' });
 const btn: React.CSSProperties = { border: `1px solid #E4E8EC`, background: '#fff', color: SEC, borderRadius: 9, padding: '7px 12px', fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' };
 const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 };
 const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999, whiteSpace: 'nowrap', color: c, background: bg });
@@ -323,52 +321,38 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
             </div>
           </section>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '224px minmax(0,1fr)', gap: 14, alignItems: 'stretch', position: 'sticky', top: 0, height: '100%', flexShrink: 0, overflow: 'hidden' }}>
-            {/* triage rail */}
-            <aside style={{ display: 'flex', flexDirection: 'column', gap: 3, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(16,24,40,.04)', padding: '9px 9px', minHeight: 0, overflowY: 'auto' }}>
-              <div style={cap}>Triage views</div>
-              {RAIL.map((r) => (
-                <button key={r.key} onClick={() => { setView(r.key); setPane('reg'); }} style={railBtn(view === r.key)}>
-                  <span style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: '0 3px 3px 0', background: AC, opacity: view === r.key ? 1 : 0 }} />
-                  {r.dot && <span style={{ width: 9, height: 9, borderRadius: '50%', background: r.dot, flex: 'none' }} />}
-                  {r.label}<span className="num" style={{ marginLeft: 'auto', fontSize: 11.5, color: '#9BA6B2' }}>{r.n}</span>
-                </button>
-              ))}
-              <div style={{ ...cap, paddingTop: 14 }}>By severity</div>
-              {SEV_RAIL.map((r) => (
-                <button key={r.key} onClick={() => { setView(r.key); setPane('reg'); }} style={railBtn(view === r.key)}>
-                  <span style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: '0 3px 3px 0', background: AC, opacity: view === r.key ? 1 : 0 }} />
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: r.sw, flex: 'none' }} />{r.label}<span className="num" style={{ marginLeft: 'auto', fontSize: 11.5, color: '#9BA6B2' }}>{r.n}</span>
-                </button>
-              ))}
-              {DOM_RAIL.length > 0 && <div style={{ ...cap, paddingTop: 14 }}>By domain</div>}
-              {DOM_RAIL.map((r) => (
-                <button key={r.key} onClick={() => { setView(r.key); setPane('reg'); }} style={railBtn(view === r.key)}>
-                  <span style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: '0 3px 3px 0', background: AC, opacity: view === r.key ? 1 : 0 }} />
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: r.sw, flex: 'none' }} />{r.label}<span className="num" style={{ marginLeft: 'auto', fontSize: 11.5, color: '#9BA6B2' }}>{r.n}</span>
-                </button>
-              ))}
-              {/* Departments / SLA — the mock keeps these in the rail; they open the
-                  existing standalone management views. (The old "Overview" link was
-                  removed: the Overview pane above is now the analytics surface.) */}
-              <div style={{ height: 1, background: '#F0F3F5', margin: '10px 4px 6px' }} />
-              <Link href="/vulnerabilities/departments" style={{ ...railBtn(false), textDecoration: 'none' }}><Building2 size={15} color="#5B6673" />Departments</Link>
-              <Link href="/vulnerabilities/sla" style={{ ...railBtn(false), textDecoration: 'none' }}><Clock size={15} color="#5B6673" />SLA config</Link>
-            </aside>
-
-            {/* main */}
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {/* Full width — the left triage rail was cut; its Triage views / By severity / By domain
+              filters now live in the single top-bar <select> below (same `view` state). */}
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', flexShrink: 0, overflow: 'hidden' }}>
+            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
                   <Search size={16} style={{ position: 'absolute', left: 11, top: 10, color: FAINT }} />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by title, CVE ID…" style={{ width: '100%', height: 34, border: `1px solid #E4E8EC`, borderRadius: 9, padding: '0 12px 0 34px', fontSize: 12.5, color: SEC, background: '#fff' }} />
                 </div>
+                {/* triage/severity/domain filter — the old left rail, collapsed into one control */}
+                <select value={view} onChange={(e) => { setView(e.target.value as TriageView); setPane('reg'); }} style={{ ...btn, height: 34, cursor: 'pointer', maxWidth: 240 }} title="Filter — triage view, severity or domain (was the left rail)">
+                  <optgroup label="Triage views">
+                    {RAIL.map((r) => <option key={r.key} value={r.key}>{r.label} ({r.n})</option>)}
+                  </optgroup>
+                  <optgroup label="By severity">
+                    {SEV_RAIL.map((r) => <option key={r.key} value={r.key}>{r.label} ({r.n})</option>)}
+                  </optgroup>
+                  {DOM_RAIL.length > 0 && (
+                    <optgroup label="By domain">
+                      {DOM_RAIL.map((r) => <option key={r.key} value={r.key}>{r.label} ({r.n})</option>)}
+                    </optgroup>
+                  )}
+                </select>
                 <select value={scanMode} onChange={(e) => setScanMode(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }} title="Filter by scan provenance">
                   <option value="all">Scan: All</option><option value="credentialed">Authenticated</option><option value="surface">Surface / Unauth</option>
                 </select>
                 <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ ...btn, height: 34, cursor: 'pointer' }}>
                   <option value="ctx">Sort: Contextual priority</option><option value="cvss">Sort: CVSS</option><option value="epss">Sort: EPSS</option>
                 </select>
+                {/* Departments / SLA — were in the cut rail; kept here as compact links so the views stay reachable. */}
+                <Link href="/vulnerabilities/departments" style={{ ...btn, height: 34, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Departments"><Building2 size={14} color="#5B6673" />Departments</Link>
+                <Link href="/vulnerabilities/sla" style={{ ...btn, height: 34, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="SLA config"><Clock size={14} color="#5B6673" />SLA</Link>
                 {onBulkCreateTickets && rows.length > 0 && (
                   <button
                     style={{ ...btnGreen, height: 34 }}
