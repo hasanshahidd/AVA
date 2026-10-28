@@ -277,7 +277,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   // dropdowns don't render under the .inv2 zoom:0.8 on Chrome). Single-select per group, cleared
   // by re-clicking the active option; AND-combined across groups; filtering applies live.
   const grpWrap: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8 };
-  const grpTitle = (t: string) => <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: INK, margin: '16px 0 8px' }}>{t}</div>;
+  const grpTitle = (t: string) => <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#000', margin: '16px 0 8px' }}>{t}</div>;
   const optPill = (key: string, active: boolean, label: string, n: number | undefined, onClick: () => void) => (
     <button key={key} type="button" role="checkbox" aria-checked={active} onClick={onClick}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', border: `1px solid ${active ? AC : '#E4E8EC'}`, background: active ? AC : '#fff', color: active ? '#fff' : SEC, borderRadius: 999, fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer', textTransform: 'capitalize' }}>
