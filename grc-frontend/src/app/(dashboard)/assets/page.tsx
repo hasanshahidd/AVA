@@ -28,6 +28,8 @@ import {
   ShieldCheck,
   Download,
   Plus,
+  LayoutDashboard,
+  Boxes,
 } from 'lucide-react';
 // CIS Benchmark now lives as a tab inside IT Asset Inventory (merged from the
 // former standalone /compliance-overview page). Render just the overview body —
@@ -364,27 +366,29 @@ export default function AssetsPage() {
               Authoritative ownership, valuation &amp; assurance coverage · {(assets as ITAsset[] | undefined)?.length ?? 0} assets
             </div>
           </div>
-          {/* Toolbar actions collapsed into a single ⋯ menu (owner request). */}
+          {/* View switch (Overview / Inventory / CIS) + Add/Import folded into one
+              labeled top-right menu (owner request — "a clickable word" box). */}
           <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
-            <RowActionsMenu actions={[
-              { key: 'add', label: 'Add asset', icon: Plus, onClick: () => setIsModalOpen(true), hidden: !canCreate },
-              { key: 'import', label: 'Import assets', icon: Upload, onClick: () => setIsImportModalOpen(true), hidden: !canCreate },
-            ]} />
+            <RowActionsMenu
+              label={activeView === 'overview' ? 'Overview' : activeView === 'cis' ? 'CIS Benchmark' : 'Inventory'}
+              actions={[
+                { key: 'overview', label: 'Overview', icon: LayoutDashboard, onClick: () => switchView('overview'), active: activeView === 'overview' },
+                { key: 'inventory', label: 'Inventory', icon: Boxes, onClick: () => switchView('inventory'), active: activeView === 'inventory' },
+                { key: 'cis', label: 'CIS Benchmark', icon: ShieldCheck, onClick: () => switchView('cis'), active: activeView === 'cis' },
+                { key: 'add', label: 'Add asset', icon: Plus, onClick: () => setIsModalOpen(true), hidden: !canCreate },
+                { key: 'import', label: 'Import assets', icon: Upload, onClick: () => setIsImportModalOpen(true), hidden: !canCreate },
+              ]}
+            />
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
-          <div className="segwrap">
-            <button type="button" className={activeView === 'overview' ? 'seg on' : 'seg'} onClick={() => switchView('overview')}>Overview</button>
-            <button type="button" className={activeView === 'inventory' ? 'seg on' : 'seg'} onClick={() => switchView('inventory')}>Inventory</button>
-            <button type="button" className={activeView === 'cis' ? 'seg on' : 'seg'} onClick={() => switchView('cis')}>CIS Benchmark</button>
-          </div>
-          {activeView === 'cis' && (
+        {activeView === 'cis' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
             <div className="segwrap">
               <button type="button" className={cisView === 'dashboard' ? 'seg on' : 'seg'} onClick={() => setCisView('dashboard')}>Dashboard</button>
               <button type="button" className={cisView === 'hierarchy' ? 'seg on' : 'seg'} onClick={() => setCisView('hierarchy')}>Benchmark Hierarchy</button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {activeView === 'overview' ? (

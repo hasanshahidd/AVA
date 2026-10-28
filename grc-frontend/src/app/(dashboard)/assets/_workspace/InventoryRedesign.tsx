@@ -42,6 +42,33 @@ const hasCia = (a: ITAsset) => !!(a.confidentiality_rating && a.integrity_rating
 const isStale = (a: ITAsset) => (a.last_seen_at ? (Date.now() - new Date(a.last_seen_at).getTime()) / 864e5 > 30 : false);
 const critOf = (a: ITAsset) => (a.criticality || '').toLowerCase();
 const typeKey = (a: ITAsset) => (a.asset_type || '').toLowerCase().replace(/[ _-]/g, '');
+// Lane-aware type — the stored asset_type is unreliable (web domains saved as
+// "infrastructure"), so derive the scan-lane from real signals instead. Lanes
+// mirror the New-scan modal: External/Web · Host · Database · Active Directory ·
+// Cloud · Code/Repo · Container.
+const REPO_RE = /(github\.com|gitlab\.com|bitbucket\.org)|\.git(\/|$)/i;
+const IP_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+const DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+const laneOf = (a: ITAsset): string => {
+  const t = (a.asset_type || '').toLowerCase();
+  const name = a.name || ''; const host = a.host_name || '';
+  const ports = a.open_ports || [];
+  if (t === 'repository' || REPO_RE.test(name) || REPO_RE.test(host)) return 'repo';
+  if (t === 'container' || t === 'kubernetes' || t === 'k8s') return 'container';
+  if (t === 'cloud') return 'cloud';
+  if (t === 'database' || ports.some((p) => [1433, 1521, 3306, 5432, 6379, 27017].includes(p))) return 'database';
+  if (ports.some((p) => [88, 389, 636].includes(p))) return 'ad';
+  if (t === 'web' || a.scan_mode === 'easm' || (!!a.internet_facing && DOMAIN_RE.test(name) && !IP_RE.test(name))) return 'web';
+  return 'host';
+};
+const LANE_LABEL: Record<string, string> = { web: 'External / Web', host: 'Host', database: 'Database', ad: 'Active Directory', cloud: 'Cloud', repo: 'Code / Repo', container: 'Container / K8s' };
+const laneLabel = (a: ITAsset): string => {
+  const l = laneOf(a);
+  if (l !== 'host') return LANE_LABEL[l];
+  if (a.origin_source === 'agent') return 'Host · Windows';
+  if (a.platform_kind === 'server') return 'Host · Server';
+  return 'Host';
+};
 const canConnect = (a: ITAsset) => !!a.host_name && a.discovery_state !== 'unmanaged';
 // 3-mode inventory bucket (pentest discovery contract): EASM (domain/website from
 // EASM), Uncredential (credential-free network sweep), Credential (full depth —
@@ -90,7 +117,7 @@ const HEADS: { key: string; label: string; sortable: boolean }[] = [
 ];
 const SORTERS: Record<string, (a: ITAsset, b: ITAsset) => number> = {
   name: (a, b) => (a.name || '').localeCompare(b.name || ''),
-  type: (a, b) => typeKey(a).localeCompare(typeKey(b)),
+  type: (a, b) => laneLabel(a).localeCompare(laneLabel(b)),
   owner: (a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''),
   department: (a, b) => (a.department || '').localeCompare(b.department || ''),
   dataclass: (a, b) => (a.data_classification || '').localeCompare(b.data_classification || ''),
@@ -121,7 +148,7 @@ export default function InventoryRedesign(p: Props) {
   // control (was one lumped "Views" select). fFlag is single-select across the
   // non-column flags. shortcut: one flag at a time; add per-flag toggles if a
   // user needs e.g. Internet AND PCI together.
-  const [fType, setFType] = useState(['application', 'infrastructure', 'data', 'cloud', 'thirdparty', 'repository'].includes(initialView) ? initialView : '');
+  const [fType, setFType] = useState(['web', 'host', 'database', 'ad', 'cloud', 'repo', 'container'].includes(initialView) ? initialView : '');
   const [fCrit, setFCrit] = useState(['critical', 'high', 'medium', 'low'].includes(initialView) ? initialView : '');
   const [fStatus, setFStatus] = useState('');
   const [fFlag, setFFlag] = useState(['internet', 'cde', 'unowned', 'needcia', 'stale', 'vulns'].includes(initialView) ? initialView : '');
@@ -168,6 +195,7 @@ export default function InventoryRedesign(p: Props) {
       uncredN: logical.filter((a) => modeOf(a) === 'uncredential').length,
       agentN: logical.filter(agentManaged).length,
       byType: (k: string) => logical.filter((a) => typeKey(a) === k).length,
+      byLane: (k: string) => logical.filter((a) => laneOf(a) === k).length,
       mix: { critical: logical.filter((a) => critOf(a) === 'critical').length, high: logical.filter((a) => critOf(a) === 'high').length, medium: logical.filter((a) => critOf(a) === 'medium').length, low: logical.filter((a) => critOf(a) === 'low').length },
     };
   }, [assets]);
@@ -184,7 +212,7 @@ export default function InventoryRedesign(p: Props) {
   const rows = useMemo(() => {
     const r = assets.filter((a) =>
       (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
-      (!fType || typeKey(a) === fType) &&
+      (!fType || laneOf(a) === fType) &&
       (!fCrit || critOf(a) === fCrit) &&
       (!fStatus || (a.status || '').toLowerCase() === fStatus) &&
       (mode === 'all' ? true : mode === 'agent' ? agentManaged(a) : modeOf(a) === mode) &&
@@ -309,14 +337,15 @@ export default function InventoryRedesign(p: Props) {
             {/* One named control per filter dimension — no lumped "Views" grab-bag.
                 Column-backed filters (Type/Criticality/Status) sit beside the
                 non-column ones (Scan posture, and the Internet/PCI flag chips). */}
-            <select className="sel" value={fType} onChange={(e) => { setFType(e.target.value); setTab('reg'); }} title="Filter by asset type">
+            <select className="sel" value={fType} onChange={(e) => { setFType(e.target.value); setTab('reg'); }} title="Filter by type (scan lane)">
               <option value="">All types ({c.total})</option>
-              <option value="application">Applications ({c.byType('application')})</option>
-              <option value="infrastructure">Infrastructure ({c.byType('infrastructure')})</option>
-              <option value="data">Data ({c.byType('data')})</option>
-              <option value="cloud">Cloud ({c.byType('cloud')})</option>
-              <option value="thirdparty">Third-party ({c.byType('thirdparty')})</option>
-              <option value="repository">Code / Repository ({c.byType('repository')})</option>
+              <option value="web">External / Web ({c.byLane('web')})</option>
+              <option value="host">Host ({c.byLane('host')})</option>
+              <option value="database">Database ({c.byLane('database')})</option>
+              <option value="ad">Active Directory ({c.byLane('ad')})</option>
+              <option value="cloud">Cloud ({c.byLane('cloud')})</option>
+              <option value="repo">Code / Repo ({c.byLane('repo')})</option>
+              <option value="container">Container / K8s ({c.byLane('container')})</option>
             </select>
             <select className="sel" value={fCrit} onChange={(e) => { setFCrit(e.target.value); setTab('reg'); }} title="Filter by criticality">
               <option value="">All criticality</option>
@@ -422,7 +451,7 @@ export default function InventoryRedesign(p: Props) {
                               </div>
                             </div>
                           </td>
-                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={(a.asset_type || '').replace(/_/g, ' ')}>{(a.asset_type || '').replace(/_/g, ' ') || '—'}</td>
+                          <td style={{ ...td, ...clip }} title={laneLabel(a)}>{laneLabel(a)}</td>
                           <td style={{ ...td, ...clip }} title={a.owner_name || ''}>{a.owner_name ? a.owner_name : <span style={{ color: '#A32B2B', fontWeight: 600 }}>Unassigned</span>}</td>
                           <td style={{ ...td, ...clip }} title={a.department || ''}>{a.department || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
                           <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={a.data_classification || ''}>{a.data_classification || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
