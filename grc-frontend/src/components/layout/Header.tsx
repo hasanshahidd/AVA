@@ -13,6 +13,47 @@ const navIconProps = {
   strokeWidth: 1.5,
 };
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// The advisory detail's place in the hierarchy, shown in the global bar:
+// Advisories / Region / Source / Year / Month. Reads the same advisory the detail
+// page fetched (shared query cache), so it is instant and never blocks the page.
+function AdvisoryBreadcrumb({ id }: { id: string }) {
+  const { data } = useQuery({
+    queryKey: ['advisory', Number(id)],
+    queryFn: () => apiClient.get(`/advisories/${id}`).then((r) => r.data),
+    enabled: !!id,
+  });
+  const a = data as {
+    region?: string; origin?: string; source_name?: string;
+    external_id?: string; published_at?: string; created_at?: string;
+  } | undefined;
+  const crumbs: string[] = [];
+  if (a) {
+    if (a.region && a.region !== 'Unclassified') crumbs.push(a.region);
+    const issuer = a.origin === 'upload'
+      ? ((a.external_id || '').replace(/\d.*$/, '').replace(/[-_.:\s]+$/, '').trim()
+         || a.external_id || 'Uploaded document')
+      : a.source_name;
+    if (issuer) crumbs.push(issuer);
+    const d = a.published_at || a.created_at;
+    const dt = d ? new Date(d) : null;
+    if (dt && !isNaN(dt.getTime())) { crumbs.push(String(dt.getFullYear())); crumbs.push(MONTHS[dt.getMonth()]); }
+  }
+  return (
+    <div className="flex items-center gap-1.5 min-w-0 text-sm leading-none">
+      <Link href="/advisories" className="font-medium text-[var(--color-muted)] truncate">Advisories</Link>
+      {crumbs.map((c, i) => (
+        <span key={i} className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[var(--color-muted)]">/</span>
+          <span className={`truncate ${i === crumbs.length - 1 ? 'font-semibold text-[var(--color-text)]' : 'font-medium text-[var(--color-muted)]'}`}>{c}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string; section?: string }> = {
   '/vulnerabilities': { title: 'Vulnerability Register', subtitle: 'Track, manage, and remediate security vulnerabilities across your organization', section: 'Cybersecurity Assurance' },
   '/vulnerabilities/dashboard': { title: 'Vulnerability Dashboard', subtitle: 'Real-time security posture' },
@@ -215,6 +256,21 @@ export default function Header() {
                 {crumb && <><span className="text-[var(--color-muted)]">/</span><span className="font-semibold text-[var(--color-text)] truncate">{crumb}</span></>}
               </div>
             );
+          }
+          // Match history full page — breadcrumb instead of an empty bar.
+          if (!info && (pathname ?? '') === '/advisories/history') {
+            return (
+              <div className="flex items-center gap-1.5 min-w-0 text-sm leading-none">
+                <Link href="/advisories" className="font-medium text-[var(--color-muted)] truncate">Advisories</Link>
+                <span className="text-[var(--color-muted)]">/</span>
+                <span className="font-semibold text-[var(--color-text)] truncate">Match history</span>
+              </div>
+            );
+          }
+          // Advisory detail (/advisories/<id>): show the hierarchy path the list
+          // uses — Advisories / Region / Source / Year / Month — in the global bar.
+          if (!info && /^\/advisories\/\d+$/.test(pathname ?? '')) {
+            return <AdvisoryBreadcrumb id={(pathname ?? '').split('/').pop() as string} />;
           }
           if (!info) return null;
           // Pages that render their own big heading in the body (redesign kit)

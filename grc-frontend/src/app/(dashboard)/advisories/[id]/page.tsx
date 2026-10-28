@@ -205,11 +205,13 @@ export default function AdvisoryDetailPage() {
         {!isPending && (
           <>
             {/* Metadata as compact cards (dashboard/inventory style), not a table. */}
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {([
                 ['Published', fmtDate(advisory.published_at)],
-                ['Updated', fmtDate(advisory.updated_at)],
-                [ENTRY_LABEL[advisory.origin ?? ''] ?? 'Synced', fmtDate(advisory.created_at)],
+                // Updated == Synced for a feed, so show one date: "Last synced".
+                [ENTRY_LABEL[advisory.origin ?? ''] ?? 'Last synced',
+                  fmtDate(advisory.origin === 'upload' || advisory.origin === 'manual'
+                    ? advisory.created_at : advisory.updated_at)],
                 ['CVEs', String(advisory.cve_count)],
                 ['Assets affected', `${advisory.asset_affected_count} / ${advisory.asset_total_count}`],
                 ['Source', sourceLabel(advisory)],

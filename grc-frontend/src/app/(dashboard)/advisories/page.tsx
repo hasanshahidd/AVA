@@ -12,7 +12,7 @@ import {
 import {
   AdvisoryView, AdvisoryListResponse, MatchReportData, MatchTarget,
   SeverityBadge, StatusBadge, RichText, VulnCard, RegionPicker,
-  MatchPanel, MatchReport, MatchHistory, HistoryTimeline, FlowStrip,
+  MatchPanel, MatchReport, HistoryTimeline, FlowStrip,
 } from './_components/ui';
 
 interface AdvisorySource {
@@ -114,7 +114,7 @@ export default function AdvisoriesPage() {
   // Match selection + right-panel mode (detail | match | report | history).
   const [selAdv, setSelAdv] = useState<Set<number>>(new Set());
   const [selCve, setSelCve] = useState<Set<number>>(new Set());
-  const [panelMode, setPanelMode] = useState<'detail' | 'match' | 'report' | 'history'>('detail');
+  const [panelMode, setPanelMode] = useState<'detail' | 'match' | 'report'>('detail');
   const [report, setReport] = useState<MatchReportData | null>(null);
   const [reportTitle, setReportTitle] = useState<string>('Match report');
   const [reportSessionId, setReportSessionId] = useState<number | null>(null);
@@ -317,15 +317,6 @@ export default function AdvisoriesPage() {
     () => advisories.filter((a) => selAdv.has(a.id)).reduce((n, a) => n + (a.cve_count || 0), 0) + selCve.size,
     [advisories, selAdv, selCve]);
 
-  const openSession = async (id: number) => {
-    try {
-      const res = await advisoriesApi.getMatchSession(id);
-      setReport(res.data.report as MatchReportData);
-      setReportSessionId(id);
-      setReportTitle(res.data.label || `Match #${id}`);
-      setPanelMode('report');
-    } catch { /* ignore */ }
-  };
   const downloadReport = async (fmt: 'csv' | 'json') => {
     if (reportSessionId === null) return;
     try {
@@ -389,7 +380,7 @@ export default function AdvisoriesPage() {
       </div>
 
       <div className="cw-card p-3">
-        <div className="flex flex-nowrap items-end gap-x-3 overflow-x-auto">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
           <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
             className="btn-primary mb-0.5 flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
             <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
@@ -401,7 +392,7 @@ export default function AdvisoriesPage() {
               <button onClick={clearSel} className="font-medium text-[var(--color-primary)] hover:underline">Clear</button>
             </span>
           )}
-          <div className="flex flex-1 flex-nowrap items-end gap-x-3">
+          <div className="flex flex-1 flex-wrap items-end gap-x-3 gap-y-2">
             <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
             <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
             <FilterSelect label="Year" value={fYear} options={yearOptions} onChange={setFYear} />
@@ -409,8 +400,8 @@ export default function AdvisoriesPage() {
             <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
             <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
           </div>
-          <button onClick={() => setPanelMode('history')}
-            className="btn-secondary mb-0.5 flex shrink-0 items-center gap-1.5 text-sm">
+          <button onClick={() => router.push('/advisories/history')}
+            className="btn-primary mb-0.5 flex shrink-0 items-center gap-1.5 text-sm">
             <History size={15} /> History
           </button>
         </div>
@@ -554,21 +545,17 @@ export default function AdvisoriesPage() {
       </div>
 
       {/* Match flow as a modal: pick scope, Run, then the rich results — the list
-          stays behind, blurred. Opened by the Match / History buttons. */}
+          stays behind, blurred. History has its own full page (/advisories/history). */}
       {panelMode !== 'detail' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPanelMode('detail')} />
           <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-[var(--color-surface)] shadow-xl">
             <div className="flex items-center justify-between bg-[var(--color-primary)] px-5 py-4 text-white">
-              <h2 className="text-base font-bold">
-                {panelMode === 'history' ? 'Match history' : panelMode === 'report' ? 'Match results' : 'Run match'}
-              </h2>
+              <h2 className="text-base font-bold">{panelMode === 'report' ? 'Match results' : 'Run match'}</h2>
               <button onClick={() => setPanelMode('detail')} className="rounded p-1 hover:bg-white/20"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
-              {panelMode === 'history' ? (
-                <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
-              ) : panelMode === 'report' && report ? (
+              {panelMode === 'report' && report ? (
                 <MatchReport report={report} title={reportTitle}
                   onBack={() => setPanelMode('detail')}
                   onDownload={reportSessionId !== null ? downloadReport : undefined} />
