@@ -69,8 +69,38 @@ const CRIT_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, lo
 // Uniform pill — nowrap + flex:none so a row's tag line never wraps and every
 // row stays the same height (was: verbose tags wrapping unevenly).
 const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', flex: 'none' });
-const td: React.CSSProperties = { padding: '11px 12px', borderBottom: '1px solid #F0F3F5', color: '#3A4653' };
-const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', borderBottom: '1px solid #E8ECEE', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: '#0F1F2B', fontWeight: 700, position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1, whiteSpace: 'nowrap' };
+const td: React.CSSProperties = { padding: '9px 10px', borderBottom: '1px solid #F0F3F5', color: '#3A4653' };
+// Prominent header bar — brand blue, bold white (owner ask). Sticky over the body.
+const th: React.CSSProperties = { textAlign: 'left', padding: '9px 10px', borderBottom: '1px solid #0A4C84', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#fff', fontWeight: 700, position: 'sticky', top: 0, background: '#005B96', zIndex: 1, whiteSpace: 'nowrap' };
+// Clamp wide free-text cells so all columns fit one view without a right-scroll.
+const clip: React.CSSProperties = { maxWidth: 128, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+// Sortable columns — click a header to sort by it (replaces the old Sort select).
+const HEADS: { key: string; label: string; sortable: boolean }[] = [
+  { key: 'name', label: 'Asset', sortable: true },
+  { key: 'type', label: 'Type', sortable: true },
+  { key: 'owner', label: 'Owner', sortable: true },
+  { key: 'department', label: 'Department', sortable: true },
+  { key: 'dataclass', label: 'Data Class', sortable: true },
+  { key: 'bizfn', label: 'Business Function', sortable: true },
+  { key: 'crit', label: 'Criticality', sortable: true },
+  { key: 'cia', label: 'CIA', sortable: false },
+  { key: 'scan', label: 'Last scan', sortable: true },
+  { key: 'value', label: 'Value', sortable: true },
+  { key: 'status', label: 'Status', sortable: true },
+];
+const SORTERS: Record<string, (a: ITAsset, b: ITAsset) => number> = {
+  name: (a, b) => (a.name || '').localeCompare(b.name || ''),
+  type: (a, b) => typeKey(a).localeCompare(typeKey(b)),
+  owner: (a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''),
+  department: (a, b) => (a.department || '').localeCompare(b.department || ''),
+  dataclass: (a, b) => (a.data_classification || '').localeCompare(b.data_classification || ''),
+  bizfn: (a, b) => (a.business_function || '').localeCompare(b.business_function || ''),
+  crit: (a, b) => (CRIT_ORDER[critOf(a)] || 0) - (CRIT_ORDER[critOf(b)] || 0),
+  scan: (a, b) => new Date(a.last_seen_at || 0).getTime() - new Date(b.last_seen_at || 0).getTime(),
+  value: (a, b) => (a.valuation || a.purchase_cost || 0) - (b.valuation || b.purchase_cost || 0),
+  status: (a, b) => (a.status || '').localeCompare(b.status || ''),
+};
+const TEXT_SORTS = new Set(['name', 'type', 'owner', 'department', 'dataclass', 'bizfn', 'status']);
 
 // ── EASM subdomain roll-up ──────────────────────────────────────────────────
 // registrableDomain (apex) is the full Public Suffix List, imported from @/lib/domains.
@@ -81,19 +111,24 @@ export default function InventoryRedesign(p: Props) {
   const assets = p.assets || [];
   // ?view=external|internal|unowned|stale… and ?scan_depth=surface|credentialed — deep links land pre-filtered.
   const sp = useSearchParams();
-  const initialView = sp?.get('view');
-  const initialMode = sp?.get('scan_mode');
-  const [view, setView] = useState(initialView || 'all');
+  const initialView = sp?.get('view') || '';
+  const initialMode = sp?.get('scan_mode') || '';
   const [tab, setTab] = useState<'reg' | 'ins'>('reg');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('crit');
-  // 3-mode toggle — EASM / Credential / Uncredential (scan_mode from the discovery
-  // backend; null folds into Credential via modeOf). Default Credential (the
-  // full-depth bucket, incl. manual/import).
-  const [mode, setMode] = useState<'all' | 'easm' | 'credential' | 'uncredential' | 'agent' | 'pci'>(() => {
-    const m = initialMode || '';
-    return m === 'easm' || m === 'credential' || m === 'uncredential' || m === 'agent' || m === 'pci' ? m : 'all';
-  });
+  const [dir, setDir] = useState<1 | -1>(-1); // -1 = desc (critical / newest / highest first)
+  // Independent filter axes, AND-combined — each its own clearly-labeled top-bar
+  // control (was one lumped "Views" select). fFlag is single-select across the
+  // non-column flags. shortcut: one flag at a time; add per-flag toggles if a
+  // user needs e.g. Internet AND PCI together.
+  const [fType, setFType] = useState(['application', 'infrastructure', 'data', 'cloud', 'thirdparty', 'repository'].includes(initialView) ? initialView : '');
+  const [fCrit, setFCrit] = useState(['critical', 'high', 'medium', 'low'].includes(initialView) ? initialView : '');
+  const [fStatus, setFStatus] = useState('');
+  const [fFlag, setFFlag] = useState(['internet', 'cde', 'unowned', 'needcia', 'stale', 'vulns'].includes(initialView) ? initialView : '');
+  // Scan-posture axis — EASM / Credentialed / Agentless / Agent (scan_mode from
+  // the discovery backend; null folds into Credential via modeOf).
+  const [mode, setMode] = useState<'all' | 'easm' | 'credential' | 'uncredential' | 'agent'>(
+    ['easm', 'credential', 'uncredential', 'agent'].includes(initialMode) ? (initialMode as any) : 'all');
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [openApex, setOpenApex] = useState<Set<string>>(new Set());
 
@@ -137,32 +172,29 @@ export default function InventoryRedesign(p: Props) {
     };
   }, [assets]);
 
-  const match = (a: ITAsset) => {
-    switch (view) {
-      case 'all': return true;
-      case 'critical': return critOf(a) === 'critical';
-      case 'needcia': return !hasCia(a);
-      case 'unowned': return !a.owner_name;
-      case 'stale': return isStale(a);
-      case 'internet': return !!a.internet_facing;
-      case 'cde': return !!a.cde_environment;
-      case 'internal': return !isExt(a);
-      case 'external': return isExt(a);
-      default: return typeKey(a) === view;
-    }
-  };
+  const flagOk = (a: ITAsset) =>
+    !fFlag
+    || (fFlag === 'internet' ? !!a.internet_facing
+      : fFlag === 'cde' ? !!a.cde_environment
+      : fFlag === 'unowned' ? !a.owner_name
+      : fFlag === 'needcia' ? !hasCia(a)
+      : fFlag === 'stale' ? isStale(a)
+      : fFlag === 'vulns' ? (a.open_findings ?? 0) > 0
+      : true);
   const rows = useMemo(() => {
     const r = assets.filter((a) =>
-      match(a) &&
       (!q || (a.name || '').toLowerCase().includes(q.toLowerCase())) &&
-      (mode === 'all' ? true : mode === 'pci' ? !!a.cde_environment : mode === 'agent' ? agentManaged(a) : modeOf(a) === mode));
-    const s = [...r];
-    if (sort === 'crit') s.sort((a, b) => (CRIT_ORDER[critOf(b)] || 0) - (CRIT_ORDER[critOf(a)] || 0));
-    else if (sort === 'scan') s.sort((a, b) => new Date(b.last_seen_at || 0).getTime() - new Date(a.last_seen_at || 0).getTime());
-    else if (sort === 'value') s.sort((a, b) => (b.valuation || b.purchase_cost || 0) - (a.valuation || a.purchase_cost || 0));
-    else if (sort === 'name') s.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    return s;
-  }, [assets, view, q, sort, mode]);
+      (!fType || typeKey(a) === fType) &&
+      (!fCrit || critOf(a) === fCrit) &&
+      (!fStatus || (a.status || '').toLowerCase() === fStatus) &&
+      (mode === 'all' ? true : mode === 'agent' ? agentManaged(a) : modeOf(a) === mode) &&
+      flagOk(a));
+    const cmp = SORTERS[sort] || SORTERS.crit;
+    return [...r].sort((a, b) => cmp(a, b) * dir);
+  }, [assets, q, sort, dir, fType, fCrit, fStatus, mode, fFlag]);
+  // Click a header: same column flips direction, a new column sorts text A→Z and
+  // metrics high→low by default.
+  const sortBy = (k: string) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(TEXT_SORTS.has(k) ? 1 : -1); } };
 
   // Nest external subdomains under their apex. Apex rows get a ▸ toggle + "N subs"
   // badge; children are inserted right after the apex only when it's expanded.
@@ -205,11 +237,6 @@ export default function InventoryRedesign(p: Props) {
   const allChecked = rows.length > 0 && rows.every((r) => sel.has(r.id));
   const selIds = Array.from(sel);
 
-  const railBtn = (id: string, label: string, count: number, dot?: string) => (
-    <button key={id} className={'rbtn' + (view === id ? ' on' : '')} onClick={() => { setView(id); setTab('reg'); }}>
-      <span className="bar" />{dot ? <span className="dot" style={{ background: dot }} /> : null}{label}<span className="cnt num">{count}</span>
-    </button>
-  );
 
   const lastScan = (a: ITAsset) => {
     if (!a.last_seen_at) return <span className="mono" style={{ color: '#A32B2B', fontWeight: 600 }}>Never</span>;
@@ -257,10 +284,10 @@ export default function InventoryRedesign(p: Props) {
         <div className="rib-att">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} style={{ color: '#8A5A0C' }} /><span style={{ fontSize: 12, color: '#7A4E0A', fontWeight: 500 }}>Needs attention</span><b className="num" style={{ marginLeft: 'auto', fontSize: 15, color: '#8A5A0C' }}>{attnTotal}</b></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-            <button className="att" onClick={() => { setView('critical'); setTab('reg'); }}>{openVulns} open vulns</button>
-            <button className="att" onClick={() => { setView('unowned'); setTab('reg'); }}>{c.unowned} unowned</button>
-            <button className="att" onClick={() => { setView('needcia'); setTab('reg'); }}>{c.needcia} unassessed</button>
-            <button className="att" onClick={() => { setView('stale'); setTab('reg'); }}>{c.stale} stale</button>
+            <button className="att" onClick={() => { setFFlag('vulns'); setTab('reg'); }}>{openVulns} open vulns</button>
+            <button className="att" onClick={() => { setFFlag('unowned'); setTab('reg'); }}>{c.unowned} unowned</button>
+            <button className="att" onClick={() => { setFFlag('needcia'); setTab('reg'); }}>{c.needcia} unassessed</button>
+            <button className="att" onClick={() => { setFFlag('stale'); setTab('reg'); }}>{c.stale} stale</button>
           </div>
         </div>
       </section>
@@ -275,38 +302,47 @@ export default function InventoryRedesign(p: Props) {
               <button className={'seg' + (tab === 'reg' ? ' on' : '')} onClick={() => setTab('reg')}>Register</button>
               <button className={'seg' + (tab === 'ins' ? ' on' : '')} onClick={() => setTab('ins')}>Insights</button>
             </div>
-            <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 170 }}>
               <Search size={16} style={{ position: 'absolute', left: 11, top: 11, color: '#78838F' }} />
-              <input className="search" placeholder="Search this view…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input className="search" placeholder="Search assets…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            <select className="sel" value={view} onChange={(e) => { setView(e.target.value); setTab('reg'); }} title="Filter by view or asset type (was the left sidebar)">
-              <optgroup label="Views">
-                <option value="all">All assets ({c.total})</option>
-                <option value="critical">Critical ({c.critical})</option>
-                <option value="needcia">Needs CIA ({c.needcia})</option>
-                <option value="unowned">Unowned ({c.unowned})</option>
-                <option value="stale">Stale &gt; 30d ({c.stale})</option>
-                <option value="internet">Internet-facing ({c.internet})</option>
-                <option value="cde">PCI scope ({c.cde})</option>
-              </optgroup>
-              <optgroup label="By type">
-                <option value="application">Applications ({c.byType('application')})</option>
-                <option value="infrastructure">Infrastructure ({c.byType('infrastructure')})</option>
-                <option value="data">Data ({c.byType('data')})</option>
-                <option value="cloud">Cloud ({c.byType('cloud')})</option>
-                <option value="thirdparty">Third-party ({c.byType('thirdparty')})</option>
-              </optgroup>
+            {/* One named control per filter dimension — no lumped "Views" grab-bag.
+                Column-backed filters (Type/Criticality/Status) sit beside the
+                non-column ones (Scan posture, and the Internet/PCI flag chips). */}
+            <select className="sel" value={fType} onChange={(e) => { setFType(e.target.value); setTab('reg'); }} title="Filter by asset type">
+              <option value="">All types ({c.total})</option>
+              <option value="application">Applications ({c.byType('application')})</option>
+              <option value="infrastructure">Infrastructure ({c.byType('infrastructure')})</option>
+              <option value="data">Data ({c.byType('data')})</option>
+              <option value="cloud">Cloud ({c.byType('cloud')})</option>
+              <option value="thirdparty">Third-party ({c.byType('thirdparty')})</option>
+              <option value="repository">Code / Repository ({c.byType('repository')})</option>
             </select>
-            <select className="sel" value={sort} onChange={(e) => setSort(e.target.value)}><option value="crit">Sort: Criticality</option><option value="scan">Sort: Recently scanned</option><option value="value">Sort: Value</option><option value="name">Sort: Name</option></select>
-            {/* 5-tab view — All, EASM (external), Credential (full depth incl. manual),
-                Uncredential (credential-free sweep, grouped by CIDR), PCI (in-scope). */}
-            <div className="segwrap" title="View — All · EASM (external) · Credential (full depth) · Uncredential (credential-free sweep) · PCI (in scope)">
-              {(['all', 'easm', 'credential', 'uncredential', 'agent', 'pci'] as const).map((m) => (
-                <button key={m} className={'seg' + (mode === m ? ' on' : '')} onClick={() => { setMode(m); setSel(new Set()); }}>
-                  {MODE_LABEL[m]}<span style={{ marginLeft: 6, opacity: 0.55 }}>{m === 'all' ? c.total : m === 'easm' ? c.easmN : m === 'credential' ? c.credN : m === 'uncredential' ? c.uncredN : m === 'agent' ? c.agentN : c.cde}</span>
-                </button>
-              ))}
-            </div>
+            <select className="sel" value={fCrit} onChange={(e) => { setFCrit(e.target.value); setTab('reg'); }} title="Filter by criticality">
+              <option value="">All criticality</option>
+              <option value="critical">Critical ({c.mix.critical})</option>
+              <option value="high">High ({c.mix.high})</option>
+              <option value="medium">Medium ({c.mix.medium})</option>
+              <option value="low">Low ({c.mix.low})</option>
+            </select>
+            <select className="sel" value={fStatus} onChange={(e) => { setFStatus(e.target.value); setTab('reg'); }} title="Filter by status">
+              <option value="">All status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="decommissioned">Decommissioned</option>
+            </select>
+            <select className="sel" value={mode} onChange={(e) => { setMode(e.target.value as any); setSel(new Set()); setTab('reg'); }} title="Filter by scan posture">
+              <option value="all">All scans ({c.total})</option>
+              <option value="easm">EASM · external ({c.easmN})</option>
+              <option value="credential">Credentialed ({c.credN})</option>
+              <option value="uncredential">Agentless ({c.uncredN})</option>
+              <option value="agent">Agent ({c.agentN})</option>
+            </select>
+            <button type="button" className={'fchip' + (fFlag === 'internet' ? ' on' : '')} onClick={() => { setFFlag(fFlag === 'internet' ? '' : 'internet'); setTab('reg'); }} title="Internet-facing only">Internet-facing ({c.internet})</button>
+            <button type="button" className={'fchip' + (fFlag === 'cde' ? ' on' : '')} onClick={() => { setFFlag(fFlag === 'cde' ? '' : 'cde'); setTab('reg'); }} title="PCI scope only">PCI scope ({c.cde})</button>
+            {(fType || fCrit || fStatus || mode !== 'all' || fFlag) && (
+              <button type="button" className="fchip" onClick={() => { setFType(''); setFCrit(''); setFStatus(''); setMode('all'); setFFlag(''); }} title="Clear all filters">Clear</button>
+            )}
           </div>
 
           {tab === 'reg' ? (
@@ -328,15 +364,22 @@ export default function InventoryRedesign(p: Props) {
                     so it reconciles with the rolled-up total — not the flat child-row count. */}
                 <span style={{ fontSize: 11.5, color: 'var(--muted2)' }}><b className="num" style={{ color: 'var(--sec)' }}>{orderedRows.filter((r) => !childApexOf.has(r.id)).length}</b> shown · {c.total} total</span>
               </div>
-              <div style={{ overflow: 'auto', maxHeight: '58vh' }}>
+              <div style={{ overflowY: 'auto', overflowX: 'auto', maxHeight: '58vh' }}>
                 {mode === 'uncredential' ? (
                   <UncredentialView rows={rows} onOpen={p.onView} />
                 ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 1080 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'auto' }}>
                   <thead><tr>
-                    <th style={{ ...th, width: 38 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#014A81', width: 15, height: 15 }} /></th>
-                    {['Asset', 'Type', 'Owner', 'Department', 'Data Class', 'Business Function', 'Criticality', 'CIA', 'Last scan', 'Value', 'Status', 'PCI'].map((h) => <th key={h} style={th}>{h}</th>)}
-                    <th style={{ ...th, width: 36 }}></th>
+                    <th style={{ ...th, width: 34 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#fff', width: 15, height: 15 }} /></th>
+                    {HEADS.map((h) => (
+                      <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none' }}
+                        onClick={h.sortable ? () => sortBy(h.key) : undefined}
+                        title={h.sortable ? `Sort by ${h.label}` : undefined}>
+                        {h.label}{sort === h.key ? <span style={{ marginLeft: 4 }}>{dir === -1 ? '▾' : '▴'}</span> : null}
+                      </th>
+                    ))}
+                    <th style={{ ...th, width: 34 }}>PCI</th>
+                    <th style={{ ...th, width: 34 }}></th>
                   </tr></thead>
                   <tbody>
                     {p.loading ? (
@@ -379,11 +422,11 @@ export default function InventoryRedesign(p: Props) {
                               </div>
                             </div>
                           </td>
-                          <td style={{ ...td, textTransform: 'capitalize' }}>{(a.asset_type || '').replace(/_/g, ' ') || '—'}</td>
-                          <td style={td}>{a.owner_name ? a.owner_name : <span style={{ color: '#A32B2B', fontWeight: 600 }}>Unassigned</span>}</td>
-                          <td style={td}>{a.department || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
-                          <td style={{ ...td, textTransform: 'capitalize' }}>{a.data_classification || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
-                          <td style={td}>{a.business_function || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
+                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={(a.asset_type || '').replace(/_/g, ' ')}>{(a.asset_type || '').replace(/_/g, ' ') || '—'}</td>
+                          <td style={{ ...td, ...clip }} title={a.owner_name || ''}>{a.owner_name ? a.owner_name : <span style={{ color: '#A32B2B', fontWeight: 600 }}>Unassigned</span>}</td>
+                          <td style={{ ...td, ...clip }} title={a.department || ''}>{a.department || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
+                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={a.data_classification || ''}>{a.data_classification || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
+                          <td style={{ ...td, ...clip }} title={a.business_function || ''}>{a.business_function || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
                           <td style={td}>{ck ? <span style={{ background: ck.bg, color: ck.fg, borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{a.criticality}</span> : <span style={{ color: '#B4BDC6' }}>—</span>}</td>
                           <td style={td}>{hasCia(a) ? <span className="mono">{a.confidentiality_rating}·{a.integrity_rating}·{a.availability_rating}</span> : <span style={{ color: '#8A5A0C' }}>— assess</span>}</td>
                           <td style={td}>{lastScan(a)}</td>

@@ -26,6 +26,9 @@
 .inv2 .btn-pri{border-color:var(--ac);background:var(--ac);color:#06342B;font-weight:600}
 .inv2 .btn-pri:hover{background:var(--ac-strong);border-color:var(--ac-strong)}
 .inv2 .sel{height:34px;border:1px solid var(--bd);border-radius:9px;background:#fff;padding:0 12px;font-size:12px;color:var(--sec);cursor:pointer}
+.inv2 .fchip{height:34px;border:1px solid var(--bd);border-radius:9px;background:#fff;padding:0 12px;font-size:12px;font-weight:500;color:var(--sec);cursor:pointer;white-space:nowrap}
+.inv2 .fchip:hover{border-color:#CFD6DC}
+.inv2 .fchip.on{background:#005B96;border-color:#005B96;color:#fff;font-weight:600}
 /* rail */
 .inv2 .railcap{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#828E9A;padding:2px 6px 6px}
 .inv2 .rbtn{position:relative;display:flex;align-items:center;gap:11px;padding:5px 10px;border:0;border-radius:10px;background:none;color:var(--sec);font-size:12.5px;font-weight:500;text-align:left;width:100%;cursor:pointer}
