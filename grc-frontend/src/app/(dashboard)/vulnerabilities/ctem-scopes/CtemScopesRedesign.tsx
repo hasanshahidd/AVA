@@ -1180,7 +1180,7 @@ export default function CtemScopesRedesign() {
   // is clear and you can jump between stages; the active stage's results fill the
   // pane on the right. (Replaces the stacked accordion that hid results on jump.)
   const stageNav = () => (
-    <aside style={{ width: 240, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', paddingRight: 2 }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 7 }}>
       {STAGES.map((st) => {
         const done = stageDone[st.n];
         const reachable = stageReachable(st.n);
@@ -1196,12 +1196,12 @@ export default function CtemScopesRedesign() {
                 <b style={{ fontSize: 12.5, color: locked ? FAINT : INK }}>{st.label}</b>
                 {isCurrent && !done && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.05em', color: '#fff', background: INK, borderRadius: 4, padding: '1px 5px' }}>NOW</span>}
               </span>
-              <span style={{ display: 'block', fontSize: 10.5, color: locked ? FAINT : MUTED, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stageStat(st.n)}</span>
+              <span style={{ display: 'block', fontSize: 10.5, color: locked ? FAINT : MUTED, marginTop: 2, lineHeight: 1.4, wordBreak: 'break-word' }}>{stageStat(st.n)}</span>
             </span>
           </button>
         );
       })}
-    </aside>
+    </div>
   );
 
   const journeyScreen = () => {
@@ -1258,7 +1258,7 @@ export default function CtemScopesRedesign() {
     <div style={{ padding: '16px 18px', maxWidth: 1100 }}>
       <h1 style={{ fontSize: 20, letterSpacing: '-.02em', fontWeight: 700 }}>Exposure program</h1>
       <p style={{ fontSize: 12, color: 'var(--muted)', margin: '3px 0 12px' }}>Pick a session on the left to work its stages — or review the portfolio below.</p>
-      <div style={{ ...STRIP, marginBottom: 10, alignItems: 'stretch', background: '#fff' }}>
+      <div style={{ ...STRIP, flexWrap: 'nowrap', gap: 10, marginBottom: 10, alignItems: 'stretch', background: '#fff' }}>
         {kpiCell('Scopes', portfolio.scopes)}{SEP}
         {kpiCell('Open cycles', portfolio.openCycles, ACS)}{SEP}
         {kpiCell('Overdue', portfolio.overdue, portfolio.overdue ? RED : GREEN)}{SEP}
