@@ -59,6 +59,13 @@ function regionRank(region: string): number {
   return i < 0 ? REGION_ORDER.length : i;  // known buckets first, then countries A–Z
 }
 
+// Absolute date with year (publication / processing dates); '—' when absent.
+function fmtDate(at?: string | null): string {
+  if (!at) return '—';
+  const dt = new Date(at);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export default function AdvisoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -436,6 +443,26 @@ export default function AdvisoriesPage() {
                     Review &amp; confirm
                   </button>
                 )}
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--color-border)]">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {([
+                      ['Published', fmtDate(detail.published_at), detail.origin === 'upload' && !detail.published_at ? 'No date stated in the document' : ''],
+                      ['Last updated', fmtDate(detail.updated_at), ''],
+                      [detail.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(detail.created_at), ''],
+                      ['External ID', detail.external_id || '—', ''],
+                      ['Source', detail.source_name || '—', ''],
+                      ['Region', detail.region || 'Unclassified', ''],
+                    ] as [string, string, string][]).map(([k, v, hint]) => (
+                      <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
+                        <td className="w-32 bg-[var(--color-subtle)] px-3 py-1.5 font-medium cw-text-muted">{k}</td>
+                        <td className="px-3 py-1.5 cw-text-default">{hint || v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
               {detail.summary && <div className="mt-3"><RichText text={detail.summary} /></div>}
