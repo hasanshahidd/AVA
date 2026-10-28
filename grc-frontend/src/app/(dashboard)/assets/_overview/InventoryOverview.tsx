@@ -209,6 +209,7 @@ export default function InventoryOverview() {
           { label: 'End-of-life dated', value: share(d.eol.known, d.internal.total) || '0%', sub: `${nfmt(d.eol.known)} of ${nfmt(d.internal.total)}` },
           { label: 'Past vendor end-of-life', value: nfmt(d.eol.past), sub: `${nfmt(d.eol.soon)} due ≤90 days`, alarm: d.eol.past > 0 },
         ] : []} />
+      <AdvisoryExposureCard className="xl:col-span-12" />
       <ClassMatrix q={estateQ} className="xl:col-span-8" />
       <AttentionCard estate={estateQ} inv={invQ} className="xl:col-span-4" />
 
@@ -419,6 +420,43 @@ function ScoreRing({ score, grade }: { score: number | null; grade: string | nul
     </div>
   );
 }
+/* Advisory exposure — assets matched to a published security advisory CVE
+   (verdict=affected). Read-only from /advisories/affected-assets; the advisory
+   module owns the data. Red alert accent when any asset is affected. */
+function AdvisoryExposureCard({ className }: { className: string }) {
+  const q = useQuery({
+    queryKey: ['advisories', 'affected-assets'],
+    queryFn: async () => { try { return (await apiClient.get('/advisories/affected-assets')).data as any; } catch { return null; } },
+  });
+  const assetsN: number = q.data?.total ?? 0;
+  const cveN: number = (q.data?.assets || []).reduce((n: number, a: any) => n + (a.items?.length || 0), 0);
+  const hot = assetsN > 0;
+  const red = SEV.high.c;
+  return (
+    <Box title="Advisory exposure" sub="Assets matched to a published security advisory CVE"
+      icon={<AlertTriangle size={15} />} accent={hot ? red : T.success} busy={q.isFetching} className={className}>
+      <Link href="/advisories"
+        className="flex items-center gap-7 rounded-[10px] border border-[#E2E5EC] bg-[#FCFDFE] px-4 py-3 no-underline transition-colors hover:bg-[#F6F7FB]">
+        <span className="flex flex-col">
+          <span className="text-[26px] font-semibold leading-none" style={{ color: hot ? red : '#0F172A' }}>{assetsN}</span>
+          <span className="mt-1 text-[11.5px] text-[#64748B]">asset{assetsN !== 1 ? 's' : ''} affected</span>
+        </span>
+        <span className="h-9 w-px bg-[#E2E5EC]" />
+        <span className="flex flex-col">
+          <span className="text-[26px] font-semibold leading-none text-[#0F172A]">{cveN}</span>
+          <span className="mt-1 text-[11.5px] text-[#64748B]">advisory CVE{cveN !== 1 ? 's' : ''}</span>
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium" style={{ color: hot ? red : T.success }}>
+          {hot ? 'Review in Advisories' : 'No exposure'} <ArrowRight size={14} />
+        </span>
+      </Link>
+      {hot
+        ? <p className="m-0 mt-2.5 text-[11.5px]" style={{ color: red }}>⚠ {assetsN} asset{assetsN !== 1 ? 's are' : ' is'} affected by a published advisory — review and confirm remediation.</p>
+        : <p className="m-0 mt-2.5 text-[11.5px] text-[#64748B]">No assets currently match a published security advisory.</p>}
+    </Box>
+  );
+}
+
 function FleetScoreCard({ inv, className }: { inv: Q<InvOverview>; className: string }) {
   const f = inv.data?.fleet_cis;
   const total = f ? f.scanned + f.unscanned : 0;

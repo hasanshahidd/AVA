@@ -168,6 +168,19 @@ export default function InventoryRedesign(p: Props) {
   const grade: string | null = ov.data?.performance?.grade ?? null;
   const openVulns: number = ov.data?.counts?.open_vulnerabilities ?? 0;
 
+  // Advisory exposure — assets matched to a security advisory CVE (verdict=affected).
+  // Read-only: no scanning, just the durable applicability rows. [[ava backend owns the data]]
+  const adv = useQuery({
+    queryKey: ['advisories', 'affected-assets'],
+    queryFn: async () => { try { return (await apiClient.get('/advisories/affected-assets')).data as any; } catch { return null; } },
+  });
+  const affected = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const g of (adv.data?.assets || [])) m.set(g.asset_id, (g.items || []).length);
+    return m;
+  }, [adv.data]);
+  const advAssetCount: number = adv.data?.total ?? 0;
+
   const c = useMemo(() => {
     // Canonical roll-up: one registrable (apex) domain = ONE external asset
     // (subdomains folded in), internal assets flat — the shared rule every
@@ -209,6 +222,7 @@ export default function InventoryRedesign(p: Props) {
       : fFlag === 'needcia' ? !hasCia(a)
       : fFlag === 'stale' ? isStale(a)
       : fFlag === 'vulns' ? (a.open_findings ?? 0) > 0
+      : fFlag === 'advisory' ? affected.has(a.id)
       : true);
   const rows = useMemo(() => {
     const r = assets.filter((a) =>
@@ -260,7 +274,7 @@ export default function InventoryRedesign(p: Props) {
     : 'linear-gradient(90deg,#A32B2B,#DB4A4A)';
   const gradeLbl = grade || (score == null ? '—' : score >= 80 ? 'STRONG' : score >= 55 ? 'FAIR' : 'WEAK');
   const scorePct = score == null ? 0 : Math.round(score);
-  const attnTotal = openVulns + c.unowned + c.needcia + c.stale;
+  const attnTotal = openVulns + c.unowned + c.needcia + c.stale + advAssetCount;
 
   const toggle = (id: number) => setSel((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allChecked = rows.length > 0 && rows.every((r) => sel.has(r.id));
@@ -317,6 +331,7 @@ export default function InventoryRedesign(p: Props) {
             <button className="att" onClick={() => { setFFlag('unowned'); setTab('reg'); }}>{c.unowned} unowned</button>
             <button className="att" onClick={() => { setFFlag('needcia'); setTab('reg'); }}>{c.needcia} unassessed</button>
             <button className="att" onClick={() => { setFFlag('stale'); setTab('reg'); }}>{c.stale} stale</button>
+            <button className="att" title="Assets matched to a published security advisory CVE" style={advAssetCount > 0 ? { background: '#FBD5D5', borderColor: '#E7A3A3', color: '#B42318' } : undefined} onClick={() => { setFFlag('advisory'); setTab('reg'); }}>{advAssetCount} advisory-affected</button>
           </div>
         </div>
       </section>
@@ -445,6 +460,7 @@ export default function InventoryRedesign(p: Props) {
                                   {a.internet_facing ? <span title="Internet-facing" style={chip('#DBE8FA', '#28578F')}>Internet</span> : null}
                                   {a.cde_environment ? <span title="In PCI scope" style={chip('#F7D8D8', '#A32B2B')}>PCI</span> : null}
                                   {(a.open_findings ?? 0) > 0 ? <span style={chip('#F2D3C6', '#6B2412')}>{a.open_findings} vuln{(a.open_findings ?? 0) > 1 ? 's' : ''}</span> : null}
+                                  {affected.has(a.id) ? <span title="Affected by a published security advisory (advisory CVE matches this asset)" style={chip('#FBD5D5', '#B42318')}>{affected.get(a.id)} advisor{(affected.get(a.id) || 0) > 1 ? 'ies' : 'y'}</span> : null}
                                 </span>
                                 {a.environment ? <span style={{ display: 'block', fontSize: 10.5, color: '#78838F', textTransform: 'capitalize' }}>{a.environment}</span> : null}
                               </div>

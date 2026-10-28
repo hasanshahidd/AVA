@@ -55,6 +55,7 @@ import NotesPanel from './_tabs/NotesPanel';
 import HistoryPanel from './_tabs/HistoryPanel';
 import RisksPanel from './_tabs/RisksPanel';
 import VulnerabilitiesPanel from './_tabs/VulnerabilitiesPanel';
+import AdvisoriesPanel from './_tabs/AdvisoriesPanel';
 import AttachmentsPanel from './_tabs/AttachmentsPanel';
 import CompliancePanel from './_tabs/CompliancePanel';
 import ScopeAuthorizationCard from './_ScopeAuthorizationCard';
@@ -97,7 +98,7 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
   repository: 'Code / Repository',
 };
 
-type TabType = 'overview' | 'details' | 'compliance' | 'controls' | 'evidence' | 'risks' | 'vulnerabilities' | 'criticality' | 'trajectory' | 'mapping-recommendations'
+type TabType = 'overview' | 'details' | 'compliance' | 'controls' | 'evidence' | 'risks' | 'vulnerabilities' | 'advisories' | 'criticality' | 'trajectory' | 'mapping-recommendations'
   // Parity with the reference ITAM asset tab bar. Each of these reads an
   // endpoint that already exists; see _components/AssetWorkTabs.tsx.
   | 'software' | 'relationships' | 'discovery' | 'lifecycle' | 'assignments' | 'activity'
@@ -465,6 +466,19 @@ export default function AssetDetailPage() {
     enabled: activeTab === 'vulnerabilities',
   });
 
+  // Advisory exposure for this asset — advisories whose CVEs match it (verdict=affected).
+  // Always enabled so the tab shows its count badge; degrades to {items:[],total:0}
+  // if the by-asset endpoint isn't live yet.
+  const { data: advByAsset } = useQuery({
+    queryKey: ['advisories-by-asset', assetId],
+    queryFn: async () => {
+      try { return (await apiClient.get(`/advisories/by-asset/${assetId}`)).data as { items: any[]; total: number }; }
+      catch { return { items: [], total: 0 }; }
+    },
+    enabled: !!assetId,
+  });
+  const advCount: number = advByAsset?.total ?? 0;
+
   // Enrich a DB app IN PLACE with its database inventory (a Postgres login,
   // applied to this same asset — no re-discovery).
   const collectSvc = useMutation({
@@ -760,6 +774,7 @@ export default function AssetDetailPage() {
     { id: 'overview', label: 'Overview', icon: Boxes },
     { id: 'risks', label: 'Risk & Controls', icon: Shield },
     { id: 'vulnerabilities', label: 'Vulnerabilities', icon: Bug },
+    { id: 'advisories', label: 'Advisories', icon: AlertTriangle },
     // No Software tab for hosts we can only see from outside — the inventory
     // it would show cannot exist without a login.
     ...(showsSoftware ? [{ id: 'software' as TabType, label: 'Software', icon: Package }] : []),
@@ -808,7 +823,7 @@ export default function AssetDetailPage() {
     tabs: sections.map((s) => ({
       label: s.label,
       active: activeTab === s.id,
-      count: s.id === 'software' ? software.length : undefined,
+      count: s.id === 'software' ? software.length : s.id === 'advisories' ? (advCount || undefined) : undefined,
       onClick: () => setActiveTab(s.id),
     })),
     actions: [
@@ -879,6 +894,17 @@ export default function AssetDetailPage() {
                     only implied the passive scan was incomplete. Re-enable ONLY alongside a real
                     active-scan feature (which the backend requires be authorization-gated). */}
                 {false && overviewData.external && <ScopeAuthorizationCard asset={asset} canManage={canEdit} />}
+                {advCount > 0 && (
+                  <button type="button" onClick={() => setActiveTab('advisories')}
+                    className="mb-3 flex w-full items-center gap-3 rounded-xl border border-[#F3C0BE] bg-[#FCEDEC] px-4 py-3 text-left transition-colors hover:bg-[#FBE2E0]">
+                    <AlertTriangle className="h-5 w-5 shrink-0 text-[#B42318]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-semibold text-[#B42318]">Affected by {advCount} published security advisor{advCount > 1 ? 'ies' : 'y'}</span>
+                      <span className="block text-[12px] text-[#9A2A22]">This asset matches a CVE in an active advisory — review the Advisories tab.</span>
+                    </span>
+                    <span className="shrink-0 text-[12.5px] font-medium text-[#B42318]">View &rarr;</span>
+                  </button>
+                )}
                 <AssetOverviewDesign A={overviewData} surface={surfaceFacts} riskProfile={riskProfile} />
               </>
             )}
@@ -954,6 +980,9 @@ export default function AssetDetailPage() {
                 onUnlinkVulnerability={(vulnId) => unlinkVulnerabilityMutation.mutate(vulnId)}
                 isUnlinking={unlinkVulnerabilityMutation.isPending}
               />
+            )}
+            {activeTab === 'advisories' && (
+              <AdvisoriesPanel assetId={assetId} data={advByAsset} />
             )}
             {activeTab === 'risks' && (
               // Command Center's three cards (Residual Risk / CIA / CIS) on top,
