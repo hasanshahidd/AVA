@@ -231,13 +231,6 @@ export default function AdvisoryDetailPage() {
         </div>
       </section>
 
-      {advisory.extraction && <ExtractionPipeline report={advisory.extraction} />}
-
-      {/* Timeline sits high on the page so the event history is immediately visible. */}
-      {advisory.history && advisory.history.length > 0 && (
-        <HistoryTimeline events={advisory.history} />
-      )}
-
       {isPending ? (
         <div className="cw-card space-y-3 p-3">
           <div className="flex items-center gap-2">
@@ -313,12 +306,24 @@ export default function AdvisoryDetailPage() {
       ) : (
         <div className="space-y-3">
           <div className="cw-card p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-semibold cw-text-default">Match this advisory against your register</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h2>
+                <p className="mt-0.5 text-[11px] cw-text-muted">
+                  The CVEs this advisory warns about — each is tracked in your register and matched against your assets.
+                </p>
+              </div>
               <button onClick={() => matchMutation.mutate()} disabled={matchMutation.isPending}
-                className="btn-primary flex items-center gap-2 text-sm">
+                className="btn-primary flex shrink-0 items-center gap-2 text-sm">
                 {matchMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
               </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {(advisory.cves ?? []).length === 0 ? (
+                <p className="text-xs cw-text-muted">No CVEs on this advisory.</p>
+              ) : (
+                (advisory.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)
+              )}
             </div>
           </div>
           {report && (
@@ -328,21 +333,14 @@ export default function AdvisoryDetailPage() {
                 onDownload={reportSessionId !== null ? downloadReport : undefined} />
             </div>
           )}
-          <div className="cw-card p-3">
-            <h2 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h2>
-            <p className="mt-0.5 text-[11px] cw-text-muted">
-              The CVEs this advisory warns about — each is tracked in your vulnerability register and matched against your assets. Click one for its full details.
-            </p>
-            <div className="mt-3 space-y-2">
-              {(advisory.cves ?? []).length === 0 ? (
-                <p className="text-xs cw-text-muted">No CVEs on this advisory.</p>
-              ) : (
-                (advisory.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)
-              )}
-            </div>
-          </div>
         </div>
       )}
+
+      {advisory.history && advisory.history.length > 0 && (
+        <HistoryTimeline events={advisory.history} />
+      )}
+
+      {advisory.extraction && <ExtractionPipeline report={advisory.extraction} />}
     </div>
   );
 }
