@@ -724,20 +724,32 @@ $AvaEnroll = "{token}"
 $AvaTenant = "{tenant}"
 $dir = "$env:ProgramData\\AvaAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
-# Idempotent re-install: stop any running agent so the .exe isn't locked.
+# Idempotent re-install + migrate off the old scheduled-task installs: stop the
+# service (if any), remove the old task, and free the .exe.
+sc.exe stop AvaAgent 2>$null | Out-Null
 schtasks /End /TN "AvaAgent" 2>$null | Out-Null
+schtasks /Delete /TN "AvaAgent" /F 2>$null | Out-Null
 Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
+# Config the service reads at startup. A Windows service does NOT reliably inherit
+# Machine env vars set in this same session, so the file — not the registry — is
+# the dependable source; Machine env is kept only for an interactive/debug run.
+$cfg = @{{ URL = $AvaUrl; Tenant = $AvaTenant; Enroll = $AvaEnroll }} | ConvertTo-Json -Compress
+Set-Content -Path "$dir\\config.json" -Value $cfg -Encoding UTF8
 [Environment]::SetEnvironmentVariable('AVA_URL', $AvaUrl, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_ENROLL', $AvaEnroll, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_TENANT', $AvaTenant, 'Machine')
-# Run at startup as SYSTEM (a scheduled task; a full Windows service is a later hardening).
-schtasks /Create /TN "AvaAgent" /TR "`"$dir\\ava-agent.exe`"" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null
-$env:AVA_URL = $AvaUrl; $env:AVA_ENROLL = $AvaEnroll; $env:AVA_TENANT = $AvaTenant
-Start-Process -FilePath "$dir\\ava-agent.exe" -WindowStyle Hidden
-Write-Host "Ava agent installed and started. It will appear in your console shortly."
+# Real Windows service: auto-start at boot AND auto-restart on crash (SCM failure
+# actions). 'create' no-ops if it already exists; 'config' then updates it.
+$bin = "`"$dir\\ava-agent.exe`""
+sc.exe create AvaAgent binPath= $bin start= auto obj= LocalSystem DisplayName= "Ava Compliance Agent" 2>$null | Out-Null
+sc.exe config AvaAgent binPath= $bin start= auto obj= LocalSystem | Out-Null
+sc.exe failure AvaAgent reset= 86400 actions= restart/5000/restart/5000/restart/5000 | Out-Null
+sc.exe description AvaAgent "Ava Compliance Agent - inventory + CIS hardening checks" | Out-Null
+sc.exe start AvaAgent | Out-Null
+Write-Host "Ava agent installed as an auto-restarting Windows service. It will appear in your console shortly."
 """
 
 

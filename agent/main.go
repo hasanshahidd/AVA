@@ -3,8 +3,9 @@
 // basic hardware) and sends it to the cloud. For machines we can't reach over
 // the network or where the client won't share credentials.
 //
-// stdlib ONLY (no modules) so it cross-compiles for Windows, Linux and macOS
-// with no network fetch and runs with zero deps on the target.
+// stdlib only, except golang.org/x/sys/windows/svc (Windows-only, so the binary
+// can run as a real auto-restarting Windows service). Still cross-compiles for
+// Windows, Linux and macOS and runs with zero runtime deps on the target.
 //
 // Config (baked in by the per-download installer, or passed as env):
 //
@@ -71,6 +72,31 @@ func saveState(s state) error {
 	}
 	b, _ := json.MarshalIndent(s, "", "  ")
 	return os.WriteFile(p, b, 0o600)
+}
+
+// loadConfig reads url/tenant/enroll the installer wrote next to the state file
+// and puts them in the process env (only when not already set). A Windows SERVICE
+// does NOT reliably inherit Machine env vars set just before it is started, so the
+// config file — not the registry — is the dependable source. No-op when absent
+// (Linux systemd / macOS launchd bake the env into the unit/plist).
+func loadConfig() {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(statePath()), "config.json"))
+	if err != nil {
+		return
+	}
+	var c struct{ URL, Tenant, Enroll string }
+	if json.Unmarshal(b, &c) != nil {
+		return
+	}
+	setenvIfEmpty("AVA_URL", c.URL)
+	setenvIfEmpty("AVA_TENANT", c.Tenant)
+	setenvIfEmpty("AVA_ENROLL", c.Enroll)
+}
+
+func setenvIfEmpty(k, v string) {
+	if v != "" && os.Getenv(k) == "" {
+		_ = os.Setenv(k, v)
+	}
 }
 
 var httpc = &http.Client{Timeout: 180 * time.Second} // generous for multi-MB datastream downloads
@@ -676,16 +702,32 @@ func reEnroll(st *state) bool {
 }
 
 func main() {
+	loadConfig()
+	// On Windows, when the SCM launches us as a service, run under its control so
+	// Stop/Shutdown are handled and the SCM's failure action can restart us on a
+	// crash. Interactively (first install), or on Linux/macOS, run the loop direct.
+	if runtime.GOOS == "windows" && isWindowsService() {
+		runService()
+		return
+	}
+	runAgent(nil)
+}
+
+// runAgent enrolls (first run), reports once, then loops: heartbeat + pending CIS
+// every 5 min and a full inventory re-report hourly. It returns when `stop` is
+// closed (a Windows service Stop); a nil `stop` runs forever (interactive /
+// systemd / launchd, where the supervisor owns the lifecycle).
+func runAgent(stop <-chan struct{}) {
 	if base() == "" {
 		fmt.Fprintln(os.Stderr, "AVA_URL is required")
-		os.Exit(2)
+		return
 	}
 	st := loadState()
 	if st.APIToken == "" {
 		tok, err := enroll()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "enroll error:", err)
-			os.Exit(1)
+			return
 		}
 		st.APIToken = tok
 		if err := saveState(st); err != nil {
@@ -707,22 +749,25 @@ func main() {
 	if os.Getenv("AVA_ONCE") == "1" {
 		return
 	}
-	// Service loop: heartbeat + pick up pending CIS jobs every 5 min, full
-	// inventory re-report hourly.
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	elapsed := 0
-	for range ticker.C {
-		heartbeat(st.APIToken)
-		cisRun(st.APIToken)
-		elapsed += 5
-		if elapsed >= 60 {
-			elapsed = 0
-			if err := report(st.APIToken); err != nil {
-				if strings.Contains(err.Error(), "(401)") && reEnroll(&st) {
-					_ = report(st.APIToken)
-				} else {
-					fmt.Fprintln(os.Stderr, "periodic report error:", err)
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			heartbeat(st.APIToken)
+			cisRun(st.APIToken)
+			elapsed += 5
+			if elapsed >= 60 {
+				elapsed = 0
+				if err := report(st.APIToken); err != nil {
+					if strings.Contains(err.Error(), "(401)") && reEnroll(&st) {
+						_ = report(st.APIToken)
+					} else {
+						fmt.Fprintln(os.Stderr, "periodic report error:", err)
+					}
 				}
 			}
 		}
