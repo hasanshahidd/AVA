@@ -14,8 +14,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, Filter, ArrowUpDown, Check, X } from 'lucide-react';
+import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, Filter, ArrowUpDown, Check, X, List } from 'lucide-react';
 import { shortenVulnTitle, deBrandDomain, PriorityRawCell, PriorityContextualCell, enrichmentPriority, type Vulnerability } from './lib';
+import RowActionsMenu from '../../assets/_workspace/RowActionsMenu';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
 import ScanWorkspace from './ScanWorkspace';
@@ -143,22 +144,12 @@ function ImportItem({ Icon, label, hint, onClick }: { Icon: typeof Plus; label: 
 type Pane = 'cmd' | 'reg' | 'scan' | 'ctem';
 const PANE_META: { key: Pane; label: string; Icon?: typeof Target }[] = [
   { key: 'cmd', label: 'Overview', Icon: LayoutDashboard },
-  { key: 'reg', label: 'Register' },
+  { key: 'reg', label: 'Register', Icon: List },
   { key: 'scan', label: 'Scan', Icon: ScanLine },
   { key: 'ctem', label: 'CTEM Scopes', Icon: Target },
 ];
-// One toggle, shared by the Overview surface and the register area — so the
-// panes (Overview / Register / CTEM) can never drift apart. The old "Insights"
-// pane was retired: it duplicated the analytics the Overview now owns.
-function PaneToggle({ pane, setPane }: { pane: Pane; setPane: (p: Pane) => void }) {
-  return (
-    <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 11, padding: 3, gap: 2 }}>
-      {PANE_META.map(({ key, label, Icon }) => (
-        <button key={key} onClick={() => setPane(key)} style={{ height: 32, padding: '0 14px', border: 0, borderRadius: 9, background: pane === key ? '#fff' : 'none', color: pane === key ? ACS : '#6B7787', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', boxShadow: pane === key ? '0 1px 2px rgba(16,24,40,.06)' : 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>{Icon && <Icon size={14} />}{label}</button>
-      ))}
-    </div>
-  );
-}
+// The 4 panes (Overview / Register / Scan / CTEM) now live inside a single "Menu ▾"
+// dropdown in the header, so they no longer occupy a dedicated top rail row.
 
 export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const {
@@ -291,15 +282,22 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   // Register/CTEM keep their own bounded-height inner table scroll.
   const pageScroll = pane === 'cmd' && !isNca;
 
+  // Pane nav folded into one "Menu ▾" dropdown (was a full top rail row). Placed in the header's
+  // right group on cmd/reg; a slim standalone copy sits above Scan/CTEM (which carry their own
+  // headers) so those panes stay navigable. Current pane is check-marked.
+  const paneMenu = !isNca ? (
+    <RowActionsMenu label="Menu" actions={PANE_META.map((m) => ({
+      key: m.key, label: m.label, icon: (m.Icon ?? List) as React.ElementType,
+      onClick: () => setPane(m.key as Pane), active: pane === m.key,
+    }))} />
+  ) : null;
+
   return (
     // zoom:0.8 is the SAME density knob the Performance page uses (page at 80%) — it scales
     // the header AND the VulnCommandCenter dashboard (which renders inside this root) uniformly.
     // Bounded panes (register/CTEM/NCA) are height:100%, which would only fill 80% once zoomed,
     // so they compensate to 100%/0.8 = 125% layout height → exactly one viewport after zoom.
     <div className="inv2" style={{ background: '#F4F6F7', zoom: 0.8, height: pageScroll ? 'auto' : 'calc(100% / 0.8)', minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: pageScroll ? 'visible' : 'auto', overflowX: pageScroll ? 'visible' : 'hidden', padding: '10px 10px 0', fontSize: 13.5, color: INK }}>
-      {/* ONE shared pane toggle, pinned at the top of every pane (non-NCA) so the four tabs
-          never move or disappear — always in the same place, whichever pane is open. */}
-      {!isNca && <div style={{ marginBottom: 10, flexShrink: 0 }}><PaneToggle pane={pane} setPane={setPane} /></div>}
       {/* header — hidden on the CTEM/Scan panes (they carry their own) */}
       {pane !== 'ctem' && pane !== 'scan' && (
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
@@ -312,6 +310,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
         {/* Two clean zones: [ which register ] │ [ import ▾ ] [ + Add (primary) ].
             Choke points removed; the three import actions collapse into one menu. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {paneMenu}
           <select value={registerType} onChange={(e) => setRegisterType(e.target.value as 'standard' | 'nca')} style={{ ...btn, cursor: 'pointer' }} title="Switch register">
             <option value="standard">Standard register</option><option value="nca">NCA Template</option>
           </select>
@@ -349,10 +348,13 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
         <>
           {pane === 'scan' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              {/* Scan carries its own header, so a lone Menu keeps the pane nav reachable. */}
+              <div style={{ marginBottom: 8, flexShrink: 0 }}>{paneMenu}</div>
               <div style={{ flex: 1, minHeight: 0 }}><ScanWorkspace vulns={all} assetItems={assetItems} /></div>
             </div>
           ) : pane === 'ctem' ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ marginBottom: 8, flexShrink: 0 }}>{paneMenu}</div>
               <div style={{ flex: 1, minHeight: 0 }}><CtemScopesRedesign /></div>
             </div>
           ) : pane === 'cmd' ? (
