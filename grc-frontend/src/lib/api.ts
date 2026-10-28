@@ -2348,6 +2348,12 @@ export const advisoriesApi = {
   affectedAssets: () => apiClient.get('/advisories/affected-assets'),
   listRegions: () => apiClient.get('/advisories/regions'),
   setRegion: (id: number, region: string) => apiClient.post(`/advisories/${id}/region`, { region }),
+  match: (body: { advisory_ids?: number[]; cve_ids?: number[]; mode?: string; asset_ids?: number[]; label?: string }) =>
+    apiClient.post('/advisories/match', body),
+  listMatchSessions: () => apiClient.get('/advisories/match-sessions'),
+  getMatchSession: (id: number) => apiClient.get(`/advisories/match-sessions/${id}`),
+  downloadMatchSession: (id: number, fmt: 'csv' | 'json' = 'csv') =>
+    apiClient.get(`/advisories/match-sessions/${id}/download?fmt=${fmt}`, { responseType: 'blob' }),
   delete: (id: number) => apiClient.delete(`/advisories/${id}`),
 };
 

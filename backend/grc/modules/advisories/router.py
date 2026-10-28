@@ -22,9 +22,11 @@ from ...routers.auth_router import (
     get_user_primary_tenant,
     get_user_tenants,
 )
-from .models import Advisory, AdvisoryCve, AdvisorySource, AdvisoryAssetApplicability
+from .models import (
+    Advisory, AdvisoryCve, AdvisorySource, AdvisoryAssetApplicability, AdvisoryMatchSession,
+)
 from .service import normalise_severity
-from .applicability import recheck_advisory
+from .applicability import recheck_advisory, _default_scope_ids, _register_finding_details
 from .extraction import extract_from_pdf
 from .sources import list_sources
 from .scrapers import list_pdf_sources
@@ -70,6 +72,16 @@ class RecheckScope(BaseModel):
 
 class RegionIn(BaseModel):
     region: str
+
+
+class MatchRequest(BaseModel):
+    """Selection-driven match: advisories (all their CVEs) and/or specific CVE
+    rows, against a scope of assets (all scanned assets, or a hand-picked set)."""
+    advisory_ids: List[int] = []
+    cve_ids: List[int] = []            # AdvisoryCve.id values
+    mode: str = "all"                  # all | assets
+    asset_ids: List[int] = []
+    label: Optional[str] = None
 
 
 # ─── Serialisation ──────────────────────────────────────────────────────────
@@ -478,6 +490,166 @@ def affected_assets(
             g["host"] = (a.host_name or a.ip_address) if a else None
     result = sorted(by_asset.values(), key=lambda g: -len(g["items"]))
     return {"assets": result, "total": len(result)}
+
+
+# ─── Matching (selection-driven) + saved sessions ───────────────────────────
+
+def _match_scope_ids(db: Session, tenant_id: int, req: "MatchRequest") -> Set[int]:
+    """Assets to match against: a hand-picked set, else every asset with a real
+    register finding (the default). No CTEM."""
+    if req.mode == "assets" and req.asset_ids:
+        return set(req.asset_ids)
+    return _default_scope_ids(db, tenant_id)
+
+
+@router.post("/match")
+def run_match(
+    req: MatchRequest,
+    db: Session = Depends(get_db),
+    user: GRCUser = Depends(require_auth),
+):
+    """Match the selected advisories' CVEs (and any individually-selected CVEs)
+    against register findings in scope. Persists each involved advisory's
+    applicability + counts, saves a downloadable session, and returns the report."""
+    tenant_id = get_user_primary_tenant(user, db)
+    scope_ids = _match_scope_ids(db, tenant_id, req)
+
+    # Gather the selected CVE rows: every CVE of advisory_ids ∪ rows in cve_ids.
+    cve_rows: List[AdvisoryCve] = []
+    seen: Set[int] = set()
+    if req.advisory_ids:
+        for c in (db.query(AdvisoryCve)
+                  .filter(AdvisoryCve.tenant_id == tenant_id,
+                          AdvisoryCve.advisory_id.in_(req.advisory_ids)).all()):
+            if c.id not in seen:
+                seen.add(c.id); cve_rows.append(c)
+    if req.cve_ids:
+        for c in (db.query(AdvisoryCve)
+                  .filter(AdvisoryCve.tenant_id == tenant_id,
+                          AdvisoryCve.id.in_(req.cve_ids)).all()):
+            if c.id not in seen:
+                seen.add(c.id); cve_rows.append(c)
+    if not cve_rows:
+        raise HTTPException(status_code=400, detail="Select at least one advisory or CVE to match.")
+
+    # Persist per involved advisory (recompute applicability + affected counts).
+    adv_ids = sorted({c.advisory_id for c in cve_rows})
+    advisories = {a.id: a for a in db.query(Advisory)
+                  .filter(Advisory.tenant_id == tenant_id, Advisory.id.in_(adv_ids)).all()}
+    for a in advisories.values():
+        recheck_advisory(a, db, scope_ids)
+
+    # Build the report from the selected CVEs.
+    matched: List[Dict[str, Any]] = []
+    not_found: List[Dict[str, Any]] = []
+    all_asset_ids: Set[int] = set()
+    for c in cve_rows:
+        adv = advisories.get(c.advisory_id)
+        entry = {"cve_id": c.cve_id, "advisory_id": c.advisory_id,
+                 "advisory_title": adv.title if adv else None}
+        details = _register_finding_details(db, tenant_id, c.cve_id, scope_ids)
+        if details:
+            all_asset_ids |= {d["asset_id"] for d in details}
+            matched.append({**entry, "_details": details})
+        else:
+            not_found.append(entry)
+
+    names = {}
+    if all_asset_ids:
+        names = {a.id: a.name for a in db.query(ITAsset).filter(ITAsset.id.in_(all_asset_ids)).all()}
+    for m in matched:
+        m["assets"] = [{"id": d["asset_id"], "name": names.get(d["asset_id"], f"asset #{d['asset_id']}"),
+                        "severity": d["severity"], "vulnerability_id": d["vulnerability_id"]}
+                       for d in m.pop("_details")]
+
+    summary = {"cves_checked": len(cve_rows), "matched": len(matched),
+               "not_found": len(not_found), "scope_size": len(scope_ids)}
+    report = {"summary": summary, "matched": matched, "not_found": not_found}
+
+    sess = AdvisoryMatchSession(
+        tenant_id=tenant_id, label=req.label,
+        scope_mode=req.mode, scope_asset_ids=list(req.asset_ids or []),
+        advisory_ids=list(req.advisory_ids or []), cve_ids=list(req.cve_ids or []),
+        summary=summary, result=report,
+        created_by=getattr(user, "id", None),
+        actor_name=getattr(user, "username", None) or getattr(user, "email", None),
+    )
+    db.add(sess)
+    db.commit()
+    db.refresh(sess)
+    return {"session_id": sess.id,
+            "created_at": sess.created_at.isoformat() if sess.created_at else None,
+            "report": report}
+
+
+@router.get("/match-sessions")
+def list_match_sessions(
+    db: Session = Depends(get_db),
+    user: GRCUser = Depends(require_auth),
+):
+    """Match history — past runs, newest first (declared before /{advisory_id})."""
+    tenant_id = get_user_primary_tenant(user, db)
+    rows = (db.query(AdvisoryMatchSession)
+            .filter(AdvisoryMatchSession.tenant_id == tenant_id)
+            .order_by(AdvisoryMatchSession.created_at.desc())
+            .limit(100).all())
+    return {"sessions": [{
+        "id": s.id, "label": s.label, "actor": s.actor_name,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "summary": s.summary or {},
+    } for s in rows]}
+
+
+@router.get("/match-sessions/{session_id}")
+def get_match_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: GRCUser = Depends(require_auth),
+):
+    """Re-open a saved match session with its full point-in-time report."""
+    tenant_id = get_user_primary_tenant(user, db)
+    s = (db.query(AdvisoryMatchSession)
+         .filter(AdvisoryMatchSession.id == session_id,
+                 AdvisoryMatchSession.tenant_id == tenant_id).first())
+    if not s:
+        raise HTTPException(status_code=404, detail="Match session not found")
+    return {"id": s.id, "label": s.label, "actor": s.actor_name,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "scope_mode": s.scope_mode, "summary": s.summary or {}, "report": s.result or {}}
+
+
+@router.get("/match-sessions/{session_id}/download")
+def download_match_session(
+    session_id: int,
+    fmt: str = "csv",
+    db: Session = Depends(get_db),
+    user: GRCUser = Depends(require_auth),
+):
+    """Download a saved session's report as CSV (default) or JSON."""
+    from fastapi.responses import Response
+    tenant_id = get_user_primary_tenant(user, db)
+    s = (db.query(AdvisoryMatchSession)
+         .filter(AdvisoryMatchSession.id == session_id,
+                 AdvisoryMatchSession.tenant_id == tenant_id).first())
+    if not s:
+        raise HTTPException(status_code=404, detail="Match session not found")
+    report = s.result or {}
+    if fmt == "json":
+        import json
+        return Response(content=json.dumps(report, indent=2), media_type="application/json",
+                        headers={"Content-Disposition": f"attachment; filename=match-session-{s.id}.json"})
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["cve_id", "advisory", "verdict", "asset", "severity", "vulnerability_id"])
+    for m in report.get("matched", []):
+        for a in m.get("assets", []):
+            w.writerow([m.get("cve_id"), m.get("advisory_title"), "affected",
+                        a.get("name"), a.get("severity"), a.get("vulnerability_id")])
+    for n in report.get("not_found", []):
+        w.writerow([n.get("cve_id"), n.get("advisory_title"), "not_found", "", "", ""])
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=match-session-{s.id}.csv"})
 
 
 @router.get("/{advisory_id}")

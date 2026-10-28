@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { advisoriesApi } from '@/lib/api';
 import {
-  AlertCircle, ArrowLeft, ExternalLink, Loader2, Plus, Trash2, CheckCircle2,
+  AlertCircle, ArrowLeft, ExternalLink, Loader2, Plus, Trash2, CheckCircle2, Play,
 } from 'lucide-react';
 import {
   AdvisoryView,
@@ -17,8 +17,8 @@ import {
   HistoryTimeline,
   RichText,
   VulnCard,
-  MatchScopeControl,
-  RecheckScope,
+  MatchReport,
+  MatchReportData,
   RegionPicker,
 } from '../_components/ui';
 
@@ -64,13 +64,27 @@ export default function AdvisoryDetailPage() {
     }
   }, [advisory, isPending]);
 
-  const recheckMutation = useMutation({
-    mutationFn: (scope: RecheckScope) => advisoriesApi.recheck(id, scope),
-    onSuccess: () => {
+  const [report, setReport] = useState<MatchReportData | null>(null);
+  const [reportSessionId, setReportSessionId] = useState<number | null>(null);
+  const matchMutation = useMutation({
+    mutationFn: () => advisoriesApi.match({ advisory_ids: [id], mode: 'all' }),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['advisory', id] });
       queryClient.invalidateQueries({ queryKey: ['advisories'] });
+      setReport(res.data.report as MatchReportData);
+      setReportSessionId(res.data.session_id ?? null);
     },
   });
+  const downloadReport = async (fmt: 'csv' | 'json') => {
+    if (reportSessionId === null) return;
+    try {
+      const res = await advisoriesApi.downloadMatchSession(reportSessionId, fmt);
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = `match-session-${reportSessionId}.${fmt}`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
 
   const confirmMutation = useMutation({
     mutationFn: () =>
@@ -246,7 +260,20 @@ export default function AdvisoryDetailPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          <MatchScopeControl onRecheck={(s) => recheckMutation.mutate(s)} isPending={recheckMutation.isPending} />
+          <div className="rounded-lg border border-[var(--color-border)] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold cw-text-default">Match this advisory against your register</p>
+              <button onClick={() => matchMutation.mutate()} disabled={matchMutation.isPending}
+                className="btn-primary flex items-center gap-2 text-sm">
+                {matchMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
+              </button>
+            </div>
+          </div>
+          {report && (
+            <MatchReport report={report} title="Match report"
+              onBack={() => setReport(null)}
+              onDownload={reportSessionId !== null ? downloadReport : undefined} />
+          )}
           <div>
             <h2 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h2>
             <p className="text-xs cw-text-muted">

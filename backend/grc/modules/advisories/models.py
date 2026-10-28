@@ -19,6 +19,7 @@ __all__ = [
     "AdvisoryCve",
     "AdvisoryAssetApplicability",
     "AdvisoryEvent",
+    "AdvisoryMatchSession",
 ]
 
 
@@ -146,3 +147,26 @@ class AdvisoryAssetApplicability(Base):
         UniqueConstraint("advisory_cve_id", "asset_id", name="uq_advisory_cve_asset"),
         Index("ix_advisory_applic_tenant", "tenant_id"),
     )
+
+
+class AdvisoryMatchSession(Base):
+    """A saved advisory-match run — the selection, the scope, a summary and the
+    full report snapshot — so it can be re-opened and downloaded later as a
+    point-in-time record (the advisory 'history' of match sessions)."""
+
+    __tablename__ = "grc_advisory_match_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("grc_tenants.id"), nullable=False, index=True)
+    label = Column(String(200), nullable=True)
+    scope_mode = Column(String(20), nullable=False, default="all")  # all | assets
+    scope_asset_ids = Column(JSON, default=list)
+    advisory_ids = Column(JSON, default=list)
+    cve_ids = Column(JSON, default=list)
+    summary = Column(JSON, default=dict)   # cves_checked / matched / not_found / scope_size
+    result = Column(JSON, default=dict)     # full report snapshot (matched + not_found)
+    created_by = Column(Integer, ForeignKey("grc_users.id"), nullable=True)
+    actor_name = Column(String(150), nullable=True)  # denormalised for the history list
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_advisory_match_tenant", "tenant_id", "created_at"),)

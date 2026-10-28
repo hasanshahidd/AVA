@@ -4,7 +4,7 @@
 // feature folder so the whole module stays self-contained.
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, Download, ArrowLeft, Play, History } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -175,7 +175,11 @@ export function RichText({ text }: { text?: string | null }) {
 // the card links to that register detail for the full picture. Shows the
 // enriched title/severity/description + which of your assets a register finding
 // reports this CVE on.
-export function VulnCard({ cve }: { cve: AdvisoryCveView }) {
+export function VulnCard({ cve, selected, onToggleSelect }: {
+  cve: AdvisoryCveView;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+}) {
   const ap = cve.applicability;
   const linked = !!cve.bridged_vulnerability_id;
   const affected = ap?.affected_assets ?? [];
@@ -221,12 +225,19 @@ export function VulnCard({ cve }: { cve: AdvisoryCveView }) {
       </div>
     </>
   );
-  const cls = 'block rounded-lg border border-[var(--color-border)] p-4';
-  return linked ? (
+  const cls = 'block flex-1 rounded-lg border border-[var(--color-border)] p-4';
+  const card = linked ? (
     <Link href={`/vulnerabilities/${cve.bridged_vulnerability_id}`}
       className={`${cls} transition-colors hover:border-[var(--color-primary)]`}>{body}</Link>
   ) : (
     <div className={cls}>{body}</div>
+  );
+  if (!onToggleSelect) return card;
+  return (
+    <div className="flex items-start gap-2">
+      <input type="checkbox" className="mt-4 shrink-0" checked={!!selected} onChange={onToggleSelect} />
+      {card}
+    </div>
   );
 }
 
@@ -523,5 +534,200 @@ export function RegionPicker({ advisoryId, current }: { advisoryId: number; curr
       </select>
       {mut.isPending && <Loader2 size={12} className="animate-spin cw-text-muted" />}
     </span>
+  );
+}
+
+// ── Match: types + panel + report + history ─────────────────────────────────
+export interface MatchAsset { id: number; name: string; severity?: string | null; vulnerability_id?: number | null }
+export interface MatchedCve { cve_id: string; advisory_id: number; advisory_title?: string | null; assets: MatchAsset[] }
+export interface NotFoundCve { cve_id: string; advisory_id: number; advisory_title?: string | null }
+export interface MatchSummary { cves_checked: number; matched: number; not_found: number; scope_size: number }
+export interface MatchReportData { summary: MatchSummary; matched: MatchedCve[]; not_found: NotFoundCve[] }
+export interface MatchSessionRow { id: number; label?: string | null; actor?: string | null; created_at?: string | null; summary: MatchSummary }
+export interface MatchTarget { mode: string; asset_ids?: number[] }
+
+interface MinMatchAsset { id: number; name: string; host_name?: string | null; ip_address?: string | null }
+
+// Run a match on the current selection. Target = all scanned assets, or a
+// hand-picked set whose list opens right here in the panel. No CTEM.
+export function MatchPanel({ selection, onRun, onCancel, isPending }: {
+  selection: { advisories: number; cves: number };
+  onRun: (target: MatchTarget) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [mode, setMode] = useState<'all' | 'assets'>('all');
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const { data: assetsRaw } = useQuery({
+    queryKey: ['advisory-asset-list'],
+    queryFn: async () => (await assetsApi.getAll()).data,
+    enabled: mode === 'assets',
+  });
+  const assetList: MinMatchAsset[] = Array.isArray(assetsRaw) ? assetsRaw : [];
+  const toggle = (id: number) => setPicked((prev) => {
+    const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
+  const blocked = isPending || (mode === 'assets' && picked.size === 0);
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold cw-text-default">Run match</h2>
+        <button onClick={onCancel} className="text-xs cw-text-muted hover:cw-text-default">Cancel</button>
+      </div>
+      <p className="mt-0.5 text-xs cw-text-muted">
+        Matching <span className="font-semibold cw-text-default">{selection.cves}</span> CVE{selection.cves === 1 ? '' : 's'}
+        {selection.advisories > 0 ? <> from <span className="font-semibold cw-text-default">{selection.advisories}</span> advisor{selection.advisories === 1 ? 'y' : 'ies'}</> : null} against your register.
+      </p>
+
+      <div className="mt-4 space-y-2">
+        <label className="flex items-center gap-2 text-sm cw-text-default">
+          <input type="radio" checked={mode === 'all'} onChange={() => setMode('all')} /> All scanned assets
+        </label>
+        <label className="flex items-center gap-2 text-sm cw-text-default">
+          <input type="radio" checked={mode === 'assets'} onChange={() => setMode('assets')} /> Specific assets
+        </label>
+      </div>
+
+      {mode === 'assets' && (
+        <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+          {assetList.length === 0 ? (
+            <p className="text-xs cw-text-muted">No assets in inventory.</p>
+          ) : assetList.map((a) => (
+            <label key={a.id} className="flex items-center gap-2 py-0.5 text-sm cw-text-default">
+              <input type="checkbox" checked={picked.has(a.id)} onChange={() => toggle(a.id)} />
+              <span className="truncate">{a.name}{(a.host_name || a.ip_address) ? <span className="cw-text-muted"> · {a.host_name || a.ip_address}</span> : null}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => onRun(mode === 'assets' ? { mode, asset_ids: Array.from(picked) } : { mode: 'all' })}
+        disabled={blocked}
+        className="btn-primary mt-4 flex items-center gap-2">
+        {isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
+      </button>
+    </div>
+  );
+}
+
+function fmtWhen(at?: string | null): string {
+  if (!at) return '';
+  const d = new Date(at);
+  return isNaN(d.getTime()) ? '' : d.toLocaleString();
+}
+
+// Results of one match run: summary, a card per matched CVE (each affected asset
+// links to its asset page + its register finding), and the CVEs with no finding.
+export function MatchReport({ report, title, onBack, onDownload }: {
+  report: MatchReportData;
+  title?: string;
+  onBack: () => void;
+  onDownload?: (fmt: 'csv' | 'json') => void;
+}) {
+  const s = report.summary;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default">
+          <ArrowLeft size={15} /> Back
+        </button>
+        {onDownload && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => onDownload('csv')} className="btn-secondary flex items-center gap-1.5 text-xs"><Download size={14} /> CSV</button>
+            <button onClick={() => onDownload('json')} className="btn-secondary flex items-center gap-1.5 text-xs"><Download size={14} /> JSON</button>
+          </div>
+        )}
+      </div>
+
+      <h2 className="mt-2 text-base font-bold cw-text-default">{title || 'Match report'}</h2>
+      <div className="mt-2 flex flex-wrap gap-5">
+        <div><p className="text-xl font-bold cw-text-default">{s.cves_checked}</p><p className="text-xs cw-text-muted">CVEs checked</p></div>
+        <div><p className="text-xl font-bold text-red-600">{s.matched}</p><p className="text-xs cw-text-muted">matched</p></div>
+        <div><p className="text-xl font-bold cw-text-default">{s.not_found}</p><p className="text-xs cw-text-muted">not found</p></div>
+        <div><p className="text-xl font-bold cw-text-default">{s.scope_size}</p><p className="text-xs cw-text-muted">assets in scope</p></div>
+      </div>
+
+      {report.matched.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-sm font-semibold text-red-600">Matched — found on your assets</h3>
+          <div className="mt-2 space-y-2">
+            {report.matched.map((m) => (
+              <div key={`${m.advisory_id}-${m.cve_id}`} className="rounded-lg border border-red-200 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm font-semibold cw-text-default">{m.cve_id}</span>
+                  {m.advisory_title && <span className="truncate text-xs cw-text-muted">· {m.advisory_title}</span>}
+                </div>
+                <div className="mt-2 flex flex-col gap-1">
+                  {m.assets.map((a) => (
+                    <div key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
+                      <Link href={`/assets/${a.id}`} className="font-medium text-[var(--color-primary)] hover:underline">{a.name}</Link>
+                      <SeverityBadge severity={a.severity} />
+                      {a.vulnerability_id && (
+                        <Link href={`/vulnerabilities/${a.vulnerability_id}`} className="cw-text-muted hover:underline">finding →</Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {report.not_found.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-sm font-semibold cw-text-default">Not found in scope</h3>
+          <p className="text-xs cw-text-muted">No scanned asset in the chosen scope has a finding for these CVEs.</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {report.not_found.map((n) => (
+              <span key={`${n.advisory_id}-${n.cve_id}`} title={n.advisory_title || ''}
+                className="inline-flex rounded-md bg-[var(--color-subtle)] px-2 py-0.5 font-mono text-xs cw-text-default">{n.cve_id}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Saved match sessions — re-open or download a past run.
+export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void; onBack: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['advisory-match-sessions'],
+    queryFn: async () => (await advisoriesApi.listMatchSessions()).data as { sessions: MatchSessionRow[] },
+  });
+  const sessions = data?.sessions ?? [];
+  const download = async (id: number) => {
+    try {
+      const res = await advisoriesApi.downloadMatchSession(id, 'csv');
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = `match-session-${id}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default">
+        <ArrowLeft size={15} /> Back
+      </button>
+      <h2 className="mt-2 flex items-center gap-2 text-base font-bold cw-text-default"><History size={16} /> Match history</h2>
+      {sessions.length === 0 ? (
+        <p className="mt-3 text-sm cw-text-muted">No match runs yet. Select advisories or CVEs and run a match.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {sessions.map((row) => (
+            <div key={row.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] p-3">
+              <button onClick={() => onOpen(row.id)} className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-medium cw-text-default">{row.label || `Match #${row.id}`}</p>
+                <p className="text-xs cw-text-muted">{fmtWhen(row.created_at)}{row.actor ? ` · ${row.actor}` : ''} · {row.summary?.matched ?? 0} matched / {row.summary?.cves_checked ?? 0} CVEs</p>
+              </button>
+              <button onClick={() => download(row.id)} className="btn-secondary flex items-center gap-1.5 text-xs"><Download size={14} /> CSV</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

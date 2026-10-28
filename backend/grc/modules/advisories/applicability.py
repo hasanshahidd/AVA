@@ -72,6 +72,33 @@ def _register_finding_assets(
     return {r[0] for r in rows}
 
 
+def _register_finding_details(
+    db: Session, tenant_id: int, cve_id: str, scope_ids: Set[int]
+) -> List[Dict[str, Any]]:
+    """Per-asset register-finding detail for one CVE within scope: asset_id, the
+    backing Vulnerability id (for the register link) and its severity. Same real-
+    detection filter as ``_register_finding_assets`` (excludes advisory back-links)."""
+    if not cve_id or not scope_ids:
+        return []
+    rows = (
+        db.query(
+            VulnerabilityAssetLink.asset_id,
+            Vulnerability.id,
+            Vulnerability.severity,
+        )
+        .join(Vulnerability, VulnerabilityAssetLink.vulnerability_id == Vulnerability.id)
+        .filter(
+            Vulnerability.tenant_id == tenant_id,
+            func.upper(Vulnerability.cve_id) == cve_id.upper(),
+            VulnerabilityAssetLink.link_source != "advisory",
+            VulnerabilityAssetLink.asset_id.in_(scope_ids),
+        )
+        .distinct()
+        .all()
+    )
+    return [{"asset_id": r[0], "vulnerability_id": r[1], "severity": r[2]} for r in rows]
+
+
 def recheck_advisory(
     advisory: Advisory, db: Session, scope_ids: Optional[Set[int]] = None
 ) -> Dict[str, Any]:

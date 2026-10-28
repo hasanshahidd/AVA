@@ -7,11 +7,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { advisoriesApi } from '@/lib/api';
 import {
   AlertCircle, Upload, Loader2, RefreshCw, ExternalLink, ShieldAlert,
-  Database, X, ChevronDown, ChevronRight, Server,
+  Database, X, ChevronDown, ChevronRight, Server, Play, History,
 } from 'lucide-react';
 import {
-  AdvisoryView, AdvisoryListResponse,
-  SeverityBadge, StatusBadge, RichText, VulnCard, MatchScopeControl, RecheckScope, RegionPicker,
+  AdvisoryView, AdvisoryListResponse, MatchReportData, MatchTarget,
+  SeverityBadge, StatusBadge, RichText, VulnCard, RegionPicker,
+  MatchPanel, MatchReport, MatchHistory,
 } from './_components/ui';
 
 interface AdvisorySource {
@@ -69,6 +70,13 @@ export default function AdvisoriesPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [feedKeys, setFeedKeys] = useState<Set<string>>(new Set());
+  // Match selection + right-panel mode (detail | match | report | history).
+  const [selAdv, setSelAdv] = useState<Set<number>>(new Set());
+  const [selCve, setSelCve] = useState<Set<number>>(new Set());
+  const [panelMode, setPanelMode] = useState<'detail' | 'match' | 'report' | 'history'>('detail');
+  const [report, setReport] = useState<MatchReportData | null>(null);
+  const [reportTitle, setReportTitle] = useState<string>('Match report');
+  const [reportSessionId, setReportSessionId] = useState<number | null>(null);
 
   const [fRegion, setFRegion] = useState(ALL);
   const [fOrigin, setFOrigin] = useState(ALL);
@@ -129,12 +137,22 @@ export default function AdvisoriesPage() {
     onError: () => setSyncMsg({ text: 'Sync failed — check the sources are reachable', ok: false }),
   });
 
-  const recheckMutation = useMutation({
-    mutationFn: (scope: RecheckScope) => advisoriesApi.recheck(selectedId as number, scope),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['advisory', selectedId] });
+  const matchMutation = useMutation({
+    mutationFn: (target: MatchTarget) => advisoriesApi.match({
+      advisory_ids: Array.from(selAdv),
+      cve_ids: Array.from(selCve),
+      mode: target.mode,
+      asset_ids: target.asset_ids,
+    }),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['advisories'] });
       queryClient.invalidateQueries({ queryKey: ['advisory-affected-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['advisory-match-sessions'] });
+      if (selectedId !== null) queryClient.invalidateQueries({ queryKey: ['advisory', selectedId] });
+      setReport(res.data.report as MatchReportData);
+      setReportSessionId(res.data.session_id ?? null);
+      setReportTitle('Match report');
+      setPanelMode('report');
     },
   });
 
@@ -186,6 +204,43 @@ export default function AdvisoriesPage() {
       return next;
     });
 
+  const toggleAdv = (id: number) => setSelAdv((p) => {
+    const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
+  const toggleCve = (id: number) => setSelCve((p) => {
+    const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
+  const toggleRegionSel = (items: AdvisoryView[]) => setSelAdv((p) => {
+    const n = new Set(p);
+    const all = items.every((a) => n.has(a.id));
+    items.forEach((a) => (all ? n.delete(a.id) : n.add(a.id)));
+    return n;
+  });
+  const clearSel = () => { setSelAdv(new Set()); setSelCve(new Set()); };
+  const selCveTotal = useMemo(
+    () => advisories.filter((a) => selAdv.has(a.id)).reduce((n, a) => n + (a.cve_count || 0), 0) + selCve.size,
+    [advisories, selAdv, selCve]);
+
+  const openSession = async (id: number) => {
+    try {
+      const res = await advisoriesApi.getMatchSession(id);
+      setReport(res.data.report as MatchReportData);
+      setReportSessionId(id);
+      setReportTitle(res.data.label || `Match #${id}`);
+      setPanelMode('report');
+    } catch { /* ignore */ }
+  };
+  const downloadReport = async (fmt: 'csv' | 'json') => {
+    if (reportSessionId === null) return;
+    try {
+      const res = await advisoriesApi.downloadMatchSession(reportSessionId, fmt);
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = `match-session-${reportSessionId}.${fmt}`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
+
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center"><PageLoader size="md" /></div>;
   }
@@ -205,7 +260,7 @@ export default function AdvisoriesPage() {
   const uploadedDocs = advisories.filter((a) => a.origin === 'upload');
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3 overflow-hidden">
       {/* Title lives in the global app bar (PAGE_TITLES['/advisories']); here we keep just the actions. */}
       <div className="flex justify-end gap-2">
         <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
@@ -243,8 +298,26 @@ export default function AdvisoriesPage() {
         <span className="ml-auto text-xs cw-text-muted">showing {filtered.length} of {advisories.length}</span>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
-        <div className="cw-card overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
+          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+          <Play size={15} /> Match{selCveTotal > 0 ? ` (${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'})` : ''}
+        </button>
+        <span className="text-xs cw-text-muted">
+          {selAdv.size} advisor{selAdv.size === 1 ? 'y' : 'ies'}
+          {selCve.size > 0 ? ` · ${selCve.size} extra CVE${selCve.size === 1 ? '' : 's'}` : ''} selected
+        </span>
+        {(selAdv.size > 0 || selCve.size > 0) && (
+          <button onClick={clearSel} className="text-xs text-[var(--color-primary)] hover:underline">Clear</button>
+        )}
+        <button onClick={() => setPanelMode('history')}
+          className="btn-secondary ml-auto flex items-center gap-1.5 text-sm">
+          <History size={15} /> History
+        </button>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+        <div className="cw-card overflow-y-auto">
           <p className="px-4 py-3 text-xs font-semibold uppercase tracking-wider cw-text-muted">By region</p>
           {filtered.length === 0 ? (
             <div className="px-4 py-12 text-center cw-text-muted">
@@ -256,25 +329,34 @@ export default function AdvisoriesPage() {
               const isCollapsed = collapsed.has(region);
               return (
                 <div key={region}>
-                  <button onClick={() => toggleRegion(region)}
-                    className="flex w-full items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-2 text-left">
-                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                    <span className="text-xs font-semibold uppercase tracking-wider cw-text-default">{region}</span>
-                    <span className="ml-auto text-xs cw-text-muted">{items.length}</span>
-                  </button>
-                  {!isCollapsed && items.map((a) => (
-                    <button key={a.id} onClick={() => setSelectedId(a.id)}
-                      className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] px-4 py-2.5 text-left transition-colors hover:bg-[var(--color-hover)] ${selectedId === a.id ? 'bg-[var(--color-subtle)]' : ''}`}>
-                      <p className="min-w-0 flex-1 truncate text-sm font-medium cw-text-default">{a.title}</p>
-                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                        {a.status === 'pending' ? (
-                          <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700">review</span>
-                        ) : a.asset_affected_count > 0 ? (
-                          <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
-                        ) : null}
-                        <SeverityBadge severity={a.severity} />
-                      </div>
+                  <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
+                    <input type="checkbox" className="shrink-0" title="Select all in region"
+                      checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
+                      onChange={() => toggleRegionSel(items)} />
+                    <button onClick={() => toggleRegion(region)} className="flex flex-1 items-center gap-2 text-left">
+                      {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                      <span className="text-xs font-semibold uppercase tracking-wider cw-text-default">{region}</span>
+                      <span className="ml-auto text-xs cw-text-muted">{items.length}</span>
                     </button>
+                  </div>
+                  {!isCollapsed && items.map((a) => (
+                    <div key={a.id}
+                      className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] px-3 py-2.5 ${selectedId === a.id ? 'bg-[var(--color-subtle)]' : ''}`}>
+                      <input type="checkbox" className="shrink-0"
+                        checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
+                      <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium cw-text-default">{a.title}</p>
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                          {a.status === 'pending' ? (
+                            <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700">review</span>
+                          ) : a.asset_affected_count > 0 ? (
+                            <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
+                          ) : null}
+                          <SeverityBadge severity={a.severity} />
+                        </div>
+                      </button>
+                    </div>
                   ))}
                 </div>
               );
@@ -282,9 +364,19 @@ export default function AdvisoriesPage() {
           )}
         </div>
 
-        <div className="cw-card p-4">
-          {!detail ? (
-            <p className="text-sm cw-text-muted">Select an advisory to see which assets are affected.</p>
+        <div className="cw-card p-4 overflow-y-auto">
+          {panelMode === 'match' ? (
+            <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
+              onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
+              isPending={matchMutation.isPending} />
+          ) : panelMode === 'history' ? (
+            <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
+          ) : panelMode === 'report' && report ? (
+            <MatchReport report={report} title={reportTitle}
+              onBack={() => setPanelMode(detail ? 'detail' : 'history')}
+              onDownload={reportSessionId !== null ? downloadReport : undefined} />
+          ) : !detail ? (
+            <p className="text-sm cw-text-muted">Select an advisory to see its CVEs — or tick advisories/CVEs and click Match.</p>
           ) : (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -340,21 +432,18 @@ export default function AdvisoriesPage() {
               )}
 
               {detail.status !== 'pending' && (
-                <div className="mt-4">
-                  <MatchScopeControl onRecheck={(s) => recheckMutation.mutate(s)} isPending={recheckMutation.isPending} />
-                </div>
-              )}
-
-              {detail.status !== 'pending' && (
                 <div className="mt-5">
                   <h3 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h3>
                   <p className="mb-2 text-xs cw-text-muted">
-                    The CVEs this advisory warns about. Each is tracked in your vulnerability register and matched against your assets — click one for its full details.
+                    Tick any CVEs to add them to the match selection, or click a CVE for its full register details.
                   </p>
                   <div className="space-y-2">
                     {(detail.cves ?? []).length === 0
                       ? <p className="text-sm cw-text-muted">No CVEs on this advisory.</p>
-                      : (detail.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)}
+                      : (detail.cves ?? []).map((cve) => (
+                        <VulnCard key={cve.id} cve={cve}
+                          selected={selCve.has(cve.id)} onToggleSelect={() => toggleCve(cve.id)} />
+                      ))}
                   </div>
                 </div>
               )}
@@ -396,7 +485,7 @@ export default function AdvisoriesPage() {
                     );
                   })}
                 </div>
-                <button onClick={() => syncMutation.mutate([...feedKeys])}
+                <button onClick={() => syncMutation.mutate(Array.from(feedKeys))}
                   disabled={syncMutation.isPending || feedKeys.size === 0}
                   className="btn-secondary mt-3 flex items-center gap-1.5">
                   {syncMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
