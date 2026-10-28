@@ -298,15 +298,19 @@ export default function AdvisoriesPage() {
         <span className="ml-auto text-xs cw-text-muted">showing {filtered.length} of {advisories.length}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="cw-card flex flex-wrap items-center gap-2 p-2.5">
         <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
-          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
-          <Play size={15} /> Match{selCveTotal > 0 ? ` (${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'})` : ''}
+          className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+          <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
         </button>
-        <span className="text-xs cw-text-muted">
-          {selAdv.size} advisor{selAdv.size === 1 ? 'y' : 'ies'}
-          {selCve.size > 0 ? ` · ${selCve.size} extra CVE${selCve.size === 1 ? '' : 's'}` : ''} selected
-        </span>
+        {selCveTotal === 0 ? (
+          <span className="text-xs cw-text-muted">Tick advisories or CVEs on the left, then Match.</span>
+        ) : (
+          <span className="text-xs cw-text-default">
+            <span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
+            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected
+          </span>
+        )}
         {(selAdv.size > 0 || selCve.size > 0) && (
           <button onClick={clearSel} className="text-xs text-[var(--color-primary)] hover:underline">Clear</button>
         )}

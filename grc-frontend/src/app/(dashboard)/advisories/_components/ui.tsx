@@ -570,9 +570,17 @@ export function MatchPanel({ selection, onRun, onCancel, isPending }: {
   const blocked = isPending || (mode === 'assets' && picked.size === 0);
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-bold cw-text-default">Run match</h2>
-        <button onClick={onCancel} className="text-xs cw-text-muted hover:cw-text-default">Cancel</button>
+        <div className="flex items-center gap-2">
+          <button onClick={onCancel} className="text-xs cw-text-muted hover:cw-text-default">Cancel</button>
+          <button
+            onClick={() => onRun(mode === 'assets' ? { mode, asset_ids: Array.from(picked) } : { mode: 'all' })}
+            disabled={blocked}
+            className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+            {isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
+          </button>
+        </div>
       </div>
       <p className="mt-0.5 text-xs cw-text-muted">
         Matching <span className="font-semibold cw-text-default">{selection.cves}</span> CVE{selection.cves === 1 ? '' : 's'}
@@ -600,13 +608,6 @@ export function MatchPanel({ selection, onRun, onCancel, isPending }: {
           ))}
         </div>
       )}
-
-      <button
-        onClick={() => onRun(mode === 'assets' ? { mode, asset_ids: Array.from(picked) } : { mode: 'all' })}
-        disabled={blocked}
-        className="btn-primary mt-4 flex items-center gap-2">
-        {isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run match
-      </button>
     </div>
   );
 }
@@ -713,19 +714,47 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
         <ArrowLeft size={15} /> Back
       </button>
       <h2 className="mt-2 flex items-center gap-2 text-base font-bold cw-text-default"><History size={16} /> Match history</h2>
+      <p className="mt-0.5 text-xs cw-text-muted">Every match run is saved here. Open one to see its full report, or download it.</p>
       {sessions.length === 0 ? (
         <p className="mt-3 text-sm cw-text-muted">No match runs yet. Select advisories or CVEs and run a match.</p>
       ) : (
-        <div className="mt-3 space-y-2">
-          {sessions.map((row) => (
-            <div key={row.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] p-3">
-              <button onClick={() => onOpen(row.id)} className="min-w-0 flex-1 text-left">
-                <p className="text-sm font-medium cw-text-default">{row.label || `Match #${row.id}`}</p>
-                <p className="text-xs cw-text-muted">{fmtWhen(row.created_at)}{row.actor ? ` · ${row.actor}` : ''} · {row.summary?.matched ?? 0} matched / {row.summary?.cves_checked ?? 0} CVEs</p>
-              </button>
-              <button onClick={() => download(row.id)} className="btn-secondary flex items-center gap-1.5 text-xs"><Download size={14} /> CSV</button>
-            </div>
-          ))}
+        <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border)]">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-[11px] font-semibold uppercase tracking-wider cw-text-muted">
+                <th className="px-3 py-2">Run</th>
+                <th className="px-3 py-2">When</th>
+                <th className="px-3 py-2">By</th>
+                <th className="px-3 py-2 text-right">CVEs</th>
+                <th className="px-3 py-2 text-right">Matched</th>
+                <th className="px-3 py-2 text-right">Not found</th>
+                <th className="px-3 py-2 text-right">Scope</th>
+                <th className="px-3 py-2 text-right">Export</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((row) => (
+                <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-hover)]">
+                  <td className="px-3 py-2">
+                    <button onClick={() => onOpen(row.id)} className="font-medium text-[var(--color-primary)] hover:underline">
+                      {row.label || `Match #${row.id}`}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 cw-text-muted">{fmtWhen(row.created_at)}</td>
+                  <td className="px-3 py-2 cw-text-muted">{row.actor || '—'}</td>
+                  <td className="px-3 py-2 text-right cw-text-default">{row.summary?.cves_checked ?? 0}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-red-600">{row.summary?.matched ?? 0}</td>
+                  <td className="px-3 py-2 text-right cw-text-muted">{row.summary?.not_found ?? 0}</td>
+                  <td className="px-3 py-2 text-right cw-text-muted">{row.summary?.scope_size ?? 0}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => download(row.id)} className="btn-secondary inline-flex items-center gap-1 text-xs">
+                      <Download size={13} /> CSV
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
