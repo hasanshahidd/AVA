@@ -289,6 +289,12 @@ export default function AdvisoriesPage() {
         ))}
       </div>
 
+      {panelMode === 'history' ? (
+        <div className="cw-card min-h-0 flex-1 overflow-y-auto p-5">
+          <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
+        </div>
+      ) : (
+      <>
       <div className="cw-card flex flex-wrap items-center gap-2 p-2.5">
         <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
           className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
@@ -375,11 +381,9 @@ export default function AdvisoriesPage() {
             <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
               onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
               isPending={matchMutation.isPending} />
-          ) : panelMode === 'history' ? (
-            <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
           ) : panelMode === 'report' && report ? (
             <MatchReport report={report} title={reportTitle}
-              onBack={() => setPanelMode(detail ? 'detail' : 'history')}
+              onBack={() => setPanelMode('detail')}
               onDownload={reportSessionId !== null ? downloadReport : undefined} />
           ) : !detail ? (
             <p className="text-sm cw-text-muted">Select an advisory to see its CVEs — or tick advisories/CVEs and click Match.</p>
@@ -457,6 +461,8 @@ export default function AdvisoriesPage() {
           )}
         </div>
       </div>
+      </>
+      )}
 
       {sourcesOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">

@@ -716,7 +716,7 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
         <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-[11px] font-semibold uppercase tracking-wider cw-text-muted">
+              <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-xs font-bold uppercase tracking-wider cw-text-default">
                 <th className="px-3 py-2">Run</th>
                 <th className="px-3 py-2">When</th>
                 <th className="px-3 py-2">By</th>
