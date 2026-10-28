@@ -12,7 +12,7 @@ import {
 import {
   AdvisoryView, AdvisoryListResponse, MatchReportData, MatchTarget,
   SeverityBadge, StatusBadge, RichText, VulnCard, RegionPicker,
-  MatchPanel, MatchReport, MatchHistory,
+  MatchPanel, MatchReport, MatchHistory, HistoryTimeline, FlowStrip,
 } from './_components/ui';
 
 interface AdvisorySource {
@@ -340,7 +340,7 @@ export default function AdvisoriesPage() {
               <p>No advisories match these filters</p>
             </div>
           ) : (
-            grouped.map(({ region, sources, items }) => {
+            grouped.map(({ region, sources, items }, ri) => {
               const regionCollapsed = collapsed.has(region);
               return (
                 <div key={region}>
@@ -355,7 +355,7 @@ export default function AdvisoriesPage() {
                       <span className="ml-auto text-xs font-semibold cw-text-muted">{items.length}</span>
                     </button>
                   </div>
-                  {!regionCollapsed && sources.map(({ source, items: sItems }) => {
+                  {!regionCollapsed && sources.map(({ source, items: sItems }, si) => {
                     const key = srcKey(region, source);
                     const srcCollapsed = collapsed.has(key);
                     return (
@@ -370,7 +370,7 @@ export default function AdvisoriesPage() {
                             <span className="ml-auto text-[11px] cw-text-muted">{sItems.length}</span>
                           </button>
                         </div>
-                        {!srcCollapsed && sItems.map((a) => (
+                        {!srcCollapsed && sItems.map((a, ai) => (
                           <div key={a.id}
                             className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] py-2.5 pl-9 pr-3 ${selectedId === a.id ? 'bg-[var(--color-subtle)]' : ''}`}>
                             <input type="checkbox" className="shrink-0"
@@ -457,6 +457,8 @@ export default function AdvisoriesPage() {
                 )}
               </div>
 
+              {detail.flow && <div className="mt-4"><FlowStrip flow={detail.flow} /></div>}
+
               {detail.status === 'pending' && (
                 <p className="mt-4 rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
                   Extracted and awaiting review — open <span className="font-medium">Review &amp; confirm</span> to check the CVEs and the parsing report before it is tracked.
@@ -478,6 +480,10 @@ export default function AdvisoriesPage() {
                       ))}
                   </div>
                 </div>
+              )}
+
+              {detail.history && detail.history.length > 0 && (
+                <div className="mt-5"><HistoryTimeline events={detail.history} /></div>
               )}
             </>
           )}
