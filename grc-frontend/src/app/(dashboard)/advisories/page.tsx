@@ -172,11 +172,10 @@ export default function AdvisoriesPage() {
       .map((region) => ({ region, items: map[region] }));
   }, [filtered]);
 
-  // Keep the detail panel on a visible advisory.
+  // Clear the selection if the chosen advisory is filtered out — never auto-open one.
   useEffect(() => {
-    if (filtered.length === 0) return;
-    if (selectedId === null || !filtered.some((a) => a.id === selectedId)) {
-      setSelectedId(filtered[0].id);
+    if (selectedId !== null && !filtered.some((a) => a.id === selectedId)) {
+      setSelectedId(null);
     }
   }, [filtered, selectedId]);
 

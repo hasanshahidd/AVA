@@ -167,7 +167,11 @@ def nvd_item_to_draft(item: Dict[str, Any]) -> Optional[AdvisoryDraft]:
     if not cid.startswith("CVE-"):
         return None
     descs = cve.get("descriptions") or []
-    title = next((d.get("value") for d in descs if d.get("lang") == "en"), None) or cid
+    desc = next((d.get("value") for d in descs if d.get("lang") == "en"), None) or ""
+    # NVD gives only a long description — use its first sentence as a readable
+    # title and keep the full text as the summary (shown non-bold in the UI).
+    first = desc.split(". ")[0].strip()
+    title = (first[:140] if first else "") or cid
     sev = None
     metrics = cve.get("metrics") or {}
     for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
@@ -178,7 +182,8 @@ def nvd_item_to_draft(item: Dict[str, Any]) -> Optional[AdvisoryDraft]:
             break
     return AdvisoryDraft(
         external_id=cid,
-        title=title[:300],
+        title=title,
+        summary=desc or None,
         severity=sev,
         url=f"https://nvd.nist.gov/vuln/detail/{cid}",
         published_at=_parse_date((cve.get("published") or "")[:10]),
