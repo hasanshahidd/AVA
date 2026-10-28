@@ -504,6 +504,74 @@ def affected_assets(
     return {"assets": result, "total": len(result)}
 
 
+_SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+
+@router.get("/by-asset/{asset_id}")
+def advisories_by_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    user: GRCUser = Depends(require_auth),
+):
+    """Advisories that affect ONE asset (applicability verdict=affected) — powers
+    the asset-detail 'Advisories' tab. Most-severe first, then most-recently
+    checked. 200 with {items:[], total:0} when the asset has no advisory match."""
+    tenant_id = get_user_primary_tenant(user, db)
+    rows = (
+        db.query(
+            AdvisoryAssetApplicability.checked_at.label("checked_at"),
+            AdvisoryCve.cve_id.label("cve_id"),
+            AdvisoryCve.severity.label("cve_severity"),
+            Advisory.id.label("advisory_id"),
+            Advisory.title.label("advisory_title"),
+            Advisory.severity.label("advisory_severity"),
+            Advisory.url.label("url"),
+            Advisory.source_id.label("source_id"),
+            Advisory.raw_file_path.label("raw_file_path"),
+            Advisory.extraction_meta.label("extraction_meta"),
+        )
+        .join(AdvisoryCve, AdvisoryAssetApplicability.advisory_cve_id == AdvisoryCve.id)
+        .join(Advisory, AdvisoryCve.advisory_id == Advisory.id)
+        .filter(
+            AdvisoryAssetApplicability.tenant_id == tenant_id,
+            AdvisoryAssetApplicability.asset_id == asset_id,
+            AdvisoryAssetApplicability.verdict == "affected",
+        )
+        .all()
+    )
+
+    # Region isn't a column: synced advisories take it from their source, uploads
+    # from extraction_meta (same rule as the list endpoint).
+    region_map = _region_by_source_name()
+    src_ids = {r.source_id for r in rows if r.source_id}
+    src_names = ({s.id: s.name for s in db.query(AdvisorySource.id, AdvisorySource.name)
+                  .filter(AdvisorySource.tenant_id == tenant_id, AdvisorySource.id.in_(src_ids)).all()}
+                 if src_ids else {})
+
+    def _region(r) -> Optional[str]:
+        if r.source_id:
+            return region_map.get(src_names.get(r.source_id)) or UNCLASSIFIED
+        if r.raw_file_path:
+            meta = r.extraction_meta if isinstance(r.extraction_meta, dict) else {}
+            return normalize_region(meta.get("region")) or UNCLASSIFIED
+        return UNCLASSIFIED
+
+    items = [{
+        "advisory_id": r.advisory_id,
+        "advisory_title": r.advisory_title,
+        "advisory_severity": (r.advisory_severity or "info"),
+        "cve_id": r.cve_id,
+        "cve_severity": (r.cve_severity or "info"),
+        "region": _region(r),
+        "url": r.url,
+        "checked_at": r.checked_at.isoformat() if r.checked_at else None,
+    } for r in rows]
+    # Two stable passes: checked_at desc, then severity rank asc (critical first).
+    items.sort(key=lambda it: it["checked_at"] or "", reverse=True)
+    items.sort(key=lambda it: _SEV_RANK.get((it["advisory_severity"] or "info").lower(), 9))
+    return {"items": items, "total": len(items)}
+
+
 # ─── Matching (selection-driven) + saved sessions ───────────────────────────
 
 def _match_scope_ids(db: Session, tenant_id: int, req: "MatchRequest") -> Set[int]:
