@@ -38,14 +38,14 @@ const ALL = 'all';
 // Multinational buckets sort first, then countries alphabetically, Unclassified last.
 const REGION_ORDER = ['US', 'EU', 'UK', 'Global'];
 
-function FilterSelect({ label, value, options, onChange }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void;
+function FilterSelect({ label, value, options, onChange, stacked }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; stacked?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-xs cw-text-muted">
+    <label className={stacked ? 'flex flex-col gap-1 text-xs cw-text-muted' : 'flex items-center gap-1.5 text-xs cw-text-muted'}>
       {label}
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1 text-xs cw-text-default">
+        className={`rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1 text-xs cw-text-default ${stacked ? 'w-full' : ''}`}>
         <option value={ALL}>all</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -311,16 +311,20 @@ export default function AdvisoriesPage() {
         </button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
-        <div className="cw-card overflow-y-auto">
-          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
-            <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
-            <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
-            <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
-            <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
-            <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-            <span className="ml-auto text-[11px] cw-text-muted">{filtered.length}/{advisories.length}</span>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[180px_360px_1fr]">
+        <div className="cw-card flex flex-col gap-3 overflow-y-auto p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider cw-text-default">Filters</span>
+            <span className="text-[11px] cw-text-muted">{filtered.length}/{advisories.length}</span>
           </div>
+          <FilterSelect stacked label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
+          <FilterSelect stacked label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+          <FilterSelect stacked label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
+          <FilterSelect stacked label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
+          <FilterSelect stacked label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
+        </div>
+
+        <div className="cw-card overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-12 text-center cw-text-muted">
               <ShieldAlert className="mx-auto mb-3 h-10 w-10" />
