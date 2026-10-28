@@ -115,7 +115,9 @@ function Btn({ green, sm, onClick, disabled, title, style, children }: { green?:
   // One border property only — mixing the `border` shorthand with a `borderColor`
   // override across rerenders trips React's conflicting-style warning.
   const base: React.CSSProperties = { border: `1px solid ${green ? AC : '#E4E8EC'}`, background: '#fff', color: SEC, borderRadius: 9, padding: sm ? '5px 10px' : '7px 12px', fontSize: sm ? 11.5 : 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, whiteSpace: 'nowrap' };
-  const g: React.CSSProperties = green ? { background: AC, color: '#06342B', fontWeight: 600 } : {};
+  // Primary action: white text on the brand-blue AC. (Was #06342B near-black text,
+  // which went invisible once AC became the dark blue #005B96.)
+  const g: React.CSSProperties = green ? { background: AC, color: '#fff', fontWeight: 600 } : {};
   return <button type="button" title={title} disabled={disabled} onClick={onClick} style={{ ...base, ...g, ...style }}>{children}</button>;
 }
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
@@ -576,6 +578,37 @@ export default function CtemScopesRedesign() {
                 {canEdit && <Btn green sm onClick={() => enterScope(sc.id, true)}>▶ Start Cycle #{sc.cycleNo + 1}</Btn>}
               </>}
         </div>
+        {open && (() => {
+          // The 5-stage flow, shown on the program card (was only inside the
+          // scope journey behind "Open →"). Done = coloured ✓, current = coloured
+          // number, upcoming = grey. Click anywhere on it to open the journey.
+          const sp2 = sc.stageProgress ?? null;
+          const d: Record<number, boolean> = {
+            1: sc.assets > 0,
+            2: sp2 ? !!sp2.discover : sc.findings > 0,
+            3: sp2 ? !!sp2.prioritise : (sc.buckets?.chainless ?? 0) === 0,
+            4: sp2 ? !!sp2.validate : sc.controls > 0,
+            5: (sc.tasks ?? 0) > 0 || sc.fixes > 0,
+          };
+          const firstInc = [1, 2, 3, 4, 5].find((n) => !d[n]) ?? 5;
+          return (
+            <div onClick={() => enterScope(sc.id)} title="Open the scope journey"
+              style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER2}`, cursor: 'pointer' }}>
+              {STAGES.map((st, i) => {
+                const on = d[st.n] || st.n === firstInc;
+                return (
+                  <div key={st.n} style={{ display: 'flex', alignItems: 'center', flex: i < STAGES.length - 1 ? 1 : 'none', minWidth: 0 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, flex: 'none', color: d[st.n] ? st.c : st.n === firstInc ? INK : FAINT }}>
+                      <span style={{ width: 17, height: 17, borderRadius: 999, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 800, background: on ? st.c : '#EEF1F3', color: on ? '#fff' : FAINT }}>{d[st.n] ? '✓' : st.n}</span>
+                      {st.label}
+                    </span>
+                    {i < STAGES.length - 1 && <span style={{ flex: 1, height: 2, borderRadius: 2, margin: '0 8px', background: d[st.n] ? st.c : '#E8ECEE', minWidth: 12 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     );
   };
