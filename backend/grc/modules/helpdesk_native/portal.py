@@ -283,11 +283,12 @@ def portal_assets(q: Optional[str] = None, db: Session = Depends(get_db),
                   _: bool = Depends(require_requester)):
     """Assets (CMDB CIs) a requester can attach to a request/report.
 
-    With NO query -> the caller's OWN assets (CI.owner == their email); with a
-    query -> a tenant-wide name/code search so they can find a shared asset
-    (printer, server, meeting-room PC). CI.owner is frequently a team name rather
-    than a user email, so own-asset matching is best-effort by design — search
-    covers everything else. Retired CIs are excluded (they can't be linked). Only
+    With NO query -> the caller's OWN assets (CI.owner == their email), falling
+    back to the tenant's linkable assets when they own none (CI.owner is usually a
+    team/blank, so most requesters own nothing — an empty default was wrong); with
+    a query -> a tenant-wide name/code search so they can find a shared asset
+    (printer, server, meeting-room PC). Owned assets always sort first and are
+    badged "mine". Retired CIs are excluded (they can't be linked). Only
     id/code/name/type/owner are returned (no sensitive attributes)."""
     tid = tenant_id(db)
     el = (email or "").strip().lower()
@@ -308,7 +309,12 @@ def portal_assets(q: Optional[str] = None, db: Session = Depends(get_db),
     if ql:
         hits = [c for c in cis if ql in (c.name or "").lower() or ql in (c.code or "").lower()]
     else:
-        hits = [c for c in cis if mine(c)]
+        own = [c for c in cis if mine(c)]
+        # CI.owner is usually a team/blank, so a requester rarely "owns" a CI and
+        # the default list came back empty. Fall back to the tenant's linkable
+        # assets (search already exposes these) so the picker is never empty; owned
+        # assets still sort first and keep the "Mine" badge.
+        hits = own if own else cis
     hits.sort(key=lambda c: (not mine(c), (c.name or "").lower()))
     return {"assets": [{"id": c.id, "code": c.code, "name": c.name,
                         "type": c.ci_type.name if c.ci_type else None,

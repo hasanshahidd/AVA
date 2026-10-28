@@ -71,7 +71,7 @@ export function AssetPicker({ value, onChange }: {
             <div className="px-3 py-2 text-[12.5px] text-slate-400">Loading…</div>
           ) : assets.length === 0 ? (
             <div className="px-3 py-2 text-[12.5px] text-slate-400">
-              {q.trim() ? "No matching assets." : "No assets assigned to you — search to find one."}
+              {q.trim() ? "No matching assets." : "No assets available — type to search."}
             </div>
           ) : (
             assets.map((a) => (
