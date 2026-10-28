@@ -181,13 +181,23 @@ export default function AdvisoriesPage() {
     (fStatus === ALL || a.status === fStatus)
   ), [advisories, fRegion, fOrigin, fSource, fSeverity, fStatus]);
 
-  // Group the filtered list by region, ordered by REGION_ORDER then name.
+  // Group the filtered list hierarchically: region → source → advisories.
+  // Region order = REGION_ORDER then name; sources A–Z within a region.
   const grouped = useMemo(() => {
-    const map: Record<string, AdvisoryView[]> = {};
-    for (const a of filtered) (map[a.region || 'Other'] ||= []).push(a);
-    return Object.keys(map)
+    const byRegion: Record<string, Record<string, AdvisoryView[]>> = {};
+    for (const a of filtered) {
+      const r = a.region || 'Other';
+      const s = a.source_name || 'Unknown source';
+      ((byRegion[r] ||= {})[s] ||= []).push(a);
+    }
+    return Object.keys(byRegion)
       .sort((x, y) => regionRank(x) - regionRank(y) || x.localeCompare(y))
-      .map((region) => ({ region, items: map[region] }));
+      .map((region) => {
+        const sources = Object.keys(byRegion[region]).sort()
+          .map((source) => ({ source, items: byRegion[region][source] }));
+        const items = sources.flatMap((s) => s.items);
+        return { region, sources, items };
+      });
   }, [filtered]);
 
   // Clear the selection if the chosen advisory is filtered out — never auto-open one.
@@ -197,12 +207,13 @@ export default function AdvisoriesPage() {
     }
   }, [filtered, selectedId]);
 
-  const toggleRegion = (region: string) =>
+  const toggleKey = (key: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(region)) next.delete(region); else next.add(region);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  const srcKey = (region: string, source: string) => `${region}\u0000${source}`;
 
   const toggleAdv = (id: number) => setSelAdv((p) => {
     const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -295,41 +306,33 @@ export default function AdvisoriesPage() {
         </div>
       ) : (
       <>
-      <div className="cw-card flex flex-wrap items-center gap-2 p-2.5">
+      <div className="cw-card flex flex-wrap items-center gap-x-4 gap-y-2 p-2.5">
         <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
-          className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+          className="btn-primary flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
           <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
         </button>
-        {selCveTotal === 0 ? (
-          <span className="text-xs cw-text-muted">Tick advisories/CVEs on the left, then Match.</span>
-        ) : (
-          <span className="text-xs cw-text-default">
-            <span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
-            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected
+        {(selAdv.size > 0 || selCve.size > 0) && (
+          <span className="flex shrink-0 items-center gap-2 text-xs cw-text-default">
+            <span><span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
+              {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected</span>
+            <button onClick={clearSel} className="text-[var(--color-primary)] hover:underline">Clear</button>
           </span>
         )}
-        {(selAdv.size > 0 || selCve.size > 0) && (
-          <button onClick={clearSel} className="text-xs text-[var(--color-primary)] hover:underline">Clear</button>
-        )}
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+          <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
+          <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+          <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
+          <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
+          <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
+          <span className="text-[11px] cw-text-muted">{filtered.length}/{advisories.length}</span>
+        </div>
         <button onClick={() => setPanelMode('history')}
-          className="btn-secondary ml-auto flex items-center gap-1.5 text-sm">
+          className="btn-secondary flex shrink-0 items-center gap-1.5 text-sm">
           <History size={15} /> History
         </button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[180px_360px_1fr]">
-        <div className="cw-card flex flex-col gap-3 overflow-y-auto p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider cw-text-default">Filters</span>
-            <span className="text-[11px] cw-text-muted">{filtered.length}/{advisories.length}</span>
-          </div>
-          <FilterSelect stacked label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
-          <FilterSelect stacked label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
-          <FilterSelect stacked label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
-          <FilterSelect stacked label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
-          <FilterSelect stacked label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-        </div>
-
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[400px_1fr]">
         <div className="cw-card overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-12 text-center cw-text-muted">
@@ -337,39 +340,58 @@ export default function AdvisoriesPage() {
               <p>No advisories match these filters</p>
             </div>
           ) : (
-            grouped.map(({ region, items }) => {
-              const isCollapsed = collapsed.has(region);
+            grouped.map(({ region, sources, items }) => {
+              const regionCollapsed = collapsed.has(region);
               return (
                 <div key={region}>
                   <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
                     <input type="checkbox" className="shrink-0" title="Select all in region"
                       checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
                       onChange={() => toggleRegionSel(items)} />
-                    <button onClick={() => toggleRegion(region)} className="flex flex-1 items-center gap-2 text-left">
-                      {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                      <span className="text-xs font-semibold uppercase tracking-wider cw-text-default">{region}</span>
-                      <span className="ml-auto text-xs cw-text-muted">{items.length}</span>
+                    <button onClick={() => toggleKey(region)} className="flex flex-1 items-center gap-2 text-left">
+                      {regionCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                      <span className="text-xs font-bold uppercase tracking-wider cw-text-default">{region}</span>
+                      <span className="rounded bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
+                      <span className="ml-auto text-xs font-semibold cw-text-muted">{items.length}</span>
                     </button>
                   </div>
-                  {!isCollapsed && items.map((a) => (
-                    <div key={a.id}
-                      className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] px-3 py-2.5 ${selectedId === a.id ? 'bg-[var(--color-subtle)]' : ''}`}>
-                      <input type="checkbox" className="shrink-0"
-                        checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
-                      <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
-                        <p className="min-w-0 flex-1 truncate text-sm font-medium cw-text-default">{a.title}</p>
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                          {a.status === 'pending' ? (
-                            <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700">review</span>
-                          ) : a.asset_affected_count > 0 ? (
-                            <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
-                          ) : null}
-                          <SeverityBadge severity={a.severity} />
+                  {!regionCollapsed && sources.map(({ source, items: sItems }) => {
+                    const key = srcKey(region, source);
+                    const srcCollapsed = collapsed.has(key);
+                    return (
+                      <div key={key}>
+                        <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] py-1.5 pl-6 pr-3">
+                          <input type="checkbox" className="shrink-0" title="Select all from this source"
+                            checked={sItems.length > 0 && sItems.every((a) => selAdv.has(a.id))}
+                            onChange={() => toggleRegionSel(sItems)} />
+                          <button onClick={() => toggleKey(key)} className="flex flex-1 items-center gap-1.5 text-left">
+                            {srcCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium cw-text-default">{source}</span>
+                            <span className="ml-auto text-[11px] cw-text-muted">{sItems.length}</span>
+                          </button>
                         </div>
-                      </button>
-                    </div>
-                  ))}
+                        {!srcCollapsed && sItems.map((a) => (
+                          <div key={a.id}
+                            className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] py-2.5 pl-9 pr-3 ${selectedId === a.id ? 'bg-[var(--color-subtle)]' : ''}`}>
+                            <input type="checkbox" className="shrink-0"
+                              checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
+                            <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
+                              className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
+                              <p className="min-w-0 flex-1 truncate text-sm font-medium cw-text-default">{a.title}</p>
+                              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                                {a.status === 'pending' ? (
+                                  <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700">review</span>
+                                ) : a.asset_affected_count > 0 ? (
+                                  <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
+                                ) : null}
+                                <SeverityBadge severity={a.severity} />
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })
