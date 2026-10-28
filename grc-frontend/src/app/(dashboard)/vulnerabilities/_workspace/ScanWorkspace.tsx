@@ -315,15 +315,23 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                 </div>
               )}
             </div>
-            {/* findings */}
+            {/* findings — these belong to the ASSET's register. While a scan is running they are the
+                PREVIOUS results; the panel says so and refreshes (refetchPlan) when the scan completes,
+                so a re-scan is never mistaken for "reused the old session". */}
             <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${BORDER}` }}>
-                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>Findings</h3>
-                <span style={{ fontSize: 11.5, color: MUTED }}>{planLoading ? 'loading…' : `${planVulns.length} shown`}</span>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>{scanning ? 'Findings so far' : 'Findings'}</h3>
+                <span style={{ fontSize: 11.5, color: MUTED }}>{planLoading ? 'loading…' : scanning ? 'previous results · updating' : `${planVulns.length} shown`}</span>
               </div>
-              <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+              {scanning && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 11.5, color: AC, background: ACSOFT, borderBottom: `1px solid ${BORDER}` }}>
+                  <span style={{ flex: '0 0 auto', width: 7, height: 7, borderRadius: '50%', background: AC }} />
+                  <span>New scan running{routing.lane_label || routing.lane ? ` in the ${routing.lane_label || routing.lane} lane` : ''} — the rows below are this asset's existing findings and refresh when the scan finishes.</span>
+                </div>
+              )}
+              <div style={{ maxHeight: 460, overflowY: 'auto', opacity: scanning ? 0.55 : 1 }}>
                 {planVulns.length === 0 ? (
-                  <div style={{ padding: 26, textAlign: 'center', fontSize: 12, color: FAINT }}>{planLoading ? 'Loading…' : 'No findings yet — run a scan.'}</div>
+                  <div style={{ padding: 26, textAlign: 'center', fontSize: 12, color: FAINT }}>{planLoading ? 'Loading…' : scanning ? 'No earlier findings — this scan’s results will appear when it completes.' : 'No findings yet — run a scan.'}</div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
