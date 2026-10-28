@@ -238,7 +238,7 @@ export default function FindingDetail({ vulnId }: { vulnId: number }) {
           {/* Affected assets FIRST — opening a finding should show, at a glance
               (top-right), exactly which assets this vulnerability hits and how
               exposed they are. Blast radius + per-asset context, all real. */}
-          <AffectedAssets links={assetLinks} />
+          <AffectedAssets links={assetLinks} vulnId={vulnId} />
           {/* ponytail: renders every linked asset inline; a finding on 20+ hosts
               makes a tall sticky rail. Cap + "+N more" only if that ever happens. */}
           {/* Assignment near the top — the department(s) it's routed to plus the individual owner. */}
@@ -299,8 +299,29 @@ function critMeta(c?: string) {
 }
 const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
-function AffectedAssets({ links }: { links?: any[] }) {
+function AffectedAssets({ links, vulnId }: { links?: any[]; vulnId: number }) {
   const list = Array.isArray(links) ? links : [];
+  // Link an inventory asset to this finding — the register's "Not yet linked" state had no way
+  // to attach one (so a manually-added vuln could never be linked). Reuses the existing
+  // POST /vulnerabilities/{id}/assets; the dropdown excludes already-linked assets.
+  const qc = useQueryClient();
+  const [pick, setPick] = useState('');
+  const { data: invAssets } = useQuery({
+    queryKey: ['inv-assets-for-link'],
+    queryFn: async () => (await assetsApi.getAll()).data as any[],
+  });
+  const linkedIds = new Set(list.map((l) => l?.asset_id));
+  const options = (Array.isArray(invAssets) ? invAssets : []).filter((a) => !linkedIds.has(a.id));
+  const linkMut = useMutation({
+    mutationFn: (assetId: number) => vulnManagementApi.assetLinks.create(vulnId, { asset_id: assetId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vuln-assets', vulnId] });
+      qc.invalidateQueries({ queryKey: ['vulnerability', vulnId] });
+      qc.invalidateQueries({ queryKey: ['vulnerabilities'] });
+      setPick('');
+    },
+    onError: (e: any) => window.alert(e?.response?.data?.detail || 'Failed to link the asset.'),
+  });
   const n = list.length;
   const exposed = list.filter((l) => l?.asset_internet_facing).length;
   const critical = list.filter((l) => ['critical', 'high'].includes((l?.asset_criticality || '').toLowerCase())).length;
@@ -349,6 +370,19 @@ function AffectedAssets({ links }: { links?: any[] }) {
             </div>
           );
         })}
+        {options.length > 0 && (
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginTop: n === 0 ? 2 : 4 }}>
+            <select value={pick} onChange={(e) => setPick(e.target.value)}
+              style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '7px 9px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', fontFamily: 'inherit' }}>
+              <option value="">Link an asset…</option>
+              {options.map((a) => <option key={a.id} value={a.id}>{a.name || a.hostname || a.ip_address || `Asset #${a.id}`}</option>)}
+            </select>
+            <button onClick={() => pick && linkMut.mutate(Number(pick))} disabled={!pick}
+              style={{ ...btn, flex: 'none', padding: '7px 12px', cursor: pick ? 'pointer' : 'not-allowed', opacity: pick ? 1 : 0.5 }}>
+              Link
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

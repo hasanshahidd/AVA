@@ -42,8 +42,12 @@ const ctxScore = (v: Vulnerability) => Math.round((v.composite_priority ?? 0) * 
 const band = (score: number) => (score >= 55 ? 'urgent' : score >= 25 ? 'moderate' : 'low');
 const BAND_META = { urgent: { c: '#C2453F', label: 'Urgent' }, moderate: { c: '#9A6410', label: 'Mod' }, low: { c: '#1F7A54', label: 'Low' } } as const;
 const isUnassigned = (v: Vulnerability) => !v.assigned_to && !(v as any).assignee_name && !((v as any).assigned_departments?.length);
+const isLinked = (v: Vulnerability) => (((v as any).linked_assets?.length ?? 0) > 0);
 const isExposed = (v: Vulnerability) => !!(v as any).internet_facing || !!(v as any).internet_exposed;
-const domainOf = (v: Vulnerability) => v.plugin_family || (v as any).affected_component || 'General';
+// MUST mirror the backend domains bucket (null plugin_family => "Uncategorized"): the sidebar
+// counts come from the backend while the row filter runs here, so any divergence (e.g. the old
+// affected_component/'General' fallback) made "Uncategorized" count 1 but show 0.
+const domainOf = (v: Vulnerability) => v.plugin_family || 'Uncategorized';
 const OPEN_ISH = new Set(['open', 'in_progress', 'remediated', 'verified']);
 const dueLabel = (v: Vulnerability) => {
   if (!v.due_date) return null;
@@ -81,7 +85,7 @@ export interface VulnsWorkspaceProps {
   bulkUploadState?: 'idle' | 'uploading' | 'done' | 'error'; bulkUploadMsg?: string | null;
 }
 
-type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unassigned' | `sev-${SevKey}` | `dom-${string}`;
+type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unassigned' | 'linked' | 'unlinked' | `sev-${SevKey}` | `dom-${string}`;
 
 const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', color: INK, fontWeight: 700, padding: '10px 12px', borderBottom: `1px solid ${BORDER}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#FAFBFC', zIndex: 1 };
 const td: React.CSSProperties = { padding: '11px 12px', borderBottom: `1px solid ${BORDER2}`, verticalAlign: 'middle', whiteSpace: 'nowrap', fontSize: 12.5 };
@@ -179,6 +183,8 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     { key: 'epss', label: 'High EPSS', n: dcount(dashboard?.high_epss_count, (v) => (v.epss_score ?? 0) >= 0.1), dot: '#9A6410' },
     { key: 'exposed', label: 'Internet-exposed', n: dcount(dashboard?.internet_exposed_count, isExposed), dot: '#6A54C9' },
     { key: 'unassigned', label: 'Unassigned', n: count(isUnassigned), dot: '#8A95A1' },
+    { key: 'linked', label: 'Asset-linked', n: count(isLinked), dot: '#2F9E5A' },
+    { key: 'unlinked', label: 'Unlinked', n: count((v) => !isLinked(v)), dot: '#B98900' },
   ];
   const SEV_RAIL: { key: TriageView; label: string; n: number; sw: string }[] = (['critical', 'high', 'medium', 'info'] as SevKey[]).map((k) => ({ key: `sev-${k}` as TriageView, label: SEV[k].label, n: count((v) => normSev(v.severity) === k), sw: SEV[k].dot }));
   // De-brand engine/tool names → assessment type, then MERGE families that
@@ -196,6 +202,8 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
 
   const matches = (v: Vulnerability): boolean => {
     if (view === 'all' || view === 'unassigned') return view === 'all' ? true : isUnassigned(v);
+    if (view === 'linked') return isLinked(v);
+    if (view === 'unlinked') return !isLinked(v);
     if (view === 'kev') return !!v.kev_flag;
     if (view === 'exploit') return hasExploit(v);
     if (view === 'cve') return !!v.cve_id;
@@ -214,7 +222,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     return s;
   }, [filteredVulns, view, sort, scanMode]);
 
-  const railLabel: Record<string, string> = { all: 'All findings', kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned' };
+  const railLabel: Record<string, string> = { all: 'All findings', kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned', linked: 'Asset-linked', unlinked: 'Unlinked' };
   const title = railLabel[view] || (view.startsWith('sev-') ? SEV[view.slice(4) as SevKey].label : view.startsWith('dom-') ? view.slice(4) : 'Findings');
 
   // Overview (cmd) flows at natural height so the whole page scrolls with the
