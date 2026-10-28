@@ -40,7 +40,7 @@ import (
 	"time"
 )
 
-const agentVersion = "1.0.0"
+const agentVersion = "1.1.0"
 
 type state struct {
 	APIToken string `json:"api_token"`
@@ -459,7 +459,69 @@ func deepCollect(apiToken string) string {
 }
 
 func heartbeat(apiToken string) {
-	_, _, _ = post(base()+"/api/agents/heartbeat", apiToken, map[string]any{})
+	rb, _, _ := post(base()+"/api/agents/heartbeat", apiToken, map[string]any{})
+	var r struct {
+		AgentVersion string `json:"agent_version"`
+	}
+	// Self-update when the server advertises a different version — unless we ALREADY
+	// tried to reach exactly that version (a prior swap that didn't take, e.g. the
+	// server version was bumped without a rebuilt binary), which would otherwise loop.
+	if json.Unmarshal(rb, &r) == nil && r.AgentVersion != "" && r.AgentVersion != agentVersion &&
+		lastUpdateTarget() != r.AgentVersion {
+		selfUpdate(r.AgentVersion)
+	}
+}
+
+func updateMarkerPath() string { return filepath.Join(filepath.Dir(statePath()), "update-target") }
+
+func lastUpdateTarget() string {
+	b, _ := os.ReadFile(updateMarkerPath())
+	return strings.TrimSpace(string(b))
+}
+
+// selfUpdate downloads the server's current agent binary, swaps it in, and exits
+// non-zero so the supervisor relaunches us on it: Windows SCM failure action,
+// Linux systemd Restart=always, macOS launchd KeepAlive. Best-effort — any failure
+// leaves the running binary untouched and we retry on the next heartbeat.
+func selfUpdate(target string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	body, code, err := get(base()+"/api/agents/installer/"+binOS()+"/bin", "")
+	if err != nil || code != 200 || len(body) < 1_000_000 { // a real binary is multi-MB
+		return
+	}
+	newp := exe + ".new"
+	if os.WriteFile(newp, body, 0o755) != nil {
+		return
+	}
+	if runtime.GOOS == "windows" {
+		// A running .exe can't be overwritten but CAN be renamed aside.
+		_ = os.Remove(exe + ".old")
+		if os.Rename(exe, exe+".old") != nil {
+			_ = os.Remove(newp)
+			return
+		}
+	}
+	if os.Rename(newp, exe) != nil {
+		return
+	}
+	// Record the target so we don't re-attempt the same version if it didn't take.
+	_ = os.WriteFile(updateMarkerPath(), []byte(target), 0o600)
+	fmt.Println("self-update: swapped in new binary, restarting")
+	os.Exit(1)
+}
+
+// binOS maps the running platform to the server's binary key (_BIN).
+func binOS() string {
+	if runtime.GOOS == "darwin" {
+		if runtime.GOARCH == "arm64" {
+			return "darwin-arm64"
+		}
+		return "darwin-amd64"
+	}
+	return runtime.GOOS // "windows" | "linux"
 }
 
 // ─────────────────────────── CIS / compliance (local) ───────────────────────
@@ -729,6 +791,9 @@ func reEnroll(st *state) bool {
 
 func main() {
 	loadConfig()
+	if exe, err := os.Executable(); err == nil {
+		_ = os.Remove(exe + ".old") // remove a prior self-update's old binary (Windows)
+	}
 	// On Windows, when the SCM launches us as a service, run under its control so
 	// Stop/Shutdown are handled and the SCM's failure action can restart us on a
 	// crash. Interactively (first install), or on Linux/macOS, run the loop direct.

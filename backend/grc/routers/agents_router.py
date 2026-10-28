@@ -38,6 +38,11 @@ router = APIRouter(prefix="/agents", tags=["Compliance Agents"])
 # server-side (the old UI only derived it in the browser, so nothing authoritative
 # ever marked an agent stale).
 STALE_AFTER = timedelta(minutes=10)
+
+# The agent version currently shipped in agent-dist. Returned on heartbeat so a
+# running agent self-updates when it differs (bump this AND the Go agentVersion
+# together, and rebuild the binaries, to roll a new version to the fleet).
+AGENT_VERSION = "1.1.0"
 ENROLLMENT_TTL = timedelta(hours=24)
 
 
@@ -501,8 +506,9 @@ def agent_heartbeat(authorization: Optional[str] = Header(default=None),
         agent.status = "active"
     agent.updated_at = now
     db.commit()
-    # Tell the agent whether a scan-now was requested from the console.
-    return {"ok": True, "scan_now": bool(agent.pending_scan_at)}
+    # Tell the agent whether a scan-now was requested, and the version it should be
+    # running (it self-updates when this differs from its own).
+    return {"ok": True, "scan_now": bool(agent.pending_scan_at), "agent_version": AGENT_VERSION}
 
 
 # ── Agent CIS jobs (local compliance execution) ─────────────────────────────
