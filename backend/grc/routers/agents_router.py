@@ -755,15 +755,21 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 # token, and default ProgramData is world-readable. New files inherit this ACL.
 icacls "$dir" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" 2>$null | Out-Null
 # Idempotent re-install + migrate off the old scheduled-task installs: stop the
-# service (if any), remove the old task, and free the .exe.
+# service (if any), remove the old task, and free the .exe. ALL best-effort — a
+# fresh PC has no service/task, so these are EXPECTED to "fail". schtasks writes
+# that failure to stderr, which PowerShell 5.1 turns into a TERMINATING error
+# under -ErrorAction Stop (and 2>$null does not always suppress it), so we lower
+# the preference here and let cmd own the redirection (no NativeCommandError).
+$ErrorActionPreference = "SilentlyContinue"
 sc.exe stop AvaAgent 2>$null | Out-Null
-schtasks /End /TN "AvaAgent" 2>$null | Out-Null
-schtasks /Delete /TN "AvaAgent" /F 2>$null | Out-Null
+cmd /c "schtasks /End /TN AvaAgent >nul 2>nul"
+cmd /c "schtasks /Delete /TN AvaAgent /F >nul 2>nul"
 Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 # Clear the saved token so this (re)install claims the FRESH enrollment — the new
 # agent takes over and the backend supersedes the old row (one agent per host).
 Remove-Item "$dir\\agent.json" -Force -ErrorAction SilentlyContinue
+$ErrorActionPreference = "Stop"
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
 # Config the service reads at startup. A Windows service does NOT reliably inherit
