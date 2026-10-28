@@ -505,7 +505,7 @@ export default function AdvisoriesPage() {
                   <table className="w-full text-xs">
                     <tbody>
                       {([
-                        ['Published', fmtDate(detail.published_at || detail.created_at), ''],
+                        ['Published', fmtDate(detail.published_at), ''],
                         ['Last updated', fmtDate(detail.updated_at), ''],
                         [detail.origin === 'upload' ? 'Uploaded' : 'Ingested', fmtDate(detail.created_at), ''],
                         ['External ID', detail.external_id || '—', ''],
@@ -513,8 +513,7 @@ export default function AdvisoriesPage() {
                         ['Region', detail.region || 'Unclassified', ''],
                       ] as [string, string, string][]).map(([k, v, hint]) => (
                         <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
-                          <th scope="row" className="w-32 px-3 py-1.5 text-left text-[11px] font-bold"
-                            style={{ background: 'var(--color-primary)', color: '#fff' }}>{k}</th>
+                          <th scope="row" className="w-32 bg-primary-700 px-3 py-1.5 text-left text-[11px] font-bold text-white">{k}</th>
                           <td className="px-3 py-1.5 cw-text-default">{hint || v}</td>
                         </tr>
                       ))}

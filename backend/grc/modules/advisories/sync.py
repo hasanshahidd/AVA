@@ -89,6 +89,11 @@ def sync_source(db: Session, *, tenant_id: int, key: str, limit: int = 50,
                 if new_sev != existing.severity:
                     existing.severity = new_sev
                     changed.append("severity")
+            # Backfill the real publication date (RSS <pubDate>) onto advisories
+            # synced before the parser captured it.
+            if d.published_at is not None and d.published_at != existing.published_at:
+                existing.published_at = d.published_at
+                changed.append("published_at")
             if changed:
                 record_event(db, tenant_id=tenant_id, advisory_id=existing.id, event="updated",
                              actor=actor, detail={"source": meta["name"], "fields": changed})

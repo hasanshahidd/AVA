@@ -26,7 +26,8 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, List, Optional
 
 import requests
@@ -63,6 +64,22 @@ def _parse_date(value: Optional[str]) -> Optional[datetime]:
         except (ValueError, TypeError):
             continue
     return None
+
+
+def _parse_rss_date(value: Optional[str]) -> Optional[datetime]:
+    """RSS <pubDate> is RFC-822 (e.g. 'Tue, 20 Oct 2026 12:00:00 GMT'). Return it
+    as a naive-UTC datetime (the published_at column is naive), or None."""
+    if not value:
+        return None
+    try:
+        dt = parsedate_to_datetime(value)
+    except (TypeError, ValueError, IndexError):
+        return _parse_date(value)
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 # ── CISA KEV ──────────────────────────────────────────────────────────────
@@ -227,6 +244,7 @@ def parse_rss_items(xml_text: str) -> List[Dict[str, str]]:
             "title": (item.findtext("title") or "").strip(),
             "link": (item.findtext("link") or "").strip(),
             "desc": item.findtext("description") or "",
+            "pubDate": (item.findtext("pubDate") or item.findtext("pubdate") or "").strip(),
         })
     return items
 
@@ -236,6 +254,7 @@ def _item_to_draft(it: Dict[str, str], source_url: str, cves: List[str]) -> Advi
         external_id=(it["link"] or it["title"])[:160] or cves[0],
         title=it["title"] or cves[0],
         url=it["link"] or source_url,
+        published_at=_parse_rss_date(it.get("pubDate")),
         cves=[{"cve_id": c, "product": None, "versions": None} for c in cves],
     )
 

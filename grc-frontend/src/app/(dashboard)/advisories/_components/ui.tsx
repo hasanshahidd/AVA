@@ -393,10 +393,6 @@ function formatWhen(at?: string | null): string {
   });
 }
 
-// Blue table-header cell. Inline style (not a class) so it beats the global
-// `.cw-dashboard thead th` rule that forces a grey background + muted text.
-export const BLUE_TH = { background: 'var(--color-primary)', color: '#fff' } as const;
-
 // The advisory's event history as a clean Event | When | By table: ingested →
 // confirmed → re-checked, each with an absolute date and the actor.
 export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
@@ -411,9 +407,9 @@ export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
-              <th className="px-3 py-2 font-bold" style={BLUE_TH}>Event</th>
-              <th className="px-3 py-2 font-bold" style={BLUE_TH}>When</th>
-              <th className="px-3 py-2 font-bold" style={BLUE_TH}>By</th>
+              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Event</th>
+              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">When</th>
+              <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">By</th>
             </tr>
           </thead>
           <tbody>
@@ -692,9 +688,9 @@ export function MatchReport({ report, title, onBack, onDownload }: {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
-                  <th className="px-3 py-2 font-bold" style={BLUE_TH}>CVE</th>
-                  <th className="px-3 py-2 font-bold" style={BLUE_TH}>Affected assets</th>
-                  <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Advisory</th>
+                  <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">CVE</th>
+                  <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Affected assets</th>
+                  <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Advisory</th>
                 </tr>
               </thead>
               <tbody>
@@ -764,14 +760,14 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-[11px] font-bold uppercase tracking-wide">
-                <th className="px-3 py-2 font-bold" style={BLUE_TH}>Run</th>
-                <th className="px-3 py-2 font-bold" style={BLUE_TH}>When</th>
-                <th className="px-3 py-2 font-bold" style={BLUE_TH}>By</th>
-                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>CVEs</th>
-                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Matched</th>
-                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Not found</th>
-                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Scope</th>
-                <th className="px-3 py-2 text-right font-bold" style={BLUE_TH}>Export</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">Run</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">When</th>
+                <th className="px-3 py-2 font-bold !bg-primary-700 !text-white">By</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">CVEs</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Matched</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Not found</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Scope</th>
+                <th className="px-3 py-2 text-right font-bold !bg-primary-700 !text-white">Export</th>
               </tr>
             </thead>
             <tbody>

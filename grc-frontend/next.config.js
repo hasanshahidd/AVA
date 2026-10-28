@@ -8,6 +8,12 @@ const path = require('path');
 const BACKEND_URL = (process.env.BACKEND_URL || 'http://backend:4000').replace(/\/$/, '');
 
 const nextConfig = {
+  // Build output dir. Defaults to `.next` (what `next start` reads). The deploy
+  // script sets NEXT_BUILD_DIR=.next.tmp so a build writes to a side dir and is
+  // atomically swapped into `.next` — the live server never reads a half-written
+  // build (no mid-deploy "Cannot find module page.js" 500s). The service runs
+  // `next start` WITHOUT this env, so it always serves `.next`.
+  distDir: process.env.NEXT_BUILD_DIR || '.next',
   eslint: {
     ignoreDuringBuilds: true,
   },
