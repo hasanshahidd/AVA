@@ -67,6 +67,7 @@ export default function TicketDetail() {
   const [note, setNote] = useState<string | null>(null);
   const [showAssign, setShowAssign] = useState(false);
   const [savedReply, setSavedReply] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false); // on-demand reply/note composer
 
   const { data: canned } = useHd<any>("/helpdesk/canned-responses");
   const { data: attachData, reload: reloadAttachments } = useHd<any>(`${base}/attachments`);
@@ -196,7 +197,7 @@ export default function TicketDetail() {
             <h1 className="mt-1 truncate text-lg font-semibold text-[var(--color-text)]">{t.subject || `Ticket ${name}`}</h1>
           </div>
           <div className="relative flex items-center gap-2">
-            <button onClick={() => setTab("reply")} className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}><MessageSquare size={15} /> Reply</button>
+            <button onClick={() => { setTab("reply"); resetDraft(); setComposerOpen(true); }} className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}><MessageSquare size={15} /> Reply</button>
             {statuses.length > 0 ? (
               <select value="" onChange={(e) => { if (e.target.value) act("update", { status: e.target.value }, `Status → ${e.target.value}.`); }}
                 className={`${btn} border-slate-200 text-slate-600 hover:bg-slate-50`}>
@@ -233,19 +234,84 @@ export default function TicketDetail() {
         {note && <div className="mt-2 rounded-md bg-slate-50 px-3 py-1.5 text-xs text-slate-500">{note}</div>}
       </div>
 
+      {/* Top property toolbar — the quick-edit dropdowns, one wrapping lane so an
+          agent can set routing/triage without hunting the side rail. Each is wired
+          to the same update/assign actions as before. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 border-b border-slate-200 bg-slate-50/60 px-6 py-2.5">
+        <div className="w-40">
+          <PropField label="Status">
+            {statuses.length > 0 ? (
+              <ComboBoxInput ariaLabel="Status" value={t.status || ""} allowCustom={false} placeholder="— Select —"
+                options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+                onChange={(v) => { if (v) act("update", { status: v }, "Status updated."); }} />
+            ) : <Chip value={t.status} />}
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Priority">
+            {priorities.length > 0 ? (
+              <ComboBoxInput ariaLabel="Priority" value={t.priority || ""} allowCustom={false} placeholder="— Select —"
+                options={priorities.map((p) => ({ value: p, label: p }))}
+                onChange={(v) => { if (v) act("update", { priority: v }, "Priority updated."); }} />
+            ) : <Chip value={t.priority} map={PRIORITY_CHIP} />}
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Ticket type">
+            {types.length > 0 ? (
+              <ComboBoxInput ariaLabel="Ticket type" value={t.ticket_type || ""} allowCustom={false} placeholder="Unset"
+                options={types.map((ty) => ({ value: ty, label: ty }))}
+                onChange={(v) => act("update", { ticket_type: v }, "Type updated.")} />
+            ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Department">
+            <ComboBoxInput ariaLabel="Department" value={t.department_id ? String(t.department_id) : ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!departments.length} placeholder={departments.length ? "— Select —" : "No departments"}
+              options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+              onChange={(v) => act("update", { department_id: v ? Number(v) : null }, "Department updated.")} />
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Team">
+            <ComboBoxInput ariaLabel="Team" value={t.team || ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!teams.length} placeholder={teams.length ? "Unassigned" : "No teams"}
+              options={teams.filter((tm) => !tm.disabled).map((tm) => ({ value: tm.name, label: tm.team_name || tm.name }))}
+              onChange={(v) => assign(undefined, v || null)} />
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Assignee">
+            <ComboBoxInput ariaLabel="Assignee" value={t.agent || ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!agents.length} placeholder="Unassigned"
+              options={agents.map((a) => ({ value: a.email || a.name || "", label: a.agent_name || a.email || a.name || "" }))}
+              onChange={(v) => assign(v || null, undefined)} />
+          </PropField>
+        </div>
+        <div className="w-40">
+          <PropField label="Customer">
+            <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
+              disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
+              options={customers.map((c) => ({ value: String(c.name), label: c.customer_name || c.name }))}
+              onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
+          </PropField>
+        </div>
+        <div className="w-48">
+          <PropField label="Contact">
+            <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (t.contact || "")) act("update", { contact: v || null }, "Contact updated."); }}
+              className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--color-base)]" />
+          </PropField>
+        </div>
+      </div>
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* conversation tabs: Replies (default) / Comments / Activity */}
-          <div className="flex items-center gap-1 border-b border-slate-100 bg-white px-6 pt-3">
-            {([["replies", "Replies", replies.length, MessageSquare], ["comments", "Comments", comments.length, StickyNote], ["activity", "Activity", activity.length, Activity]] as const).map(([k, label, count, Icon]) => (
-              <button key={k} onClick={() => setConvTab(k)}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${convTab === k ? "border-[var(--color-base)] text-[var(--color-text)]" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
-                <Icon size={14} /> {label} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{count}</span>
-              </button>
-            ))}
-          </div>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            {convTab === "replies" && t.description && (
+            {/* Description — the ticket body, always at the top of the thread. */}
+            {t.description && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                   <MessageSquare size={13} /> Description
@@ -258,91 +324,115 @@ export default function TicketDetail() {
                 </div>
               </div>
             )}
-            {shown.length === 0 ? (
-              (convTab === "replies" && t.description) ? null : (
-                <div className="flex flex-col items-center gap-1.5 py-12 text-center">
-                  <MessageSquare size={22} className="text-slate-300" />
-                  <p className="text-[13px] font-medium text-slate-500">
-                    {convTab === "replies" ? "No replies yet" : convTab === "comments" ? "No internal notes" : "No activity yet"}
-                  </p>
-                  <p className="max-w-xs text-[12px] text-slate-400">
-                    {convTab === "replies"
-                      ? "Use the box below to respond to the requester."
-                      : convTab === "comments"
-                      ? "Add a note your team can see but the requester can't."
-                      : "Status changes and assignments show up here."}
-                  </p>
-                </div>
-              )
-            ) : shown.map((m, i) => <TimelineItem key={i} m={m} />)}
-          </div>
 
-          <div className="border-t border-slate-200 bg-white px-6 py-3">
-            <div className="mb-2 flex items-center gap-1.5">
-              <button onClick={() => { if (tab !== "reply") { setTab("reply"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "reply" ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><MessageSquare size={14} /> Reply</button>
-              <button onClick={() => { if (tab !== "comment") { setTab("comment"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "comment" ? "bg-amber-100 text-amber-800" : "text-slate-500"}`}><StickyNote size={14} /> Internal note</button>
-              {tab === "reply" && (
-                <button onClick={() => setShowCc((v) => !v)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${showCc ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><Mail size={14} /> Cc/Bcc</button>
-              )}
-              {tab === "reply" && cannedList.length > 0 && (
-                <select value={savedReply} onChange={(e) => {
-                  const r = cannedList.find((c) => c.name === e.target.value);
-                  if (r) { const add = r.message || r.title || ""; setDraft((d) => (d && !isEmptyHtml(d) ? d : "") + add); setComposerKey((k) => k + 1); setSavedReply(""); }
-                }} className="ml-auto rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-500">
-                  <option value="">Insert canned reply…</option>
-                  {cannedList.map((c) => <option key={c.name} value={c.name}>{c.title || c.name}</option>)}
-                </select>
-              )}
-            </div>
-            <div className="mb-2 text-[11px] text-slate-400">
-              {tab === "reply"
-                ? <>Reply goes to <span className="font-medium text-slate-600">{t.contact || t.raised_by || t.customer || "the requester"}</span>.</>
-                : "Internal note — visible to agents only, not the requester."}
-            </div>
-            {tab === "reply" && showCc && (
-              <div className="mb-2 space-y-1.5">
-                <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc (comma-separated)"
-                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
-                <input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Bcc (comma-separated)"
-                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
-              </div>
-            )}
-            {tab === "reply" ? (
-              <RichComposer key={composerKey} value={draft} onChange={setDraft} />
-            ) : (
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3}
-                placeholder="Add an internal note…"
-                className="w-full resize-none rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm focus:border-[var(--color-base)] focus:outline-none" />
-            )}
-            {/* attachments — persisted per ticket (type-allowlisted, 10MB max) */}
-            <div className="mt-2 space-y-1.5">
-              {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {attachments.map((a) => (
-                    <button key={a.id} onClick={() => downloadAttachment(a)} title={`Download ${a.filename}`}
-                      className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
-                      <Paperclip size={12} className="shrink-0" />
-                      <span className="truncate">{a.filename}</span>
-                      {typeof a.size_bytes === "number" && <span className="shrink-0 text-slate-400">{Math.max(1, Math.round(a.size_bytes / 1024))} KB</span>}
-                      <Download size={12} className="shrink-0 text-slate-400" />
-                    </button>
-                  ))}
+            {/* On-demand composer — collapsed to two buttons until you reply/note,
+                so the thread isn't crowded by an always-open box. */}
+            <div className="rounded-xl border border-slate-200 bg-white">
+              {!composerOpen ? (
+                <div className="flex flex-wrap items-center gap-2 p-3">
+                  <button onClick={() => { setTab("reply"); resetDraft(); setComposerOpen(true); }}
+                    className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"><MessageSquare size={14} /> Reply</button>
+                  <button onClick={() => { setTab("comment"); resetDraft(); setComposerOpen(true); }}
+                    className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"><StickyNote size={14} /> Add note</button>
+                  <span className="ml-auto text-[11px] text-slate-400">Reply the requester sees, or an internal note they don't.</span>
+                </div>
+              ) : (
+                <div className="p-3">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <button onClick={() => { if (tab !== "reply") { setTab("reply"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "reply" ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><MessageSquare size={14} /> Reply</button>
+                    <button onClick={() => { if (tab !== "comment") { setTab("comment"); resetDraft(); } }} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${tab === "comment" ? "bg-amber-100 text-amber-800" : "text-slate-500"}`}><StickyNote size={14} /> Internal note</button>
+                    {tab === "reply" && (
+                      <button onClick={() => setShowCc((v) => !v)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${showCc ? "bg-slate-100 text-slate-800" : "text-slate-500"}`}><Mail size={14} /> Cc/Bcc</button>
+                    )}
+                    {tab === "reply" && cannedList.length > 0 && (
+                      <select value={savedReply} onChange={(e) => {
+                        const r = cannedList.find((c) => c.name === e.target.value);
+                        if (r) { const add = r.message || r.title || ""; setDraft((d) => (d && !isEmptyHtml(d) ? d : "") + add); setComposerKey((k) => k + 1); setSavedReply(""); }
+                      }} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-500">
+                        <option value="">Insert canned reply…</option>
+                        {cannedList.map((c) => <option key={c.name} value={c.name}>{c.title || c.name}</option>)}
+                      </select>
+                    )}
+                    <button onClick={() => { setComposerOpen(false); resetDraft(); }} className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Close composer"><XCircle size={16} /></button>
+                  </div>
+                  <div className="mb-2 text-[11px] text-slate-400">
+                    {tab === "reply"
+                      ? <>Reply goes to <span className="font-medium text-slate-600">{t.contact || t.raised_by || t.customer || "the requester"}</span>.</>
+                      : "Internal note — visible to agents only, not the requester."}
+                  </div>
+                  {tab === "reply" && showCc && (
+                    <div className="mb-2 space-y-1.5">
+                      <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc (comma-separated)"
+                        className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+                      <input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Bcc (comma-separated)"
+                        className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+                    </div>
+                  )}
+                  {tab === "reply" ? (
+                    <RichComposer key={composerKey} value={draft} onChange={setDraft} />
+                  ) : (
+                    <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3}
+                      placeholder="Add an internal note…"
+                      className="w-full resize-none rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm focus:border-[var(--color-base)] focus:outline-none" />
+                  )}
+                  {/* attachments — persisted per ticket (type-allowlisted, 10MB max) */}
+                  <div className="mt-2 space-y-1.5">
+                    {attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {attachments.map((a) => (
+                          <button key={a.id} onClick={() => downloadAttachment(a)} title={`Download ${a.filename}`}
+                            className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                            <Paperclip size={12} className="shrink-0" />
+                            <span className="truncate">{a.filename}</span>
+                            {typeof a.size_bytes === "number" && <span className="shrink-0 text-slate-400">{Math.max(1, Math.round(a.size_bytes / 1024))} KB</span>}
+                            <Download size={12} className="shrink-0 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <input ref={fileInputRef} type="file" className="hidden"
+                        accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.docx,.xlsx" onChange={onPickFile} />
+                      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+                        <Paperclip size={13} /> {uploading ? "Uploading…" : "Attach file"}
+                      </button>
+                      <button onClick={send} disabled={tab === "comment" ? !draft.trim() : isEmptyHtml(draft)} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send reply" : "Add note"}</button>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <input ref={fileInputRef} type="file" className="hidden"
-                  accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.docx,.xlsx" onChange={onPickFile} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-40">
-                  <Paperclip size={13} /> {uploading ? "Uploading…" : "Attach file"}
-                </button>
-                <button onClick={send} disabled={tab === "comment" ? !draft.trim() : isEmptyHtml(draft)} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-base)] px-3.5 py-1.5 text-sm font-medium text-white disabled:opacity-40"><Send size={14} /> {tab === "reply" ? "Send" : "Add note"}</button>
-              </div>
             </div>
+
+            {/* conversation tabs: Replies (default) / Comments / Activity */}
+            <div className="flex items-center gap-1 border-b border-slate-100">
+              {([["replies", "Replies", replies.length, MessageSquare], ["comments", "Comments", comments.length, StickyNote], ["activity", "Activity", activity.length, Activity]] as const).map(([k, label, count, Icon]) => (
+                <button key={k} onClick={() => setConvTab(k)}
+                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${convTab === k ? "border-[var(--color-base)] text-[var(--color-text)]" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                  <Icon size={14} /> {label} <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">{count}</span>
+                </button>
+              ))}
+            </div>
+
+            {shown.length === 0 ? (
+              <div className="flex flex-col items-center gap-1.5 py-12 text-center">
+                <MessageSquare size={22} className="text-slate-300" />
+                <p className="text-[13px] font-medium text-slate-500">
+                  {convTab === "replies" ? "No replies yet" : convTab === "comments" ? "No internal notes" : "No activity yet"}
+                </p>
+                <p className="max-w-xs text-[12px] text-slate-400">
+                  {convTab === "replies"
+                    ? "Use Reply above to respond to the requester."
+                    : convTab === "comments"
+                    ? "Add a note your team can see but the requester can't."
+                    : "Status changes and assignments show up here."}
+                </p>
+              </div>
+            ) : shown.map((m, i) => <TimelineItem key={i} m={m} />)}
           </div>
         </div>
 
-        <aside className="w-80 shrink-0 space-y-3 overflow-y-auto border-l border-slate-200 bg-white px-4 py-5">
+        <aside className="w-[280px] shrink-0 space-y-3 overflow-y-auto border-l border-slate-200 bg-white px-4 py-5">
           {/* Change workflow: surface type/risk + the approval state and the
               submit→CAB / approve / schedule actions on the detail itself, so a
               change can be driven (and its CAB resolved from the risk matrix)
@@ -362,51 +452,7 @@ export default function TicketDetail() {
           {data?.approval && <ApprovalPanel ap={data.approval} />}
           <RelatedTickets name={t.name || name} process={t.process} related={data?.related} onChanged={reload} />
           <Knowledge name={t.name || name} kbLinks={data?.kb_links} onChanged={reload} />
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Properties</h3>
-          {/* Editable triage fields — searchable, wired to the same update/assign
-              actions as the header controls (send only the changed field). */}
-          <PropField label="Status">
-            {statuses.length > 0 ? (
-              <ComboBoxInput ariaLabel="Status" value={t.status || ""} allowCustom={false} placeholder="— Select —"
-                options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-                onChange={(v) => { if (v) act("update", { status: v }, "Status updated."); }} />
-            ) : <Chip value={t.status} />}
-          </PropField>
-          <PropField label="Priority">
-            {priorities.length > 0 ? (
-              <ComboBoxInput ariaLabel="Priority" value={t.priority || ""} allowCustom={false} placeholder="— Select —"
-                options={priorities.map((p) => ({ value: p, label: p }))}
-                onChange={(v) => { if (v) act("update", { priority: v }, "Priority updated."); }} />
-            ) : <Chip value={t.priority} map={PRIORITY_CHIP} />}
-          </PropField>
-          <PropField label="Ticket type">
-            {types.length > 0 ? (
-              <ComboBoxInput ariaLabel="Ticket type" value={t.ticket_type || ""} allowCustom={false} placeholder="Unset"
-                options={types.map((ty) => ({ value: ty, label: ty }))}
-                onChange={(v) => act("update", { ticket_type: v }, "Type updated.")} />
-            ) : (t.ticket_type || <span className="text-slate-300">Unset</span>)}
-          </PropField>
-          <PropField label="Team">
-            <ComboBoxInput ariaLabel="Team" value={t.team || ""} allowCustom={false} displayLabelInsteadOfValue
-              disabled={!teams.length} placeholder={teams.length ? "Unassigned" : "No teams"}
-              options={teams.filter((tm) => !tm.disabled).map((tm) => ({ value: tm.name, label: tm.team_name || tm.name }))}
-              onChange={(v) => assign(undefined, v || null)} />
-          </PropField>
-          <PropField label="Assignee">
-            <ComboBoxInput ariaLabel="Assignee" value={t.agent || ""} allowCustom={false} displayLabelInsteadOfValue
-              disabled={!agents.length} placeholder="Unassigned"
-              options={agents.map((a) => ({ value: a.email || a.name || "", label: a.agent_name || a.email || a.name || "" }))}
-              onChange={(v) => assign(v || null, undefined)} />
-          </PropField>
-          {/* Department / Customer / Contact are editable (TicketUpdate accepts
-              department_id / customer_id / contact). Changing the department does NOT
-              auto-reroute the team — set Team/Assignee above independently. */}
-          <PropField label="Department">
-            <ComboBoxInput ariaLabel="Department" value={t.department_id ? String(t.department_id) : ""} allowCustom={false} displayLabelInsteadOfValue
-              disabled={!departments.length} placeholder={departments.length ? "— Select —" : "No departments"}
-              options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
-              onChange={(v) => act("update", { department_id: v ? Number(v) : null }, "Department updated.")} />
-          </PropField>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Details</h3>
           <PropRow label="Source">
             {t.source_kind === "vulnerability" && t.source_finding_id ? (
               <Link href={`/vulnerabilities/${encodeURIComponent(String(t.source_finding_id))}`} className="font-medium text-[var(--color-base)] hover:underline">
@@ -414,18 +460,6 @@ export default function TicketDetail() {
               </Link>
             ) : (t.source || <span className="text-slate-300">—</span>)}
           </PropRow>
-          <PropField label="Customer">
-            <ComboBoxInput ariaLabel="Customer" value={t.customer_id ? String(t.customer_id) : ""} allowCustom={false} displayLabelInsteadOfValue
-              disabled={!customers.length} placeholder={customers.length ? "— None —" : "No customers"}
-              options={customers.map((c) => ({ value: String(c.name), label: c.customer_name || c.name }))}
-              onChange={(v) => act("update", { customer_id: v ? Number(v) : null }, "Customer updated.")} />
-          </PropField>
-          <PropField label="Contact">
-            <input key={t.contact || ""} defaultValue={t.contact || ""} type="email" placeholder="person@company.com"
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (t.contact || "")) act("update", { contact: v || null }, "Contact updated."); }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--color-base)] focus:ring-2 focus:ring-[var(--color-base)]/15" />
-          </PropField>
           {/* Affected CI — agents link/change/clear the configuration item this ticket is about. */}
           <div>
             <div className="mb-1 text-[11px] font-medium text-slate-400">Affected CI</div>

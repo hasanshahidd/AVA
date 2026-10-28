@@ -185,6 +185,37 @@ export default function Header() {
               </div>
             );
           }
+          // Help Desk pages have no PAGE_TITLES entry and render their own body
+          // header, so the global bar sat empty. Show a section breadcrumb
+          // (Help Desk / <section> / <page or #id>) so the bar tracks where you are.
+          if (!info && (pathname ?? '').startsWith('/helpdesk')) {
+            const parts = (pathname ?? '').split('/').filter(Boolean); // ['helpdesk','tickets','80']
+            const LABEL: Record<string, string> = {
+              dashboard: 'Dashboard', tickets: 'Tickets', incidents: 'Incidents', problems: 'Problems',
+              changes: 'Changes', 'service-requests': 'Service Requests', agents: 'Agents',
+              customers: 'Customers', contacts: 'Contacts', kb: 'Knowledge Base', canned: 'Canned Responses',
+              catalogue: 'Service Catalogue', cmdb: 'CMDB', governance: 'Governance', settings: 'Settings',
+              report: 'Report an issue', request: 'Request something', 'my-requests': 'My Requests',
+              'my-approvals': 'My Approvals',
+            };
+            const seg = parts[1] || '';
+            const id = parts[2] || '';
+            let section = 'Agent Console';
+            let crumb = LABEL[seg] || (seg ? seg[0].toUpperCase() + seg.slice(1) : '');
+            if (seg === 'portal') { section = 'Portal'; crumb = LABEL[id] || 'Portal'; }
+            else if (seg === 'admin') { section = 'Service Desk Admin'; crumb = LABEL[id] || ''; }
+            else if (seg === 'settings') { section = 'Service Desk Admin'; crumb = 'Settings'; }
+            else if (seg === 'tickets' && id) crumb = `Ticket #${id}`;
+            else if (['incidents', 'problems', 'changes', 'service-requests'].includes(seg) && id) crumb = `${LABEL[seg]} #${id}`;
+            return (
+              <div className="flex items-center gap-1.5 min-w-0 text-sm leading-none">
+                <Link href="/helpdesk/dashboard" className="font-medium text-[var(--color-muted)] truncate">Help Desk</Link>
+                <span className="text-[var(--color-muted)]">/</span>
+                <span className="font-medium text-[var(--color-muted)] truncate">{section}</span>
+                {crumb && <><span className="text-[var(--color-muted)]">/</span><span className="font-semibold text-[var(--color-text)] truncate">{crumb}</span></>}
+              </div>
+            );
+          }
           if (!info) return null;
           // Pages that render their own big heading in the body (redesign kit)
           // get a breadcrumb here instead of a repeated title+subtitle, so the
