@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search, Download, Plus, Upload, FileSpreadsheet, Loader2, Building2, Clock, Target, LayoutDashboard, ChevronDown, Server, Ticket, ScanLine, Trash2, Filter, ArrowUpDown, Check, X } from 'lucide-react';
-import { shortenVulnTitle, deBrandDomain, PriorityBeforeAfter, type Vulnerability } from './lib';
+import { shortenVulnTitle, deBrandDomain, PriorityRawCell, PriorityContextualCell, enrichmentPriority, type Vulnerability } from './lib';
 import CtemScopesRedesign from '../ctem-scopes/CtemScopesRedesign';
 import VulnCommandCenter from './VulnCommandCenter';
 import ScanWorkspace from './ScanWorkspace';
@@ -97,7 +97,8 @@ const HEADS: { key: string; label: string; sortable: boolean }[] = [
   { key: 'asset', label: 'Linked asset', sortable: true }, { key: 'cve', label: 'CVE', sortable: true },
   { key: 'sev', label: 'Severity', sortable: true }, { key: 'cvss', label: 'CVSS', sortable: true },
   { key: 'epss', label: 'EPSS', sortable: true }, { key: 'exploit', label: 'Exploit', sortable: true },
-  { key: 'ctx', label: 'Priority · before → after', sortable: true }, { key: 'status', label: 'Status', sortable: true },
+  { key: 'before', label: 'Priority before', sortable: true }, { key: 'after', label: 'Priority after', sortable: true },
+  { key: 'status', label: 'Status', sortable: true },
   { key: 'due', label: 'SLA / Due', sortable: true }, { key: 'owner', label: 'Assigned to', sortable: true },
 ];
 const _ownerOf = (v: Vulnerability) => ((v as any).assignee_name || v.assigned_to || '') as string;
@@ -110,14 +111,15 @@ const SORTERS: Record<string, (a: Vulnerability, b: Vulnerability) => number> = 
   cvss: (a, b) => (a.cvss_score ?? 0) - (b.cvss_score ?? 0),
   epss: (a, b) => (a.epss_score ?? 0) - (b.epss_score ?? 0),
   exploit: (a, b) => (hasExploit(a) ? 1 : 0) - (hasExploit(b) ? 1 : 0),
-  ctx: (a, b) => ctxScore(a) - ctxScore(b),
+  before: (a, b) => enrichmentPriority(a).before - enrichmentPriority(b).before,
+  after: (a, b) => ctxScore(a) - ctxScore(b),
   status: (a, b) => (a.status || '').localeCompare(b.status || ''),
   due: (a, b) => new Date(a.due_date || '2999-01-01').getTime() - new Date(b.due_date || '2999-01-01').getTime(),
   owner: (a, b) => _ownerOf(a).localeCompare(_ownerOf(b)),
 };
 const TEXT_SORTS = new Set(['title', 'asset', 'cve', 'status', 'owner']);
 // Short labels for the Sort menu button/list (HEADS labels are too long for a button).
-const SORT_LABEL: Record<string, string> = { id: 'ID', title: 'Title', asset: 'Linked asset', cve: 'CVE', sev: 'Severity', cvss: 'CVSS', epss: 'EPSS', exploit: 'Exploit', ctx: 'Priority', status: 'Status', due: 'SLA / Due', owner: 'Assigned to' };
+const SORT_LABEL: Record<string, string> = { id: 'ID', title: 'Title', asset: 'Linked asset', cve: 'CVE', sev: 'Severity', cvss: 'CVSS', epss: 'EPSS', exploit: 'Exploit', before: 'Priority (before)', after: 'Priority (after)', status: 'Status', due: 'SLA / Due', owner: 'Assigned to' };
 const btn: React.CSSProperties = { border: `1px solid #E4E8EC`, background: '#fff', color: SEC, borderRadius: 9, padding: '7px 12px', fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' };
 const btnGreen: React.CSSProperties = { ...btn, background: AC, borderColor: AC, color: '#fff', fontWeight: 600 };
 const pill = (c: string, bg: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999, whiteSpace: 'nowrap', color: c, background: bg });
@@ -181,7 +183,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   // with the register one click away. When scoped to a CTEM scope the register
   // itself is the point, so land there instead (the Overview reads the whole list).
   const [pane, setPane] = useState<Pane>(scoped ? 'reg' : 'cmd');
-  const [sort, setSort] = useState('ctx');
+  const [sort, setSort] = useState('after');
   const [dir, setDir] = useState<1 | -1>(-1); // -1 = desc (highest priority / newest first)
   const [filtersOpen, setFiltersOpen] = useState(false); // right-side filter slide-over
   const [sortOpen, setSortOpen] = useState(false); // sort field/direction menu
@@ -260,7 +262,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
       (!fStatus || (v.status || 'open').toLowerCase() === fStatus) &&
       (scanMode === 'all' || (v.scan_mode ?? null) === scanMode) &&
       flagOk(v));
-    const cmp = SORTERS[sort] || SORTERS.ctx;
+    const cmp = SORTERS[sort] || SORTERS.after;
     return [...r].sort((a, b) => cmp(a, b) * dir);
   }, [filteredVulns, fSev, fDom, fStatus, scanMode, fFlag, sort, dir]);
   // Click a header: same column flips direction; a new column sorts text A→Z, metrics high→low.
@@ -461,9 +463,9 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                       ))}{canDelete && <th style={th}></th>}</tr></thead>
                       <tbody>
                         {loading ? (
-                          <tr><td colSpan={canDelete ? 13 : 12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
+                          <tr><td colSpan={canDelete ? 14 : 13} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>Loading…</td></tr>
                         ) : rows.length === 0 ? (
-                          <tr><td colSpan={canDelete ? 13 : 12} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
+                          <tr><td colSpan={canDelete ? 14 : 13} style={{ ...td, textAlign: 'center', color: '#9BA6B2', padding: 28 }}>No findings match this view.</td></tr>
                         ) : rows.map((v) => {
                           const sev = normSev(v.severity); const sm = SEV[sev];
                           const exp = hasExploit(v); const due = dueLabel(v);
@@ -488,7 +490,8 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
                               <td style={{ ...td, fontFamily: MONO, color: sm.pillC }}>{v.cvss_score ?? '—'}</td>
                               <td style={{ ...td, fontFamily: MONO, color: FAINT }}>{v.epss_score != null ? `${(v.epss_score * 100).toFixed(1)}%` : '—'}</td>
                               <td style={{ ...td, color: exp ? '#C0682F' : FAINT }}>{exp ? 'Public' : 'None'}</td>
-                              <td style={td}><PriorityBeforeAfter v={v} /></td>
+                              <td style={td}><PriorityRawCell v={v} /></td>
+                              <td style={td}><PriorityContextualCell v={v} /></td>
                               <td style={td}><span style={{ ...pill('#B23A3A', '#fff'), border: '1px solid #F3D3DA', textTransform: 'capitalize' }}>{(v.status || 'open').replace(/_/g, ' ')}</span></td>
                               <td style={td}>{due ? <b style={{ fontWeight: 600, color: due.c }}>{due.t}</b> : <span style={{ color: FAINT }}>—</span>}</td>
                               <td style={td}>
