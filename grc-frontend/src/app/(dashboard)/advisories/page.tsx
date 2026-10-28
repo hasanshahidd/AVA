@@ -289,38 +289,38 @@ export default function AdvisoriesPage() {
         ))}
       </div>
 
-      <div className="cw-card flex flex-wrap items-center gap-x-3 gap-y-2 p-2.5">
+      <div className="cw-card flex flex-wrap items-center gap-2 p-2.5">
         <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
           className="btn-primary flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
           <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
         </button>
         {selCveTotal === 0 ? (
-          <span className="text-xs cw-text-muted">Tick advisories/CVEs, then Match.</span>
+          <span className="text-xs cw-text-muted">Tick advisories/CVEs on the left, then Match.</span>
         ) : (
           <span className="text-xs cw-text-default">
-            <span className="font-semibold">{selAdv.size}</span> adv
-            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> CVE</> : null}
+            <span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
+            {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected
           </span>
         )}
         {(selAdv.size > 0 || selCve.size > 0) && (
           <button onClick={clearSel} className="text-xs text-[var(--color-primary)] hover:underline">Clear</button>
         )}
-        <div className="mx-1 hidden h-5 w-px bg-[var(--color-border)] lg:block" />
-        <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
-        <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
-        <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
-        <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
-        <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-        <span className="ml-auto text-xs cw-text-muted">{filtered.length}/{advisories.length}</span>
         <button onClick={() => setPanelMode('history')}
-          className="btn-secondary flex items-center gap-1.5 text-sm">
+          className="btn-secondary ml-auto flex items-center gap-1.5 text-sm">
           <History size={15} /> History
         </button>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
         <div className="cw-card overflow-y-auto">
-          <p className="px-4 py-3 text-xs font-semibold uppercase tracking-wider cw-text-muted">By region</p>
+          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+            <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
+            <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
+            <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
+            <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
+            <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
+            <span className="ml-auto text-[11px] cw-text-muted">{filtered.length}/{advisories.length}</span>
+          </div>
           {filtered.length === 0 ? (
             <div className="px-4 py-12 text-center cw-text-muted">
               <ShieldAlert className="mx-auto mb-3 h-10 w-10" />

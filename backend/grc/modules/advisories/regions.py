@@ -82,29 +82,55 @@ def normalize_region(value: Optional[str]) -> Optional[str]:
     return None
 
 
+def _hint_region(*parts: str) -> Optional[str]:
+    """Deterministic region from a known issuer token in the external_id /
+    filename / title (e.g. 'NCA-17.240826' → Saudi Arabia, 'CERT-EU' → EU,
+    'CISA' → US), via the alias table. The issuer is who PUBLISHED the advisory,
+    which is the region — independent of which vendor/product it is about."""
+    import re
+    blob = " ".join(p for p in parts if p).lower()
+    if not blob:
+        return None
+    tokens = set(re.split(r"[^a-z0-9]+", blob))
+    for alias, region in _ALIASES.items():
+        if any(ch in alias for ch in " -."):
+            if alias in blob:            # multi-word / punctuated alias: substring
+                return region
+        elif alias in tokens:            # single token: whole-token match (not substring)
+            return region
+    return None
+
+
 def classify_region(
     *, title: str = "", summary: str = "", external_id: str = "",
     filename: str = "", text: str = "",
 ) -> Dict[str, Any]:
-    """LLM-classify the issuing region/country of an uploaded advisory into one
-    canonical label. Best-effort: returns {region: None, confidence: 'low'} when
-    no key / parse fails / the model is unsure → caller files it Unclassified."""
+    """Classify the ISSUING region/country of an uploaded advisory into one
+    canonical label. The LLM reads the document first; a deterministic issuer
+    hint from the external_id/filename/title is the fallback. Returns
+    {region: None} only when neither can tell → caller files it Unclassified."""
     # Reuse the advisory extraction's shared OpenAI client + model.
     from .extraction import _openai_client
     from ...config import get_openai_model
 
+    hint = _hint_region(external_id, filename, title)
     client = _openai_client()
     if client is None:
-        return {"region": None, "confidence": "low"}
+        # No LLM available — fall back to the deterministic issuer hint.
+        return {"region": hint, "confidence": "medium"} if hint else {"region": None, "confidence": "low"}
 
     snippet = " ".join((text or "").split())[:2500]
     prompt = (
-        "You identify which country or multinational body issued a cybersecurity advisory.\n"
+        "You identify which country or multinational body ISSUED a cybersecurity advisory.\n"
+        "Classify by the ISSUING AUTHORITY (the CERT/agency that published it — often in the\n"
+        "External ID prefix or the document header/footer: e.g. NCA, NCERT, CISA, NCSC, CERT-EU),\n"
+        "NOT by the vendor or product the advisory is about (Adobe, WhatsApp, Microsoft, etc.\n"
+        "are just the affected products, not the issuer).\n"
         "Return ONE label:\n"
         "- 'US' for CISA/US-CERT/NIST; 'UK' for NCSC UK; 'EU' for CERT-EU/ENISA;\n"
-        "  'Global' for vendor/CVE advisories (GitHub, NVD, Red Hat, Microsoft, etc. with no national issuer).\n"
+        "  'Global' only for a pure vendor/CVE advisory (GitHub, NVD, Red Hat) with no national CERT issuer.\n"
         "- Otherwise the issuing country's standard English short name (e.g. 'Pakistan', 'Saudi Arabia', 'India', 'United Arab Emirates').\n"
-        "- 'Unknown' if you genuinely cannot tell.\n"
+        "- 'Unknown' only if there is genuinely no issuer signal at all.\n"
         'Reply as JSON: {"region": "<label>", "confidence": "high|medium|low"}.\n\n'
         f"Title: {title}\nExternal ID: {external_id}\nFilename: {filename}\n"
         f"Summary: {summary}\nDocument excerpt:\n{snippet}"
@@ -119,12 +145,13 @@ def classify_region(
         data = json.loads(completion.choices[0].message.content or "{}")
     except Exception:
         logger.info("advisory region classify failed")
-        return {"region": None, "confidence": "low"}
+        return {"region": hint, "confidence": "medium"} if hint else {"region": None, "confidence": "low"}
 
     raw = (data.get("region") or "").strip()
     conf = (data.get("confidence") or "low").strip().lower()
     conf = conf if conf in ("high", "medium", "low") else "medium"
-    region = normalize_region(raw)
+    # LLM (reads the document) first; deterministic issuer hint as the fallback.
+    region = normalize_region(raw) or hint
     if region is None or region == UNCLASSIFIED:
         return {"region": None, "confidence": "low"}
     return {"region": region, "confidence": conf}
