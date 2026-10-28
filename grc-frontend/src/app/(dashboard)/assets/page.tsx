@@ -13,6 +13,7 @@ import { AssetModal } from './AssetModal';
 import { AssetsWorkspace } from './_workspace/AssetsWorkspace';
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import InventoryRedesign from './_workspace/InventoryRedesign';
+import { RowActionsMenu } from './_workspace/RowActionsMenu';
 import InventoryOverview from './_overview/InventoryOverview';
 import { SmartImportWizard } from './_import/SmartImportWizard';
 import {
@@ -363,11 +364,12 @@ export default function AssetsPage() {
               Authoritative ownership, valuation &amp; assurance coverage · {(assets as ITAsset[] | undefined)?.length ?? 0} assets
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 9, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select className="sel"><option>Last 30 days</option><option>Last 7 days</option><option>This quarter</option></select>
-            <button type="button" className="btn"><Download size={15} />Export</button>
-            {canCreate && <button type="button" className="btn" onClick={() => setIsImportModalOpen(true)}><Upload size={15} />Import</button>}
-            {canCreate && <button type="button" className="btn btn-pri" onClick={() => setIsModalOpen(true)}><Plus size={15} />Add asset</button>}
+          {/* Toolbar actions collapsed into a single ⋯ menu (owner request). */}
+          <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
+            <RowActionsMenu actions={[
+              { key: 'add', label: 'Add asset', icon: Plus, onClick: () => setIsModalOpen(true), hidden: !canCreate },
+              { key: 'import', label: 'Import assets', icon: Upload, onClick: () => setIsImportModalOpen(true), hidden: !canCreate },
+            ]} />
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>

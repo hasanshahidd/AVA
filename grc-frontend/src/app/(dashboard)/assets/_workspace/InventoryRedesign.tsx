@@ -266,28 +266,9 @@ export default function InventoryRedesign(p: Props) {
       </section>
 
       {/* WORKSPACE */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,224px) minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
-        <aside className="rail card" style={{ padding: '9px 9px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <div className="railcap">Views</div>
-          {railBtn('all', 'All assets', c.total)}
-          {railBtn('critical', 'Critical', c.critical, '#C2453F')}
-          {railBtn('needcia', 'Needs CIA', c.needcia, '#5A45B5')}
-          {railBtn('unowned', 'Unowned', c.unowned, '#8A5A0C')}
-          {railBtn('stale', 'Stale > 30d', c.stale, '#8A95A1')}
-          {railBtn('internet', 'Internet-facing', c.internet, '#28578F')}
-          {railBtn('cde', 'PCI scope', c.cde, '#014A81')}
-          <div className="railcap" style={{ paddingTop: 14 }}>By type</div>
-          {[['application', 'Applications', '#28578F'], ['infrastructure', 'Infrastructure', '#014A81'], ['data', 'Data', '#8A5A0C'], ['cloud', 'Cloud', '#5A45B5'], ['thirdparty', 'Third-party', '#DB7B45']].map(([id, label, sw]) => (
-            <button key={id} className={'rbtn' + (view === id ? ' on' : '')} onClick={() => { setView(id); setTab('reg'); }}>
-              <span className="bar" /><span style={{ width: 8, height: 8, borderRadius: 2, background: sw, flex: 'none' }} />{label}<span className="cnt num">{c.byType(id)}</span>
-            </button>
-          ))}
-          <div style={{ marginTop: 12, background: '#F7F9FA', borderRadius: 10, padding: '11px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}><span>Scan coverage</span><b className="num" style={{ color: 'var(--ink)' }}>{c.scanned} / {c.total}</b></div>
-            <div className="track" style={{ marginTop: 8, height: 6 }}><i className="grow" style={{ width: (c.total ? Math.round((c.scanned / c.total) * 100) : 0) + '%', background: 'var(--ac)' }} /></div>
-          </div>
-        </aside>
-
+      {/* Sidebar removed — its View/Type filters moved to the top bar dropdown
+          below so the register gets the full width. */}
+      <div>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             <div className="segwrap">
@@ -298,6 +279,24 @@ export default function InventoryRedesign(p: Props) {
               <Search size={16} style={{ position: 'absolute', left: 11, top: 11, color: '#78838F' }} />
               <input className="search" placeholder="Search this view…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
+            <select className="sel" value={view} onChange={(e) => { setView(e.target.value); setTab('reg'); }} title="Filter by view or asset type (was the left sidebar)">
+              <optgroup label="Views">
+                <option value="all">All assets ({c.total})</option>
+                <option value="critical">Critical ({c.critical})</option>
+                <option value="needcia">Needs CIA ({c.needcia})</option>
+                <option value="unowned">Unowned ({c.unowned})</option>
+                <option value="stale">Stale &gt; 30d ({c.stale})</option>
+                <option value="internet">Internet-facing ({c.internet})</option>
+                <option value="cde">PCI scope ({c.cde})</option>
+              </optgroup>
+              <optgroup label="By type">
+                <option value="application">Applications ({c.byType('application')})</option>
+                <option value="infrastructure">Infrastructure ({c.byType('infrastructure')})</option>
+                <option value="data">Data ({c.byType('data')})</option>
+                <option value="cloud">Cloud ({c.byType('cloud')})</option>
+                <option value="thirdparty">Third-party ({c.byType('thirdparty')})</option>
+              </optgroup>
+            </select>
             <select className="sel" value={sort} onChange={(e) => setSort(e.target.value)}><option value="crit">Sort: Criticality</option><option value="scan">Sort: Recently scanned</option><option value="value">Sort: Value</option><option value="name">Sort: Name</option></select>
             {/* 5-tab view — All, EASM (external), Credential (full depth incl. manual),
                 Uncredential (credential-free sweep, grouped by CIDR), PCI (in-scope). */}
