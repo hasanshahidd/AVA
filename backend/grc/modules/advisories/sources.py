@@ -40,7 +40,7 @@ _UA = {"User-Agent": "caiva-advisory-sync/1.0"}
 _KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 _GITHUB_URL = "https://api.github.com/advisories"
 _REDHAT_URL = "https://access.redhat.com/hydra/rest/securitydata/cve.json"
-_NVD_URL = "https://services.nvd.nist.gov/rest/json/2.0/cves/2.0"
+_NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
 
 @dataclass
