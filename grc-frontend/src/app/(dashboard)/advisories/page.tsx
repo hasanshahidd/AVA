@@ -42,10 +42,10 @@ function FilterSelect({ label, value, options, onChange }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
+    <label className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold uppercase tracking-wider cw-text-muted">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="min-w-[8rem] rounded-md border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm cw-text-default">
+        className="min-w-[7rem] rounded-md border border-[var(--color-border)] bg-transparent px-2.5 py-1.5 text-xs cw-text-default">
         <option value={ALL}>All</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -290,9 +290,10 @@ export default function AdvisoriesPage() {
   const uploadedDocs = advisories.filter((a) => a.origin === 'upload');
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
-      {/* Title lives in the global app bar (PAGE_TITLES['/advisories']); here we keep just the actions. */}
-      <div className="flex justify-end gap-2.5">
+    <div className="space-y-3">
+      {/* Title lives in the global app bar (PAGE_TITLES['/advisories']); here we keep just the actions.
+          No viewport lock: the page flows as one column and the dashboard <main> owns the scroll. */}
+      <div className="flex justify-end gap-2">
         <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleUpload} className="hidden" />
         <button onClick={() => setSourcesOpen(true)} className="btn-secondary flex items-center gap-2 text-sm">
           <Database size={15} /> Sources
@@ -302,7 +303,7 @@ export default function AdvisoriesPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { l: 'Advisories', v: summary.total ?? advisories.length, hint: 'Show all',
             onClick: () => { setFStatus(ALL); setFRegion(ALL); setFSource(ALL); setFSeverity(ALL); setFOrigin(ALL); } },
@@ -311,29 +312,29 @@ export default function AdvisoriesPage() {
           { l: 'Sources', v: sourceCount, hint: 'Manage', onClick: () => setSourcesOpen(true) },
         ].map((k) => (
           <button key={k.l} onClick={k.onClick}
-            className="cw-card group p-4 text-left transition-colors hover:border-[var(--color-primary)]">
-            <p className="text-xs font-medium cw-text-muted">{k.l}</p>
-            <p className="mt-1.5 text-3xl font-semibold leading-none cw-text-default">{k.v}</p>
-            <p className="mt-2 text-xs font-medium text-[var(--color-primary)]">{k.hint} →</p>
+            className="cw-card group p-3 text-left transition-colors hover:border-[var(--color-primary)]">
+            <p className="text-[11px] font-medium cw-text-muted">{k.l}</p>
+            <p className="mt-1 text-2xl font-semibold leading-none cw-text-default">{k.v}</p>
+            <p className="mt-1.5 text-[11px] font-medium text-[var(--color-primary)]">{k.hint} →</p>
           </button>
         ))}
       </div>
 
       {panelMode === 'history' ? (
-        <div className="cw-card min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="cw-card p-3">
           <MatchHistory onOpen={openSession} onBack={() => setPanelMode('detail')} />
         </div>
       ) : (
       <>
-      <div className="cw-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <div className="flex flex-wrap items-center gap-3">
+      <div className="cw-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
               className="btn-primary flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
               <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
             </button>
             {(selAdv.size > 0 || selCve.size > 0) && (
-              <span className="flex shrink-0 items-center gap-2.5 text-sm cw-text-default">
+              <span className="flex shrink-0 items-center gap-2 text-xs cw-text-default">
                 <span><span className="font-semibold">{selAdv.size}</span> advisor{selAdv.size === 1 ? 'y' : 'ies'}
                   {selCve.size > 0 ? <> · <span className="font-semibold">{selCve.size}</span> extra CVE{selCve.size === 1 ? '' : 's'}</> : null} selected</span>
                 <button onClick={clearSel} className="font-medium text-[var(--color-primary)] hover:underline">Clear</button>
@@ -346,39 +347,39 @@ export default function AdvisoriesPage() {
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-4 border-t border-[var(--color-border)] pt-4">
+        <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3 border-t border-[var(--color-border)] pt-3">
           <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
           <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
           <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
           <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
           <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-          <span className="ml-auto pb-2 text-xs cw-text-muted">
+          <span className="ml-auto pb-1.5 text-[11px] cw-text-muted">
             Showing <span className="font-semibold cw-text-default">{filtered.length}</span> of {advisories.length}
           </span>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-[420px_1fr]">
-        <div className="cw-card overflow-y-auto">
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[360px_1fr]">
+        <div className="cw-card overflow-hidden">
           {filtered.length === 0 ? (
-            <div className="px-6 py-16 text-center cw-text-muted">
-              <ShieldAlert className="mx-auto mb-3 h-10 w-10" />
-              <p className="text-sm">No advisories match these filters.</p>
+            <div className="px-4 py-10 text-center cw-text-muted">
+              <ShieldAlert className="mx-auto mb-2 h-8 w-8" />
+              <p className="text-xs">No advisories match these filters.</p>
             </div>
           ) : (
             grouped.map(({ region, sources, items }, ri) => {
               const regionCollapsed = collapsed.has(region);
               return (
                 <div key={region} className="first:border-t-0">
-                  <div className="flex w-full items-center gap-3 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3">
+                  <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
                     <input type="checkbox" className="shrink-0" title="Select all in region"
                       checked={items.length > 0 && items.every((a) => selAdv.has(a.id))}
                       onChange={() => toggleRegionSel(items)} />
                     <button onClick={() => toggleKey(region)} className="flex flex-1 items-center gap-2 text-left">
-                      {regionCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-                      <span className="text-xs font-bold uppercase tracking-wider cw-text-default">{region}</span>
-                      <span className="rounded bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-medium cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
-                      <span className="ml-auto text-sm font-semibold cw-text-muted">{items.length}</span>
+                      {regionCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                      <span className="text-[11px] font-bold uppercase tracking-wider cw-text-default">{region}</span>
+                      <span className="rounded bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] font-medium cw-text-muted">{sources.length} source{sources.length === 1 ? '' : 's'}</span>
+                      <span className="ml-auto text-xs font-semibold cw-text-muted">{items.length}</span>
                     </button>
                   </div>
                   {!regionCollapsed && sources.map(({ source, items: sItems }, si) => {
@@ -386,29 +387,29 @@ export default function AdvisoriesPage() {
                     const srcCollapsed = collapsed.has(key);
                     return (
                       <div key={key}>
-                        <div className="flex w-full items-center gap-3 border-t border-[var(--color-border)] py-2.5 pl-8 pr-4">
+                        <div className="flex w-full items-center gap-2 border-t border-[var(--color-border)] py-1.5 pl-7 pr-3">
                           <input type="checkbox" className="shrink-0" title="Select all from this source"
                             checked={sItems.length > 0 && sItems.every((a) => selAdv.has(a.id))}
                             onChange={() => toggleRegionSel(sItems)} />
-                          <button onClick={() => toggleKey(key)} className="flex flex-1 items-center gap-2 text-left">
-                            {srcCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                            <span className="min-w-0 flex-1 truncate text-xs font-medium cw-text-default">{source}</span>
-                            <span className="ml-auto text-xs cw-text-muted">{sItems.length}</span>
+                          <button onClick={() => toggleKey(key)} className="flex flex-1 items-center gap-1.5 text-left">
+                            {srcCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium cw-text-default">{source}</span>
+                            <span className="ml-auto text-[11px] cw-text-muted">{sItems.length}</span>
                           </button>
                         </div>
                         {!srcCollapsed && sItems.map((a, ai) => (
                           <div key={a.id}
-                            className={`flex w-full items-center gap-3 border-t border-[var(--color-border)] py-3 pl-12 pr-4 transition-colors ${selectedId === a.id ? 'bg-[var(--color-base-soft)]' : 'hover:bg-[var(--color-hover)]'}`}>
+                            className={`flex w-full items-center gap-2 border-t border-[var(--color-border)] py-2 pl-10 pr-3 transition-colors ${selectedId === a.id ? 'bg-[var(--color-base-soft)]' : 'hover:bg-[var(--color-hover)]'}`}>
                             <input type="checkbox" className="shrink-0"
                               checked={selAdv.has(a.id)} onChange={() => toggleAdv(a.id)} />
                             <button onClick={() => { setSelectedId(a.id); setPanelMode('detail'); }}
-                              className="flex min-w-0 flex-1 items-center gap-2.5 text-left transition-colors hover:text-[var(--color-primary)]">
-                              <p className="min-w-0 flex-1 truncate text-sm font-medium cw-text-default">{a.title}</p>
-                              <div className="ml-auto flex shrink-0 items-center gap-2">
+                              className="flex min-w-0 flex-1 items-center gap-2 text-left transition-colors hover:text-[var(--color-primary)]">
+                              <p className="min-w-0 flex-1 truncate text-xs font-medium cw-text-default">{a.title}</p>
+                              <div className="ml-auto flex shrink-0 items-center gap-1.5">
                                 {a.status === 'pending' ? (
-                                  <span className="rounded-md bg-yellow-50 px-2 py-0.5 text-[11px] font-medium text-yellow-700">review</span>
+                                  <span className="rounded-md bg-yellow-50 px-1.5 py-0.5 text-[10px] font-medium text-yellow-700">review</span>
                                 ) : a.asset_affected_count > 0 ? (
-                                  <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
+                                  <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">{a.asset_affected_count} affected</span>
                                 ) : null}
                                 <SeverityBadge severity={a.severity} />
                               </div>
@@ -424,7 +425,7 @@ export default function AdvisoriesPage() {
           )}
         </div>
 
-        <div className="cw-card overflow-y-auto p-6">
+        <div className="cw-card p-3">
           {panelMode === 'match' ? (
             <MatchPanel selection={{ advisories: selAdv.size, cves: selCveTotal }}
               onRun={(t) => matchMutation.mutate(t)} onCancel={() => setPanelMode('detail')}
@@ -434,63 +435,63 @@ export default function AdvisoriesPage() {
               onBack={() => setPanelMode('detail')}
               onDownload={reportSessionId !== null ? downloadReport : undefined} />
           ) : !detail ? (
-            <div className="flex h-full flex-col items-center justify-center px-6 py-16 text-center cw-text-muted">
-              <ShieldAlert className="mb-3 h-10 w-10" />
-              <p className="text-sm">Select an advisory to see its details and CVEs,</p>
-              <p className="text-sm">or tick advisories and CVEs, then click Match.</p>
+            <div className="flex flex-col items-center justify-center px-4 py-14 text-center cw-text-muted">
+              <ShieldAlert className="mb-2 h-8 w-8" />
+              <p className="text-xs">Select an advisory to see its details and CVEs,</p>
+              <p className="text-xs">or tick advisories and CVEs, then click Match.</p>
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-primary)]">
                     Advisory{detail.region && detail.region !== 'Unclassified' ? ` · ${detail.region}` : ''}
                   </p>
                   {detail.region === 'Unclassified' && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-yellow-700">Region not detected —</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] text-yellow-700">Region not detected —</span>
                       <RegionPicker advisoryId={detail.id} current={detail.region} />
                     </div>
                   )}
-                  <h2 className="mt-1.5 text-xl font-semibold leading-snug cw-text-default">{detail.title}</h2>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <h2 className="mt-1 text-base font-semibold leading-snug cw-text-default">{detail.title}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <SeverityBadge severity={detail.severity} />
                     <StatusBadge status={detail.status} />
                     {detail.url && (
                       <a href={detail.url} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline">
-                        <ExternalLink size={13} /> Source
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-primary)] hover:underline">
+                        <ExternalLink size={12} /> Source
                       </a>
                     )}
                   </div>
                 </div>
                 {detail.status === 'pending' && (
-                  <button onClick={() => router.push(`/advisories/${detail.id}`)} className="btn-primary flex shrink-0 items-center gap-2">
+                  <button onClick={() => router.push(`/advisories/${detail.id}`)} className="btn-primary flex shrink-0 items-center gap-2 text-sm">
                     Review &amp; confirm
                   </button>
                 )}
               </div>
 
-              {detail.summary && <div className="mt-4"><RichText text={detail.summary} /></div>}
+              {detail.summary && <div className="mt-3"><RichText text={detail.summary} /></div>}
 
-              <section className="mt-6">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3"
+              <section className="mt-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2"
                     title="Assets found to run the affected software (or confirmed by a scan), and how many were affected.">
-                    <p className="text-2xl font-semibold leading-tight cw-text-default">{detail.asset_affected_count}<span className="text-base cw-text-muted"> / {detail.asset_total_count}</span></p>
-                    <p className="mt-1 text-xs cw-text-muted">Assets affected / checked</p>
+                    <p className="text-xl font-semibold leading-tight cw-text-default">{detail.asset_affected_count}<span className="text-sm cw-text-muted"> / {detail.asset_total_count}</span></p>
+                    <p className="mt-0.5 text-[11px] cw-text-muted">Assets affected / checked</p>
                   </div>
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3">
-                    <p className="text-2xl font-semibold leading-tight cw-text-default">{detail.cve_count}</p>
-                    <p className="mt-1 text-xs cw-text-muted">CVEs</p>
+                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-3 py-2">
+                    <p className="text-xl font-semibold leading-tight cw-text-default">{detail.cve_count}</p>
+                    <p className="mt-0.5 text-[11px] cw-text-muted">CVEs</p>
                   </div>
                 </div>
               </section>
 
-              <section className="mt-6">
-                <h3 className="mb-3 text-sm font-semibold cw-text-default">Details</h3>
+              <section className="mt-3">
+                <h3 className="mb-2 text-sm font-semibold cw-text-default">Details</h3>
                 <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-xs">
                     <tbody>
                       {([
                         ['Published', fmtDate(detail.published_at), detail.origin === 'upload' && !detail.published_at ? 'No date stated in the document' : ''],
@@ -501,8 +502,8 @@ export default function AdvisoriesPage() {
                         ['Region', detail.region || 'Unclassified', ''],
                       ] as [string, string, string][]).map(([k, v, hint]) => (
                         <tr key={k} className="border-b border-[var(--color-border)] last:border-0">
-                          <th scope="row" className="w-40 bg-[var(--color-subtle)] px-4 py-3 text-left font-medium cw-text-muted">{k}</th>
-                          <td className="px-4 py-3 cw-text-default">{hint || v}</td>
+                          <th scope="row" className="w-32 bg-[var(--color-primary)] px-3 py-1.5 text-left font-bold text-white">{k}</th>
+                          <td className="px-3 py-1.5 cw-text-default">{hint || v}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -511,37 +512,39 @@ export default function AdvisoriesPage() {
               </section>
 
               {detail.flow && (
-                <section className="mt-6">
-                  <h3 className="mb-3 text-sm font-semibold cw-text-default">Lifecycle</h3>
+                <section className="mt-3">
+                  <h3 className="mb-2 text-sm font-semibold cw-text-default">Lifecycle</h3>
                   <FlowStrip flow={detail.flow} />
                 </section>
               )}
 
+              {/* Timeline sits high — right under Lifecycle — so it is reachable
+                  without scrolling past the (possibly long) CVE list below. */}
+              {detail.history && detail.history.length > 0 && (
+                <section className="mt-3"><HistoryTimeline events={detail.history} /></section>
+              )}
+
               {detail.status === 'pending' && (
-                <p className="mt-6 rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+                <p className="mt-3 rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
                   Extracted and awaiting review — open <span className="font-medium">Review &amp; confirm</span> to check the CVEs and the parsing report before it is tracked.
                 </p>
               )}
 
               {detail.status !== 'pending' && (
-                <section className="mt-6">
+                <section className="mt-3">
                   <h3 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h3>
-                  <p className="mb-3 mt-1 text-xs cw-text-muted">
+                  <p className="mb-2 mt-0.5 text-[11px] cw-text-muted">
                     Tick any CVEs to add them to the match selection, or click a CVE for its full register details.
                   </p>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {(detail.cves ?? []).length === 0
-                      ? <p className="text-sm cw-text-muted">No CVEs on this advisory.</p>
+                      ? <p className="text-xs cw-text-muted">No CVEs on this advisory.</p>
                       : (detail.cves ?? []).map((cve) => (
                         <VulnCard key={cve.id} cve={cve}
                           selected={selCve.has(cve.id)} onToggleSelect={() => toggleCve(cve.id)} />
                       ))}
                   </div>
                 </section>
-              )}
-
-              {detail.history && detail.history.length > 0 && (
-                <section className="mt-6"><HistoryTimeline events={detail.history} /></section>
               )}
             </>
           )}
