@@ -15,7 +15,8 @@
  * palette — no external stylesheet needed on the vulnerabilities route.
  */
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import '../../pentest/_components/pentest-redesign.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -157,6 +158,15 @@ export default function CtemScopesRedesign() {
   // Navigation: 'home' = program (scope cards); 'scope' = journey.
   const [screen, setScreen] = useState<'home' | 'scope'>('home');
   const [selId, setSelId] = useState<number | null>(null);
+  // Resizable sessions column (drag handle + localStorage, delta-based, clamp 220–560).
+  const [listW, setListW] = useState<number>(() => { try { return Number(localStorage.getItem('ctem.listW')) || 300; } catch { return 300; } });
+  const dragRef = useRef<{ x: number; w: number } | null>(null);
+  useEffect(() => {
+    const mv = (e: MouseEvent) => { if (!dragRef.current) return; setListW(Math.max(220, Math.min(560, dragRef.current.w + e.clientX - dragRef.current.x))); };
+    const up = () => { if (dragRef.current) { dragRef.current = null; try { localStorage.setItem('ctem.listW', String(listW)); } catch { /* ignore */ } } };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+  }, [listW]);
   const [showAllCw, setShowAllCw] = useState(false);
   const [showAllRanked, setShowAllRanked] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -547,44 +557,46 @@ export default function CtemScopesRedesign() {
       <div><div style={{ ...SK, ...(color ? { color } : {}) }}>{label}</div><div style={{ fontSize: 15, fontWeight: 700, ...MONO, ...(color ? { color } : {}) }}>{val}</div></div>
     );
     return (
-      <div key={sc.id} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '11px 14px', marginBottom: 10 }}>
-        <span style={{ width: 38, height: 38, borderRadius: 11, background: ACSOFT, color: ACS, display: 'grid', placeItems: 'center', flex: 'none' }}><Crosshair className="h-[18px] w-[18px]" /></span>
-        <div style={{ minWidth: 0, flex: '1 1 210px' }}>
-          <b style={{ fontSize: 13.5 }}>{sc.name}</b> <span style={{ color: MUTED, fontSize: 11.5 }}>{membText(sc)} · owner {sc.owner ?? 'Unassigned'}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            {open ? (
-              <>
-                <Pill bg={ACSOFT} c={ACS}>● Cycle #{sc.cycleNo} · Open{sc.cycleDay != null ? ` · day ${sc.cycleDay}` : ''}</Pill>
-                {sc.cycleOverdue
-                  ? <Pill bg={REDBG} c={RED}>Overdue</Pill>
-                  : sc.cycleDueAt ? <span style={{ fontSize: 10.5, color: AMBER, fontWeight: 600 }}>due {fmtDate(sc.cycleDueAt)}</span> : null}
-                {cur && <span style={{ fontSize: 10.5, color: FAINT }}>at <b style={{ color: SEC }}>{cur}</b></span>}
-              </>
-            ) : (
-              <>
-                <Pill bg="#EEF1F3" c="#475569">■ No cycle running</Pill>
-                <span style={{ fontSize: 10.5, color: FAINT }}>last closed {fmtDate(sc.lastClosed)} · {(sc.cycleHistory?.length ?? 0)} in history</span>
-              </>
-            )}
+      <div key={sc.id} style={{ ...CARD, display: 'flex', overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '11px 14px' }}>
+          <span style={{ width: 38, height: 38, borderRadius: 11, background: ACSOFT, color: ACS, display: 'grid', placeItems: 'center', flex: 'none' }}><Crosshair className="h-[18px] w-[18px]" /></span>
+          <div style={{ minWidth: 0, flex: '1 1 210px' }}>
+            <b style={{ fontSize: 13.5 }}>{sc.name}</b> <span style={{ color: MUTED, fontSize: 11.5 }}>{membText(sc)} · owner {sc.owner ?? 'Unassigned'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              {open ? (
+                <>
+                  <Pill bg={ACSOFT} c={ACS}>● Cycle #{sc.cycleNo} · Open{sc.cycleDay != null ? ` · day ${sc.cycleDay}` : ''}</Pill>
+                  {sc.cycleOverdue
+                    ? <Pill bg={REDBG} c={RED}>Overdue</Pill>
+                    : sc.cycleDueAt ? <span style={{ fontSize: 10.5, color: AMBER, fontWeight: 600 }}>due {fmtDate(sc.cycleDueAt)}</span> : null}
+                  {cur && <span style={{ fontSize: 10.5, color: FAINT }}>at <b style={{ color: SEC }}>{cur}</b></span>}
+                </>
+              ) : (
+                <>
+                  <Pill bg="#EEF1F3" c="#475569">■ No cycle running</Pill>
+                  <span style={{ fontSize: 10.5, color: FAINT }}>last closed {fmtDate(sc.lastClosed)} · {(sc.cycleHistory?.length ?? 0)} in history</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', flex: 'none' }}>
+            {num('Findings', sc.findings)}
+            {num('Dangerous', sc.dangerous, REDD)}
+            {num('Fixed ✓', fixed, GREEN)}
+          </div>
+          <div style={{ marginLeft: 'auto', flex: 'none', display: 'flex', gap: 7 }}>
+            {open
+              ? <Btn sm onClick={() => enterScope(sc.id)}>Open →</Btn>
+              : <>
+                  <Btn sm onClick={() => enterScope(sc.id)}>History →</Btn>
+                  {canEdit && <Btn green sm onClick={() => enterScope(sc.id, true)}>▶ Start Cycle #{sc.cycleNo + 1}</Btn>}
+                </>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', flex: 'none' }}>
-          {num('Findings', sc.findings)}
-          {num('Dangerous', sc.dangerous, REDD)}
-          {num('Fixed ✓', fixed, GREEN)}
-        </div>
-        <div style={{ marginLeft: 'auto', flex: 'none', display: 'flex', gap: 7 }}>
-          {open
-            ? <Btn sm onClick={() => enterScope(sc.id)}>Open →</Btn>
-            : <>
-                <Btn sm onClick={() => enterScope(sc.id)}>History →</Btn>
-                {canEdit && <Btn green sm onClick={() => enterScope(sc.id, true)}>▶ Start Cycle #{sc.cycleNo + 1}</Btn>}
-              </>}
-        </div>
         {open && (() => {
-          // The 5-stage flow, shown on the program card (was only inside the
-          // scope journey behind "Open →"). Done = coloured ✓, current = coloured
-          // number, upcoming = grey. Click anywhere on it to open the journey.
+          // The 5-stage flow as an independent vertical SIDE COLUMN on the card
+          // (owner wants a side column, not a horizontal strip). Done = ✓, current
+          // = coloured number, upcoming = grey. Click = open the scope journey.
           const sp2 = sc.stageProgress ?? null;
           const d: Record<number, boolean> = {
             1: sc.assets > 0,
@@ -596,16 +608,17 @@ export default function CtemScopesRedesign() {
           const firstInc = [1, 2, 3, 4, 5].find((n) => !d[n]) ?? 5;
           return (
             <div onClick={() => enterScope(sc.id)} title="Open the scope journey"
-              style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORDER2}`, cursor: 'pointer' }}>
+              style={{ flex: 'none', width: 190, borderLeft: `1px solid ${BORDER2}`, background: '#FAFBFC', padding: '12px 14px', cursor: 'pointer' }}>
               {STAGES.map((st, i) => {
                 const on = d[st.n] || st.n === firstInc;
+                const last = i === STAGES.length - 1;
                 return (
-                  <div key={st.n} style={{ display: 'flex', alignItems: 'center', flex: i < STAGES.length - 1 ? 1 : 'none', minWidth: 0 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, flex: 'none', color: d[st.n] ? st.c : st.n === firstInc ? INK : FAINT }}>
-                      <span style={{ width: 17, height: 17, borderRadius: 999, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 800, background: on ? st.c : '#EEF1F3', color: on ? '#fff' : FAINT }}>{d[st.n] ? '✓' : st.n}</span>
-                      {st.label}
-                    </span>
-                    {i < STAGES.length - 1 && <span style={{ flex: 1, height: 2, borderRadius: 2, margin: '0 8px', background: d[st.n] ? st.c : '#E8ECEE', minWidth: 12 }} />}
+                  <div key={st.n} style={{ display: 'flex', gap: 9, alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 'none' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: 999, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 800, flex: 'none', background: on ? st.c : '#EEF1F3', color: on ? '#fff' : FAINT }}>{d[st.n] ? '✓' : st.n}</span>
+                      {!last && <span style={{ width: 2, flex: 1, minHeight: 12, background: d[st.n] ? st.c : '#E8ECEE', margin: '2px 0', borderRadius: 2 }} />}
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, paddingTop: 2, paddingBottom: last ? 0 : 9, color: d[st.n] ? st.c : st.n === firstInc ? INK : FAINT }}>{st.label}</span>
                   </div>
                 );
               })}
@@ -1216,9 +1229,52 @@ export default function CtemScopesRedesign() {
     );
   };
 
+  // One compact row in the left Sessions column (replaces the big floating cards).
+  const sessionRow = (sc: Scope) => {
+    const active = sc.id === selId && screen === 'scope';
+    const cur = curStageLabel(sc) ?? (sc.cycleOpen ? 'Discover' : null);
+    return (
+      <button key={sc.id} type="button" onClick={() => enterScope(sc.id)}
+        style={{ display: 'block', textAlign: 'left', width: '100%', border: 0, borderLeft: `3px solid ${active ? 'var(--base)' : 'transparent'}`, borderBottom: '1px solid var(--line)', background: active ? 'var(--base-soft)' : 'transparent', padding: '10px 13px', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <b style={{ fontSize: 12.5, color: 'var(--text)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sc.name}</b>
+          {sc.cycleOpen
+            ? <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--base-strong)', background: 'var(--base-soft)', borderRadius: 20, padding: '2px 7px', flex: 'none' }}>● C#{sc.cycleNo}{sc.cycleOverdue ? ' · overdue' : ''}</span>
+            : <span style={{ fontSize: 9, fontWeight: 700, color: '#64748B', background: '#EEF1F3', borderRadius: 20, padding: '2px 7px', flex: 'none' }}>idle</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, fontSize: 10.5, color: 'var(--muted)' }}>
+          {cur && <span style={{ color: 'var(--base-strong)', fontWeight: 600 }}>at {cur}</span>}
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 9 }}>
+            <span>{sc.findings} find</span>
+            {sc.dangerous > 0 && <span style={{ color: REDD, fontWeight: 600 }}>{sc.dangerous} danger</span>}
+          </span>
+        </div>
+      </button>
+    );
+  };
+
+  // The portfolio overview — shown in the main area when no session is selected.
+  const overviewMain = () => (
+    <div style={{ padding: '16px 18px', maxWidth: 1100 }}>
+      <h1 style={{ fontSize: 20, letterSpacing: '-.02em', fontWeight: 700 }}>Exposure program</h1>
+      <p style={{ fontSize: 12, color: 'var(--muted)', margin: '3px 0 12px' }}>Pick a session on the left to work its stages — or review the portfolio below.</p>
+      <div style={{ ...STRIP, marginBottom: 10, alignItems: 'stretch', background: '#fff' }}>
+        {kpiCell('Scopes', portfolio.scopes)}{SEP}
+        {kpiCell('Open cycles', portfolio.openCycles, ACS)}{SEP}
+        {kpiCell('Overdue', portfolio.overdue, portfolio.overdue ? RED : GREEN)}{SEP}
+        {kpiCell('Findings', portfolio.findings)}{ARROW}
+        {kpiCell('Dangerous', portfolio.dangerous, REDD)}{ARROW}
+        {kpiCell('Mobilised', portfolio.mobilised, BLUE)}{ARROW}
+        {kpiCell('Fixed ✓', portfolio.fixed, GREEN)}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '14px 2px 8px' }}><b style={{ fontSize: 14 }}>Trends</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>across closed cycles · provable period over period</span></div>
+      {trends()}
+    </div>
+  );
+
   /* ─────────────────── root ─────────────────── */
   return (
-    <div style={{ fontFamily: "var(--font-poppins, 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif)", color: INK, fontSize: 13.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="ptx" style={{ fontSize: 13.5, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--subtle)' }}>
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: INK, color: '#fff', padding: '10px 16px', borderRadius: 10, fontSize: 12, zIndex: 80, boxShadow: '0 8px 24px rgba(2,6,23,.3)', maxWidth: '80vw' }}>{toast}</div>}
       {error && <p className="flex items-start gap-1.5 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700" style={{ marginBottom: 12 }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {error}</p>}
 
@@ -1387,7 +1443,48 @@ export default function CtemScopesRedesign() {
 
       {SCOPES.length === 0 ? (
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}><EmptyState onCreate={() => setShowCreate(true)} onTemplate={(preset) => { setForm((prev) => ({ ...prev, ...preset })); setShowCreate(true); }} canEdit={canEdit} /></div>
-      ) : screen === 'scope' ? journeyScreen() : homeScreen()}
+      ) : (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          {/* PANE 1 — Sessions (resizable left column) */}
+          <aside style={{ width: listW, flexShrink: 0, background: '#fff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ padding: '11px 13px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>Sessions</div>
+                <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{SCOPES.length} scope{SCOPES.length === 1 ? '' : 's'} · worst first</div>
+              </div>
+              {canEdit && <Btn green sm onClick={() => setShowCreate(true)}><Plus className="h-3.5 w-3.5" /> New</Btn>}
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {[...SCOPES].sort((a, b) => (Number(!!(b.cycleOpen && b.cycleOverdue)) - Number(!!(a.cycleOpen && a.cycleOverdue))) || (b.dangerous - a.dangerous) || (b.findings - a.findings)).map(sessionRow)}
+            </div>
+          </aside>
+          {/* drag handle */}
+          <div onMouseDown={(e) => { dragRef.current = { x: e.clientX, w: listW }; }} title="Drag to resize" style={{ width: 5, cursor: 'col-resize', flexShrink: 0, background: 'transparent' }} />
+          {/* PANES 2 + 3 — stage rail + results, or the portfolio overview */}
+          {screen === 'scope' && s ? (
+            s.cycleOpen ? (
+              <>
+                <aside style={{ width: 208, flexShrink: 0, background: '#fff', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: 12, minHeight: 0 }}>{stageNav()}</aside>
+                <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fcfdfe' }}>
+                  <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>{commandBar()}</div>
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '4px 17px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '2px 0 11px' }}>
+                      {DISC(STAGES[activeStage - 1] ?? STAGES[0], stageDone[activeStage], false)}
+                      <b style={{ fontSize: 14 }}>{(STAGES[activeStage - 1] ?? STAGES[0]).label}</b>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stageStat(activeStage)}</span>
+                    </div>
+                    {stageBody(activeStage)}
+                  </div>
+                </main>
+              </>
+            ) : (
+              <main style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: '12px 17px 16px', background: '#fcfdfe' }}>{commandBar()}{closedState()}</main>
+            )
+          ) : (
+            <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: '#fcfdfe' }}>{overviewMain()}</main>
+          )}
+        </div>
+      )}
     </div>
   );
 }
