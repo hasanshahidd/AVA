@@ -174,7 +174,7 @@ export default function CtemScopesRedesign() {
   // Discover asset filter (machine name, or 'all').
   const [discAsset, setDiscAsset] = useState<string>('all');
   // "By control" evidence popup.
-  const [ctrlPopup, setCtrlPopup] = useState<{ id: number; code: string; name: string; coveredIds: number[]; findings: number } | null>(null);
+  const [ctrlPopup, setCtrlPopup] = useState<{ id: number; code: string; name: string; coveredIds: number[]; findings: number; tier?: string; reason?: string; basis?: string; standards?: string[] } | null>(null);
   const [peek, setPeek] = useState<any | null>(null);
   // Which stage's accordion body is open. null → resolves to the first
   // stage that isn't done yet, so opening a scope lands on the live work.
@@ -203,7 +203,7 @@ export default function CtemScopesRedesign() {
   const aiRun = (aiRunData as any)?.last_run ?? null;
   const mappingRunning = !!aiRun?.running;
   useEffect(() => {
-    if (aiRun && !aiRun.running) { qc.invalidateQueries({ queryKey: ['ctem-portfolio'] }); qc.invalidateQueries({ queryKey: ['ctem.scope-findings'] }); setActiveStage(null); }
+    if (aiRun && !aiRun.running) { qc.invalidateQueries({ queryKey: ['ctem-portfolio'] }); qc.invalidateQueries({ queryKey: ['ctem.scope-findings'] }); setActiveStage(4); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiRun?.running]);
 
@@ -243,7 +243,10 @@ export default function CtemScopesRedesign() {
   const completeStage = useMutation({
     mutationFn: async (args: { scopeId: number; stage: 'discover' | 'prioritise' | 'dispatch' }) =>
       (await ctemScopesApi.completeStage(args.scopeId, args.stage)).data,
-    onSuccess: () => { setError(null); setActiveStage(null); invalidate(); },
+    // Stay on the stage that just finished so its results show, instead of
+    // jumping to the next incomplete stage (the "it doesn't show results, it
+    // just moves forward" bug). dispatch hands off to Mobilise(5).
+    onSuccess: (_d, args) => { setError(null); setActiveStage(({ discover: 2, prioritise: 3, dispatch: 5 } as Record<string, number>)[args.stage] ?? null); invalidate(); },
     onError: (e: any) => setError(e?.response?.data?.detail || 'Could not advance the stage'),
   });
   // Re-run the attack-path engine over the scope. Inside an open cycle this IS
@@ -254,7 +257,7 @@ export default function CtemScopesRedesign() {
       setError(null);
       const inOpenCycle = (data?.scopes ?? []).find((x) => x.id === scopeId)?.stageProgress != null;
       if (inOpenCycle) {
-        try { await ctemScopesApi.completeStage(scopeId, 'prioritise'); setActiveStage(null); }
+        try { await ctemScopesApi.completeStage(scopeId, 'prioritise'); setActiveStage(3); }
         catch (e: any) { setError(e?.response?.data?.detail || 'Prioritise ran, but the stage could not be stamped'); }
       }
       invalidate(); qc.invalidateQueries({ queryKey: ['choke-points'] });
@@ -956,7 +959,7 @@ export default function CtemScopesRedesign() {
                   <div style={{ fontWeight: 600, fontSize: 12.5 }}>{v.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 3, fontSize: 10.5, color: FAINT }}><SevBadge sev={v.severity} /><span style={MONO}>{v.composite_priority != null ? `${Math.round(Number(v.composite_priority) * 10)}/100` : '—'}</span>{(v.linked_assets ?? [])[0] && <span>{v.linked_assets[0]}</span>}{v.kev_flag && <Kev />}</div>
                 </div>
-                <div style={{ flex: '1 1 200px', minWidth: 0 }}><div style={{ fontSize: 9.5, color: FAINT, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Addressed by</div><div>{chips(v.linked_control_codes)}</div></div>
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}><div title="Controls crosswalked to mitigate this finding — the fix to implement" style={{ fontSize: 9.5, color: FAINT, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Addressed by</div><div>{chips(v.linked_control_codes)}</div></div>
                 <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 8 }}><Pill bg={GREENBG} c={GREEN}>auto-linked</Pill></div>
               </div>
             ))}
@@ -985,9 +988,9 @@ export default function CtemScopesRedesign() {
                 const ok = c.basis === 'ai' || c.basis === 'ai_auto' || c.basis === 'ai_family' || c.basis === 'reused';
                 return (
                   <tr key={`${c.kind}-${c.control_id ?? c.code}`}>
-                    <td style={TD}><b style={MONO}>{c.code}</b><div style={{ color: MUTED, fontSize: 10.5 }}>{c.title}</div></td>
+                    <td style={TD}><button type="button" onClick={() => setCtrlPopup({ id: c.control_id ?? 0, code: c.code, name: c.title, coveredIds: covered, findings: c.findings, tier: c.tier, reason: c.reason, basis: c.basis, standards: c.standards ?? [c.fw] })} title="View control detail" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}><b style={{ ...MONO, color: ACS }}>{c.code}</b><div style={{ color: MUTED, fontSize: 10.5 }}>{c.title}</div></button></td>
                     <td style={TD}>{(c.standards ?? [c.fw]).filter(Boolean).map((t) => <span key={t} style={{ display: 'inline-block', border: `1px solid #E4E8EC`, background: '#F7F9FA', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 600, color: '#5B6673', margin: '2px 3px 0 0' }}>{t}</span>)}</td>
-                    <td style={TD}><Btn sm disabled={c.findings === 0} onClick={() => setCtrlPopup({ id: c.control_id ?? 0, code: c.code, name: c.title, coveredIds: covered, findings: c.findings })}><b style={MONO}>{c.findings}</b> findings</Btn></td>
+                    <td style={TD}><Btn sm disabled={c.findings === 0} onClick={() => setCtrlPopup({ id: c.control_id ?? 0, code: c.code, name: c.title, coveredIds: covered, findings: c.findings, tier: c.tier, reason: c.reason, basis: c.basis, standards: c.standards ?? [c.fw] })}><b style={MONO}>{c.findings}</b> findings</Btn></td>
                     <td style={TD}><Pill bg={ok ? VIOLETBG : AMBERBG} c={ok ? VIOLET : AMBER}>{basisLabel[c.basis as string] ?? 'crosswalk rule'}</Pill></td>
                   </tr>
                 );
@@ -1154,53 +1157,64 @@ export default function CtemScopesRedesign() {
     return renderMobilise();
   };
 
-  const accordion = () => (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' }}>
-      {STAGES.map((st, i) => {
+  const DISC = (st: { n: number; c: string }, done: boolean, locked: boolean): React.ReactNode => done
+    ? <span style={{ width: 26, height: 26, borderRadius: 999, border: `2px solid ${st.c}`, color: st.c, background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, flex: 'none' }}>✓</span>
+    : locked
+    ? <span style={{ width: 26, height: 26, borderRadius: 999, background: '#EEF1F3', color: FAINT, display: 'grid', placeItems: 'center', fontSize: 10, flex: 'none' }}>🔒</span>
+    : <span style={{ width: 26, height: 26, borderRadius: 999, background: st.c, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, flex: 'none' }}>{st.n}</span>;
+
+  // Left rail: the 5 stages as a vertical nav — always visible so the whole flow
+  // is clear and you can jump between stages; the active stage's results fill the
+  // pane on the right. (Replaces the stacked accordion that hid results on jump.)
+  const stageNav = () => (
+    <aside style={{ width: 240, flex: 'none', display: 'flex', flexDirection: 'column', gap: 7, overflowY: 'auto', paddingRight: 2 }}>
+      {STAGES.map((st) => {
         const done = stageDone[st.n];
         const reachable = stageReachable(st.n);
         const locked = (gated && !done && !reachable) || (gated && st.n === 5 && !sp?.dispatch);
+        const active = st.n === activeStage && !locked;
         const isCurrent = st.n === firstIncomplete;
-        const open = st.n === activeStage && !locked;
-        const last = i === STAGES.length - 1;
-        const disc = done
-          ? <span style={{ width: 26, height: 26, borderRadius: 999, border: `2px solid ${st.c}`, color: st.c, background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800 }}>✓</span>
-          : locked
-          ? <span style={{ width: 26, height: 26, borderRadius: 999, background: '#EEF1F3', color: FAINT, display: 'grid', placeItems: 'center', fontSize: 10 }}>🔒</span>
-          : <span style={{ width: 26, height: 26, borderRadius: 999, background: st.c, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800 }}>{st.n}</span>;
-        const tag = open ? null
-          : done ? <span style={{ color: FAINT, fontSize: 14 }}>›</span>
-          : locked ? <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.05em', color: FAINT }}>LOCKED</span>
-          : isCurrent ? <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: '#fff', background: INK, borderRadius: 5, padding: '2px 7px' }}>CURRENT</span>
-          : <span style={{ color: FAINT, fontSize: 14 }}>›</span>;
         return (
-          <div key={st.n} style={{ display: 'flex', gap: 14 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 'none', width: 26, paddingTop: 14 }}>{disc}{!last && <span style={{ flex: 1, width: 2, background: done ? st.c : '#E4E8EC', marginTop: 4, borderRadius: 2 }} />}</div>
-            <div style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : 14 }}>
-              <div style={{ ...CARD, overflow: 'hidden', ...(open ? { border: `1px solid ${st.c}`, boxShadow: '0 4px 14px rgba(2,6,23,.06)' } : {}), ...(locked ? { opacity: 0.65 } : {}) }}>
-                <div onClick={() => { if (!locked) setActiveStage(st.n); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 13px', cursor: locked ? 'default' : 'pointer' }}>
-                  <b style={{ fontSize: 13, color: locked ? FAINT : INK, flex: 'none' }}>{st.label}</b>
-                  <span style={{ fontSize: 11.5, color: locked ? FAINT : MUTED, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stageStat(st.n)}</span>
-                  {tag}
-                </div>
-                {open && <div style={{ borderTop: `1px solid ${BORDER2}`, padding: '12px 14px' }}>{stageBody(st.n)}</div>}
-              </div>
-            </div>
-          </div>
+          <button key={st.n} type="button" disabled={locked} onClick={() => { if (!locked) setActiveStage(st.n); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', width: '100%', border: `1px solid ${active ? st.c : BORDER}`, background: active ? '#fff' : '#FAFBFC', borderRadius: 11, padding: '10px 12px', cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.6 : 1, boxShadow: active ? '0 2px 10px rgba(2,6,23,.06)' : 'none' }}>
+            {DISC(st, done, locked)}
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <b style={{ fontSize: 12.5, color: locked ? FAINT : INK }}>{st.label}</b>
+                {isCurrent && !done && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.05em', color: '#fff', background: INK, borderRadius: 4, padding: '1px 5px' }}>NOW</span>}
+              </span>
+              <span style={{ display: 'block', fontSize: 10.5, color: locked ? FAINT : MUTED, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stageStat(st.n)}</span>
+            </span>
+          </button>
         );
       })}
-    </div>
+    </aside>
   );
 
-  const journeyScreen = () => (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', maxWidth: 1060, width: '100%', margin: '0 auto', padding: '4px 18px 0' }}>
-      <div style={{ marginBottom: 10, flexShrink: 0 }}><Btn sm onClick={() => { setScreen('home'); setSelId(null); }}>← All scopes</Btn></div>
-      <div style={{ flexShrink: 0 }}>{commandBar()}</div>
-      {s.cycleOpen
-        ? <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{accordion()}</div>
-        : <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 12 }}>{closedState()}</div>}
-    </div>
-  );
+  const journeyScreen = () => {
+    const st = STAGES[activeStage - 1] ?? STAGES[0];
+    return (
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', maxWidth: 1320, width: '100%', margin: '0 auto', padding: '4px 18px 0' }}>
+        <div style={{ marginBottom: 10, flexShrink: 0 }}><Btn sm onClick={() => { setScreen('home'); setSelId(null); }}>← All scopes</Btn></div>
+        <div style={{ flexShrink: 0 }}>{commandBar()}</div>
+        {s.cycleOpen
+          ? <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
+              {stageNav()}
+              <main style={{ ...CARD, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 16px', borderBottom: `1px solid ${BORDER2}`, flexShrink: 0 }}>
+                  {DISC(st, stageDone[activeStage], false)}
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ fontSize: 14 }}>{st.label}</b>
+                    <span style={{ display: 'block', fontSize: 11, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stageStat(activeStage)}</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '14px 16px' }}>{stageBody(activeStage)}</div>
+              </main>
+            </div>
+          : <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 12 }}>{closedState()}</div>}
+      </div>
+    );
+  };
 
   /* ─────────────────── root ─────────────────── */
   return (
@@ -1300,6 +1314,18 @@ export default function CtemScopesRedesign() {
               <Btn sm onClick={() => setCtrlPopup(null)}><X className="h-3.5 w-3.5" /></Btn>
             </div>
             <div style={{ fontSize: 10.5, color: FAINT, margin: '6px 0 8px' }}>A link is the fix to implement — it does <b>not</b> close these findings.</div>
+            {(ctrlPopup.standards?.filter(Boolean).length || ctrlPopup.tier || ctrlPopup.basis || ctrlPopup.reason) ? (
+              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, background: '#FAFBFC', padding: '10px 12px', marginBottom: 10, fontSize: 11.5 }}>
+                <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                  {ctrlPopup.standards && ctrlPopup.standards.filter(Boolean).length > 0 && (
+                    <div><div style={SK}>Standards</div><div style={{ marginTop: 3 }}>{ctrlPopup.standards.filter(Boolean).map((t) => <span key={t} style={{ display: 'inline-block', border: `1px solid #E4E8EC`, background: '#fff', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 600, color: '#5B6673', margin: '0 3px 0 0' }}>{t}</span>)}</div></div>
+                  )}
+                  {ctrlPopup.tier && <div><div style={SK}>Tier</div><div style={{ fontWeight: 600, marginTop: 3, textTransform: 'capitalize' }}>{ctrlPopup.tier}</div></div>}
+                  {ctrlPopup.basis && <div><div style={SK}>Why linked</div><div style={{ fontWeight: 600, marginTop: 3 }}>{({ ai: 'AI · accepted', ai_auto: 'AI · auto-linked', ai_family: 'AI · via group', reused: 'reused decision', manual: 'manual', rule: 'crosswalk rule' } as Record<string, string>)[ctrlPopup.basis] ?? ctrlPopup.basis}</div></div>}
+                </div>
+                {ctrlPopup.reason && <div style={{ marginTop: 8, color: SEC, lineHeight: 1.5 }}><div style={SK}>Rationale</div><div style={{ marginTop: 2 }}>{ctrlPopup.reason}</div></div>}
+              </div>
+            ) : null}
             {(() => {
               const evItems = (ctrlEvidence as any)?.items ?? [];
               const list: any[] = evItems.length ? evItems : ctrlPopup.coveredIds.map((id) => (scopeFindings ?? []).find((v: any) => v.id === id)).filter(Boolean);
@@ -1347,7 +1373,7 @@ export default function CtemScopesRedesign() {
             </div>
             {Array.isArray(peek.linked_control_codes) && peek.linked_control_codes.length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <div style={SK}>Addressed by</div>
+                <div style={SK} title="Controls crosswalked to mitigate this finding — the fix to implement">Addressed by</div>
                 <div style={{ marginTop: 4 }}>{peek.linked_control_codes.map((c: string) => <span key={c} style={{ display: 'inline-flex', background: VIOLETBG, color: VIOLET, borderRadius: 7, padding: '2px 8px', fontSize: 10.5, fontWeight: 600, margin: '2px 4px 0 0' }}>{c}</span>)}</div>
                 <div style={{ fontSize: 10, color: FAINT, marginTop: 6 }}>A control link is the fix to implement — it does <b>not</b> close this finding or lower its score. Only a Nessus re-scan closes it.</div>
               </div>
