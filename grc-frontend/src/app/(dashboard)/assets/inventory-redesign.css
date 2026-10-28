@@ -29,9 +29,11 @@
 .inv2 .fchip{height:34px;border:1px solid var(--bd);border-radius:9px;background:#fff;padding:0 12px;font-size:12px;font-weight:500;color:var(--sec);cursor:pointer;white-space:nowrap}
 .inv2 .fchip:hover{border-color:#CFD6DC}
 .inv2 .fchip.on{background:#005B96;border-color:#005B96;color:#fff;font-weight:600}
-/* Prominent header bar — beats the dashboard shell's .governance-light thead th
-   theme (which otherwise paints it light with muted text). */
-.inv2 table thead th{background:#005B96 !important;color:#fff !important;border-bottom-color:#0A4C84 !important;font-weight:700 !important}
+/* Prominent header bar. Must out-specify BOTH the dashboard shell's
+   `.governance-light thead th` AND the asset-suite's `.asset-suite table thead th`
+   (same specificity as a bare .inv2 rule + !important muted color → wins the tie
+   on source order). The extra `.card` class lifts specificity so white/bold win. */
+.inv2 .card table thead th{background:#005B96 !important;color:#fff !important;border-bottom-color:#0A4C84 !important;font-weight:700 !important}
 /* rail */
 .inv2 .railcap{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#828E9A;padding:2px 6px 6px}
 .inv2 .rbtn{position:relative;display:flex;align-items:center;gap:11px;padding:5px 10px;border:0;border-radius:10px;background:none;color:var(--sec);font-size:12.5px;font-weight:500;text-align:left;width:100%;cursor:pointer}
