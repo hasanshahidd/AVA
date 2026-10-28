@@ -449,6 +449,25 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
     if body.agent_version:
         agent.agent_version = body.agent_version
     agent.updated_at = now
+    # One agent per host (take-over): a freshly (re)installed agent reporting for
+    # this asset supersedes any OLDER agent bound to the same asset — the new one
+    # takes over, the old row is revoked and its collector connection retired, so
+    # re-installing never leaves a duplicate/stale agent in the list.
+    from grc.models import IntegrationConnection
+    for old in (db.query(ComplianceAgent)
+                .filter(ComplianceAgent.tenant_id == agent.tenant_id,
+                        ComplianceAgent.asset_id == asset_id,
+                        ComplianceAgent.id != agent.id,
+                        ComplianceAgent.status != "revoked").all()):
+        old.status = "revoked"
+        old.revoked_at = now
+        old.revoke_reason = f"superseded by re-install (agent #{agent.id})"
+        old.api_token_hash = None
+        old.enrollment_token_hash = None
+        old.updated_at = now
+        (db.query(IntegrationConnection)
+         .filter(IntegrationConnection.assigned_collector_agent_id == old.id)
+         .update({"is_active": False, "status": "revoked"}, synchronize_session=False))
     db.commit()
     return {"ok": True, "asset_id": asset_id}
 
@@ -680,6 +699,8 @@ AVA_TENANT="{tenant}"
 install -d /opt/ava-agent
 # Idempotent re-install: stop any running agent so the binary isn't busy (ETXTBSY).
 systemctl stop ava-agent 2>/dev/null || true
+# Clear the saved token so this (re)install claims the FRESH enrollment (take-over).
+rm -f /etc/ava-agent/agent.json
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/api/agents/installer/linux/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
@@ -731,6 +752,9 @@ schtasks /End /TN "AvaAgent" 2>$null | Out-Null
 schtasks /Delete /TN "AvaAgent" /F 2>$null | Out-Null
 Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
+# Clear the saved token so this (re)install claims the FRESH enrollment — the new
+# agent takes over and the backend supersedes the old row (one agent per host).
+Remove-Item "$dir\\agent.json" -Force -ErrorAction SilentlyContinue
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
 # Config the service reads at startup. A Windows service does NOT reliably inherit
@@ -771,6 +795,8 @@ esac
 install -d /opt/ava-agent
 # Idempotent re-install: unload any running agent so the binary isn't busy.
 launchctl bootout system /Library/LaunchDaemons/io.caiva.agent.plist 2>/dev/null || launchctl unload /Library/LaunchDaemons/io.caiva.agent.plist 2>/dev/null || true
+# Clear the saved token so this (re)install claims the FRESH enrollment (take-over).
+rm -f /etc/ava-agent/agent.json
 echo "Downloading agent..."
 curl -fsSL "$AVA_URL/api/agents/installer/$BIN/bin" -o /opt/ava-agent/ava-agent
 chmod +x /opt/ava-agent/ava-agent
