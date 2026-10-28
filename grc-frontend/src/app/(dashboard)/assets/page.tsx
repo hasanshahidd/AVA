@@ -366,7 +366,7 @@ export default function AssetsPage() {
               labeled top-right menu (owner request — "a clickable word" box). */}
           <div style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
             <RowActionsMenu
-              label={activeView === 'overview' ? 'Overview' : activeView === 'cis' ? 'CIS Benchmark' : 'Inventory'}
+              label="Menu"
               actions={[
                 { key: 'overview', label: 'Overview', icon: LayoutDashboard, onClick: () => switchView('overview'), active: activeView === 'overview' },
                 { key: 'inventory', label: 'Inventory', icon: Boxes, onClick: () => switchView('inventory'), active: activeView === 'inventory' },
