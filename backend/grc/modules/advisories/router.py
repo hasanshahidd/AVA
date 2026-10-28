@@ -14,9 +14,10 @@ from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ...models import GRCUser, get_db, ITAsset, Vulnerability
+from ...models import GRCUser, get_db, ITAsset, Vulnerability, VulnerabilityAssetLink
 from ...routers.auth_router import (
     require_auth,
     get_user_primary_tenant,
@@ -521,7 +522,6 @@ def advisories_by_asset(
         db.query(
             AdvisoryAssetApplicability.checked_at.label("checked_at"),
             AdvisoryCve.cve_id.label("cve_id"),
-            AdvisoryCve.severity.label("cve_severity"),
             Advisory.id.label("advisory_id"),
             Advisory.title.label("advisory_title"),
             Advisory.severity.label("advisory_severity"),
@@ -556,12 +556,31 @@ def advisories_by_asset(
             return normalize_region(meta.get("region")) or UNCLASSIFIED
         return UNCLASSIFIED
 
+    # Per-CVE severity isn't on AdvisoryCve — it lives on the matched register
+    # finding (the same real-detection link the match used). Map cve_id→severity
+    # for this asset; fall back to the advisory's own severity when absent.
+    cve_ids = {r.cve_id for r in rows}
+    sev_by_cve: Dict[str, str] = {}
+    if cve_ids:
+        for cve, sev in (
+            db.query(Vulnerability.cve_id, Vulnerability.severity)
+            .join(VulnerabilityAssetLink, VulnerabilityAssetLink.vulnerability_id == Vulnerability.id)
+            .filter(
+                Vulnerability.tenant_id == tenant_id,
+                VulnerabilityAssetLink.asset_id == asset_id,
+                VulnerabilityAssetLink.link_source != "advisory",
+                func.upper(Vulnerability.cve_id).in_([c.upper() for c in cve_ids]),
+            ).all()
+        ):
+            if sev and cve and cve.upper() not in sev_by_cve:
+                sev_by_cve[cve.upper()] = sev
+
     items = [{
         "advisory_id": r.advisory_id,
         "advisory_title": r.advisory_title,
         "advisory_severity": (r.advisory_severity or "info"),
         "cve_id": r.cve_id,
-        "cve_severity": (r.cve_severity or "info"),
+        "cve_severity": (sev_by_cve.get((r.cve_id or "").upper()) or r.advisory_severity or "info"),
         "region": _region(r),
         "url": r.url,
         "checked_at": r.checked_at.isoformat() if r.checked_at else None,
