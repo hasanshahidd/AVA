@@ -266,8 +266,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   // Click a header: same column flips direction; a new column sorts text A→Z, metrics high→low.
   const sortBy = (k: string) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(TEXT_SORTS.has(k) ? 1 : -1); } };
 
-  const railLabel: Record<string, string> = { kev: 'Fix first · KEV', exploit: 'Public exploit', cve: 'With CVE', epss: 'High EPSS', exposed: 'Internet-exposed', unassigned: 'Unassigned', linked: 'Asset-linked', unlinked: 'Unlinked' };
-  const title = fFlag ? (railLabel[fFlag] || 'Findings') : fSev ? SEV[fSev as SevKey].label : fDom || 'All findings';
   const anyFilter = !!(fSev || fDom || fStatus || fFlag) || scanMode !== 'all';
   const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (fFlag ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
   const sevOpts = (['critical', 'high', 'medium', 'low', 'info'] as SevKey[]).map((k) => ({ k, label: SEV[k].label, n: count((v) => normSev(v.severity) === k) }));
@@ -449,10 +447,6 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
 
               {(
                 <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(16,24,40,.04)', overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 16px', borderBottom: `1px solid ${BORDER2}`, flexWrap: 'wrap' }}>
-                    <h3 style={{ fontSize: 13.5, margin: 0 }}>{title}</h3>
-                    <span style={{ fontSize: 11.5, color: MUTED }}><b className="num" style={{ color: SEC }}>{rows.length}</b> shown · {agg.total} total</span>
-                  </div>
                   <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
                     {/* The dashboard shell's global `.governance-light thead th` repaints headers light/muted
                         and overrides our inline blue, so force the brand-blue header bar with a scoped rule. */}
