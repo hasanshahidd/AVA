@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -99,7 +100,13 @@ func setenvIfEmpty(k, v string) {
 	}
 }
 
-var httpc = &http.Client{Timeout: 180 * time.Second} // generous for multi-MB datastream downloads
+// The cloud is HTTPS: the default transport validates the server cert against the
+// system roots (no InsecureSkipVerify anywhere). We pin an explicit TLS 1.2 floor
+// so the agent never negotiates a weak protocol — a bank-grade requirement.
+var httpc = &http.Client{
+	Timeout:   180 * time.Second, // generous for multi-MB datastream downloads
+	Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}},
+}
 
 func post(url, bearer string, payload any) ([]byte, int, error) {
 	body, _ := json.Marshal(payload)

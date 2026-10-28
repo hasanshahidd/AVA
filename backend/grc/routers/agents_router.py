@@ -745,6 +745,9 @@ $AvaEnroll = "{token}"
 $AvaTenant = "{tenant}"
 $dir = "$env:ProgramData\\AvaAgent"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
+# Lock the dir to SYSTEM + Administrators only — it holds the api_token + enrollment
+# token, and default ProgramData is world-readable. New files inherit this ACL.
+icacls "$dir" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" 2>$null | Out-Null
 # Idempotent re-install + migrate off the old scheduled-task installs: stop the
 # service (if any), remove the old task, and free the .exe.
 sc.exe stop AvaAgent 2>$null | Out-Null
