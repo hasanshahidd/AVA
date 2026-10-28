@@ -42,10 +42,10 @@ function FilterSelect({ label, value, options, onChange }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wider cw-text-muted">{label}</span>
+    <label className="flex shrink-0 flex-col gap-0.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide cw-text-muted">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="min-w-[7rem] rounded-md border border-[var(--color-border)] bg-transparent px-2.5 py-1.5 text-xs cw-text-default">
+        className="w-[5.5rem] shrink-0 truncate rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1 text-xs cw-text-default">
         <option value={ALL}>All</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -341,7 +341,7 @@ export default function AdvisoriesPage() {
       ) : (
       <>
       <div className="cw-card p-3">
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+        <div className="flex flex-nowrap items-end gap-x-3 overflow-x-auto">
           <button onClick={() => setPanelMode('match')} disabled={selCveTotal === 0}
             className="btn-primary mb-0.5 flex shrink-0 items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-50">
             <Play size={15} /> Match{selCveTotal > 0 ? ` ${selCveTotal} CVE${selCveTotal === 1 ? '' : 's'}` : ''}
@@ -353,13 +353,13 @@ export default function AdvisoriesPage() {
               <button onClick={clearSel} className="font-medium text-[var(--color-primary)] hover:underline">Clear</button>
             </span>
           )}
-          <div className="flex flex-1 flex-wrap items-end gap-x-4 gap-y-2">
+          <div className="flex flex-1 flex-nowrap items-end gap-x-3">
             <FilterSelect label="Origin" value={fOrigin} options={['uploaded', 'synced']} onChange={setFOrigin} />
             <FilterSelect label="Region" value={fRegion} options={regionOptions} onChange={setFRegion} />
             <FilterSelect label="Source" value={fSource} options={sourceOptions} onChange={setFSource} />
             <FilterSelect label="Severity" value={fSeverity} options={['critical', 'high', 'medium', 'low']} onChange={setFSeverity} />
             <FilterSelect label="Status" value={fStatus} options={['pending', 'open', 'resolved', 'not_applicable']} onChange={setFStatus} />
-            <span className="mb-1.5 text-[11px] cw-text-muted">
+            <span className="mb-1.5 shrink-0 whitespace-nowrap text-[11px] cw-text-muted">
               <span className="font-semibold cw-text-default">{filtered.length}</span>/{advisories.length}
             </span>
           </div>
