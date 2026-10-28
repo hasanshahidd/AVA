@@ -185,9 +185,9 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
   const affected = ap?.affected_assets ?? [];
   const body = (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="font-mono text-sm font-semibold cw-text-default">{cve.cve_id}</span>
             {cve.severity && <SeverityBadge severity={cve.severity} />}
             {typeof cve.cvss_score === 'number' && (
@@ -198,10 +198,10 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
             )}
           </div>
           {cve.title && cve.title !== cve.cve_id && (
-            <p className="mt-0.5 text-xs font-medium cw-text-default">{cve.title}</p>
+            <p className="mt-1.5 text-sm font-medium cw-text-default">{cve.title}</p>
           )}
           {(cve.affected_product || cve.affected_versions) && (
-            <p className="text-xs cw-text-muted">
+            <p className="mt-0.5 text-xs cw-text-muted">
               {cve.affected_product || 'product n/a'}{cve.affected_versions ? ` · ${cve.affected_versions}` : ''}
             </p>
           )}
@@ -209,12 +209,12 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
         {linked && <span className="shrink-0 text-xs font-medium text-[var(--color-primary)]">Full details →</span>}
       </div>
       {cve.description && (
-        <p className="mt-2 line-clamp-2 text-xs cw-text-muted">{cve.description}</p>
+        <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed cw-text-muted">{cve.description}</p>
       )}
-      <div className="mt-3">
-        <p className="mb-1 text-xs font-semibold text-red-600">Affected assets ({ap?.affected_count ?? 0})</p>
+      <div className="mt-3.5 border-t border-[var(--color-border)] pt-3">
+        <p className="mb-1.5 text-xs font-semibold cw-text-muted">Affected assets ({ap?.affected_count ?? 0})</p>
         {affected.length === 0 ? (
-          <span className="text-xs cw-text-muted">no asset in the checked scope has a finding for this CVE</span>
+          <span className="text-xs cw-text-muted">No asset in the checked scope has a finding for this CVE.</span>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {affected.map((a) => (
@@ -225,7 +225,7 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
       </div>
     </>
   );
-  const cls = 'block flex-1 rounded-lg border border-[var(--color-border)] p-3';
+  const cls = 'block flex-1 rounded-lg border border-[var(--color-border)] p-4';
   const card = linked ? (
     <Link href={`/vulnerabilities/${cve.bridged_vulnerability_id}`}
       className={`${cls} transition-colors hover:border-[var(--color-primary)]`}>{body}</Link>
@@ -234,8 +234,8 @@ export function VulnCard({ cve, selected, onToggleSelect }: {
   );
   if (!onToggleSelect) return card;
   return (
-    <div className="flex items-start gap-2">
-      <input type="checkbox" className="mt-4 shrink-0" checked={!!selected} onChange={onToggleSelect} />
+    <div className="flex items-start gap-3">
+      <input type="checkbox" className="mt-5 shrink-0" checked={!!selected} onChange={onToggleSelect} />
       {card}
     </div>
   );
@@ -383,37 +383,58 @@ function eventSummary(e: AdvisoryEventView): string {
   }
 }
 
+// Absolute date + time with the year, so an event is never ambiguous.
 function formatWhen(at?: string | null): string {
   if (!at) return '';
   const dt = new Date(at);
-  return isNaN(dt.getTime()) ? '' : dt.toLocaleString();
+  if (isNaN(dt.getTime())) return '';
+  return dt.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
 }
 
+// The advisory's event history as a clean Event | When | By table: ingested →
+// confirmed → re-checked, each with an absolute date and the actor.
 export function HistoryTimeline({ events }: { events: AdvisoryEventView[] }) {
   if (!events || events.length === 0) return null;
   return (
-    <div className="cw-card p-5">
-      <h2 className="mb-4 text-sm font-semibold cw-text-default">History</h2>
-      <ol className="space-y-4">
-        {events.map((e) => {
-          const m = EVENT_META[e.event] || { label: e.event, dot: 'bg-gray-400' };
-          const summary = eventSummary(e);
-          return (
-            <li key={e.id} className="flex gap-3">
-              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${m.dot}`} />
-              <div className="min-w-0">
-                <p className="text-sm cw-text-default">
-                  <span className="font-medium">{m.label}</span>
-                  {summary ? <span className="cw-text-muted"> — {summary}</span> : null}
-                </p>
-                <p className="text-xs cw-text-muted">
-                  {formatWhen(e.at)}{e.actor ? ` · ${e.actor}` : ''}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+    <div className="cw-card overflow-hidden">
+      <div className="border-b border-[var(--color-border)] px-5 py-4">
+        <h2 className="text-sm font-semibold cw-text-default">Timeline</h2>
+        <p className="mt-1 text-xs cw-text-muted">Everything that has happened to this advisory, oldest first.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-xs font-semibold uppercase tracking-wider cw-text-muted">
+              <th className="px-5 py-2.5 font-semibold">Event</th>
+              <th className="px-5 py-2.5 font-semibold">When</th>
+              <th className="px-5 py-2.5 font-semibold">By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((e) => {
+              const m = EVENT_META[e.event] || { label: e.event, dot: 'bg-gray-400' };
+              const summary = eventSummary(e);
+              return (
+                <tr key={e.id} className="border-b border-[var(--color-border)] align-top last:border-0">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${m.dot}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium cw-text-default">{m.label}</p>
+                        {summary ? <p className="mt-0.5 text-xs cw-text-muted">{summary}</p> : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5 cw-text-muted">{formatWhen(e.at) || '—'}</td>
+                  <td className="px-5 py-3.5 cw-text-muted">{e.actor || '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -571,9 +592,9 @@ export function MatchPanel({ selection, onRun, onCancel, isPending }: {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold cw-text-default">Run match</h2>
-        <div className="flex items-center gap-2">
-          <button onClick={onCancel} className="text-xs cw-text-muted hover:cw-text-default">Cancel</button>
+        <h2 className="text-base font-semibold cw-text-default">Run match</h2>
+        <div className="flex items-center gap-3">
+          <button onClick={onCancel} className="text-sm cw-text-muted hover:cw-text-default">Cancel</button>
           <button
             onClick={() => onRun(mode === 'assets' ? { mode, asset_ids: Array.from(picked) } : { mode: 'all' })}
             disabled={blocked}
@@ -582,22 +603,22 @@ export function MatchPanel({ selection, onRun, onCancel, isPending }: {
           </button>
         </div>
       </div>
-      <p className="mt-0.5 text-xs cw-text-muted">
+      <p className="mt-1.5 text-sm leading-relaxed cw-text-muted">
         Matching <span className="font-semibold cw-text-default">{selection.cves}</span> CVE{selection.cves === 1 ? '' : 's'}
         {selection.advisories > 0 ? <> from <span className="font-semibold cw-text-default">{selection.advisories}</span> advisor{selection.advisories === 1 ? 'y' : 'ies'}</> : null} against your register.
       </p>
 
-      <div className="mt-4 space-y-2">
-        <label className="flex items-center gap-2 text-sm cw-text-default">
+      <div className="mt-5 space-y-3">
+        <label className="flex items-center gap-2.5 text-sm cw-text-default">
           <input type="radio" checked={mode === 'all'} onChange={() => setMode('all')} /> All scanned assets
         </label>
-        <label className="flex items-center gap-2 text-sm cw-text-default">
+        <label className="flex items-center gap-2.5 text-sm cw-text-default">
           <input type="radio" checked={mode === 'assets'} onChange={() => setMode('assets')} /> Specific assets
         </label>
       </div>
 
       {mode === 'assets' && (
-        <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+        <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-[var(--color-border)] p-2">
           {assetList.length === 0 ? (
             <p className="text-xs cw-text-muted">No assets in inventory.</p>
           ) : assetList.map((a) => (
@@ -627,10 +648,16 @@ export function MatchReport({ report, title, onBack, onDownload }: {
   onDownload?: (fmt: 'csv' | 'json') => void;
 }) {
   const s = report.summary;
+  const stats = [
+    { label: 'CVEs checked', value: s.cves_checked, accent: false },
+    { label: 'Matched', value: s.matched, accent: true },
+    { label: 'Not found', value: s.not_found, accent: false },
+    { label: 'Assets in scope', value: s.scope_size, accent: false },
+  ];
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <button onClick={onBack} className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-sm cw-text-muted hover:cw-text-default">
           <ArrowLeft size={15} /> Back
         </button>
         {onDownload && (
@@ -641,45 +668,61 @@ export function MatchReport({ report, title, onBack, onDownload }: {
         )}
       </div>
 
-      <h2 className="mt-1.5 text-sm font-bold cw-text-default">{title || 'Match report'}</h2>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-        <div><span className="text-base font-bold cw-text-default">{s.cves_checked}</span> <span className="text-xs cw-text-muted">CVEs checked</span></div>
-        <div><span className="text-base font-bold text-red-600">{s.matched}</span> <span className="text-xs cw-text-muted">matched</span></div>
-        <div><span className="text-base font-bold cw-text-default">{s.not_found}</span> <span className="text-xs cw-text-muted">not found</span></div>
-        <div><span className="text-base font-bold cw-text-default">{s.scope_size}</span> <span className="text-xs cw-text-muted">assets in scope</span></div>
+      <h2 className="mt-3 text-base font-semibold cw-text-default">{title || 'Match report'}</h2>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map((st) => (
+          <div key={st.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3">
+            <p className={`text-2xl font-semibold leading-tight ${st.accent ? 'text-red-600' : 'cw-text-default'}`}>{st.value}</p>
+            <p className="mt-1 text-xs cw-text-muted">{st.label}</p>
+          </div>
+        ))}
       </div>
 
       {report.matched.length === 0 ? (
-        <p className="mt-4 text-sm cw-text-muted">No selected CVE was found on any asset in the chosen scope.</p>
+        <p className="mt-6 text-sm cw-text-muted">No selected CVE was found on any asset in the chosen scope.</p>
       ) : (
-        <div className="mt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-red-600">Matched — found on your assets</h3>
-          <div className="mt-2 space-y-2">
-            {report.matched.map((m) => (
-              <div key={`${m.advisory_id}-${m.cve_id}`} className="rounded-lg border border-red-200 p-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs font-semibold cw-text-default">{m.cve_id}</span>
-                    {m.advisory_title && <span className="truncate text-xs cw-text-muted">· {m.advisory_title}</span>}
-                  </div>
-                  <a href={`/advisories/${m.advisory_id}`} target="_blank" rel="noopener noreferrer"
-                    className="shrink-0 text-xs font-medium text-[var(--color-primary)] hover:underline">Open advisory →</a>
-                </div>
-                <div className="mt-1.5 flex flex-col gap-1">
-                  {m.assets.map((a) => (
-                    <div key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
-                      <a href={`/assets/${a.id}`} target="_blank" rel="noopener noreferrer"
-                        className="font-medium text-[var(--color-primary)] hover:underline">{a.name}</a>
-                      <SeverityBadge severity={a.severity} />
-                      {a.vulnerability_id && (
-                        <a href={`/vulnerabilities/${a.vulnerability_id}`} target="_blank" rel="noopener noreferrer"
-                          className="text-[var(--color-primary)] hover:underline">Open vulnerability →</a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+        <div className="mt-6">
+          <h3 className="mb-2.5 text-sm font-semibold cw-text-default">Matched — found on your assets</h3>
+          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-xs font-semibold uppercase tracking-wider cw-text-muted">
+                  <th className="px-4 py-2.5 font-semibold">CVE</th>
+                  <th className="px-4 py-2.5 font-semibold">Affected assets</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Advisory</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.matched.map((m) => (
+                  <tr key={`${m.advisory_id}-${m.cve_id}`} className="border-b border-[var(--color-border)] align-top last:border-0">
+                    <td className="px-4 py-3.5">
+                      <span className="font-mono text-xs font-semibold cw-text-default">{m.cve_id}</span>
+                      {m.advisory_title && <p className="mt-0.5 text-xs cw-text-muted">{m.advisory_title}</p>}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-col gap-1.5">
+                        {m.assets.map((a) => (
+                          <div key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
+                            <a href={`/assets/${a.id}`} target="_blank" rel="noopener noreferrer"
+                              className="font-medium text-[var(--color-primary)] hover:underline">{a.name}</a>
+                            <SeverityBadge severity={a.severity} />
+                            {a.vulnerability_id && (
+                              <a href={`/vulnerabilities/${a.vulnerability_id}`} target="_blank" rel="noopener noreferrer"
+                                className="text-[var(--color-primary)] hover:underline">Open finding →</a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <a href={`/advisories/${m.advisory_id}`} target="_blank" rel="noopener noreferrer"
+                        className="whitespace-nowrap text-xs font-medium text-[var(--color-primary)] hover:underline">Open →</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -705,43 +748,43 @@ export function MatchHistory({ onOpen, onBack }: { onOpen: (id: number) => void;
   };
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm cw-text-muted hover:cw-text-default">
         <ArrowLeft size={15} /> Back
       </button>
-      <h2 className="mt-2 flex items-center gap-2 text-sm font-bold cw-text-default"><History size={15} /> Match history</h2>
-      <p className="mt-0.5 text-xs cw-text-muted">Every match run is saved here. Open one to see its full report, or download it.</p>
+      <h2 className="mt-3 flex items-center gap-2 text-base font-semibold cw-text-default"><History size={16} /> Match history</h2>
+      <p className="mt-1 text-sm cw-text-muted">Every match run is saved here. Open one to see its full report, or download it.</p>
       {sessions.length === 0 ? (
-        <p className="mt-3 text-sm cw-text-muted">No match runs yet. Select advisories or CVEs and run a match.</p>
+        <p className="mt-4 text-sm cw-text-muted">No match runs yet. Select advisories or CVEs and run a match.</p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border)]">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--color-border)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-xs font-bold uppercase tracking-wider cw-text-default">
-                <th className="px-3 py-2">Run</th>
-                <th className="px-3 py-2">When</th>
-                <th className="px-3 py-2">By</th>
-                <th className="px-3 py-2 text-right">CVEs</th>
-                <th className="px-3 py-2 text-right">Matched</th>
-                <th className="px-3 py-2 text-right">Not found</th>
-                <th className="px-3 py-2 text-right">Scope</th>
-                <th className="px-3 py-2 text-right">Export</th>
+              <tr className="border-b border-[var(--color-border)] bg-[var(--color-subtle)] text-left text-xs font-semibold uppercase tracking-wider cw-text-muted">
+                <th className="px-4 py-3 font-semibold">Run</th>
+                <th className="px-4 py-3 font-semibold">When</th>
+                <th className="px-4 py-3 font-semibold">By</th>
+                <th className="px-4 py-3 text-right font-semibold">CVEs</th>
+                <th className="px-4 py-3 text-right font-semibold">Matched</th>
+                <th className="px-4 py-3 text-right font-semibold">Not found</th>
+                <th className="px-4 py-3 text-right font-semibold">Scope</th>
+                <th className="px-4 py-3 text-right font-semibold">Export</th>
               </tr>
             </thead>
             <tbody>
               {sessions.map((row) => (
                 <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-hover)]">
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <button onClick={() => onOpen(row.id)} className="font-medium text-[var(--color-primary)] hover:underline">
                       {row.label || `Match #${row.id}`}
                     </button>
                   </td>
-                  <td className="px-3 py-2 cw-text-muted">{fmtWhen(row.created_at)}</td>
-                  <td className="px-3 py-2 cw-text-muted">{row.actor || '—'}</td>
-                  <td className="px-3 py-2 text-right cw-text-default">{row.summary?.cves_checked ?? 0}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-red-600">{row.summary?.matched ?? 0}</td>
-                  <td className="px-3 py-2 text-right cw-text-muted">{row.summary?.not_found ?? 0}</td>
-                  <td className="px-3 py-2 text-right cw-text-muted">{row.summary?.scope_size ?? 0}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="whitespace-nowrap px-4 py-3 cw-text-muted">{fmtWhen(row.created_at)}</td>
+                  <td className="px-4 py-3 cw-text-muted">{row.actor || '—'}</td>
+                  <td className="px-4 py-3 text-right cw-text-default">{row.summary?.cves_checked ?? 0}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-red-600">{row.summary?.matched ?? 0}</td>
+                  <td className="px-4 py-3 text-right cw-text-muted">{row.summary?.not_found ?? 0}</td>
+                  <td className="px-4 py-3 text-right cw-text-muted">{row.summary?.scope_size ?? 0}</td>
+                  <td className="px-4 py-3 text-right">
                     <button onClick={() => download(row.id)} className="btn-secondary inline-flex items-center gap-1 text-xs">
                       <Download size={13} /> CSV
                     </button>

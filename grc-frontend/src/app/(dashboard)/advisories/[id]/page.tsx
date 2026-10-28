@@ -126,60 +126,66 @@ export default function AdvisoryDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-5xl space-y-6">
       <button
         onClick={() => router.push('/advisories')}
-        className="flex items-center gap-1 text-sm cw-text-muted hover:cw-text-default"
+        className="flex items-center gap-1.5 text-sm cw-text-muted hover:cw-text-default"
       >
         <ArrowLeft size={16} /> Advisories
       </button>
 
-      <div className="cw-card p-5">
+      <div className="cw-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-primary)]">
               Advisory{advisory.region && advisory.region !== 'Unclassified' ? ` · ${advisory.region}` : ''}
             </p>
             {advisory.region === 'Unclassified' && (
-              <div className="mt-1 flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-yellow-700">Region not detected —</span>
                 <RegionPicker advisoryId={advisory.id} current={advisory.region} />
               </div>
             )}
-            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold cw-text-default">{advisory.title}</h1>
+            <h1 className="mt-1.5 text-2xl font-semibold leading-snug cw-text-default">{advisory.title}</h1>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <SeverityBadge severity={advisory.severity} />
               <StatusBadge status={advisory.status} />
+              {advisory.url && (
+                <a href={advisory.url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:underline">
+                  <ExternalLink size={13} /> Source
+                </a>
+              )}
             </div>
-            <p className="text-xs cw-text-muted mt-1">
+            <p className="mt-2 text-xs cw-text-muted">
               {advisory.external_id || '—'}
               {advisory.source_name ? ` · ${advisory.source_name}` : ''}
             </p>
-            {advisory.flow && <div className="mt-3"><FlowStrip flow={advisory.flow} /></div>}
           </div>
         </div>
 
-        {advisory.summary && <div className="mt-3"><RichText text={advisory.summary} /></div>}
+        {advisory.summary && <div className="mt-4"><RichText text={advisory.summary} /></div>}
+
+        {advisory.flow && (
+          <div className="mt-5">
+            <h3 className="mb-3 text-sm font-semibold cw-text-default">Lifecycle</h3>
+            <FlowStrip flow={advisory.flow} />
+          </div>
+        )}
 
         {!isPending && (
-          <div className="mt-4 flex flex-wrap items-center gap-6">
-            <div>
-              <p className="text-2xl font-bold cw-text-default">
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3">
+              <p className="text-2xl font-semibold leading-tight cw-text-default">
                 {advisory.asset_affected_count}
-                <span className="text-sm cw-text-muted"> / {advisory.asset_total_count}</span>
+                <span className="text-base cw-text-muted"> / {advisory.asset_total_count}</span>
               </p>
-              <p className="text-xs cw-text-muted">assets affected (of those running the software)</p>
+              <p className="mt-1 text-xs cw-text-muted">Assets affected / running the software</p>
             </div>
-            <div>
-              <p className="text-2xl font-bold cw-text-default">{advisory.cve_count}</p>
-              <p className="text-xs cw-text-muted">CVEs</p>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-subtle)] px-4 py-3">
+              <p className="text-2xl font-semibold leading-tight cw-text-default">{advisory.cve_count}</p>
+              <p className="mt-1 text-xs cw-text-muted">CVEs</p>
             </div>
-            {advisory.url && (
-              <a href={advisory.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm text-[var(--color-primary)] hover:underline">
-                <ExternalLink size={14} /> Source
-              </a>
-            )}
           </div>
         )}
       </div>
@@ -187,12 +193,12 @@ export default function AdvisoryDetailPage() {
       {advisory.extraction && <ExtractionPipeline report={advisory.extraction} />}
 
       {isPending ? (
-        <div className="cw-card p-5 space-y-3">
+        <div className="cw-card space-y-4 p-6">
           <div className="flex items-center gap-2">
             <AlertCircle size={18} className="text-yellow-600" />
-            <h2 className="text-sm font-semibold cw-text-default">Review extracted CVEs</h2>
+            <h2 className="text-base font-semibold cw-text-default">Review extracted CVEs</h2>
           </div>
-          <p className="text-xs cw-text-muted">
+          <p className="text-sm leading-relaxed cw-text-muted">
             These CVEs were read from the document by the multi-stage parser (see the pipeline above —
             the vision stage recovers CVEs the text layer misses in tables). Check them, fill in product
             and versions, then confirm to start tracking and matching against your assets.
@@ -259,9 +265,9 @@ export default function AdvisoryDetailPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-[var(--color-border)] p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-5">
+          <div className="cw-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold cw-text-default">Match this advisory against your register</p>
               <button onClick={() => matchMutation.mutate()} disabled={matchMutation.isPending}
                 className="btn-primary flex items-center gap-2 text-sm">
@@ -270,21 +276,25 @@ export default function AdvisoryDetailPage() {
             </div>
           </div>
           {report && (
-            <MatchReport report={report} title="Match report"
-              onBack={() => setReport(null)}
-              onDownload={reportSessionId !== null ? downloadReport : undefined} />
+            <div className="cw-card p-6">
+              <MatchReport report={report} title="Match report"
+                onBack={() => setReport(null)}
+                onDownload={reportSessionId !== null ? downloadReport : undefined} />
+            </div>
           )}
-          <div>
+          <div className="cw-card p-6">
             <h2 className="text-sm font-semibold cw-text-default">Vulnerabilities in this advisory</h2>
-            <p className="text-xs cw-text-muted">
+            <p className="mt-1 text-xs cw-text-muted">
               The CVEs this advisory warns about — each is tracked in your vulnerability register and matched against your assets. Click one for its full details.
             </p>
+            <div className="mt-4 space-y-3">
+              {(advisory.cves ?? []).length === 0 ? (
+                <p className="text-sm cw-text-muted">No CVEs on this advisory.</p>
+              ) : (
+                (advisory.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)
+              )}
+            </div>
           </div>
-          {(advisory.cves ?? []).length === 0 ? (
-            <p className="text-sm cw-text-muted">No CVEs on this advisory.</p>
-          ) : (
-            (advisory.cves ?? []).map((cve) => <VulnCard key={cve.id} cve={cve} />)
-          )}
         </div>
       )}
 
