@@ -92,7 +92,7 @@ export interface VulnsWorkspaceProps {
 type TriageView = 'all' | 'kev' | 'exploit' | 'cve' | 'epss' | 'exposed' | 'unassigned' | 'linked' | 'unlinked' | `sev-${SevKey}` | `dom-${string}`;
 
 // Prominent header bar — brand blue, bold white (owner ask). Sticky over the body.
-const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: '#fff', fontWeight: 700, padding: '9px 10px', borderBottom: '1px solid #0A4C84', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#005B96', zIndex: 1 };
+const th: React.CSSProperties = { textAlign: 'left', fontSize: 13, letterSpacing: '.03em', textTransform: 'uppercase', color: '#fff', fontWeight: 700, padding: '10px 10px', borderBottom: '1px solid #0A4C84', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#005B96', zIndex: 1 };
 const td: React.CSSProperties = { padding: '9px 10px', borderBottom: `1px solid ${BORDER2}`, verticalAlign: 'middle', whiteSpace: 'nowrap', fontSize: 12 };
 const SEV_ORDER: Record<SevKey, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
 // Click a header to sort by it (replaces the old Sort select). Metrics sort high→low, text A→Z.
