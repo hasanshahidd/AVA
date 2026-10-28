@@ -198,8 +198,11 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
             _desc = (vuln.description or "")
             if _steps:
                 _desc = (_desc + "\n\n---\n**Suggested remediation steps**\n\n" + _steps).strip()
+            # Task-style subject so the ticket reads as work to do, not a raw scan
+            # string (e.g. "Remediate CVE-2025-26466 on ssh (port 22/tcp)").
+            _base = vuln.title or (vuln.cve_id or vuln.vuln_id or "finding")
             payload = {
-                "subject": (vuln.title or f"Vulnerability {vuln.vuln_id}")[:255],
+                "subject": f"Remediate {_base}"[:255],
                 "description": _desc,
             }
             _sev = {"critical": "Urgent", "high": "High", "medium": "Medium",
@@ -213,9 +216,24 @@ def push_finding(db: Session, vuln, connection, *, user_id: Optional[int] = None
                       HDTicketPriority.name == "Medium").first())
             if _p:
                 payload["priority_id"] = _p.id
-            _dep = db.query(HDDepartment).filter(
+            # Route vulnerability findings to a dedicated Security department (then
+            # IT), NOT just "the first department by id" — which dumped every
+            # finding into whatever dept had the lowest id (e.g. Sales).
+            _deps = db.query(HDDepartment).filter(
                 HDDepartment.tenant_id == vuln.tenant_id,
-                HDDepartment.enabled.is_(True)).order_by(HDDepartment.id.asc()).first()
+                HDDepartment.enabled.is_(True)).order_by(HDDepartment.id.asc()).all()
+
+            def _dep_pick():
+                for d in _deps:  # prefer Security / InfoSec / Cyber
+                    if any(k in (d.name or "").lower() for k in ("security", "infosec", "cyber")):
+                        return d
+                for d in _deps:  # then IT
+                    n = (d.name or "").strip().lower()
+                    if n in ("it", "information technology") or "information technology" in n:
+                        return d
+                return _deps[0] if _deps else None  # last resort: first enabled dept
+
+            _dep = _dep_pick()
             if _dep:
                 payload["department_id"] = _dep.id
                 _team = hd_dept.resolve_department_team(db, vuln.tenant_id, _dep.id)

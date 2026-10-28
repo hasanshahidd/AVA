@@ -46,6 +46,8 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
     queryFn: async () => (await vulnManagementApi.vulnerabilities.itsmTickets(vulnId)).data,
   });
   const tickets: TicketLink[] = ticketData?.tickets || [];
+  // Deep-link straight to the created ticket instead of the whole board.
+  const primaryTicketId = tickets.find((t) => t.external_ticket_id)?.external_ticket_id;
 
   // No connection_id: the Help Desk engine is invisible, resolved server-side.
   const pushMut = useMutation({
@@ -123,7 +125,7 @@ export default function ItsmPanel({ vulnId }: { vulnId: number }) {
           })}
         </ul>
       )}
-      <Link href="/helpdesk/tickets" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
+      <Link href={primaryTicketId ? `/helpdesk/tickets/${primaryTicketId}` : "/helpdesk/tickets"} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
         <ExternalLink className="h-3.5 w-3.5" /> View in Help Desk →
       </Link>
     </section>

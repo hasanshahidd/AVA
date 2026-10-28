@@ -12,6 +12,8 @@ import { RelatedTickets } from "./_related";
 import { ImpactedCis } from "./_impacted";
 import { Knowledge } from "./_knowledge";
 import { ChangeActions, ApprovalBadge } from "../../changes/_actions";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // Backend created/creation are NAIVE UTC (datetime.utcnow(), no zone). new Date()
 // would read them as LOCAL → the date lands a day early west of UTC (QA: a ticket
@@ -87,8 +89,11 @@ export default function TicketDetail() {
 
   // ── group the conversation into the three tabs (default Replies) ──
   const { replies, comments, activity } = useMemo(() => {
+    // The opening description is rendered as its own markdown "Description" card
+    // (below), NOT folded into the reply thread as a raw-HTML "Customer" bubble —
+    // vuln-pushed descriptions are markdown and were showing literal **/# + a
+    // collapsed wall of text.
     const replies: any[] = [], comments: any[] = [], activity: any[] = [];
-    if (t?.description) replies.push({ type: "received", sender: t.contact || t.raised_by || t.customer || "Customer", content: t.description, date: t.created || t.creation });
     for (const m of conv) {
       if (/activity/i.test(m.type || "")) activity.push(m);
       else if (/comment|note/i.test(m.type || "")) comments.push(m);
@@ -211,10 +216,25 @@ export default function TicketDetail() {
             ))}
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            {shown.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-300">
-                {convTab === "replies" ? "No replies yet." : convTab === "comments" ? "No internal comments." : "No activity yet."}
+            {convTab === "replies" && t.description && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  <MessageSquare size={13} /> Description
+                  <span className="ml-auto font-normal normal-case text-slate-400">
+                    {t.source_kind === "vulnerability" ? "Raised from a vulnerability finding" : (t.contact || t.raised_by || t.customer || "Requester")}
+                  </span>
+                </div>
+                <div className="prose prose-sm max-w-none break-words text-slate-700">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.description}</ReactMarkdown>
+                </div>
               </div>
+            )}
+            {shown.length === 0 ? (
+              (convTab === "replies" && t.description) ? null : (
+                <div className="py-8 text-center text-xs text-slate-300">
+                  {convTab === "replies" ? "No replies yet." : convTab === "comments" ? "No internal comments." : "No activity yet."}
+                </div>
+              )
             ) : shown.map((m, i) => <TimelineItem key={i} m={m} />)}
           </div>
 
