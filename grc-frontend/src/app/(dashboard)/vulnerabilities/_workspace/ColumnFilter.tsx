@@ -35,10 +35,15 @@ export function ColumnFilter({ columnLabel, sections, align = 'left' }: {
   align?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
   const wrapRef = useRef<HTMLSpanElement>(null);
   const usable = sections.filter((s) => s.options.length > 0);
   const active = usable.some((s) => s.value !== '');
+  // Search only earns its space on long lists (e.g. the asset column); tiny lists like Severity don't need it.
+  const showSearch = usable.reduce((n, s) => n + s.options.length, 0) > 8;
+  const ql = q.trim().toLowerCase();
 
+  useEffect(() => { if (!open) setQ(''); }, [open]);  // fresh search each open
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -79,12 +84,22 @@ export function ColumnFilter({ columnLabel, sections, align = 'left' }: {
             textTransform: 'none', letterSpacing: 0,
           }}
         >
-          {usable.map((s, i) => (
+          {showSearch && (
+            <input
+              autoFocus value={q} onChange={(e) => setQ(e.target.value)} onClick={(e) => e.stopPropagation()}
+              placeholder={`Search ${columnLabel.toLowerCase()}…`}
+              style={{ width: '100%', boxSizing: 'border-box', height: 30, border: `1px solid ${BORDER}`, borderRadius: 7, padding: '0 9px', fontSize: 12, color: SEC, marginBottom: 5, outline: 'none' }}
+            />
+          )}
+          {usable.map((s, i) => {
+            const opts = ql ? s.options.filter((o) => o.label.toLowerCase().includes(ql)) : s.options;
+            if (!opts.length) return null;
+            return (
             <div key={s.key} style={i ? { borderTop: `1px solid ${BORDER2}`, marginTop: 5, paddingTop: 5 } : undefined}>
               {s.title && (
                 <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED, padding: '4px 9px 5px' }}>{s.title}</div>
               )}
-              {s.options.map((o) => {
+              {opts.map((o) => {
                 const on = s.value === o.value;
                 return (
                   <button
@@ -107,7 +122,11 @@ export function ColumnFilter({ columnLabel, sections, align = 'left' }: {
                 );
               })}
             </div>
-          ))}
+            );
+          })}
+          {ql && !usable.some((s) => s.options.some((o) => o.label.toLowerCase().includes(ql))) && (
+            <div style={{ padding: '10px 9px', fontSize: 12, color: MUTED }}>No matches.</div>
+          )}
         </div>
       )}
     </span>
