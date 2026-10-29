@@ -12,8 +12,9 @@
  * job=poll) + /pentest/scanned-assets for the rail. No new scanner.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus, Trash2, ArrowLeft, Ban } from 'lucide-react';
+import { ScanLine, ShieldCheck, Server, Globe, KeyRound, Target, Plus, Trash2, ArrowLeft, Ban, Crosshair } from 'lucide-react';
 import apiClient, { vulnManagementApi } from '@/lib/api';
 import { AssetCveSidebar, type SidebarAsset } from '@/components/scan/AssetCveSidebar';
 import ScanLauncher from './ScanLauncher';
@@ -52,6 +53,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
   vulns?: Vulnerability[];
 }) {
   const qc = useQueryClient();
+  const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [showLauncher, setShowLauncher] = useState(false);
@@ -205,6 +207,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
   const header = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <button style={{ ...btnGreen, justifyContent: 'center' }} onClick={() => setShowLauncher(true)}><Plus size={14} />New scan</button>
+      <button style={{ ...btn, justifyContent: 'center' }} onClick={() => router.push('/pentest')} title="Go to the Gate / Exploit workspace"><Crosshair size={14} />Gate &amp; Exploit</button>
       <div style={{ display: 'inline-flex', background: '#EAEEF1', borderRadius: 9, padding: 3, gap: 2 }}>
         {(['all', 'inventory', 'adhoc'] as Filter[]).map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, height: 26, border: 0, borderRadius: 7, background: filter === f ? '#fff' : 'none', color: filter === f ? ACS : '#6B7787', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{f === 'adhoc' ? 'Ad-hoc' : f}</button>
