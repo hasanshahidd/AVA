@@ -230,7 +230,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                   <ScanLine size={28} style={{ opacity: 0.5 }} /><p style={{ marginTop: 8, fontSize: 13 }}>No scans yet. Start one with <b>New scan</b>, or pick an asset to plan &amp; scan it.</p>
                 </div>
               ) : (
-                <div style={{ maxHeight: 560, overflowY: 'auto' }}>
+                <div style={{ maxHeight: 560, overflowY: 'auto', overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: '#FAFBFC' }}>
@@ -248,7 +248,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                             <div style={{ fontWeight: 600, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.asset_name}{j.adhoc && <span style={{ fontSize: 9, fontWeight: 700, color: MUTED, background: '#EEF1F3', borderRadius: 5, padding: '1px 5px', marginLeft: 6 }}>AD-HOC</span>}</div>
                             {j.target && j.target !== j.asset_name && <div style={{ fontSize: 10, color: FAINT, fontFamily: 'ui-monospace,Consolas,monospace' }}>{j.target}</div>}
                           </td>
-                          <td style={{ padding: '9px 12px', color: SEC, whiteSpace: 'nowrap' }}>{j.lane_label || j.lane || '—'}{(j.scanner_label || j.find_mcp) ? <span style={{ color: FAINT }}> · {j.scanner_label || j.find_mcp}</span> : null}</td>
+                          <td style={{ padding: '9px 12px', color: SEC }}><div style={{ maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${j.lane_label || j.lane || ''}${(j.scanner_label || j.find_mcp) ? ' · ' + (j.scanner_label || j.find_mcp) : ''}`}>{j.lane_label || j.lane || '—'}{(j.scanner_label || j.find_mcp) ? <span style={{ color: FAINT }}> · {j.scanner_label || j.find_mcp}</span> : null}</div></td>
                           <td style={{ padding: '9px 12px' }}><span style={{ fontSize: 10, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 999, padding: '2px 8px', textTransform: 'capitalize' }}>{sk}</span></td>
                           <td style={{ padding: '9px 12px', width: 110, textAlign: 'right' }}>
                             {active ? (
@@ -320,18 +320,23 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                 so a re-scan is never mistaken for "reused the old session". */}
             <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${BORDER}` }}>
-                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>{scanning ? 'Findings so far' : 'Findings'}</h3>
-                <span style={{ fontSize: 11.5, color: MUTED }}>{planLoading ? 'loading…' : scanning ? 'previous results · updating' : `${planVulns.length} shown`}</span>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>Findings</h3>
+                <span style={{ fontSize: 11.5, color: MUTED }}>{planLoading ? 'loading…' : scanning ? 'scan in progress' : `${planVulns.length} shown`}</span>
               </div>
-              {scanning && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 11.5, color: AC, background: ACSOFT, borderBottom: `1px solid ${BORDER}` }}>
-                  <span style={{ flex: '0 0 auto', width: 7, height: 7, borderRadius: '50%', background: AC }} />
-                  <span>New scan running{routing.lane_label || routing.lane ? ` in the ${routing.lane_label || routing.lane} lane` : ''} — the rows below are this asset's existing findings and refresh when the scan finishes.</span>
+              {/* While a scan runs, DON'T show the asset's earlier findings — they're from a previous scan
+                  and reading them as this run's output is misleading. Show a clean progress state; the real
+                  results appear (via refetchPlan) when the scan finishes. */}
+              {scanning ? (
+                <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: AC }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: AC }} />Scan in progress — {job?.stage || 'scanning'}…
+                  </div>
+                  <div style={{ marginTop: 7, fontSize: 12, color: MUTED }}>This run’s findings appear here when it finishes (and land in the Register at the gate).{planVulns.length > 0 ? ` This asset already has ${planVulns.length} finding(s) from an earlier scan — they stay in the Register.` : ''}</div>
                 </div>
-              )}
-              <div style={{ maxHeight: 460, overflowY: 'auto', opacity: scanning ? 0.55 : 1 }}>
+              ) : (
+              <div style={{ maxHeight: 460, overflowY: 'auto' }}>
                 {planVulns.length === 0 ? (
-                  <div style={{ padding: 26, textAlign: 'center', fontSize: 12, color: FAINT }}>{planLoading ? 'Loading…' : scanning ? 'No earlier findings — this scan’s results will appear when it completes.' : 'No findings yet — run a scan.'}</div>
+                  <div style={{ padding: 26, textAlign: 'center', fontSize: 12, color: FAINT }}>{planLoading ? 'Loading…' : 'No findings yet — run a scan.'}</div>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
@@ -346,6 +351,7 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                   </table>
                 )}
               </div>
+              )}
             </div>
           </div>
         )}
