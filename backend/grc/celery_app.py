@@ -78,6 +78,9 @@ celery_app = Celery(
         "grc.tasks.discovery",
         # Help Desk CMDB ← inventory auto-sync (beat-driven, every 6h).
         "grc.tasks.helpdesk_cmdb",
+        # Pen-test scan-job zombie reconciler — beat-driven server-side sweep so a
+        # runaway/hung scan is bounded even when nobody opens the Scan sessions page.
+        "grc.tasks.pentest_reconcile",
     ],
 )
 
@@ -159,6 +162,8 @@ celery_app.conf.update(
         # Help Desk CMDB inventory auto-sync. Light per-tenant DB work; shares
         # `parsing` until a dedicated queue is justified.
         "grc.tasks.helpdesk_cmdb.*": {"queue": "parsing"},
+        # Pen-test scan-job zombie reconciler. Light per-tenant DB sweep; shares `parsing`.
+        "grc.tasks.pentest_reconcile.*": {"queue": "parsing"},
     },
 
     # ── Beat schedule ────────────────────────────────────────────────────────
@@ -228,6 +233,15 @@ celery_app.conf.update(
         "helpdesk-cmdb-inventory-sync": {
             "task": "grc.tasks.helpdesk_cmdb.cmdb_inventory_sync_fan_out",
             "schedule": 6 * 60 * 60,
+            "options": {"queue": "parsing"},
+        },
+        # Pen-test scan-job zombie reconciler. Every 5 minutes — a scan runs in an
+        # in-process backend thread that can die or hang; this server-side sweep
+        # fails any job stuck past the wall-clock ceiling without waiting for a human
+        # to open the Scan sessions page. Pure DB flip, per tenant, non-fatal.
+        "pentest-zombie-scan-sweep": {
+            "task": "grc.tasks.pentest_reconcile.reconcile_zombie_scans_sweep",
+            "schedule": 5 * 60,
             "options": {"queue": "parsing"},
         },
     },
