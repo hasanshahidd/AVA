@@ -43,6 +43,20 @@ def test_nmap_ports_and_vulners_cves():
     assert all(r["source_slug"] == "nmap" for r in rows)
 
 
+def test_nmap_rejects_future_year_cve_but_keeps_current():
+    # the vulners feed can surface reserved/placeholder ids with an impossible FUTURE year — dropped so they
+    # never inflate the register. a legit high-sequence CURRENT-year id (CVE-<thisyear>-99999) is kept.
+    from datetime import datetime, timezone
+    yr = datetime.now(timezone.utc).year
+    out = ("22/tcp open ssh OpenSSH 7.4\n"
+           "| vulners:\n"
+           f"|       CVE-{yr}-99999   9.8   https://vulners.com/cve/CVE-{yr}-99999\n"
+           f"|       CVE-{yr + 1}-100000   9.8   https://vulners.com/cve/CVE-{yr + 1}-100000\n")
+    cves = {r["cve_id"] for r in lst.parse_tool("nmap", out, "1.2.3.4", 1, "http://1.2.3.4") if r["cve_id"]}
+    assert f"CVE-{yr}-99999" in cves                 # current-year high-sequence kept (no digit heuristic)
+    assert f"CVE-{yr + 1}-100000" not in cves        # future-year impossible id dropped
+
+
 def test_masscan_open_ports_dedup():
     out = ("Starting masscan 1.3.2\n"
            "Discovered open port 80/tcp on 1.2.3.4\n"
