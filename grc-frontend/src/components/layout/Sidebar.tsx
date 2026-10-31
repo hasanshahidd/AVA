@@ -229,7 +229,7 @@ function NavSubGroup({ group, activeHref }: { group: NavGroup; activeHref?: stri
         )}
       >
         {Icon && <Icon size={16} strokeWidth={1.75} className={clsx('flex-shrink-0', hasActive ? 'text-[var(--color-base)]' : 'text-[var(--sidebar-icon)]')} />}
-        <span className="flex-1 text-left leading-tight break-words">{group.name}</span>
+        <span className="flex-1 min-w-0 truncate text-left">{group.name}</span>
         <ChevronDown size={13} className={clsx('flex-shrink-0 text-[var(--sidebar-icon)] transition-transform duration-200', !open && '-rotate-90')} />
       </button>
       <div className={clsx('grid transition-[grid-template-rows] duration-300 ease-out', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
@@ -251,7 +251,7 @@ function NavSubGroup({ group, activeHref }: { group: NavGroup; activeHref?: stri
                   )}
                 >
                   <item.icon size={15} strokeWidth={1.75} className={clsx('flex-shrink-0', childActive ? 'text-[var(--color-base)]' : 'text-[var(--sidebar-icon)]')} />
-                  <span className="leading-tight break-words">{item.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
                 </Link>
               );
             })}
@@ -286,7 +286,7 @@ function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
           isActive ? 'text-[var(--color-base)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--color-text)]'
         )}
       />
-      {!collapsed && <span className="leading-tight break-words">{item.name}</span>}
+      {!collapsed && <span className="min-w-0 flex-1 truncate">{item.name}</span>}
     </Link>
   );
 }
@@ -361,7 +361,7 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
               hasActiveChild ? 'text-[var(--color-base)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--color-text)]')}
           />
         )}
-        <span className="flex-1 text-left leading-tight break-words">{group.name}</span>
+        <span className="flex-1 min-w-0 truncate text-left">{group.name}</span>
         <ChevronDown
           size={15}
           className={clsx('flex-shrink-0 text-[var(--sidebar-icon)] transition-transform duration-200', !isOpen && '-rotate-90')}
@@ -404,7 +404,7 @@ function NavGroupSection({ group, collapsed }: { group: NavGroup; collapsed: boo
                     className={clsx('flex-shrink-0',
                       childActive ? 'text-[var(--color-base)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--color-text)]')}
                   />
-                  <span className="leading-tight break-words">{item.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
                 </Link>
               );
             })}

@@ -334,37 +334,42 @@ export function ScanWorkspace({ assetItems = [], vulns = [] }: {
                 <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK }}>Findings</h3>
                 <span style={{ fontSize: 11.5, color: MUTED }}>{planLoading ? 'loading…' : scanning ? 'scan in progress' : (sevFilter === 'all' && catFilter === 'all' ? `${planVulns.length} shown` : `${shownVulns.length} of ${planVulns.length}`)}</span>
               </div>
-              {/* severity filter chips — slice the findings by rank; only ranks actually present are shown */}
+              {/* one filter toolbar: severity chips (ranks present) + a divider + category chips (SAST / CI-CD /
+                  Secret / Web …, only when >1 category). Combined into a single strip so the filters are clearly
+                  placed together and the findings list isn't pushed down by two separate bars. */}
               {!scanning && planVulns.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '9px 16px', borderBottom: `1px solid ${BORDER}` }}>
-                  {(['all', 'critical', 'high', 'medium', 'low', 'info'] as const).map((s) => {
-                    const n = s === 'all' ? planVulns.length : planVulns.filter((v) => (v.severity || 'info').toLowerCase() === s).length;
-                    if (s !== 'all' && n === 0) return null;
-                    const on = sevFilter === s;
-                    const sc = s === 'all' ? { c: AC, bg: ACSOFT } : SEVC[s];
-                    return (
-                      <button key={s} type="button" onClick={() => setSevFilter(s)}
-                        style={{ border: `1px solid ${on ? sc.c : '#E4E8EC'}`, background: on ? sc.bg : '#fff', color: on ? sc.c : SEC, borderRadius: 999, padding: '4px 11px', fontSize: 11.5, fontWeight: on ? 700 : 500, cursor: 'pointer', textTransform: 'capitalize', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                        {s}<span style={{ fontVariantNumeric: 'tabular-nums', color: on ? sc.c : MUTED, fontWeight: 600 }}>{n}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {/* category filter chips — SAST / CI-CD / Secret / Dependency CVE / IaC / Web … (what this asset has).
-                  Only shown when the asset carries more than one category (a single-category asset needs no chips). */}
-              {!scanning && planCats.length > 1 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '9px 16px', borderBottom: `1px solid ${BORDER}` }}>
-                  {['all', ...planCats].map((cName) => {
-                    const n = cName === 'all' ? planVulns.length : planVulns.filter((v) => v.category === cName).length;
-                    const on = catFilter === cName;
-                    return (
-                      <button key={cName} type="button" onClick={() => setCatFilter(cName)}
-                        style={{ border: `1px solid ${on ? AC : '#E4E8EC'}`, background: on ? ACSOFT : '#fff', color: on ? AC : SEC, borderRadius: 999, padding: '4px 11px', fontSize: 11.5, fontWeight: on ? 700 : 500, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                        {cName === 'all' ? 'All categories' : cName}<span style={{ fontVariantNumeric: 'tabular-nums', color: on ? AC : MUTED, fontWeight: 600 }}>{n}</span>
-                      </button>
-                    );
-                  })}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(['all', 'critical', 'high', 'medium', 'low', 'info'] as const).map((s) => {
+                      const n = s === 'all' ? planVulns.length : planVulns.filter((v) => (v.severity || 'info').toLowerCase() === s).length;
+                      if (s !== 'all' && n === 0) return null;
+                      const on = sevFilter === s;
+                      const sc = s === 'all' ? { c: AC, bg: ACSOFT } : SEVC[s];
+                      return (
+                        <button key={s} type="button" onClick={() => setSevFilter(s)}
+                          style={{ border: `1px solid ${on ? sc.c : '#E4E8EC'}`, background: on ? sc.bg : '#fff', color: on ? sc.c : SEC, borderRadius: 999, padding: '4px 11px', fontSize: 11.5, fontWeight: on ? 700 : 500, cursor: 'pointer', textTransform: 'capitalize', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                          {s}<span style={{ fontVariantNumeric: 'tabular-nums', color: on ? sc.c : MUTED, fontWeight: 600 }}>{n}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {planCats.length > 1 && (
+                    <>
+                      <span style={{ width: 1, alignSelf: 'stretch', background: BORDER, margin: '0 2px' }} />
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {['all', ...planCats].map((cName) => {
+                          const n = cName === 'all' ? planVulns.length : planVulns.filter((v) => v.category === cName).length;
+                          const on = catFilter === cName;
+                          return (
+                            <button key={cName} type="button" onClick={() => setCatFilter(cName)}
+                              style={{ border: `1px solid ${on ? AC : '#E4E8EC'}`, background: on ? ACSOFT : '#fff', color: on ? AC : SEC, borderRadius: 999, padding: '4px 11px', fontSize: 11.5, fontWeight: on ? 700 : 500, cursor: 'pointer', display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                              {cName === 'all' ? 'All categories' : cName}<span style={{ fontVariantNumeric: 'tabular-nums', color: on ? AC : MUTED, fontWeight: 600 }}>{n}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               {/* While a scan runs, DON'T show the asset's earlier findings — they're from a previous scan
