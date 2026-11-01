@@ -1343,7 +1343,7 @@ def get_password_policy(
 def update_password_policy(
     payload: _PasswordPolicyPayload,
     tenant_db: Session = Depends(get_tenant_db),
-    user: GRCUser = Depends(require_auth),
+    user: TenantUser = Depends(require_permission("admin:settings:edit")),  # was require_auth: any user could weaken the policy
 ):
     """Patch the password policy. Only superuser / org admin should reach
     this in practice; the frontend hides the page from other roles.
@@ -1416,7 +1416,7 @@ def update_password_policy(
 def list_role_members(
     role_id: int,
     tenant_db: Session = Depends(get_tenant_db),
-    user: GRCUser = Depends(require_auth),
+    user: TenantUser = Depends(require_permission("admin:roles:view")),  # was require_auth: leaked role membership to any user
 ):
     """Return the users assigned to this role, with assignment metadata.
 
