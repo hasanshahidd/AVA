@@ -315,22 +315,39 @@ def on_startup():
     # Re-attach the poll+sync loop to any hosted (Flow 1) scan left in-flight when
     # we last stopped — the poll thread is in-process and dies on restart, so a
     # scan that finishes while we're down would otherwise never sync its findings.
+    # Enumerate ALL active tenants so resume re-attaches in-flight scans for every tenant
+    # (fwbl, jsbl, …), not just 'ava'. Registry is in the master catalog.
     try:
-        from grc.modules.integrations.services.hosted_scan import resume_inflight_hosted_scans
-        resume_inflight_hosted_scans(os.getenv("AVA_TENANT_SLUG", "ava"))
+        from grc.db import MasterSession
+        from grc.models import Tenant
+        _m = MasterSession()
+        try:
+            _tenant_slugs = [t.slug for t in _m.query(Tenant).filter(Tenant.is_active.is_(True)).all() if t.slug]
+        finally:
+            _m.close()
     except Exception:  # noqa: BLE001
         import logging as _logging
-        _logging.getLogger(__name__).warning("hosted-scan resume-on-startup skipped", exc_info=True)
+        _logging.getLogger(__name__).warning("tenant enumeration for resume failed; using 'ava' only", exc_info=True)
+        _tenant_slugs = [os.getenv("AVA_TENANT_SLUG", "ava")]
+
+    for _ts in _tenant_slugs:
+        try:
+            from grc.modules.integrations.services.hosted_scan import resume_inflight_hosted_scans
+            resume_inflight_hosted_scans(_ts)
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).warning("hosted-scan resume-on-startup skipped for %s", _ts, exc_info=True)
 
     # Same for AVA pentest Find scans (grc_pentest_scan_jobs): their worker thread dies on restart
     # too, so re-drive nessus/openvas and fail the in-process ones with a clear reason instead of
     # leaving them stuck 'running'.
-    try:
-        from grc.modules.pentest.service import resume_inflight_scans
-        resume_inflight_scans(os.getenv("AVA_TENANT_SLUG", "ava"))
-    except Exception:  # noqa: BLE001
-        import logging as _logging
-        _logging.getLogger(__name__).warning("pentest resume-on-startup skipped", exc_info=True)
+    for _ts in _tenant_slugs:
+        try:
+            from grc.modules.pentest.service import resume_inflight_scans
+            resume_inflight_scans(_ts)
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).warning("pentest resume-on-startup skipped for %s", _ts, exc_info=True)
 
     # Auto-start the pentest MCP fleet's PERSISTENT backends (HexStrike's :8888 server, and the
     # Greenbone/OpenVAS stack when built) so scanners are available without a manual restart — a WSL
