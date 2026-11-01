@@ -378,11 +378,64 @@ func memInfo() string {
 // server-side — the agent never runs it. Best-effort: a probe that fails just
 // contributes nothing and never blocks the report.
 func recon(pkgs []sw) map[string]any {
-	return map[string]any{
+	r := map[string]any{
+		"os_family":    runtime.GOOS, // pentest lane routes on this ("windows" -> Windows lane)
 		"open_ports":   listeningPorts(),
 		"packages":     pkgs,
 		"collected_at": time.Now().UTC().Format(time.RFC3339),
 	}
+	if runtime.GOOS == "windows" {
+		if w := windowsSurface(); w != nil {
+			r["windows"] = w
+		}
+	}
+	return r
+}
+
+// asList coerces ConvertTo-Json's lone-element collapse (PS 5.1 renders a
+// one-item array as a scalar) back into a list, so hotfixes/local_admins are
+// always arrays for the consumer.
+func asList(v any) []any {
+	switch t := v.(type) {
+	case []any:
+		return t
+	case nil:
+		return nil
+	default:
+		return []any{t}
+	}
+}
+
+// windowsSurface collects the Windows attack surface the pentest Windows lane
+// arms from: installed hotfixes/KBs (missing patch -> CVE -> exploit module),
+// SMB1 + signing, RDP/WinRM exposure, OS build/edition, UAC, and local admins.
+// ONE PowerShell call emits a compact JSON object we hand back verbatim under
+// platform_properties['recon']['windows']. Collection only — the agent never
+// runs the exploit arsenal. Best-effort: "" / parse failure -> nil.
+func windowsSurface() map[string]any {
+	ps := `$ErrorActionPreference='SilentlyContinue';` +
+		`$smb=Get-SmbServerConfiguration;` +
+		`$ts=Get-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server';` +
+		`$nla=(Get-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp').UserAuthentication;` +
+		`$uac=(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System').EnableLUA;` +
+		`$cv=Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion';` +
+		`$kb=@(Get-HotFix | Select-Object -ExpandProperty HotFixID);` +
+		`$ad=@(Get-LocalGroupMember -Group Administrators | Select-Object -ExpandProperty Name);` +
+		`[pscustomobject]@{os_build="$($cv.CurrentBuildNumber).$($cv.UBR)";os_edition=$cv.ProductName;` +
+		`hotfixes=$kb;smb=@{v1_enabled=[bool]$smb.EnableSMB1Protocol;signing_required=[bool]$smb.RequireSecuritySignature};` +
+		`rdp=@{enabled=($ts.fDenyTSConnections -eq 0);nla=($nla -eq 1)};winrm=@{running=((Get-Service WinRM).Status -eq 'Running')};` +
+		`uac=@{enabled=($uac -eq 1)};local_admins=$ad} | ConvertTo-Json -Compress -Depth 4`
+	out := run("powershell", "-NoProfile", "-Command", ps)
+	if out == "" {
+		return nil
+	}
+	var m map[string]any
+	if json.Unmarshal([]byte(out), &m) != nil {
+		return nil
+	}
+	m["hotfixes"] = asList(m["hotfixes"])
+	m["local_admins"] = asList(m["local_admins"])
+	return m
 }
 
 func listeningPorts() []map[string]any {

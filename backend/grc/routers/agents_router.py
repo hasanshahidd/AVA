@@ -366,15 +366,18 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
     # so the pentest arming can read authoritative open ports/services. Projected
     # to the agreed keys (evidence is dropped here — it rides the finding rows).
     if body.recon:
-        pp["recon"] = {
-            "open_ports": [
-                {"port": _p.get("port"), "proto": _p.get("proto"),
-                 "service": _p.get("service"), "version": _p.get("version")}
-                for _p in (body.recon.get("open_ports") or []) if isinstance(_p, dict)
-            ],
-            "packages": body.recon.get("packages") or [],
-            "collected_at": body.recon.get("collected_at") or now.isoformat(),
-        }
+        # Keep the agent's recon block as-is (os_family + windows surface + any
+        # future keys the pentest lane reads) and only strip the per-port evidence
+        # (that rides the finding rows, not platform_properties).
+        _rec = dict(body.recon)
+        _rec["open_ports"] = [
+            {"port": _p.get("port"), "proto": _p.get("proto"),
+             "service": _p.get("service"), "version": _p.get("version")}
+            for _p in (body.recon.get("open_ports") or []) if isinstance(_p, dict)
+        ]
+        _rec.setdefault("os_family", (body.os_family or "").lower() or None)
+        _rec.setdefault("collected_at", now.isoformat())
+        pp["recon"] = _rec
     asset.platform_properties = pp
     if body.software:
         # Windows registers some products under more than one uninstall key, so
