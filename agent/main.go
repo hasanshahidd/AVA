@@ -40,7 +40,7 @@ import (
 	"time"
 )
 
-const agentVersion = "1.2.0"
+const agentVersion = "1.3.0"
 
 type state struct {
 	APIToken string `json:"api_token"`
@@ -368,6 +368,182 @@ func memInfo() string {
 	return ""
 }
 
+// ─────────────────────────── local recon (ground truth) ─────────────────────
+// recon does lightweight LOCAL reconnaissance on the host itself: the listening
+// ports with their owning service, plus the installed-package list. The backend
+// folds this into platform_properties['recon'] and emits one 'agent:recon'
+// register finding per open port. The pentest engine deliberately will NOT
+// remote-scan an agent host (it is behind NAT/VPN), so the agent reports ground
+// truth and the engine arms from it; the heavy arsenal (nmap/nuclei/…) stays
+// server-side — the agent never runs it. Best-effort: a probe that fails just
+// contributes nothing and never blocks the report.
+func recon(pkgs []sw) map[string]any {
+	return map[string]any{
+		"open_ports":   listeningPorts(),
+		"packages":     pkgs,
+		"collected_at": time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+func listeningPorts() []map[string]any {
+	switch runtime.GOOS {
+	case "linux":
+		return linuxPorts()
+	case "darwin":
+		return macPorts()
+	case "windows":
+		return windowsPorts()
+	}
+	return nil
+}
+
+// portOf returns the port from the first "host:port" field (0 if none). Handles
+// ss/netstat "0.0.0.0:22" / "[::]:22" and lsof "*:22" / "127.0.0.1:631".
+func portOf(fields []string) int {
+	for _, f := range fields {
+		c := strings.LastIndex(f, ":")
+		if c < 0 || c+1 >= len(f) {
+			continue
+		}
+		s := f[c+1:]
+		if i := strings.IndexAny(s, " \t("); i >= 0 {
+			s = s[:i]
+		}
+		if p, err := strconv.Atoi(s); err == nil && p > 0 && p < 65536 {
+			return p
+		}
+	}
+	return 0
+}
+
+// firstQuoted returns the text inside the first pair of double quotes, else "".
+func firstQuoted(s string) string {
+	i := strings.IndexByte(s, '"')
+	if i < 0 {
+		return ""
+	}
+	j := strings.IndexByte(s[i+1:], '"')
+	if j < 0 {
+		return ""
+	}
+	return s[i+1 : i+1+j]
+}
+
+func normProto(p string) string {
+	p = strings.ToLower(p)
+	switch {
+	case strings.HasPrefix(p, "tcp"):
+		return "tcp"
+	case strings.HasPrefix(p, "udp"):
+		return "udp"
+	}
+	return ""
+}
+
+// dedupPorts collapses the same (port, proto, service) seen on several addresses
+// (0.0.0.0 and ::) and caps the list so a chatty host can't bloat the report.
+func dedupPorts(rows []map[string]any) []map[string]any {
+	seen := map[string]bool{}
+	out := []map[string]any{}
+	for _, r := range rows {
+		k := fmt.Sprintf("%v/%v/%v", r["port"], r["proto"], r["service"])
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, r)
+		if len(out) >= 500 {
+			break
+		}
+	}
+	return out
+}
+
+func linuxPorts() []map[string]any {
+	out := run("ss", "-tulnpH") // TCP+UDP listening, numeric, with process, no header
+	if out == "" {
+		out = run("ss", "-tulnp") // older ss without -H (the header line auto-skips)
+	}
+	if out == "" {
+		out = run("netstat", "-tulnp")
+	}
+	var rows []map[string]any
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 {
+			continue
+		}
+		proto := normProto(f[0])
+		if proto == "" { // header line ("Netid"/"State"/"Proto") or junk
+			continue
+		}
+		port := portOf(f)
+		if port == 0 {
+			continue
+		}
+		service := firstQuoted(line) // ss: users:(("sshd",pid=...))
+		if service == "" {           // netstat: trailing "pid/sshd"
+			last := f[len(f)-1]
+			if i := strings.LastIndex(last, "/"); i >= 0 && i+1 < len(last) {
+				service = last[i+1:]
+			}
+		}
+		rows = append(rows, map[string]any{
+			"port": port, "proto": proto, "service": service, "version": "",
+			"evidence": strings.TrimSpace(line),
+		})
+	}
+	return dedupPorts(rows)
+}
+
+func macPorts() []map[string]any {
+	var rows []map[string]any
+	add := func(out, proto string) {
+		for _, line := range strings.Split(out, "\n") {
+			f := strings.Fields(line)
+			if len(f) < 2 || f[0] == "COMMAND" { // skip the header; portOf filters the rest
+				continue
+			}
+			port := portOf(f)
+			if port == 0 {
+				continue
+			}
+			rows = append(rows, map[string]any{
+				"port": port, "proto": proto, "service": f[0], "version": "",
+				"evidence": strings.TrimSpace(line),
+			})
+		}
+	}
+	add(run("lsof", "-nP", "-iTCP", "-sTCP:LISTEN"), "tcp")
+	add(run("lsof", "-nP", "-iUDP"), "udp")
+	return dedupPorts(rows)
+}
+
+func windowsPorts() []map[string]any {
+	ps := `Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $n=''; try { $n=(Get-Process -Id $_.OwningProcess -ErrorAction Stop).ProcessName } catch {}; "$($_.LocalPort)|tcp|$n" }; Get-NetUDPEndpoint -ErrorAction SilentlyContinue | ForEach-Object { $n=''; try { $n=(Get-Process -Id $_.OwningProcess -ErrorAction Stop).ProcessName } catch {}; "$($_.LocalPort)|udp|$n" }`
+	out := run("powershell", "-NoProfile", "-Command", ps)
+	var rows []map[string]any
+	for _, line := range strings.Split(out, "\n") {
+		p := strings.Split(strings.TrimSpace(line), "|")
+		if len(p) < 2 {
+			continue
+		}
+		port, err := strconv.Atoi(strings.TrimSpace(p[0]))
+		if err != nil || port <= 0 {
+			continue
+		}
+		service := ""
+		if len(p) >= 3 {
+			service = strings.TrimSpace(p[2])
+		}
+		rows = append(rows, map[string]any{
+			"port": port, "proto": strings.TrimSpace(p[1]), "service": service,
+			"version": "", "evidence": strings.TrimSpace(line),
+		})
+	}
+	return dedupPorts(rows)
+}
+
 func base() string { return strings.TrimRight(os.Getenv("AVA_URL"), "/") }
 
 func enroll() (string, error) {
@@ -400,11 +576,13 @@ func enroll() (string, error) {
 
 func report(apiToken string) error {
 	inv, host, ip := collectInventory()
+	pkgs := software() // collected once: reported as "software" AND fed to recon
 	rb, code, err := post(base()+"/api/agents/report", apiToken, map[string]any{
 		"hostname": host, "os_name": osName(), "os_family": runtime.GOOS,
 		"ip_address": ip, "agent_version": agentVersion,
-		"software": software(), "inventory": inv,
-		"deep": deepCollect(apiToken),
+		"software": pkgs, "inventory": inv,
+		"deep":  deepCollect(apiToken),
+		"recon": recon(pkgs),
 	})
 	if err != nil {
 		return err

@@ -42,7 +42,7 @@ STALE_AFTER = timedelta(minutes=10)
 # The agent version currently shipped in agent-dist. Returned on heartbeat so a
 # running agent self-updates when it differs (bump this AND the Go agentVersion
 # together, and rebuild the binaries, to roll a new version to the fleet).
-AGENT_VERSION = "1.2.0"
+AGENT_VERSION = "1.3.0"
 ENROLLMENT_TTL = timedelta(hours=24)
 
 
@@ -220,6 +220,7 @@ class ReportIn(BaseModel):
     software: Optional[List[Dict[str, Any]]] = None   # [{name, version, ...}]
     inventory: Optional[Dict[str, Any]] = None         # hardware/os/network block
     deep: Optional[str] = None                         # raw stdout of the deep probe (JSON on win, sectioned on linux)
+    recon: Optional[Dict[str, Any]] = None             # {open_ports:[{port,proto,service,version,evidence}], packages:[{name,version}], collected_at}
 
 
 def _agent_by_api_token(db: Session, authorization: Optional[str]) -> ComplianceAgent:
@@ -361,6 +362,19 @@ def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportI
                 pp[k] = v
         except Exception:
             pass
+    # Local recon (ground truth from the host itself): namespaced under 'recon'
+    # so the pentest arming can read authoritative open ports/services. Projected
+    # to the agreed keys (evidence is dropped here — it rides the finding rows).
+    if body.recon:
+        pp["recon"] = {
+            "open_ports": [
+                {"port": _p.get("port"), "proto": _p.get("proto"),
+                 "service": _p.get("service"), "version": _p.get("version")}
+                for _p in (body.recon.get("open_ports") or []) if isinstance(_p, dict)
+            ],
+            "packages": body.recon.get("packages") or [],
+            "collected_at": body.recon.get("collected_at") or now.isoformat(),
+        }
     asset.platform_properties = pp
     if body.software:
         # Windows registers some products under more than one uninstall key, so
@@ -486,6 +500,59 @@ def _auto_cis_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
                      name=f"agent-cis-autoscan-t{tenant_id}-a{asset_id}").start()
 
 
+def _recon_rows(asset_id: int, host: str, ports: list) -> list:
+    """Normalized finding rows (the pentest _lrow shape) from recon open ports —
+    one info row per port, affected_component = service + version (what the
+    pentest arming keys on). Stable vid so a re-report UPSERTS instead of
+    duplicating. Pure (no DB), so it is unit-checkable."""
+    import hashlib
+    rows = []
+    for p in ports:
+        if not isinstance(p, dict):
+            continue
+        try:
+            port = int(p.get("port"))
+        except (TypeError, ValueError):
+            continue
+        if port <= 0:
+            continue
+        proto = str(p.get("proto") or "tcp").lower()[:8]
+        service = str(p.get("service") or "").strip()
+        version = str(p.get("version") or "").strip()
+        component = (f"{service} {version}".strip() or service)[:120] or None
+        title = f"Open port {port}/{proto}: {service or 'unknown service'}"
+        if version:
+            title = f"{title} ({version})"
+        title = title[:500]
+        digest = hashlib.sha1(f"recon|{title}|{port}/{proto}".encode("utf-8", "replace")).hexdigest()[:12]
+        fields = {
+            "title": title, "severity": "info", "affected_host": (host or "")[:255],
+            "evidence": str(p.get("evidence") or title)[:4000], "status": "open",
+            "source": "agent:recon", "plugin_family": "Agent Recon", "affected_port": port,
+        }
+        if component:
+            fields["affected_component"] = component
+        rows.append({
+            "vid": f"AGENT-RECON-{asset_id}-{digest}"[:50], "kind": "network",
+            "source_slug": "recon", "title": title, "affected_url": None,
+            "affected_component": component, "affected_port": port, "cve_id": None,
+            "fields": fields,
+        })
+    return rows
+
+
+def _ingest_recon_findings(db: Session, tenant_id: int, asset_id: int, host: str,
+                           recon: Dict[str, Any]) -> int:
+    """Persist agent recon open ports as 'agent:recon' register findings through the
+    SAME writer the pentest engine uses (dedup + grc_vulnerability_asset_links), so
+    agent-reported ground truth lands in the register exactly like engine findings."""
+    rows = _recon_rows(asset_id, host, list(recon.get("open_ports") or []))
+    if not rows:
+        return 0
+    from grc.modules.pentest import service as _pt
+    return _pt._write_rows(db, tenant_id, asset_id, _pt._dedup_findings(rows))
+
+
 @router.post("/report")
 def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=None),
                  db: Session = Depends(get_db)):
@@ -526,6 +593,16 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
          .filter(IntegrationConnection.assigned_collector_agent_id == old.id)
          .update({"is_active": False, "status": "revoked"}, synchronize_session=False))
     db.commit()
+    # Local recon → register findings (best-effort; isolated so it never fails the
+    # report, like the deep-probe parse above). Agent hosts are refused REMOTE scan
+    # by the pentest engine, so this ground truth is how they get into the register.
+    if body.recon:
+        try:
+            _a2 = db.get(ITAsset, asset_id)
+            _rh = (_a2.host_name or _a2.ip_address or "") if _a2 else ""
+            _ingest_recon_findings(db, agent.tenant_id, asset_id, _rh, body.recon)
+        except Exception:
+            db.rollback()
     # Fresh install → auto-run CIS once, no click needed (guards inside).
     if first_report and asset_id:
         _auto_cis_first_scan(db.get_bind(), agent.tenant_id, asset_id)
@@ -995,4 +1072,24 @@ if __name__ == "__main__":  # self-check — pure logic, no DB
     cmd_priv = _install_commands(req, "enr_1", "ava", "private")
     assert "ava.internal" in cmd_priv["linux"] and "reach=private" in cmd_priv["linux"]
     os.environ.pop("AVA_AGENT_PRIVATE_URL", None)
+
+    # Recon finding rows: contract shape for the pentest gate (source/severity/
+    # component/stable vid), and junk ports dropped.
+    rr = _recon_rows(7, "10.0.0.5", [
+        {"port": 22, "proto": "tcp", "service": "sshd", "version": "OpenSSH 8.9", "evidence": "x"},
+        {"port": 80, "proto": "tcp", "service": "nginx", "version": ""},
+        {"port": 0, "proto": "tcp", "service": "bad"},   # dropped: port <= 0
+        {"port": "nope"},                                 # dropped: non-int
+        "not-a-dict",                                     # dropped: not a mapping
+    ])
+    assert len(rr) == 2, rr
+    r0 = rr[0]
+    assert r0["fields"]["source"] == "agent:recon" and r0["fields"]["severity"] == "info"
+    assert r0["fields"]["plugin_family"] == "Agent Recon" and r0["fields"]["status"] == "open"
+    assert r0["fields"]["affected_port"] == 22 and r0["affected_component"] == "sshd OpenSSH 8.9"
+    assert r0["fields"]["title"] == "Open port 22/tcp: sshd (OpenSSH 8.9)"
+    assert r0["vid"].startswith("AGENT-RECON-7-") and len(r0["vid"]) <= 50
+    assert rr[1]["affected_component"] == "nginx" and rr[1]["fields"]["title"] == "Open port 80/tcp: nginx"
+    # Stable vid: re-reporting the same port upserts (does not duplicate).
+    assert _recon_rows(7, "10.0.0.5", [{"port": 22, "proto": "tcp", "service": "sshd", "version": "OpenSSH 8.9"}])[0]["vid"] == r0["vid"]
     print("agents_router self-check PASSED")
