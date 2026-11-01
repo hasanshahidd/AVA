@@ -88,6 +88,36 @@ def test_wapiti_injection_findings():
 
 
 # ---- P0b pass 2: TLS auditors (testssl, sslyze), header/param (humble, arjun), enum tools -------------
+def test_nuclei_dast_injection_rows_route():
+    # nuclei default text line: `[template-id] [proto] [severity] url` with the fuzzed param in the URL.
+    out = ("[error-based-sql-injection] [http] [critical] https://h/catalog?searchTerm=x\n"
+           "[xss] [http] [high] https://h/product?id=1\n"
+           "[open-redirect] [http] [medium] https://h/go?next=//evil\n"
+           "banner line without brackets — ignored\n")
+    rows = wst.parse_tool("nuclei-dast", out, "h", 9, "https://h")
+    _assert_shape(rows)
+    assert len(rows) == 3
+    titles = [r["title"].lower() for r in rows]
+    # hyphens normalized to spaces so the exploit router's SPACED class keywords match
+    assert any("sql injection" in t for t in titles)
+    assert any("xss" in t for t in titles)
+    assert any("open redirect" in t for t in titles)
+    # severity preserved from the nuclei line (DAST confirms are real vulns, not info)
+    assert {r["fields"]["severity"] for r in rows} == {"critical", "high", "medium"}
+    # the fuzzed param captured as affected_component -> the exploit prover's -p target
+    comps = {r["affected_component"] for r in rows}
+    assert "searchTerm" in comps and "id" in comps and "next" in comps
+    # honest skip: no nuclei finding lines / empty -> nothing (never fabricated)
+    assert wst.parse_tool("nuclei-dast", "no findings on this target\n", "h", 9, "https://h") == []
+    assert wst.parse_tool("nuclei-dast", "", "h", 9, "https://h") == []
+    assert isinstance(wst.parse_tool("nuclei-dast", "\x00 [garbage", "h", 9, "https://h"), list)
+    # argv runs katana (JS crawl -> qurl) then nuclei -dast; bounded + read-only
+    argv = wst._nuclei_dast_argv("h", "https://h")
+    inner = " ".join(argv)
+    assert "katana" in inner and "-jc" in inner and "qurl" in inner
+    assert "nuclei -l" in inner and "-dast" in inner
+
+
 def test_testssl_flat_json_severity_mapped():
     out = ('[ {"id":"engine_problem","ip":"/","port":"443","severity":"WARN","finding":"no engine"},'
            '{"id":"TLS1","ip":"h/1.2.3.4","port":"443","severity":"LOW","finding":"offered (deprecated)"},'
