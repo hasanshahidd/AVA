@@ -361,6 +361,11 @@ function InstallAgent({
   // not joined to this domain — a leaked install command can't onboard an
   // outside/home machine (it reports WORKGROUP or a different domain).
   const [domain, setDomain] = useState('');
+  // Where the agent phones home. Public = the host this console is on (testing,
+  // reachable anywhere). Private = the production VPN/internal address the server
+  // advertises via AVA_AGENT_PRIVATE_URL (agents on the client network, not the
+  // public internet). Defaults to public until the cutover.
+  const [reach, setReach] = useState<'public' | 'private'>('public');
   const runner = os === 'windows' ? 'an elevated PowerShell' : 'a terminal as root (sudo)';
 
   const copyText = async (text: string) => {
@@ -404,14 +409,16 @@ function InstallAgent({
     try {
       // Mint a one-time token; the backend returns the full install command with
       // the cloud URL + tenant + token baked in (one command per OS family).
-      const enr = await agentsApi.enroll({ agent_name: enrollName ?? `${os} agent`, os_family: os, allowed_domain: domain.trim() || undefined });
+      const enr = await agentsApi.enroll({ agent_name: enrollName ?? `${os} agent`, os_family: os, allowed_domain: domain.trim() || undefined, reachability: reach });
       const data = enr.data as { commands?: Record<string, string> };
       const command = data.commands?.[os];
       if (!command) throw new Error('No install command returned by the server');
       setCmd(command);
       await copyText(command);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unknown error';
+      // Prefer the server's reason (e.g. "Private agent reachability is not configured").
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const msg = detail || (e instanceof Error ? e.message : 'Unknown error');
       toast.toast({ title: 'Could not prepare installer', message: msg, type: 'error' });
     } finally {
       setBusy(false);
@@ -429,6 +436,26 @@ function InstallAgent({
           title="Only machines joined to this domain can enrol with this command. Leave blank to allow any machine."
           className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-[11px] text-slate-800 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
         />
+        {/* Reachability: the address baked into the install command the agent
+            phones home to. Public for testing; Private for production (server
+            must have AVA_AGENT_PRIVATE_URL set to the VPN/internal address). */}
+        <div className="flex items-center gap-1 rounded-md border border-slate-200 p-0.5">
+          {(['public', 'private'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setReach(r)}
+              title={r === 'public'
+                ? 'Agent reaches the server on this console’s address — works from anywhere. Use for testing.'
+                : 'Agent reaches the server on the production VPN / internal address (AVA_AGENT_PRIVATE_URL). Use in production.'}
+              className={`flex-1 rounded px-2 py-1 text-[11px] font-medium transition ${
+                reach === r ? 'bg-primary-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {r === 'public' ? 'Public (testing)' : 'Private (production)'}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={generate}

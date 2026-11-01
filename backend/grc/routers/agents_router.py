@@ -91,6 +91,7 @@ class EnrollIn(BaseModel):
     asset_id: Optional[int] = None
     os_family: Optional[str] = None
     allowed_domain: Optional[str] = None   # AD domain the enrolling PC must be joined to; blank = any
+    reachability: Optional[str] = "public"  # 'public' (testing: the host the browser used) or 'private' (production: AVA_AGENT_PRIVATE_URL)
 
 
 class BulkHost(BaseModel):
@@ -158,7 +159,7 @@ def enroll_agent(body: EnrollIn, request: Request,
     slug = getattr(request.state, "tenant_slug", None) or ""
     return {"id": agent.id, "agent_name": agent.agent_name, "status": agent.status,
             "enrollment_token": enr, "expires_in": int(ENROLLMENT_TTL.total_seconds()),
-            "tenant_slug": slug, "commands": _install_commands(request, enr, slug),
+            "tenant_slug": slug, "commands": _install_commands(request, enr, slug, body.reachability),
             "install": _install_hint(enr, body.os_family)}
 
 
@@ -717,15 +718,43 @@ def _public_base(request: Request) -> str:
     return f"{proto}://{host}"
 
 
-def _install_commands(request: Request, token: str, tenant: str) -> Dict[str, str]:
+def _agent_base(request: Request, reachability: Optional[str]) -> str:
+    """Where the installed agent phones home FOREVER (baked into the service).
+      • 'public'  — the host the operator reached the console on (default; good
+                    for testing, reachable from anywhere).
+      • 'private' — the production address agents reach the server over their own
+                    network (VPN / internal DNS), set once by ops in
+                    AVA_AGENT_PRIVATE_URL. NOT the droplet's VPC private IP: that
+                    is reachable only by other droplets in the VPC, not by agents
+                    on client machines. We only pick which base to bake; the
+                    actual private value is ops's to configure."""
+    if (reachability or "public").strip().lower() == "private":
+        priv = os.environ.get("AVA_AGENT_PRIVATE_URL", "").strip().rstrip("/")
+        if not priv:
+            raise HTTPException(409, "Private agent reachability is not configured on "
+                                "the server. Set AVA_AGENT_PRIVATE_URL to the VPN / "
+                                "internal address agents should reach, or use Public.")
+        return priv
+    return _public_base(request)
+
+
+def _install_commands(request: Request, token: str, tenant: str,
+                      reachability: Optional[str] = "public") -> Dict[str, str]:
     """One-line install commands the console shows for a fresh enrollment token —
     run in an elevated terminal on the target host. This is the primary install
     path (no downloaded .ps1/.sh to "open with…"): the one-liner fetches the
     personalised installer and executes it. ``?tenant_slug`` is carried so the
     tenant is baked even though the fetch has no browser session (TenantMiddleware
-    resolves it from the query param)."""
-    base = _public_base(request)
-    q = f"?tenant_slug={tenant}" if tenant else ""
+    resolves it from the query param). ``?reach`` is carried so the installer the
+    agent fetches bakes the SAME base (public vs private) the console chose, rather
+    than re-deriving it from the fetch host."""
+    base = _agent_base(request, reachability)
+    params = []
+    if tenant:
+        params.append(f"tenant_slug={tenant}")
+    if (reachability or "public").strip().lower() == "private":
+        params.append("reach=private")
+    q = ("?" + "&".join(params)) if params else ""
     return {
         # Elevated PowerShell. iwr → iex runs the installer in the current session.
         "windows": f'iwr "{base}/api/agents/installer/windows/{token}{q}" -UseBasicParsing | iex',
@@ -892,13 +921,15 @@ echo "Ava agent installed and started. It will appear in your console shortly."
 
 
 @router.get("/installer/{os_family}/{enrollment_token}", response_class=PlainTextResponse)
-def download_installer(os_family: str, enrollment_token: str, request: Request):
+def download_installer(os_family: str, enrollment_token: str, request: Request,
+                       reach: str = "public"):
     """Personalised one-shot installer script with the tenant's enrollment token
     AND tenant slug baked in (the agent sends the slug as X-Tenant-Slug so the
     backend routes to the right per-tenant DB). The token IS the auth (same model
     as the connect wizard), so this is intentionally not user-session gated — but
-    the tenant slug comes from the authenticated browser that downloads it."""
-    url = _public_base(request)
+    the tenant slug comes from the authenticated browser that downloads it. ``reach``
+    (from the one-liner) decides whether AVA_URL is baked public or private."""
+    url = _agent_base(request, reach)
     tenant = getattr(request.state, "tenant_slug", None) or ""
     if os_family == "linux":
         return _linux_installer(url, enrollment_token, tenant)
@@ -941,4 +972,27 @@ if __name__ == "__main__":  # self-check — pure logic, no DB
     assert _domain_allowed("WORKGROUP", "WORKGROUP", False)   # non-dotted name (e.g. test box) matches by name
     assert "ava-agent.exe" in win and "schtasks" in win and "AVA_TENANT" in win
     assert _BIN["linux"] == "ava-agent-linux" and _BIN["windows"] == "ava-agent-windows.exe"
+
+    # Reachability: public derives from the request host; private uses the ops env
+    # (and refuses when unset). A tiny fake Request is enough for the pure logic.
+    class _Url:
+        scheme = "https"; netloc = "app.caiva.io"
+    class _Req:
+        headers = {"host": "app.caiva.io"}; url = _Url()
+    req = _Req()
+    os.environ.pop("CONNECT_WIZARD_PUBLIC_URL", None)
+    os.environ.pop("AVA_AGENT_PRIVATE_URL", None)
+    assert _agent_base(req, "public") == "https://app.caiva.io"
+    try:
+        _agent_base(req, "private"); assert False, "private must refuse when unset"
+    except HTTPException as e:
+        assert e.status_code == 409
+    os.environ["AVA_AGENT_PRIVATE_URL"] = "https://ava.internal/"
+    assert _agent_base(req, "private") == "https://ava.internal"   # trailing slash stripped
+    cmd_pub = _install_commands(req, "enr_1", "ava", "public")
+    assert "app.caiva.io" in cmd_pub["linux"] and "tenant_slug=ava" in cmd_pub["linux"]
+    assert "reach=private" not in cmd_pub["linux"]
+    cmd_priv = _install_commands(req, "enr_1", "ava", "private")
+    assert "ava.internal" in cmd_priv["linux"] and "reach=private" in cmd_priv["linux"]
+    os.environ.pop("AVA_AGENT_PRIVATE_URL", None)
     print("agents_router self-check PASSED")

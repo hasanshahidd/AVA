@@ -4514,7 +4514,7 @@ export const riskPostureApi = {
 
 export const agentsApi = {
   list: () => apiClient.get('/agents'),
-  enroll: (data: { agent_name: string; mode?: 'collector' | 'endpoint'; asset_id?: number; os_family?: string; allowed_domain?: string }) =>
+  enroll: (data: { agent_name: string; mode?: 'collector' | 'endpoint'; asset_id?: number; os_family?: string; allowed_domain?: string; reachability?: 'public' | 'private' }) =>
     apiClient.post('/agents', data),
   bulkEnroll: (data: {
     hosts: Array<{ hostname: string; mode?: 'collector' | 'endpoint'; os_family?: string; asset_id?: number }>;
