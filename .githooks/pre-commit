@@ -1,0 +1,5 @@
+#!/bin/sh
+# Supply-chain guard (local). Blocks committing an infected config.
+# Enable once per clone:  git config core.hooksPath .githooks
+# CI (.github/workflows/malware-guard.yml) is the hard gate; this is the early local catch.
+node scripts/scan-malware-configs.js --staged || exit 1
