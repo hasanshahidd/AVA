@@ -14,11 +14,15 @@ from grc.models import GRCUser, ITAsset, Vulnerability, VulnerabilityAssetLink, 
 from grc.models._pentest_exploit_results import PentestExploitResult
 from grc.modules.vuln_management._adhoc_filter import exclude_adhoc, inventory_assets_only
 from grc.modules.vuln_management.routers.dashboard import RESOLVED_STATUSES
-from grc.routers.auth_router import get_user_tenants, require_auth
+from grc.routers.auth_router import get_user_tenants, require_auth, require_tenant_permission
 
 from .service import summarize
 
-router = APIRouter(prefix="/exec-dashboard", tags=["Executive Dashboard"])
+# Exec dashboard exposes org-wide security posture (vuln/exploit aggregates) — gate it so a
+# low-privilege user can't read it. Fail-closed; Administrator + primary-contact bypass
+# (grant dashboard:overview:view in Admin > Roles otherwise).
+router = APIRouter(prefix="/exec-dashboard", tags=["Executive Dashboard"],
+                   dependencies=[Depends(require_tenant_permission("dashboard:overview:view"))])
 
 _V_KEYS = ("id", "severity", "status", "source", "discovered_at", "kev_flag", "public_exploit_count",
            "exploitdb_count", "epss_score", "cve_id", "affected_host", "nvd_last_synced_at", "public_exploit_synced_at")
