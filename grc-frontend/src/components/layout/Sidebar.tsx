@@ -434,7 +434,7 @@ const ADMIN_POPOVER_ITEMS: Array<{ id: string; label: string; icon: LucideIcon; 
   { id: 'roles',            label: 'Role Management',       icon: ShieldCheck },
   { id: 'teams',            label: 'Teams',                 icon: Users },
   { id: 'departments',      label: 'Departments',           icon: Building2 },
-  { id: 'password-policy',  label: 'Password Policy',       icon: Shield },
+  { id: 'password-policy',  label: 'Sign-in & Session',     icon: Shield },
   // Unified Connectors tab — External Connectors, Vulnerability Scanners, Cloud,
   // Discovery Hosts and Identity/SSO now live here as categories.
   { id: 'connectors',       label: 'Connectors',            icon: Plug },

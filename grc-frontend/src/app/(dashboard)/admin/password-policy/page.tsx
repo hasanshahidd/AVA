@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Lock, Shield } from 'lucide-react';
-import { adminApi } from '@/lib/api';
+import Link from 'next/link';
+import { KeyRound, Lock, Shield } from 'lucide-react';
+import { adminApi, ssoApi } from '@/lib/api';
 import { PageLoader } from '@/components/ui';
 
 // Mirrors the GET /admin/password-policy response shape. Kept local because
@@ -27,6 +28,14 @@ export default function PasswordPolicyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  // Domain sign-in (Entra SSO): when connected, password + lockout rules are the directory's, not ours.
+  const [ssoConnected, setSsoConnected] = useState<boolean | null>(null);
+  const [showLocal, setShowLocal] = useState(false);
+  useEffect(() => {
+    ssoApi.getConfig()
+      .then((r) => setSsoConnected(!!(r.data?.connected && r.data?.is_enabled !== false)))
+      .catch(() => setSsoConnected(false));
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
   // Edit-mode draft. We only mutate this; on Cancel we discard back to the
@@ -139,27 +148,9 @@ export default function PasswordPolicyPage() {
     </div>
   );
 
-  return (
-    <div className="space-y-4">
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
-          {error}
-        </div>
-      )}
-      {okMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-emerald-700">
-          {okMessage}
-        </div>
-      )}
-
-      {/* ── Card 1: Password Complexity ───────────────────────────────────── */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-card">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <Lock size={16} className="text-slate-600" />
-            Password Complexity
-          </h2>
-          {!editing ? (
+  // Shared by both cards: with domain sign-in on, the password card is hidden but the session card still needs it.
+  const editControls = (
+    !editing ? (
             <button
               onClick={() => setEditing(true)}
               className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-[color:var(--color-on-base,#0a0a0a)] rounded-lg text-sm transition-colors"
@@ -187,7 +178,60 @@ export default function PasswordPolicyPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
-          )}
+          )
+  );
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+          {error}
+        </div>
+      )}
+      {okMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-emerald-700">
+          {okMessage}
+        </div>
+      )}
+
+      {/* ── Card 0: Domain sign-in ─────────────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-card p-6">
+        <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <KeyRound size={16} className="text-slate-600" />
+          Domain sign-in (SSO)
+        </h2>
+        {ssoConnected === null ? (
+          <p className="text-sm text-slate-500 mt-1">Checking…</p>
+        ) : ssoConnected ? (
+          <p className="text-sm text-slate-600 mt-1">
+            <span className="font-medium text-emerald-700">Connected.</span> Users who sign in with your organization&apos;s
+            domain account follow your directory&apos;s password, expiry and lockout policy — not the settings below.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-600 mt-1">
+            <span className="font-medium text-amber-700">Not connected.</span> Users sign in with CAIVA passwords, so the
+            local account rules below apply to everyone. Connect your directory (Microsoft Entra ID) under{' '}
+            <Link href="/admin?tab=connectors" className="font-medium text-primary-700 hover:underline">Connectors</Link>{' '}
+            to use your domain&apos;s own password policy.
+          </p>
+        )}
+      </div>
+
+      {ssoConnected && !showLocal && (
+        <button onClick={() => setShowLocal(true)} className="text-sm font-medium text-primary-700 hover:underline">
+          Show local-account password rules (first admin / break-glass accounts only)
+        </button>
+      )}
+
+      {/* ── Card 1: Local account passwords ───────────────────────────────── */}
+      {(!ssoConnected || showLocal) && (
+      <div className="bg-white border border-slate-200 rounded-xl shadow-card">
+        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Lock size={16} className="text-slate-600" />
+            Local account passwords
+          </h2>
+          {editControls}
         </div>
 
         <div className="p-6">
@@ -271,16 +315,19 @@ export default function PasswordPolicyPage() {
         </div>
       </div>
 
-      {/* ── Card 2: Account Lockout & Session ─────────────────────────────── */}
+      )}
+
+      {/* ── Card 2: Session & lockout ─────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-card">
         <div className="p-6 border-b border-slate-200">
+          {ssoConnected && !showLocal && <div className="float-right">{editControls}</div>}
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <Shield size={16} className="text-slate-600" />
-            Account Lockout & Session
+            Session &amp; lockout
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Brute-force protection and idle-session enforcement. Changes apply to all subsequent
-            logins.
+            The idle timeout applies to every user. Lockout applies to CAIVA-password sign-ins; domain (SSO)
+            sign-ins are locked out by your directory.
           </p>
         </div>
 

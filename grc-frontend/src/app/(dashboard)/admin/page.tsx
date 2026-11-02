@@ -46,7 +46,7 @@ export default function AdminPage() {
     // Help-Desk service-desk departments, surfaced in Admin (also visible in HD).
     { id: 'departments', label: 'Departments', icon: Building2 },
     // Password & session policy — controls complexity, lockout, and idle timeout.
-    { id: 'password-policy', label: 'Password Policy', icon: Lock },
+    { id: 'password-policy', label: 'Sign-in & Session', icon: Lock },
     // Unified connectors — External Connectors, Vulnerability Scanners, Cloud,
     // Discovery Hosts and Identity/SSO as categories on one page.
     { id: 'connectors', label: 'Connectors', icon: Plug },
