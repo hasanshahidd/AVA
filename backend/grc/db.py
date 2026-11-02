@@ -397,6 +397,26 @@ def _ensure_hosted_scan_columns(engine: Engine) -> None:
         ))
 
 
+def _ensure_tenant_risk_weight_columns(engine: Engine) -> None:
+    """Additive EASM weight columns on grc_tenant_risk_weights. External assets
+    are tunable per-tenant now (hygiene/exploit/exposure/business). create_all
+    only makes tables, so an already-provisioned DB needs these or GET/PUT
+    /risk-posture/weights 500s selecting the mapped columns. Nullable → no
+    backfill; NULL reads as the fixed EASM defaults in risk_posture/service.py."""
+    if engine.dialect.name != "postgresql":
+        return
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    if not inspector.has_table("grc_tenant_risk_weights"):
+        return
+    with engine.begin() as conn:
+        for col in ("weight_easm_hygiene", "weight_easm_exploit",
+                    "weight_easm_exposure", "weight_easm_business"):
+            conn.execute(text(
+                f"ALTER TABLE grc_tenant_risk_weights ADD COLUMN IF NOT EXISTS {col} NUMERIC(5,2)"
+            ))
+
+
 def _ensure_statutory_audit_tables(engine: Engine) -> None:
     """Focused IF NOT EXISTS / checkfirst ensure for statutory-audit tables.
 
@@ -547,6 +567,10 @@ def _init_tenant_schema(engine: Engine, slug: str) -> None:
             _ensure_hosted_scan_columns(engine)
         except Exception:
             logger.exception("hosted_scan columns ensure failed for slug=%s", slug)
+        try:
+            _ensure_tenant_risk_weight_columns(engine)
+        except Exception:
+            logger.exception("tenant_risk_weight EASM columns ensure failed for slug=%s", slug)
         # Ava: compliance schema self-heal removed with the compliance module.
         try:
             from .modules.identity.schema_migrations import (
