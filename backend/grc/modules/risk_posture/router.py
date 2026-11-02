@@ -340,28 +340,20 @@ def update_weights(
     # RBAC gate — Administrator role only.
     # Tune Weights changes the scoring formula for the entire tenant. The
     # frontend hides the button for non-admins; this server check is the
-    # defence-in-depth gate. We resolve the user's tenant-scoped roles by
-    # querying the tenant schema's `roles` + `user_roles` directly, since
-    # the public-schema GRCUser ORM doesn't carry them.
+    # defence-in-depth gate. DB-per-tenant: resolve roles via the ORM, NOT a
+    # `tenant_<slug>` Postgres schema (which doesn't exist here — that raw SQL
+    # 500'd on every save). Same bug class already fixed in _is_owner_scoped.
     tenant_id = get_user_primary_tenant(current_user, db)
-    from sqlalchemy import text
-    tenant_row = db.execute(text("SELECT slug FROM grc_tenants WHERE id=:tid"),
-                            {"tid": tenant_id}).fetchone()
-    if not tenant_row:
-        raise HTTPException(403, "Tenant context not found")
-    schema = "tenant_" + tenant_row[0].replace("-", "")
-    # Match by email — grc_users.id and tenant_<slug>.users.id are
-    # independent sequences, so we join via email which is unique in both.
-    is_admin = db.execute(
-        text(
-            f"SELECT 1 FROM {schema}.users u "
-            f"JOIN {schema}.user_roles ur ON ur.user_id = u.id "
-            f"JOIN {schema}.roles r ON r.id = ur.role_id "
-            f"WHERE u.email = :email AND r.name = 'Administrator' LIMIT 1"
-        ),
-        {"email": current_user.email},
-    ).fetchone()
-    if not is_admin:
+    from grc.models import UserRole, Role
+    role_names = [
+        r[0] for r in (
+            db.query(Role.name)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .filter(UserRole.user_id == current_user.id)
+            .all()
+        )
+    ]
+    if "Administrator" not in role_names:
         raise HTTPException(403, "Only Tenant Administrators can change risk weights.")
 
     total = (body.weight_cis + body.weight_vuln + body.weight_cia
