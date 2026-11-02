@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import apiClient, { assetsApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import PciAttributesFields from '@/components/assets/PciAttributesFields';
@@ -273,6 +273,11 @@ export function AssetModal({
     eol_date: (String((initialData as any)?.eol_date || '')).slice(0, 10),
   });
   const [customSubComponent, setCustomSubComponent] = useState('');
+  // Opened from the register's PCI tick: land on the PCI attributes, not the top of the form.
+  const pciRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (forceCde && initialData) pciRef.current?.scrollIntoView({ block: 'center' });
+  }, [forceCde, initialData]);
 
   // OS Knowledge Registry — drives the OS/Product picker so the user can
   // pick what kind of asset this is, and the benchmark matcher resolves the
@@ -853,7 +858,7 @@ export function AssetModal({
                   Shared component so the IT Assets form and the PCI Cardholder
                   Data Inventory show identical fields. */}
               {formData.cde_environment && (
-                <div className="mb-3">
+                <div ref={pciRef} className="mb-3">
                   <PciAttributesFields
                     value={formData.pci_dss}
                     onChange={(patch) => setFormData({ ...formData, pci_dss: { ...formData.pci_dss, ...patch } as Record<string, string> })}

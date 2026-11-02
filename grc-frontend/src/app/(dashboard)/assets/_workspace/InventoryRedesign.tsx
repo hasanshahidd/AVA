@@ -33,7 +33,7 @@ interface Props {
   onBulkConnect?: (ids: number[]) => void;
   onBulkDelete?: (ids: number[]) => void;
   onBulkUpdate?: (ids: number[], patch: Record<string, unknown>) => void;
-  /** Ticking an asset INTO PCI scope opens its PCI attributes instead of a bare flag flip. */
+  /** Ticking an asset INTO PCI scope opens the edit sidebar at its PCI attributes instead of a bare flag flip. */
   onMarkPci?: (a: ITAsset) => void;
   onAdd?: () => void;
   /** Parent renders the common title+toggle header; skip the local one. */
