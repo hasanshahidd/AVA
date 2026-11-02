@@ -4508,6 +4508,10 @@ export const riskPostureApi = {
     weight_cia: number;
     weight_ctrl: number;
     weight_risk: number;
+    weight_easm_hygiene?: number;
+    weight_easm_exploit?: number;
+    weight_easm_exposure?: number;
+    weight_easm_business?: number;
     preset_name?: string;
   }) => apiClient.put('/risk-posture/weights', data),
 };

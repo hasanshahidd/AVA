@@ -258,7 +258,7 @@ def preview_asset_posture(
 from pydantic import BaseModel, Field
 
 from grc.models import TenantRiskWeights
-from .service import DEFAULT_WEIGHTS, resolve_weights_for_tenant
+from .service import DEFAULT_WEIGHTS, DEFAULT_EASM_WEIGHTS, resolve_weights_for_tenant
 
 
 class WeightsPayload(BaseModel):
@@ -269,6 +269,12 @@ class WeightsPayload(BaseModel):
     weight_cia:  float = Field(ge=0, le=100)
     weight_ctrl: float = Field(ge=0, le=100)
     weight_risk: float = Field(ge=0, le=100)
+    # EASM (external asset) dimension weights — optional so an old client that
+    # only sends the internal five still works (those requests leave EASM as-is).
+    weight_easm_hygiene:  Optional[float] = Field(default=None, ge=0, le=100)
+    weight_easm_exploit:  Optional[float] = Field(default=None, ge=0, le=100)
+    weight_easm_exposure: Optional[float] = Field(default=None, ge=0, le=100)
+    weight_easm_business: Optional[float] = Field(default=None, ge=0, le=100)
     preset_name: Optional[str] = None
 
 
@@ -276,10 +282,28 @@ class WeightsPayload(BaseModel):
 # + a slider-only customisation UI. We deliberately do NOT ship named presets
 # (Vuln-focused / Compliance-heavy / etc) because each bank's profile is
 # unique enough that the operator should think through their own weights
-# rather than pick a label off the shelf.
+# rather than pick a label off the shelf. The preset carries BOTH the internal
+# five and the four EASM dimensions so the UI can reset both groups at once.
 PRESETS = {
-    "Banking (default)":  {"cis": 25, "vuln": 30, "cia": 15, "ctrl": 15, "risk": 15},
+    "Banking (default)":  {
+        "cis": 25, "vuln": 30, "cia": 15, "ctrl": 15, "risk": 15,
+        "easm_hygiene": 30, "easm_exploit": 35, "easm_exposure": 20, "easm_business": 15,
+    },
 }
+
+
+def _easm_out(row) -> dict:
+    """The four EASM weights as percentages for the GET response — the tenant's
+    tuned values, or the fixed defaults when a column is NULL / no row yet."""
+    def pct(v, key):
+        return float(v) if v is not None else DEFAULT_EASM_WEIGHTS[key] * 100
+    r = row if row is not None else None
+    return {
+        "weight_easm_hygiene":  pct(getattr(r, "weight_easm_hygiene", None),  "hygiene"),
+        "weight_easm_exploit":  pct(getattr(r, "weight_easm_exploit", None),  "exploitability"),
+        "weight_easm_exposure": pct(getattr(r, "weight_easm_exposure", None), "exposure"),
+        "weight_easm_business": pct(getattr(r, "weight_easm_business", None), "business"),
+    }
 
 
 @router.get("/weights")
@@ -306,6 +330,7 @@ def get_weights(
             "updated_at":  row.updated_at.isoformat() if row.updated_at else None,
             "is_custom":   row.preset_name in (None, "", "Custom"),
             "presets":     PRESETS,
+            **_easm_out(row),
         }
     # Defaults — no row yet
     return {
@@ -318,6 +343,7 @@ def get_weights(
         "updated_at":  None,
         "is_custom":   False,
         "presets":     PRESETS,
+        **_easm_out(None),
     }
 
 
@@ -365,6 +391,22 @@ def update_weights(
             f"Adjust one dimension up/down before saving.",
         )
 
+    # EASM weights are optional and all-or-nothing: either all four are present
+    # (and must sum to 100) or none are (external weights left untouched).
+    easm_vals = (body.weight_easm_hygiene, body.weight_easm_exploit,
+                 body.weight_easm_exposure, body.weight_easm_business)
+    easm_present = [v for v in easm_vals if v is not None]
+    if easm_present:
+        if len(easm_present) != 4:
+            raise HTTPException(400, "All four external (EASM) weights must be provided together.")
+        easm_total = sum(easm_present)
+        if abs(easm_total - 100.0) > 0.5:
+            raise HTTPException(
+                400,
+                f"External (EASM) weights must sum to 100% (got {easm_total:.2f}%). "
+                f"Adjust one dimension up/down before saving.",
+            )
+
     row = db.query(TenantRiskWeights).filter(TenantRiskWeights.tenant_id == tenant_id).first()
     if not row:
         row = TenantRiskWeights(tenant_id=tenant_id)
@@ -374,6 +416,11 @@ def update_weights(
     row.weight_cia  = body.weight_cia
     row.weight_ctrl = body.weight_ctrl
     row.weight_risk = body.weight_risk
+    if easm_present:
+        row.weight_easm_hygiene  = body.weight_easm_hygiene
+        row.weight_easm_exploit  = body.weight_easm_exploit
+        row.weight_easm_exposure = body.weight_easm_exposure
+        row.weight_easm_business = body.weight_easm_business
     row.preset_name = body.preset_name or "Custom"
     row.updated_by  = current_user.id
     db.commit()
@@ -387,4 +434,5 @@ def update_weights(
         "preset_name": row.preset_name,
         "updated_at":  row.updated_at.isoformat() if row.updated_at else None,
         "updated_by":  row.updated_by,
+        **_easm_out(row),
     }
