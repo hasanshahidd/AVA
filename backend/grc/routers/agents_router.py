@@ -42,7 +42,7 @@ STALE_AFTER = timedelta(minutes=10)
 # The agent version currently shipped in agent-dist. Returned on heartbeat so a
 # running agent self-updates when it differs (bump this AND the Go agentVersion
 # together, and rebuild the binaries, to roll a new version to the fleet).
-AGENT_VERSION = "1.3.1"
+AGENT_VERSION = "1.3.2"
 ENROLLMENT_TTL = timedelta(hours=24)
 
 
@@ -941,6 +941,7 @@ Wants=network-online.target
 Environment=AVA_URL=$AVA_URL
 Environment=AVA_ENROLL=$AVA_ENROLL
 Environment=AVA_TENANT=$AVA_TENANT
+Environment=HTTPS_PROXY=${{HTTPS_PROXY:-}}
 ExecStart=/opt/ava-agent/ava-agent
 Restart=always
 RestartSec=10
@@ -985,7 +986,8 @@ Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava
 # Config the service reads at startup. A Windows service does NOT reliably inherit
 # Machine env vars set in this same session, so the file — not the registry — is
 # the dependable source; Machine env is kept only for an interactive/debug run.
-$cfg = @{{ URL = $AvaUrl; Tenant = $AvaTenant; Enroll = $AvaEnroll }} | ConvertTo-Json -Compress
+# Optional corporate proxy: set $env:HTTPS_PROXY before running this installer.
+$cfg = @{{ URL = $AvaUrl; Tenant = $AvaTenant; Enroll = $AvaEnroll; Proxy = $env:HTTPS_PROXY }} | ConvertTo-Json -Compress
 Set-Content -Path "$dir\\config.json" -Value $cfg -Encoding UTF8
 [Environment]::SetEnvironmentVariable('AVA_URL', $AvaUrl, 'Machine')
 [Environment]::SetEnvironmentVariable('AVA_ENROLL', $AvaEnroll, 'Machine')
@@ -1036,6 +1038,7 @@ cat > /Library/LaunchDaemons/io.caiva.agent.plist <<PLIST
     <key>AVA_URL</key><string>$AVA_URL</string>
     <key>AVA_ENROLL</key><string>$AVA_ENROLL</string>
     <key>AVA_TENANT</key><string>$AVA_TENANT</string>
+    <key>HTTPS_PROXY</key><string>${{HTTPS_PROXY:-}}</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
