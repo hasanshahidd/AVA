@@ -708,7 +708,10 @@ export function AssetModal({
             </div>
             </FormSection>
 
-            {(show.hardware || show.os) && (
+            {/* Hardware/OS telemetry is machine-collected (scan / agent) and shown on the asset page;
+                editing is for manual fields only. Add keeps it: a hand-added asset has no scan yet and
+                the OS picker is what lets CIS match a benchmark. */}
+            {!isEditMode && (show.hardware || show.os) && (
             <FormSection id="technical" title="Technical profile" hint="Hardware and OS — auto-filled by scans" flash={flash}>
             {/* Hardware — infrastructure only (servers/network/hardware). Also
                 auto-populated by agent heartbeat or agentless (WinRM/SSH) scan.
