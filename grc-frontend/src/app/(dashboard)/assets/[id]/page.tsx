@@ -39,7 +39,7 @@ import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 // Updated_CIS_Assests migration: host applications "room-and-chair" panel
 // rendered above the existing ComplianceTab content.
-import { AssetModal } from '../AssetModal';
+import { AssetModal, type AssetFormSection } from '../AssetModal';
 import HostApplicationsPanel from './_host-applications-panel';
 import { PlatformDetails, PLATFORM_META } from './_platform-detail-card';
 import AssetOverviewDesign from './_overview-design';
@@ -365,6 +365,7 @@ export default function AssetDetailPage() {
   ]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editSection, setEditSection] = useState<AssetFormSection | undefined>(undefined);
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [setupEntry, setSetupEntry] = useState<SoftwareSetupEntry | null>(null);
   const [collectSvcOpen, setCollectSvcOpen] = useState(false);
@@ -831,13 +832,13 @@ export default function AssetDetailPage() {
       ...(dbAppKind ? [{ label: collectSvc.isPending ? 'Collecting…' : 'Collect database details', primary: true, onClick: () => setCollectSvcOpen(true) }] : []),
       // "Assess risk" opened the now-hidden Criticality Assessments tab — hidden with it.
       // { label: 'Assess risk', primary: !dbAppKind, onClick: () => setActiveTab('criticality') },
-      ...(canEdit ? [{ label: 'Edit', onClick: () => setShowEditModal(true) }] : []),
+      ...(canEdit ? [{ label: 'Edit', onClick: () => { setEditSection(undefined); setShowEditModal(true); } }] : []),
       ...(canEdit ? [{ label: 'Lifecycle', onClick: () => setShowLifecycleModal(true) }] : []),
       { label: 'CIS scans', onClick: () => router.push(`/compliance-plugins/asset/${assetId}`) },
       { label: 'Risk posture', onClick: () => router.push(`/risk-posture/asset/${assetId}`) },
       ...(canDelete ? [{ label: 'Delete', danger: true, onClick: () => setShowDeleteConfirm(true) }] : []),
     ],
-    onEdit: canEdit ? () => setShowEditModal(true) : undefined,
+    onEdit: canEdit ? (section?: AssetFormSection) => { setEditSection(section); setShowEditModal(true); } : undefined,
     onSoftwareClick: (s: any) => {
       const enr = (softwareForCount?.inventory ?? []).find((x: any) => x.software_key === s.software_key) || {};
       setSetupEntry({
@@ -885,7 +886,7 @@ export default function AssetDetailPage() {
 
   return (
     <>
-      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => setShowEditModal(true)} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onRunSurfacePentest={(isSurface || outsideOnly) ? () => router.push(`/pentest?new=run&asset=${assetId}`) : undefined} onDelete={() => setShowDeleteConfirm(true)}>
+      <AssetRecordShell asset={asset} overviewData={overviewData} displayName={displayName} sections={sections} activeTab={activeTab} onTab={setActiveTab} tabCounts={tabCounts} canEdit={canEdit} canDelete={canDelete} getIcon={getAssetIcon} onAssessRisk={() => assessRiskMutation.mutate()} assessing={assessRiskMutation.isPending} onEdit={() => { setEditSection(undefined); setShowEditModal(true); }} onLifecycle={() => setShowLifecycleModal(true)} onCisScans={() => router.push(`/compliance-plugins/asset/${assetId}`)} onRiskPosture={() => router.push(`/risk-posture/asset/${assetId}`)} onRunSurfacePentest={(isSurface || outsideOnly) ? () => router.push(`/pentest?new=run&asset=${assetId}`) : undefined} onDelete={() => setShowDeleteConfirm(true)}>
             {activeTab === 'overview' && (
               <>
                 {/* External (EASM) assets: scanning-scope authorization sits above
@@ -1052,6 +1053,7 @@ export default function AssetDetailPage() {
       {showEditModal && (
         <AssetModal
           initialData={asset as unknown as ITAsset}
+          focusSection={editSection}
           onClose={() => setShowEditModal(false)}
           onSave={(data) => updateAssetMutation.mutate(data as AssetUpdatePayload)}
           isLoading={updateAssetMutation.isPending}

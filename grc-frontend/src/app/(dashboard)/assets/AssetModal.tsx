@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import apiClient, { assetsApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import PciAttributesFields from '@/components/assets/PciAttributesFields';
@@ -188,6 +188,27 @@ const CRITICALITY_OPTIONS: ComboBoxOption[] = [
 ];
 
 
+export type AssetFormSection = 'basics' | 'technical' | 'identity' | 'compliance' | 'risk' | 'procurement';
+const FLASH_MS = 4000;
+
+function FormSection({ id, title, hint, flash, children }: {
+  id: AssetFormSection; title: string; hint?: string; flash?: AssetFormSection; children: React.ReactNode;
+}) {
+  const on = flash === id;
+  return (
+    <section
+      id={`asset-form-${id}`}
+      className={`scroll-mt-2 rounded-lg border p-4 transition-colors duration-700 ${on ? 'border-blue-400 bg-blue-50/70 ring-2 ring-blue-300' : 'border-slate-200 bg-white'}`}
+    >
+      <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2">
+        <h3 className="text-[13px] font-semibold text-slate-900">{title}</h3>
+        {hint && <span className="text-[11px] text-slate-500">{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function AssetModal({
   onClose,
   onSave,
@@ -195,6 +216,7 @@ export function AssetModal({
   initialData,
   forceCde,
   forceEphi,
+  focusSection,
 }: {
   onClose: () => void;
   onSave: (data: Parameters<typeof assetsApi.create>[0]) => void;
@@ -206,6 +228,8 @@ export function AssetModal({
   /** Default the "ePHI Environment" toggle on (used by the HIPAA ePHI
    *  Inventory, which only ever creates ePHI assets). */
   forceEphi?: boolean;
+  /** Open scrolled to this section and briefly highlight it (overview card Edit links, PCI tick). */
+  focusSection?: AssetFormSection;
 }) {
   const parseSubComponents = (value?: string) =>
     value
@@ -273,11 +297,14 @@ export function AssetModal({
     eol_date: (String((initialData as any)?.eol_date || '')).slice(0, 10),
   });
   const [customSubComponent, setCustomSubComponent] = useState('');
-  // Opened from the register's PCI tick: land on the PCI attributes, not the top of the form.
-  const pciRef = useRef<HTMLDivElement>(null);
+  // Land on the section the user came for and flash it so they can see which fields belong to it.
+  const [flash, setFlash] = useState<AssetFormSection | undefined>(focusSection);
   useEffect(() => {
-    if (forceCde && initialData) pciRef.current?.scrollIntoView({ block: 'center' });
-  }, [forceCde, initialData]);
+    if (!focusSection) return;
+    document.getElementById(`asset-form-${focusSection}`)?.scrollIntoView({ block: 'start' });
+    const t = setTimeout(() => setFlash(undefined), FLASH_MS);
+    return () => clearTimeout(t);
+  }, [focusSection]);
 
   // OS Knowledge Registry — drives the OS/Product picker so the user can
   // pick what kind of asset this is, and the benchmark matcher resolves the
@@ -517,7 +544,8 @@ export function AssetModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <FormSection id="basics" title="Basics" hint="What the asset is" flash={flash}>
             {/* Row 1: Name + Description */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
               <div>
@@ -541,7 +569,6 @@ export function AssetModal({
                 />
               </div>
             </div>
-
             {/* Asset Type */}
             <div className="mb-3">
               <label className="block text-xs font-medium text-slate-600 mb-1">Asset Type *</label>
@@ -579,7 +606,6 @@ export function AssetModal({
                 })}
               </div>
             </div>
-
             {show.repo ? (
               /* A repo's scannable address IS its clone URL — stored in host_name
                  (via formData.component), ip_address left empty. The vuln scanner
@@ -626,7 +652,64 @@ export function AssetModal({
               )}
             </div>
             )}
+            {/* Sub-components */}
+            {subComponentSuggestions.length > 0 && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Sub-components</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {subComponentSuggestions.map((subComponent) => {
+                    const isSelected = formData.sub_components.includes(subComponent);
+                    return (
+                      <button
+                        key={subComponent}
+                        type="button"
+                        onClick={() => toggleSubComponent(subComponent)}
+                        className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                          isSelected
+                            ? 'border-blue-400 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {subComponent}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Custom sub-component */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-slate-600 mb-0.5">Custom Sub-component</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSubComponent}
+                  onChange={(e) => setCustomSubComponent(e.target.value)}
+                  className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                  placeholder="e.g., WiFi Controller"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSubComponent(); } }}
+                />
+                <button type="button" onClick={addCustomSubComponent} className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
+                  Add
+                </button>
+              </div>
+              {formData.sub_components.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {formData.sub_components.map((subComponent) => (
+                    <span key={subComponent} className="inline-flex items-center gap-1 rounded-full border border-blue-400 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                      {subComponent}
+                      <button type="button" onClick={() => toggleSubComponent(subComponent)} className="text-blue-500 hover:text-blue-700" aria-label={`Remove ${subComponent}`}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            </FormSection>
 
+            {(show.hardware || show.os) && (
+            <FormSection id="technical" title="Technical profile" hint="Hardware and OS — auto-filled by scans" flash={flash}>
             {/* Hardware — infrastructure only (servers/network/hardware). Also
                 auto-populated by agent heartbeat or agentless (WinRM/SSH) scan.
                 Kept editable for manual entry. */}
@@ -643,7 +726,6 @@ export function AssetModal({
               </div>
             </div>
             )}
-
             {/* OS / Product picker — drives benchmark matching. Without
                 this, manually-added assets land with os_normalized=NULL and
                 the Host-Applications panel shows 'no benchmark' + no
@@ -698,296 +780,10 @@ export function AssetModal({
               )}
             </div>
             )}
-
-            {/* Sub-components */}
-            {subComponentSuggestions.length > 0 && (
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Sub-components</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {subComponentSuggestions.map((subComponent) => {
-                    const isSelected = formData.sub_components.includes(subComponent);
-                    return (
-                      <button
-                        key={subComponent}
-                        type="button"
-                        onClick={() => toggleSubComponent(subComponent)}
-                        className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                          isSelected
-                            ? 'border-blue-400 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        {subComponent}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+            </FormSection>
             )}
 
-            {/* Custom sub-component */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-600 mb-0.5">Custom Sub-component</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customSubComponent}
-                  onChange={(e) => setCustomSubComponent(e.target.value)}
-                  className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                  placeholder="e.g., WiFi Controller"
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSubComponent(); } }}
-                />
-                <button type="button" onClick={addCustomSubComponent} className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50">
-                  Add
-                </button>
-              </div>
-              {formData.sub_components.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {formData.sub_components.map((subComponent) => (
-                    <span key={subComponent} className="inline-flex items-center gap-1 rounded-full border border-blue-400 bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
-                      {subComponent}
-                      <button type="button" onClick={() => toggleSubComponent(subComponent)} className="text-blue-500 hover:text-blue-700" aria-label={`Remove ${subComponent}`}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-slate-200 pt-3 mt-1">
-              {/* Row: Vendor + Location — vendor for SaaS/cloud/data/third-party;
-                  location for on-prem infrastructure/data. */}
-              {(show.vendor || show.location) && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
-                {show.vendor && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Vendor</label>
-                  <ComboBoxInput
-                    value={formData.vendor}
-                    onChange={(v) => setFormData({ ...formData, vendor: v })}
-                    options={VENDOR_SUGGESTIONS}
-                    placeholder="Search or type a vendor…"
-                    ariaLabel="Vendor"
-                  />
-                </div>
-                )}
-                {show.location && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Location</label>
-                  <ComboBoxInput
-                    value={formData.location}
-                    onChange={(v) => setFormData({ ...formData, location: v })}
-                    options={LOCATION_SUGGESTIONS}
-                    placeholder="Search or type a location…"
-                    ariaLabel="Location"
-                  />
-                </div>
-                )}
-              </div>
-              )}
-
-              {/* Row: Asset Value (criticality is now derived — see below) */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Asset Value (USD)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="number"
-                      value={formData.valuation || ''}
-                      onChange={(e) => setFormData({ ...formData, valuation: e.target.value ? Number(e.target.value) : null })}
-                      className="w-full rounded border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
-                </div>
-                {show.network && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Network Segment</label>
-                  <ComboBoxInput
-                    value={formData.network_segment}
-                    onChange={(v) => setFormData({ ...formData, network_segment: v })}
-                    options={NETWORK_SEGMENT_SUGGESTIONS}
-                    placeholder="Search or type a segment…"
-                    ariaLabel="Network segment"
-                  />
-                </div>
-                )}
-              </div>
-
-              {/* Row: PCI DSS + Status(edit) */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">PCI DSS Scope</label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, cde_environment: !formData.cde_environment })}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                        formData.cde_environment ? 'bg-emerald-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
-                          formData.cde_environment ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span className="text-xs text-slate-700">CDE Environment</span>
-                  </label>
-                </div>
-                {isEditMode && (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Status</label>
-                    <ComboBoxInput
-                      value={formData.status}
-                      onChange={(v) => setFormData({ ...formData, status: (v || 'active') as typeof formData.status })}
-                      options={STATUS_OPTIONS}
-                      allowCustom={false}
-                      displayLabelInsteadOfValue
-                      placeholder="Select status…"
-                      ariaLabel="Status"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* PCI DSS attributes — revealed when the asset is in the CDE.
-                  Shared component so the IT Assets form and the PCI Cardholder
-                  Data Inventory show identical fields. */}
-              {formData.cde_environment && (
-                <div ref={pciRef} className="mb-3">
-                  <PciAttributesFields
-                    value={formData.pci_dss}
-                    onChange={(patch) => setFormData({ ...formData, pci_dss: { ...formData.pci_dss, ...patch } as Record<string, string> })}
-                  />
-                </div>
-              )}
-
-              {/* Row: HIPAA ePHI scope — mirror of the PCI CDE toggle above. */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">HIPAA Scope</label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, ephi_environment: !formData.ephi_environment })}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                        formData.ephi_environment ? 'bg-indigo-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
-                          formData.ephi_environment ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span className="text-xs text-slate-700">ePHI Environment</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* HIPAA ePHI attributes — revealed when the asset holds ePHI.
-                  Shared component so the IT Assets form and the HIPAA ePHI
-                  Inventory show identical fields. */}
-              {formData.ephi_environment && (
-                <div className="mb-3">
-                  <HipaaAttributesFields
-                    value={formData.hipaa}
-                    onChange={(patch) => setFormData({ ...formData, hipaa: { ...formData.hipaa, ...patch } as Record<string, string> })}
-                  />
-                </div>
-              )}
-
-              {/* CIA Ratings — primary input to derived criticality */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  CIA Ratings <span className="text-slate-400 font-normal">(highest of the three drives criticality)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <RatingSelector
-                    label="Confidentiality"
-                    value={formData.confidentiality_rating}
-                    onChange={(v) => setFormData({ ...formData, confidentiality_rating: v })}
-                    color="bg-blue-600"
-                  />
-                  <RatingSelector
-                    label="Integrity"
-                    value={formData.integrity_rating}
-                    onChange={(v) => setFormData({ ...formData, integrity_rating: v })}
-                    color="bg-green-600"
-                  />
-                  <RatingSelector
-                    label="Availability"
-                    value={formData.availability_rating}
-                    onChange={(v) => setFormData({ ...formData, availability_rating: v })}
-                    color="bg-yellow-600"
-                  />
-                </div>
-              </div>
-
-              {/* Data classification + Internet-facing — secondary inputs */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Data Classification</label>
-                  <ComboBoxInput
-                    value={formData.data_classification}
-                    onChange={(v) => setFormData({ ...formData, data_classification: (v || '') as typeof formData.data_classification })}
-                    options={DATA_CLASSIFICATION_OPTIONS}
-                    allowCustom={false}
-                    displayLabelInsteadOfValue
-                    placeholder="None — search to pick…"
-                    ariaLabel="Data classification"
-                  />
-                </div>
-                {show.internet && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Internet-Facing</label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, internet_facing: !formData.internet_facing })}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                        formData.internet_facing ? 'bg-amber-500' : 'bg-slate-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
-                          formData.internet_facing ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span className="text-xs text-slate-700">{formData.internet_facing ? 'Exposed to the public internet' : 'Internal only'}</span>
-                  </label>
-                </div>
-                )}
-              </div>
-
-              {/* Business function — structured catalogue, drives criticality
-                  boost. Searchable + supports free-text for teams whose
-                  function isn't in the seeded catalogue. */}
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-slate-600 mb-0.5">Business Function</label>
-                <ComboBoxInput
-                  value={formData.business_function}
-                  onChange={(v) => setFormData({ ...formData, business_function: v })}
-                  options={Object.entries(businessFunctionGroups).flatMap(([group, items]) =>
-                    items.map((item) => ({
-                      value: item.id,
-                      label: item.label,
-                      group,
-                      hint: item.high_impact ? '⬆ boosts criticality' : undefined,
-                    })),
-                  )}
-                  placeholder="Search or type a function…"
-                  emptyText="No matches — Enter to use the typed value as a custom function."
-                  ariaLabel="Business function"
-                  displayLabelInsteadOfValue
-                />
-              </div>
-
+            <FormSection id="identity" title="Identity & Ownership" hint="Who owns it, where it lives, what it does" flash={flash}>
               {/* Ownership chain — people & team responsible (all asset types). */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
                 <div>
@@ -1019,7 +815,6 @@ export function AssetModal({
                   </select>
                 </div>
               </div>
-
               {/* CMDB details — team / department / assigned user / environment / lifecycle. */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
                 <div>
@@ -1057,30 +852,201 @@ export function AssetModal({
                   </select>
                 </div>
               </div>
+<div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Data Classification</label>
+                  <ComboBoxInput
+                    value={formData.data_classification}
+                    onChange={(v) => setFormData({ ...formData, data_classification: (v || '') as typeof formData.data_classification })}
+                    options={DATA_CLASSIFICATION_OPTIONS}
+                    allowCustom={false}
+                    displayLabelInsteadOfValue
+                    placeholder="None — search to pick…"
+                    ariaLabel="Data classification"
+                  />
+                </div>
+                {show.location && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Location</label>
+                  <ComboBoxInput
+                    value={formData.location}
+                    onChange={(v) => setFormData({ ...formData, location: v })}
+                    options={LOCATION_SUGGESTIONS}
+                    placeholder="Search or type a location…"
+                    ariaLabel="Location"
+                  />
+                </div>
+                )}
+                {isEditMode && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Status</label>
+                    <ComboBoxInput
+                      value={formData.status}
+                      onChange={(v) => setFormData({ ...formData, status: (v || 'active') as typeof formData.status })}
+                      options={STATUS_OPTIONS}
+                      allowCustom={false}
+                      displayLabelInsteadOfValue
+                      placeholder="Select status…"
+                      ariaLabel="Status"
+                    />
+                  </div>
+                )}
+</div>
+              {/* Business function — structured catalogue, drives criticality
+                  boost. Searchable + supports free-text for teams whose
+                  function isn't in the seeded catalogue. */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-slate-600 mb-0.5">Business Function</label>
+                <ComboBoxInput
+                  value={formData.business_function}
+                  onChange={(v) => setFormData({ ...formData, business_function: v })}
+                  options={Object.entries(businessFunctionGroups).flatMap(([group, items]) =>
+                    items.map((item) => ({
+                      value: item.id,
+                      label: item.label,
+                      group,
+                      hint: item.high_impact ? '⬆ boosts criticality' : undefined,
+                    })),
+                  )}
+                  placeholder="Search or type a function…"
+                  emptyText="No matches — Enter to use the typed value as a custom function."
+                  ariaLabel="Business function"
+                  displayLabelInsteadOfValue
+                />
+              </div>
+            </FormSection>
 
-              {/* Procurement & Cost */}
-              <div className="border-t border-slate-200 pt-3 mb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Procurement &amp; Cost</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Purchase Cost (USD)</label>
-                    <input type="number" min="0" value={formData.purchase_cost ?? ''} onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value ? Number(e.target.value) : null })} placeholder="0" className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Purchase Date</label>
-                    <input type="date" value={formData.purchase_date} onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Warranty Expiry</label>
-                    <input type="date" value={formData.warranty_expiry} onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-0.5">End of Life</label>
-                    <input type="date" value={formData.eol_date} onChange={(e) => setFormData({ ...formData, eol_date: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
-                  </div>
+            <FormSection id="compliance" title="Compliance scope" hint="PCI DSS and HIPAA" flash={flash}>
+<div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">PCI DSS Scope</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, cde_environment: !formData.cde_environment })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        formData.cde_environment ? 'bg-emerald-500' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                          formData.cde_environment ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs text-slate-700">CDE Environment</span>
+                  </label>
+                </div>
+</div>
+              {/* PCI DSS attributes — revealed when the asset is in the CDE.
+                  Shared component so the IT Assets form and the PCI Cardholder
+                  Data Inventory show identical fields. */}
+              {formData.cde_environment && (
+                <div className="mb-3">
+                  <PciAttributesFields
+                    value={formData.pci_dss}
+                    onChange={(patch) => setFormData({ ...formData, pci_dss: { ...formData.pci_dss, ...patch } as Record<string, string> })}
+                  />
+                </div>
+              )}
+              {/* Row: HIPAA ePHI scope — mirror of the PCI CDE toggle above. */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">HIPAA Scope</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, ephi_environment: !formData.ephi_environment })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        formData.ephi_environment ? 'bg-indigo-500' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                          formData.ephi_environment ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs text-slate-700">ePHI Environment</span>
+                  </label>
                 </div>
               </div>
 
+              {/* HIPAA ePHI attributes — revealed when the asset holds ePHI.
+                  Shared component so the IT Assets form and the HIPAA ePHI
+                  Inventory show identical fields. */}
+              {formData.ephi_environment && (
+                <div className="mb-3">
+                  <HipaaAttributesFields
+                    value={formData.hipaa}
+                    onChange={(patch) => setFormData({ ...formData, hipaa: { ...formData.hipaa, ...patch } as Record<string, string> })}
+                  />
+                </div>
+              )}
+            </FormSection>
+
+            <FormSection id="risk" title="Risk & criticality" hint="Inputs to the calculated criticality" flash={flash}>
+              {/* CIA Ratings — primary input to derived criticality */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  CIA Ratings <span className="text-slate-400 font-normal">(highest of the three drives criticality)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <RatingSelector
+                    label="Confidentiality"
+                    value={formData.confidentiality_rating}
+                    onChange={(v) => setFormData({ ...formData, confidentiality_rating: v })}
+                    color="bg-blue-600"
+                  />
+                  <RatingSelector
+                    label="Integrity"
+                    value={formData.integrity_rating}
+                    onChange={(v) => setFormData({ ...formData, integrity_rating: v })}
+                    color="bg-green-600"
+                  />
+                  <RatingSelector
+                    label="Availability"
+                    value={formData.availability_rating}
+                    onChange={(v) => setFormData({ ...formData, availability_rating: v })}
+                    color="bg-yellow-600"
+                  />
+                </div>
+              </div>
+<div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+                {show.internet && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Internet-Facing</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, internet_facing: !formData.internet_facing })}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        formData.internet_facing ? 'bg-amber-500' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                          formData.internet_facing ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs text-slate-700">{formData.internet_facing ? 'Exposed to the public internet' : 'Internal only'}</span>
+                  </label>
+                </div>
+                )}
+                {show.network && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Network Segment</label>
+                  <ComboBoxInput
+                    value={formData.network_segment}
+                    onChange={(v) => setFormData({ ...formData, network_segment: v })}
+                    options={NETWORK_SEGMENT_SUGGESTIONS}
+                    placeholder="Search or type a segment…"
+                    ariaLabel="Network segment"
+                  />
+                </div>
+                )}
+</div>
               {/* Derived criticality — live preview + override */}
               <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/40 p-3 mb-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1151,7 +1117,56 @@ export function AssetModal({
                   </div>
                 )}
               </div>
-            </div>
+            </FormSection>
+
+            <FormSection id="procurement" title="Procurement & Cost" hint="Finance / CMDB" flash={flash}>
+<div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-3">
+                {show.vendor && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Vendor</label>
+                  <ComboBoxInput
+                    value={formData.vendor}
+                    onChange={(v) => setFormData({ ...formData, vendor: v })}
+                    options={VENDOR_SUGGESTIONS}
+                    placeholder="Search or type a vendor…"
+                    ariaLabel="Vendor"
+                  />
+                </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-0.5">Asset Value (USD)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="number"
+                      value={formData.valuation || ''}
+                      onChange={(e) => setFormData({ ...formData, valuation: e.target.value ? Number(e.target.value) : null })}
+                      className="w-full rounded border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Purchase Cost (USD)</label>
+                    <input type="number" min="0" value={formData.purchase_cost ?? ''} onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value ? Number(e.target.value) : null })} placeholder="0" className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Purchase Date</label>
+                    <input type="date" value={formData.purchase_date} onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">Warranty Expiry</label>
+                    <input type="date" value={formData.warranty_expiry} onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-0.5">End of Life</label>
+                    <input type="date" value={formData.eol_date} onChange={(e) => setFormData({ ...formData, eol_date: e.target.value })} className="w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none" />
+                  </div>
+                </div>
+            </FormSection>
           </div>
 
                     <div className="flex-shrink-0 flex justify-end gap-3 border-t border-slate-200 px-6 py-4">

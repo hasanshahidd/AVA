@@ -438,6 +438,7 @@ export default function AssetsPage() {
           isLoading={updateMutation.isPending}
           initialData={editingAsset}
           forceCde={editPci}
+          focusSection={editPci ? 'compliance' : undefined}
         />
       )}
 
