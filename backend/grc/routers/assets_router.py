@@ -482,7 +482,7 @@ _BULK_FIELD_ALIASES = {"type": "asset_type", "lifecycle": "lifecycle_state"}
 _BULK_ALLOWED_FIELDS = {
     "criticality", "status", "lifecycle_state", "asset_type", "environment",
     "department", "data_classification", "owner_id", "primary_owner_id",
-    "internet_facing", "cde_environment",
+    "internet_facing", "cde_environment", "ephi_environment",
 }
 
 
