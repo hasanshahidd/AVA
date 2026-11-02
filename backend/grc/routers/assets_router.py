@@ -2487,6 +2487,8 @@ def get_asset_detail(
         pci_dss=_g("pci_dss"),
         ephi_environment=_g("ephi_environment"),
         hipaa=_g("hipaa"),
+        criticality_manual_override=_g("criticality_manual_override"),
+        criticality_override_reason=_g("criticality_override_reason"),
         manufacturer=_g("manufacturer"),
         model=_g("model"),
         serial_number=_g("serial_number"),

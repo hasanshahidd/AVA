@@ -14,6 +14,7 @@ import { AssetsWorkspace } from './_workspace/AssetsWorkspace';
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import InventoryRedesign from './_workspace/InventoryRedesign';
 import { RowActionsMenu } from './_workspace/RowActionsMenu';
+import PciScopeDialog from './_workspace/PciScopeDialog';
 import InventoryOverview from './_overview/InventoryOverview';
 import { SmartImportWizard } from './_import/SmartImportWizard';
 import {
@@ -83,6 +84,7 @@ export default function AssetsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<ITAsset | null>(null);
+  const [pciAsset, setPciAsset] = useState<ITAsset | null>(null);
   const [expandedAsset, setExpandedAsset] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
@@ -192,6 +194,16 @@ export default function AssetsPage() {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assets-dashboard'] });
       setEditingAsset(null);
+    },
+  });
+
+  const pciScopeMutation = useMutation({
+    mutationFn: ({ id, pci_dss }: { id: number; pci_dss: Record<string, string> }) =>
+      assetsApi.update(id, { cde_environment: true, pci_dss } as Partial<ITAsset>),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-facets'] });
+      setPciAsset(null);
     },
   });
 
@@ -405,6 +417,7 @@ export default function AssetsPage() {
         onConnect={(asset) => handleConnect(noopEvent, asset)}
         onBulkDelete={(ids) => bulkDeleteMutation.mutate(ids)}
         onBulkUpdate={(ids, patch) => bulkUpdateMutation.mutate({ ids, patch })}
+        onMarkPci={(asset) => setPciAsset(asset)}
         onBulkConnect={(ids) => {
           const next = new Set(ids);
           setSelectedAssetIds(next);
@@ -434,6 +447,15 @@ export default function AssetsPage() {
           onSave={(data) => updateMutation.mutate({ id: editingAsset.id, data })}
           isLoading={updateMutation.isPending}
           initialData={editingAsset}
+        />
+      )}
+
+      {pciAsset && (
+        <PciScopeDialog
+          asset={pciAsset}
+          onClose={() => setPciAsset(null)}
+          onSave={(pci_dss) => pciScopeMutation.mutate({ id: pciAsset.id, pci_dss })}
+          isSaving={pciScopeMutation.isPending}
         />
       )}
 
