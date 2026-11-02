@@ -1012,6 +1012,7 @@ export default function AssetDetailPage() {
                 assetId={assetId}
                 asset={asset}
                 onOpenCompliance={() => setActiveTab('compliance')}
+                onEditCia={canEdit ? () => { setEditSection('risk'); setShowEditModal(true); } : undefined}
                 coveragePctFromApi={coverage?.coverage_percentage ?? asset.coverage_percentage ?? null}
                 allControls={(allControls || []).map((c) => ({
                   id: c.id,
