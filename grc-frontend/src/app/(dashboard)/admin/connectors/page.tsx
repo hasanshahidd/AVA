@@ -8,8 +8,8 @@ import {
   Cloud,
 } from 'lucide-react';
 import {
-  connectorsApi, integrationsApi, cloudConnectorsApi,
-  type ConnectorProviderMeta, type ConnectorRow, type CloudConnector,
+  connectorsApi, integrationsApi, cloudConnectorsApi, ssoApi,
+  type ConnectorProviderMeta, type ConnectorRow, type CloudConnector, type LdapConfig,
 } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { AwsIcon, AzureIcon, GcpIcon, NessusIcon } from '@/components/integrations/ProviderIcons';
@@ -151,6 +151,20 @@ export default function ConnectorsAdminPage() {
           </section>
         );
       })}
+
+      {/* Directory — import users from on-prem Active Directory / LDAP. */}
+      {catalog && (
+        <section className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Fingerprint className="h-4 w-4 text-slate-500" />
+            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Directory</h3>
+            <span className="text-xs text-slate-400">— Import users from your on-prem Active Directory / LDAP into User Management.</span>
+          </div>
+          <div className="grid grid-cols-1 items-start gap-2">
+            <LdapCard />
+          </div>
+        </section>
+      )}
 
       {/* Cloud posture — each provider shows its own connectors inline. */}
       {catalog && (
@@ -859,6 +873,113 @@ function SetupModal({ provider, existing, onClose }: SetupModalProps) {
             )}
           </button>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+
+// --- On-prem Active Directory / LDAP directory connector --------------
+// Save the server + base DN + bind DN; the bind password is entered per
+// Test / Sync and never stored. Sync imports users into User Management.
+function LdapCard() {
+  const [cfg, setCfg] = useState<Partial<LdapConfig>>({ ldap_user_filter: '(&(objectClass=user)(objectCategory=person))' });
+  const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState<null | 'save' | 'test' | 'sync'>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    ssoApi.getLdap().then((r) => { if (r.data?.configured) setCfg(r.data); }).catch(() => {});
+  }, []);
+
+  const set = (k: keyof LdapConfig, v: string) => setCfg((p) => ({ ...p, [k]: v }));
+  const errText = (e: any) => e?.response?.data?.detail || e?.message || 'Request failed';
+
+  const save = async () => {
+    setBusy('save'); setMsg(null);
+    try {
+      const r = await ssoApi.saveLdap({
+        ldap_server: cfg.ldap_server || '',
+        ldap_base_dn: cfg.ldap_base_dn || '',
+        ldap_bind_dn: cfg.ldap_bind_dn || '',
+        ldap_user_filter: cfg.ldap_user_filter || '',
+        is_enabled: true,
+      });
+      setCfg(r.data);
+      setMsg({ ok: true, text: 'Connection saved.' });
+    } catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
+  };
+  const test = async () => {
+    if (!pw) { setMsg({ ok: false, text: 'Enter the bind password to test.' }); return; }
+    setBusy('test'); setMsg(null);
+    try { const r = await ssoApi.testLdap(pw); setMsg({ ok: true, text: r.data.message || 'Bind succeeded.' }); }
+    catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
+  };
+  const sync = async () => {
+    if (!pw) { setMsg({ ok: false, text: 'Enter the bind password to sync.' }); return; }
+    setBusy('sync'); setMsg(null);
+    try {
+      const r = await ssoApi.syncLdap(pw);
+      setMsg({ ok: true, text: `Imported ${r.data.total_imported} user(s) - ${r.data.created} new, ${r.data.updated} updated, ${r.data.skipped} skipped.` });
+    } catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
+  };
+
+  const field = (label: string, key: keyof LdapConfig, placeholder: string) => (
+    <div>
+      <label className="block text-[11px] font-medium text-slate-500 mb-0.5">{label}</label>
+      <input
+        value={(cfg[key] as string) || ''}
+        onChange={(e) => set(key, e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-primary-500"
+      />
+    </div>
+  );
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Fingerprint className="h-4 w-4 text-slate-500" />
+        <span className="text-sm font-semibold text-slate-800">Active Directory / LDAP</span>
+        {cfg.last_test_status === 'ok' && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600"><CheckCircle className="h-3 w-3" /> bind ok</span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {field('LDAP server', 'ldap_server', 'ldap://dc01.bank.local:389')}
+        {field('Base DN', 'ldap_base_dn', 'DC=bank,DC=local')}
+        {field('Bind DN', 'ldap_bind_dn', 'CN=svc-ava,OU=Service,DC=bank,DC=local')}
+        {field('User filter', 'ldap_user_filter', '(&(objectClass=user)(objectCategory=person))')}
+      </div>
+      <div className="mt-2">
+        <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Bind password <span className="text-slate-400">(used for Test / Sync, never stored)</span></label>
+        <input
+          type="password"
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          placeholder="********"
+          className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-primary-500"
+        />
+      </div>
+      {msg && (
+        <div className={`mt-2 flex items-start gap-1.5 text-xs ${msg.ok ? 'text-emerald-600' : 'text-rose-600'}`}>
+          {msg.ok ? <CheckCircle className="h-3.5 w-3.5 mt-px shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />}
+          <span>{msg.text}</span>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={save} disabled={busy !== null}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-[color:var(--color-on-base,#0a0a0a)] rounded text-sm disabled:opacity-50">
+          {busy === 'save' && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+        <button type="button" onClick={test} disabled={busy !== null}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded text-sm disabled:opacity-50">
+          {busy === 'test' && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Test connection
+        </button>
+        <button type="button" onClick={sync} disabled={busy !== null}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded text-sm disabled:opacity-50">
+          {busy === 'sync' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Sync users
+        </button>
       </div>
     </div>
   );

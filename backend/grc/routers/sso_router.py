@@ -1229,3 +1229,234 @@ def sso_callback(
         return _login_redirect(request, "sso_invalid_callback", target_tenant_slug)
     finally:
         tenant_db.close()
+
+
+# ===========================================================================
+# On-prem Active Directory / LDAP connector
+# ---------------------------------------------------------------------------
+# A real directory connector: save the server + search base + bind DN, test the
+# bind, and SYNC (import) users into this tenant's user table. The bind password
+# is NEVER stored -- it is supplied per test / per sync. Imported users get an
+# unloginable password hash (directory-sync scope); LDAP sign-in is a later step.
+# ===========================================================================
+
+PROVIDER_LDAP = "ldap"
+_DEFAULT_LDAP_USER_FILTER = "(&(objectClass=user)(objectCategory=person))"
+_LDAP_ATTRS = ["mail", "userPrincipalName", "sAMAccountName", "uid", "displayName", "cn"]
+
+
+class LdapConfigUpdate(BaseModel):
+    ldap_server: Optional[str] = None
+    ldap_base_dn: Optional[str] = None
+    ldap_bind_dn: Optional[str] = None
+    ldap_user_filter: Optional[str] = None
+    is_enabled: Optional[bool] = None
+    auto_provision_on_signin: Optional[bool] = None
+    allowed_email_domains: Optional[List[str]] = None
+
+
+class LdapSecretBody(BaseModel):
+    bind_password: str
+
+
+def _get_ldap_config(tenant_db: Session) -> Optional[IdentityProviderConfig]:
+    return tenant_db.query(IdentityProviderConfig).filter(
+        IdentityProviderConfig.provider == PROVIDER_LDAP,
+    ).first()
+
+
+def _serialize_ldap(c: IdentityProviderConfig) -> Dict[str, Any]:
+    return {
+        "configured": True,
+        "provider": c.provider,
+        "is_enabled": c.is_enabled,
+        "ldap_server": c.ldap_server,
+        "ldap_base_dn": c.ldap_base_dn,
+        "ldap_bind_dn": c.ldap_bind_dn,
+        "ldap_user_filter": c.ldap_user_filter or _DEFAULT_LDAP_USER_FILTER,
+        "auto_provision_on_signin": c.auto_provision_on_signin,
+        "allowed_email_domains": c.allowed_email_domains or [],
+        "last_tested_at": c.last_tested_at.isoformat() if c.last_tested_at else None,
+        "last_test_status": c.last_test_status,
+        "last_test_message": c.last_test_message,
+        "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+    }
+
+
+def _ldap_bind(cfg: IdentityProviderConfig, bind_password: str):
+    """Open an authenticated LDAP connection, or raise HTTPException(400)."""
+    from ldap3 import Server, Connection, NONE
+    from ldap3.core.exceptions import LDAPException
+    if not cfg.ldap_server or not cfg.ldap_bind_dn:
+        raise HTTPException(status_code=400, detail="Set the LDAP server and bind DN first")
+    try:
+        server = Server(cfg.ldap_server, get_info=NONE, connect_timeout=10)
+        conn = Connection(
+            server, user=cfg.ldap_bind_dn, password=bind_password,
+            auto_bind=True, receive_timeout=20,
+        )
+        return conn
+    except LDAPException as exc:
+        raise HTTPException(status_code=400, detail=f"LDAP bind failed: {exc}")
+    except Exception as exc:  # network / TLS / timeout
+        raise HTTPException(status_code=400, detail=f"Could not reach the LDAP server: {exc}")
+
+
+@router.get("/ldap")
+def get_ldap_config(
+    tenant_db: Session = Depends(get_tenant_db),
+    grc_auth_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    _require_admin(tenant_db, grc_auth_token, authorization)
+    cfg = _get_ldap_config(tenant_db)
+    if not cfg:
+        return {"configured": False, "is_enabled": False,
+                "ldap_user_filter": _DEFAULT_LDAP_USER_FILTER}
+    return _serialize_ldap(cfg)
+
+
+@router.put("/ldap")
+def update_ldap_config(
+    body: LdapConfigUpdate,
+    tenant_db: Session = Depends(get_tenant_db),
+    grc_auth_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    admin = _require_admin(tenant_db, grc_auth_token, authorization)
+    cfg = _get_ldap_config(tenant_db)
+    if not cfg:
+        tenant_row = tenant_db.query(Tenant).first()
+        cfg = IdentityProviderConfig(
+            tenant_id=tenant_row.id if tenant_row else 0,
+            provider=PROVIDER_LDAP,
+            created_by_id=getattr(admin, "id", None),
+        )
+        tenant_db.add(cfg)
+    if body.ldap_server is not None:
+        cfg.ldap_server = body.ldap_server.strip() or None
+    if body.ldap_base_dn is not None:
+        cfg.ldap_base_dn = body.ldap_base_dn.strip() or None
+    if body.ldap_bind_dn is not None:
+        cfg.ldap_bind_dn = body.ldap_bind_dn.strip() or None
+    if body.ldap_user_filter is not None:
+        cfg.ldap_user_filter = body.ldap_user_filter.strip() or None
+    if body.is_enabled is not None:
+        cfg.is_enabled = body.is_enabled
+    if body.auto_provision_on_signin is not None:
+        cfg.auto_provision_on_signin = body.auto_provision_on_signin
+    if body.allowed_email_domains is not None:
+        cfg.allowed_email_domains = body.allowed_email_domains
+    tenant_db.commit()
+    tenant_db.refresh(cfg)
+    return _serialize_ldap(cfg)
+
+
+@router.post("/ldap/test")
+def test_ldap_config(
+    body: LdapSecretBody,
+    tenant_db: Session = Depends(get_tenant_db),
+    grc_auth_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    _require_admin(tenant_db, grc_auth_token, authorization)
+    cfg = _get_ldap_config(tenant_db)
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Save the LDAP connection first")
+    conn = _ldap_bind(cfg, body.bind_password)
+    sample = 0
+    try:
+        if cfg.ldap_base_dn:
+            filt = cfg.ldap_user_filter or _DEFAULT_LDAP_USER_FILTER
+            from ldap3 import SUBTREE
+            conn.search(cfg.ldap_base_dn, filt, search_scope=SUBTREE,
+                        attributes=["mail"], paged_size=50)
+            sample = len(conn.entries)
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+    cfg.last_tested_at = datetime.utcnow()
+    cfg.last_test_status = "ok"
+    if cfg.ldap_base_dn:
+        cfg.last_test_message = f"Bind succeeded; {sample}+ user object(s) visible under the base DN"
+    else:
+        cfg.last_test_message = "Bind succeeded"
+    tenant_db.commit()
+    return {"ok": True, "sample_count": sample, "message": cfg.last_test_message}
+
+
+@router.post("/ldap/sync")
+def sync_ldap_users(
+    body: LdapSecretBody,
+    tenant_db: Session = Depends(get_tenant_db),
+    grc_auth_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+):
+    _require_admin(tenant_db, grc_auth_token, authorization)
+    cfg = _get_ldap_config(tenant_db)
+    if not cfg or not cfg.ldap_server or not cfg.ldap_base_dn:
+        raise HTTPException(status_code=400, detail="Set the LDAP server and base DN first")
+    conn = _ldap_bind(cfg, body.bind_password)
+    filt = cfg.ldap_user_filter or _DEFAULT_LDAP_USER_FILTER
+    allowed = list(cfg.allowed_email_domains or [])
+    created = updated = skipped = 0
+    try:
+        from ldap3 import SUBTREE
+        entries = conn.extend.standard.paged_search(
+            search_base=cfg.ldap_base_dn, search_filter=filt,
+            search_scope=SUBTREE, attributes=_LDAP_ATTRS,
+            paged_size=500, generator=True,
+        )
+        for entry in entries:
+            if entry.get("type") != "searchResEntry":
+                continue
+            attrs = entry.get("attributes", {}) or {}
+
+            def _g(k):
+                v = attrs.get(k)
+                if isinstance(v, (list, tuple)):
+                    v = v[0] if v else None
+                return str(v).strip() if v else None
+
+            email = (_g("mail") or _g("userPrincipalName") or "").lower().strip()
+            if not email or "@" not in email:
+                skipped += 1
+                continue
+            if allowed and not _domain_allowed(email, allowed):
+                skipped += 1
+                continue
+            username = (_g("sAMAccountName") or _g("uid") or email.split("@")[0]).strip()
+            display_name = _g("displayName") or _g("cn") or email
+            dn = entry.get("dn") or email
+            existing = tenant_db.query(GRCUser).filter(
+                ((GRCUser.external_provider == PROVIDER_LDAP) & (GRCUser.external_id == dn))
+                | (GRCUser.email == email)
+            ).first()
+            if existing:
+                if not existing.external_id:
+                    existing.external_provider = PROVIDER_LDAP
+                    existing.external_id = dn
+                if display_name:
+                    existing.display_name = display_name
+                updated += 1
+            else:
+                tenant_db.add(GRCUser(
+                    username=username or email,
+                    email=email,
+                    password_hash=_make_unloginable_hash(),
+                    display_name=display_name,
+                    is_active=True,
+                    external_provider=PROVIDER_LDAP,
+                    external_id=dn,
+                ))
+                created += 1
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+    tenant_db.commit()
+    return {"created": created, "updated": updated, "skipped": skipped,
+            "total_imported": created + updated}

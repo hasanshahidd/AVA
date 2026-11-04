@@ -39,6 +39,9 @@ class IdentityProviderConfig(Base):
     # NEVER stored — it is supplied per-sync. Lives on provider='ldap' row.
     ldap_server = Column(String(255), nullable=True)
     ldap_base_dn = Column(String(500), nullable=True)
+    ldap_bind_dn = Column(String(500), nullable=True)
+    # LDAP search filter for user objects; blank → a sensible default per bind.
+    ldap_user_filter = Column(String(500), nullable=True)
 
     # Tier-2 IGA governance connector (SailPoint, Saviynt, …): the API base URL +
     # vendor. The client secret is NEVER stored — supplied per-sync. Lives on the

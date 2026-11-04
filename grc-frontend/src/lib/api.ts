@@ -3823,7 +3823,8 @@ export const adminApi = {
     division?: string;
     designation?: string;
     is_active?: boolean; 
-    role_ids?: number[] 
+    role_ids?: number[];
+    password?: string;
   }) => apiClient.put(`/admin/users/${id}`, data),
   deleteUser: (id: number) => apiClient.delete(`/admin/users/${id}`),
 
@@ -4028,7 +4029,27 @@ export const ssoApi = {
   createGroupMapping: (data: { entra_group_id: string; entra_group_name?: string; role_id: number }) =>
     apiClient.post<{ id: number; created?: boolean; duplicate?: boolean }>('/sso/group-mappings', data),
   deleteGroupMapping: (id: number) => apiClient.delete<{ deleted: boolean }>(`/sso/group-mappings/${id}`),
+  // On-prem Active Directory / LDAP directory connector
+  getLdap: () => apiClient.get<LdapConfig>('/sso/ldap'),
+  saveLdap: (data: Partial<LdapConfig>) => apiClient.put<LdapConfig>('/sso/ldap', data),
+  testLdap: (bind_password: string) =>
+    apiClient.post<{ ok: boolean; sample_count: number; message: string }>('/sso/ldap/test', { bind_password }),
+  syncLdap: (bind_password: string) =>
+    apiClient.post<{ created: number; updated: number; skipped: number; total_imported: number }>('/sso/ldap/sync', { bind_password }),
 };
+
+export interface LdapConfig {
+  configured: boolean;
+  is_enabled: boolean;
+  ldap_server?: string | null;
+  ldap_base_dn?: string | null;
+  ldap_bind_dn?: string | null;
+  ldap_user_filter?: string | null;
+  allowed_email_domains?: string[];
+  last_tested_at?: string | null;
+  last_test_status?: string | null;
+  last_test_message?: string | null;
+}
 
 export const tenantAuthApi = {
   login: (data: { username: string; password: string }, subdomain: string) => 
