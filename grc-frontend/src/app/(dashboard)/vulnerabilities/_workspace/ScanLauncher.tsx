@@ -9,10 +9,10 @@
  *
  * Styling reuses the pentest redesign CSS via a `.ptx` wrapper (same btn/lbl/mono/CSS-var classes).
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Globe, Server, KeyRound, Cloud, Code2, Boxes, Radar, Database, X, Check, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
-import { assetsApi, discoveryApi, vulnManagementApi } from '@/lib/api';
+import { Globe, Server, KeyRound, Cloud, Code2, Boxes, Radar, Database, X, Check, Loader2, ArrowRight, ShieldCheck, FolderUp } from 'lucide-react';
+import apiClient, { assetsApi, discoveryApi, vulnManagementApi } from '@/lib/api';
 import '../../pentest/_components/pentest-redesign.css';
 
 type SubLane = { key: string; label: string; Icon: any; fleet: string[]; tools: string };
@@ -52,6 +52,41 @@ const LANE_CRED_KINDS: Record<string, string[]> = {
 type AssetLite = { id: number; label: string; ip: string | null; type: string | null; fleet_lane: string | null };
 type CredLite = { id: number; name: string; kind: string; username?: string };
 
+/** FolderDropzone — pick a folder from disk for the Code/Repo lane (the alternative to a git URL).
+ *  Uses a directory file input; the whole tree is uploaded + SAST-scanned server-side like a clone. */
+function FolderDropzone({ files, folderName, onChange }: { files: File[]; folderName: string; onChange: (f: File[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // webkitdirectory/directory aren't typed input props — set them so a whole folder is pickable.
+    if (inputRef.current) { inputRef.current.setAttribute('webkitdirectory', ''); inputRef.current.setAttribute('directory', ''); }
+  }, []);
+  const totalKb = Math.round(files.reduce((t, f) => t + f.size, 0) / 1024);
+  return (
+    <div>
+      <input ref={inputRef} id="repo-folder-input" type="file" multiple style={{ display: 'none' }}
+        onChange={(e) => onChange(Array.from(e.target.files ?? []))} />
+      {files.length === 0 ? (
+        <label htmlFor="repo-folder-input"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--subtle)', padding: '26px 16px', textAlign: 'center' }}>
+          <FolderUp width={22} height={22} color="#94a3b8" />
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Choose a folder to scan</span>
+          <span style={{ fontSize: 10.5, color: 'var(--faint)' }}>Its source files are uploaded and SAST-scanned, just like a cloned repo.</span>
+        </label>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border)', borderRadius: 10, background: '#fff', padding: '10px 12px' }}>
+          <span style={{ display: 'grid', placeItems: 'center', height: 34, width: 34, flex: 'none', borderRadius: 8, background: '#eafaf1', color: '#1e7a42' }}><FolderUp width={18} height={18} /></span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{folderName || 'Selected folder'}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{files.length} file{files.length === 1 ? '' : 's'} · {totalKb.toLocaleString()} KB</div>
+          </div>
+          <label htmlFor="repo-folder-input" style={{ fontSize: 11, fontWeight: 600, color: 'var(--base)', cursor: 'pointer' }}>Change</label>
+          <button onClick={() => onChange([])} aria-label="Clear folder" style={{ display: 'grid', placeItems: 'center', height: 20, width: 20, border: 'none', background: 'transparent', color: 'var(--faint)', cursor: 'pointer' }}><X width={13} height={13} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ScanLauncher({ onClose, onStarted }: {
   onClose: () => void;
   onStarted: (assetId: number, jobId: number) => void;
@@ -77,6 +112,10 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const [credOff, setCredOff] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Code/Repo lane only: paste a git URL (chip field) OR upload a folder from disk. An uploaded
+  // folder is staged server-side and scanned via scan.adhoc exactly like a repo URL.
+  const [repoMode, setRepoMode] = useState<'url' | 'folder'>('url');
+  const [folderFiles, setFolderFiles] = useState<File[]>([]);
 
   const top = TOP_LANES.find((l) => l.key === lane)!;
   const subLane = top.subs ? (top.subs.find((s) => s.key === sub) ?? top.subs[0]) : null;
@@ -84,6 +123,11 @@ export default function ScanLauncher({ onClose, onStarted }: {
   const effKey = subLane ? subLane.key : top.key;
   const laneName = subLane ? `${top.label} · ${subLane.label}` : top.label;
   const laneOverride = effFleet[0];                               // e.g. 'web' | 'windows' | 'linux' | …
+  const isCodeLane = effKey === 'code';
+  const usingFolder = flow === 'target' && isCodeLane && repoMode === 'folder';
+  const folderName = folderFiles[0]
+    ? (((folderFiles[0] as any).webkitRelativePath as string) || folderFiles[0].name).split('/')[0]
+    : '';
   const pickTop = (k: string) => { setLane(k); setPicked(new Set()); setCredId(null); setCredOff(new Set()); const t = TOP_LANES.find((l) => l.key === k); if (t?.subs) setSub(t.subs[0].key); };
   const pickSub = (k: string) => { setSub(k); setPicked(new Set()); setCredId(null); setCredOff(new Set()); };
 
@@ -115,11 +159,25 @@ export default function ScanLauncher({ onClose, onStarted }: {
     setDraft('');
   };
 
-  const ready = flow === 'target' ? (targets.length > 0 || !!draft.trim()) && authorized : picked.size > 0;
+  const ready = flow === 'target'
+    ? (usingFolder ? folderFiles.length > 0 && authorized : (targets.length > 0 || !!draft.trim()) && authorized)
+    : picked.size > 0;
   const start = async () => {
     if (busy) return;
     setBusy(true); setErr(null);
     try {
+      // Uploaded folder → stage it, then scan the extracted path as a repo ad-hoc target (same flow as a URL).
+      if (usingFolder) {
+        const fd = new FormData();
+        folderFiles.forEach((f) => {
+          fd.append('files', f);
+          fd.append('rel_paths', ((f as any).webkitRelativePath as string) || f.name);
+        });
+        const up = await apiClient.post('/pentest/upload-folder', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const { data } = await vulnManagementApi.scan.adhoc({ target: up.data.path, authorized, lane: laneOverride, ...(credId ? { credential_id: credId } : {}) });
+        if (data?.asset_id && data?.job_id) onStarted(data.asset_id, data.job_id); else onClose();
+        return;
+      }
       if (flow === 'target') {
         const t = Array.from(new Set([...targets, ...draft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean)]));
         if (!t.length) { setBusy(false); return; }
@@ -230,24 +288,40 @@ export default function ScanLauncher({ onClose, onStarted }: {
           <div>
             <div style={{ fontSize: 11.5, fontWeight: 600, color: '#475569', marginBottom: 2 }}>{hint.label}</div>
             <div style={{ fontSize: 10.5, color: 'var(--faint)', marginBottom: 7 }}>Bring a target that isn’t in inventory — scanned as an ad-hoc asset (stored & viewable, excluded from the dashboard).</div>
-            {targets.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                {targets.map((t) => (
-                  <span key={t} className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)', background: 'var(--subtle)', borderRadius: 20, padding: '3px 6px 3px 10px', fontSize: 11.5 }}>
-                    {t}
-                    <button onClick={() => setTargets((x) => x.filter((v) => v !== t))} aria-label={`Remove ${t}`} style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--faint)', cursor: 'pointer' }}><X width={11} height={11} /></button>
-                  </span>
+            {isCodeLane && (
+              <div style={{ display: 'inline-flex', gap: 2, padding: 2, marginBottom: 10, border: '1px solid var(--line)', borderRadius: 9, background: 'var(--subtle)' }}>
+                {(['url', 'folder'] as const).map((m) => (
+                  <button key={m} onClick={() => setRepoMode(m)}
+                    style={{ border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: repoMode === m ? '#fff' : 'transparent', color: repoMode === m ? 'var(--base)' : 'var(--muted)', boxShadow: repoMode === m ? '0 1px 2px rgba(15,23,42,.08)' : 'none' }}>
+                    {m === 'url' ? 'Paste repo URL' : 'Upload folder'}
+                  </button>
                 ))}
               </div>
             )}
-            <input value={draft} onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTargets(draft); } else if (e.key === 'Backspace' && !draft && targets.length) { setTargets((x) => x.slice(0, -1)); } }}
-              onBlur={() => addTargets(draft)}
-              placeholder={hint.ph}
-              className="mono" style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 11px', fontSize: 12.5, outline: 'none', fontFamily: 'inherit' }} />
+            {usingFolder ? (
+              <FolderDropzone files={folderFiles} folderName={folderName} onChange={setFolderFiles} />
+            ) : (
+              <>
+                {targets.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {targets.map((t) => (
+                      <span key={t} className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)', background: 'var(--subtle)', borderRadius: 20, padding: '3px 6px 3px 10px', fontSize: 11.5 }}>
+                        {t}
+                        <button onClick={() => setTargets((x) => x.filter((v) => v !== t))} aria-label={`Remove ${t}`} style={{ display: 'grid', placeItems: 'center', height: 16, width: 16, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--faint)', cursor: 'pointer' }}><X width={11} height={11} /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <input value={draft} onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTargets(draft); } else if (e.key === 'Backspace' && !draft && targets.length) { setTargets((x) => x.slice(0, -1)); } }}
+                  onBlur={() => addTargets(draft)}
+                  placeholder={hint.ph}
+                  className="mono" style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 11px', fontSize: 12.5, outline: 'none', fontFamily: 'inherit' }} />
+              </>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, fontSize: 11.5, color: '#475569' }}>
               <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} />
-              I am authorized to test {targets.length > 1 ? 'these targets' : 'this target'}.
+              {usingFolder ? 'I am authorized to scan the uploaded folder.' : `I am authorized to test ${targets.length > 1 ? 'these targets' : 'this target'}.`}
             </label>
           </div>
           )}
