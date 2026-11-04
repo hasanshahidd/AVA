@@ -102,6 +102,33 @@ export function prune(v: any): any {
   return v === null || v === '' ? undefined : v;
 }
 
+/** The asset's summary columns (register, CIS matching, risk), read from the edited telemetry
+ *  categories so the form has one place to type them. Only touched categories contribute. */
+export function summaryFromTelemetry(edits: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  const set = (k: string, v: any) => { if (v !== null && v !== undefined && v !== '' && !(Number.isNaN(v))) out[k] = v; };
+  const num = (v: any) => (v === null || v === undefined || v === '' ? undefined : Number(v));
+  const id = edits.identity;
+  if (isObj(id)) {
+    set('manufacturer', id.manufacturer); set('model', id.model);
+    set('serial_number', id.serial || id.bios_serial); set('fqdn', id.fqdn);
+    set('os_version', id.distro_version);   // Linux keeps its OS in identity
+  }
+  const cpu = edits.cpu;
+  if (isObj(cpu)) set('cpu_cores', num(cpu.logical_processors ?? cpu.physical_cores ?? cpu.cpus));
+  if (isObj(edits.memory)) set('memory_gb', num(edits.memory.total_gb));
+  const disks = isObj(edits.storage) && Array.isArray(edits.storage.physical_disks) ? edits.storage.physical_disks : [];
+  const diskGb = disks.reduce((t: number, d: any) => t + (Number(d?.size_gb) || 0), 0);
+  if (diskGb) set('storage_gb', Math.round(diskGb));
+  const net = edits.network;
+  const nics: any[] = Array.isArray(net) ? net : isObj(net) && Array.isArray(net.interfaces) ? net.interfaces : [];
+  set('primary_mac', nics.find((n) => n?.mac)?.mac);
+  const os = edits.os;
+  if (isObj(os)) { set('os_version', os.version); set('os_build', os.build); set('os_edition', os.edition); }
+  // AV / EDR: the backend re-derives the posture from the security_products / defender sections.
+  return out;
+}
+
 const INPUT = 'w-full rounded border border-slate-200 bg-white px-2.5 py-1 text-[13px] text-slate-900 focus:border-blue-500 focus:outline-none';
 
 function Leaf({ label, value, type, onChange }: { label: string; value: any; type: 's' | 'n' | 'b'; onChange: (v: any) => void }) {
