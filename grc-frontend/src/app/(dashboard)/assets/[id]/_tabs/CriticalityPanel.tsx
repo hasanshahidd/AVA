@@ -232,7 +232,7 @@ export default function CriticalityPanel({ assetId }: { assetId: number }) {
           <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-2">
             <Link
               href={`/assets/criticality-assessments?create=isca&asset=${assetId}`}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[9px] whitespace-nowrap border bg-[#005B96] text-[#06342B] border-[#005B96] hover:bg-[#014A81]"
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[9px] whitespace-nowrap border bg-[#005B96] text-white border-[#005B96] hover:bg-[#014A81]"
             >
               + New Information System assessment
             </Link>

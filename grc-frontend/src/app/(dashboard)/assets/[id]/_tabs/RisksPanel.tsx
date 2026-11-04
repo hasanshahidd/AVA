@@ -41,7 +41,7 @@ import { InlineLinkPicker, PageLoader } from '@/components/ui';
 const MONO = 'tabular-nums';
 const SHADOW = 'shadow-[0_1px_2px_rgba(16,24,40,0.04)]';
 const CARD = `bg-white border border-[#E8ECEE] rounded-[15px] overflow-hidden ${SHADOW}`;
-const BTN_PRIMARY = 'inline-flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-2 rounded-[9px] whitespace-nowrap border bg-[#005B96] text-[#06342B] border-[#005B96] hover:bg-[#014A81] disabled:opacity-50';
+const BTN_PRIMARY = 'inline-flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-2 rounded-[9px] whitespace-nowrap border bg-[#005B96] text-white border-[#005B96] hover:bg-[#014A81] disabled:opacity-50';
 const BTN_GHOST = 'inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-[7px] rounded-[9px] whitespace-nowrap border bg-white text-[#3A4653] border-[#E8ECEE] hover:bg-[#F4F6F7] disabled:opacity-50';
 
 // coverage-status tone + label — single source for the Mapped Controls table.

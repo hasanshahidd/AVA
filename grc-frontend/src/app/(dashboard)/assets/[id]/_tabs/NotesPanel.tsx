@@ -119,7 +119,7 @@ export default function NotesPanel({ entityType, entityId }: { entityType: Entit
               onClick={() => draft.trim() && add.mutate(draft.trim())}
               disabled={!draft.trim() || add.isPending}
               className="bg-[#005B96] hover:enabled:bg-[#014A81] transition-colors"
-              style={{ marginLeft: 'auto', height: 32, padding: '0 15px', borderRadius: 9, border: `1px solid ${AC}`, color: '#06342B', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, opacity: !draft.trim() || add.isPending ? 0.5 : 1, cursor: !draft.trim() || add.isPending ? 'default' : 'pointer' }}
+              style={{ marginLeft: 'auto', height: 32, padding: '0 15px', borderRadius: 9, border: `1px solid ${AC}`, color: '#fff', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, opacity: !draft.trim() || add.isPending ? 0.5 : 1, cursor: !draft.trim() || add.isPending ? 'default' : 'pointer' }}
             >
               {add.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
               Post

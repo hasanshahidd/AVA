@@ -36,7 +36,7 @@ type ScopeAuth = {
 const AC = '#005B96', ACS = '#014A81', AMBER = '#9A6410', AMBER_BG = '#FBF2DF';
 const GREEN = '#1F7A54', GREEN_BG = '#E7F5EE', MUTED = '#8A95A1', BORDER = '#E4E8EC';
 const CARD: React.CSSProperties = { background: '#fff', border: '1px solid #E8ECEE', borderRadius: 15, boxShadow: '0 1px 2px rgba(16,24,40,.04)', marginBottom: 14 };
-const BTN_P: React.CSSProperties = { height: 34, padding: '0 14px', border: `1px solid ${AC}`, background: AC, color: '#06342B', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+const BTN_P: React.CSSProperties = { height: 34, padding: '0 14px', border: `1px solid ${AC}`, background: AC, color: '#fff', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
 const BTN_S: React.CSSProperties = { height: 34, padding: '0 13px', border: `1px solid ${BORDER}`, background: '#fff', color: '#3A4653', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer' };
 const INPUT: React.CSSProperties = { height: 34, border: `1px solid ${BORDER}`, borderRadius: 9, padding: '0 10px', fontSize: 12.5, width: '100%', background: '#fff' };
 const MONO = 'ui-monospace,Consolas,monospace';

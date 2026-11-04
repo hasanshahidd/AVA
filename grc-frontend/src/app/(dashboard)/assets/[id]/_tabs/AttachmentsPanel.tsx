@@ -35,7 +35,7 @@ import { GuideMarker, useGuide } from '@/components/guide';
 const CARD = 'bg-white border border-[#E8ECEE] rounded-[15px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden';
 const BTN_PRIMARY =
   'inline-flex items-center gap-1.5 h-[33px] px-3.5 rounded-[10px] border border-[#005B96] bg-[#005B96] ' +
-  'text-[#06342B] text-[12px] font-semibold hover:bg-[#014A81] disabled:opacity-50 transition-colors whitespace-nowrap';
+  'text-white text-[12px] font-semibold hover:bg-[#014A81] disabled:opacity-50 transition-colors whitespace-nowrap';
 
 // Relationship pill — same supports/validates/documents semantics as before,
 // recoloured to the mock's chip spec (6px radius, 10.5px, semantic tones).

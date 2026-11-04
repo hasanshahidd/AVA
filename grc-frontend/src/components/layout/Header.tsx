@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, LogOut, UserCircle, Users, Search, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { apiClient, searchApi } from '@/lib/api';
-import { GuideToggle } from '@/components/guide';
 
 const navIconProps = {
   size: 18,
@@ -297,9 +296,6 @@ export default function Header() {
       </div>
 
       <div className="ml-3 flex items-center gap-2.5">
-        {/* Guide mode — toggles small numbered markers on key UI elements. */}
-        <GuideToggle />
-
         {/* Notification bell */}
         <div className="relative" ref={notifRef}>
           <button

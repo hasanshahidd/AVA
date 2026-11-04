@@ -105,7 +105,7 @@ export default function LifecyclePanel({ asset, onTransition }: { asset: any; on
               <button
                 onClick={onTransition}
                 className="h-[34px] px-3.5 rounded-[10px] text-[12px] font-semibold whitespace-nowrap border"
-                style={{ background: AC, borderColor: AC, color: '#06342B' }}
+                style={{ background: AC, borderColor: AC, color: '#fff' }}
               >
                 Transition state
               </button>
@@ -139,7 +139,7 @@ export default function LifecyclePanel({ asset, onTransition }: { asset: any; on
                       className="w-7 h-7 rounded-full grid place-items-center mx-auto border-[3px] border-white"
                       style={{ background: AC, boxShadow: `0 0 0 1px ${BORDER}` }}
                     >
-                      <Check className="w-[13px] h-[13px]" strokeWidth={2.8} style={{ color: '#06342B' }} />
+                      <Check className="w-[13px] h-[13px]" strokeWidth={2.8} style={{ color: '#fff' }} />
                     </span>
                   ) : isNow ? (
                     <span

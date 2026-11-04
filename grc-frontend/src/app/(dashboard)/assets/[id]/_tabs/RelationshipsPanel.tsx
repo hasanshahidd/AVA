@@ -52,7 +52,7 @@ const STYLE = `
 .relpanel .chip{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:600;white-space:nowrap}
 .relpanel .mono{font-family:ui-monospace,Consolas,monospace}
 .relpanel .btn{height:32px;padding:0 13px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.relpanel .btn-primary{background:var(--ac);border-color:var(--ac);color:#06342B}
+.relpanel .btn-primary{background:var(--ac);border-color:var(--ac);color:#fff}
 .relpanel .btn-primary:hover{background:var(--ac-strong);border-color:var(--ac-strong)}
 .relpanel .btn-primary[disabled]{opacity:.45;cursor:not-allowed}
 .relpanel .btn-secondary{background:#fff;border-color:var(--border);color:var(--sec)}

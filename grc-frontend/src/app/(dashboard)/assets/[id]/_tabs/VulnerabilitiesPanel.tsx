@@ -102,7 +102,7 @@ const TD = 'px-3.5 py-[9px] text-[11.8px] text-[#3A4653] border-b border-[#F0F3F
 const THC = 'text-left px-3 py-[3px] text-[9px] uppercase tracking-[0.04em] text-[#8A95A1] font-semibold bg-[#FAFBFC] border-b border-[#E8ECEE] whitespace-nowrap';
 const TDC = 'px-3 py-[4px] text-[10.5px] text-[#3A4653] border-b border-[#F0F3F5] align-middle';
 const SEV_RANK_DISTINCT: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-const BTN_PRI = 'h-[33px] px-3.5 rounded-[10px] border border-[#005B96] bg-[#005B96] text-[#06342B] text-[12px] font-semibold whitespace-nowrap hover:bg-[#014A81] hover:border-[#014A81]';
+const BTN_PRI = 'inline-flex items-center gap-1.5 h-[33px] px-3.5 rounded-[10px] border border-[#005B96] bg-[#005B96] text-white text-[12px] font-semibold whitespace-nowrap hover:bg-[#014A81] hover:border-[#014A81]';
 const FILTER_BTN = (on: boolean) =>
   `h-[33px] px-3 rounded-[10px] border text-[11.5px] whitespace-nowrap ${on ? 'border-[#005B96] bg-[#EFF5FA] text-[#014A81] font-semibold' : 'border-[#E8ECEE] bg-white text-[#3A4653] font-medium'}`;
 
@@ -550,7 +550,7 @@ export default function VulnerabilitiesPanel({
                             key={p}
                             onClick={() => setPage(p)}
                             className={`h-[26px] min-w-[26px] px-1.5 rounded-[7px] border text-[11px] ${
-                              p === curPage ? 'border-[#005B96] bg-[#005B96] text-[#06342B] font-semibold' : 'border-[#E8ECEE] bg-white text-[#3A4653]'
+                              p === curPage ? 'border-[#005B96] bg-[#005B96] text-white font-semibold' : 'border-[#E8ECEE] bg-white text-[#3A4653]'
                             }`}
                           >
                             {p}
