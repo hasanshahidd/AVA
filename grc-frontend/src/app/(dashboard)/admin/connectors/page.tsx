@@ -135,7 +135,7 @@ export default function ConnectorsAdminPage() {
               </h3>
               <span className="text-xs text-slate-400">— {meta.description}</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start gap-2">
               {providers.map((p) => (
                 <ProviderCard
                   key={p.provider}
@@ -160,7 +160,7 @@ export default function ConnectorsAdminPage() {
             <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Cloud</h3>
             <span className="text-xs text-slate-400">— Pull vulnerability findings from your cloud security posture (AWS / Azure / GCP).</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start gap-2">
             {CLOUD_PROVIDERS.map((p) => (
               <CloudProviderCard key={p.provider} provider={p.provider} label={p.label} icon={p.icon} description={p.description} />
             ))}
