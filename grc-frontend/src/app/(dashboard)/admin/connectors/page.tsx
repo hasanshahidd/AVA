@@ -160,7 +160,7 @@ export default function ConnectorsAdminPage() {
             <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Directory</h3>
             <span className="text-xs text-slate-400">— Import users from your on-prem Active Directory / LDAP into User Management.</span>
           </div>
-          <div className="grid grid-cols-1 items-start gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start gap-2">
             <LdapCard />
           </div>
         </section>
@@ -879,21 +879,74 @@ function SetupModal({ provider, existing, onClose }: SetupModalProps) {
 }
 
 
-// --- On-prem Active Directory / LDAP directory connector --------------
-// Save the server + base DN + bind DN; the bind password is entered per
-// Test / Sync and never stored. Sync imports users into User Management.
+// ─── Directory (Active Directory / LDAP) card — one config per tenant ─
+// Matches the connector-card pattern: a compact card whose button opens a
+// SetupModal-style modal. The bind password is entered per Test / Sync and
+// never stored; Sync imports users into User Management.
 function LdapCard() {
+  const [open, setOpen] = useState(false);
+  const { data: cfg } = useQuery({
+    queryKey: ['ldap', 'config'],
+    queryFn: async () => (await ssoApi.getLdap()).data,
+  });
+  const configured = Boolean(cfg?.configured);
+
+  return (
+    <div className="group rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-[var(--color-base)] hover:shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <Fingerprint className="h-4 w-4 text-slate-400" strokeWidth={1.75} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="truncate text-sm font-semibold text-slate-900">Active Directory / LDAP</h4>
+            {configured && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                <CheckCircle className="h-2.5 w-2.5" />connected
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            Import users from your on-prem Active Directory / LDAP into User Management.
+          </p>
+        </div>
+      </div>
+
+      {configured && cfg?.ldap_server && (
+        <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs">
+          <StatusDot status={cfg.last_test_status === 'ok' ? 'connected' : 'pending'} />
+          <button type="button" onClick={() => setOpen(true)}
+            className="flex-1 truncate text-left text-slate-700 hover:text-primary-600" title={cfg.ldap_base_dn || ''}>
+            {cfg.ldap_server}
+          </button>
+        </div>
+      )}
+
+      <button type="button" onClick={() => setOpen(true)}
+        className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-primary-400 hover:text-primary-600 transition-colors">
+        <Plus className="h-3.5 w-3.5" /> {configured ? 'Configure directory' : 'Connect directory'}
+      </button>
+
+      {open && <LdapModal onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── Directory setup modal ───────────────────────────────────────────
+
+function LdapModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['ldap', 'config'], queryFn: async () => (await ssoApi.getLdap()).data });
   const [cfg, setCfg] = useState<Partial<LdapConfig>>({ ldap_user_filter: '(&(objectClass=user)(objectCategory=person))' });
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState<null | 'save' | 'test' | 'sync'>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  useEffect(() => {
-    ssoApi.getLdap().then((r) => { if (r.data?.configured) setCfg(r.data); }).catch(() => {});
-  }, []);
+  useEffect(() => { if (data?.configured) setCfg(data); }, [data]);
 
   const set = (k: keyof LdapConfig, v: string) => setCfg((p) => ({ ...p, [k]: v }));
   const errText = (e: any) => e?.response?.data?.detail || e?.message || 'Request failed';
+  const refresh = () => qc.invalidateQueries({ queryKey: ['ldap', 'config'] });
 
   const save = async () => {
     setBusy('save'); setMsg(null);
@@ -905,14 +958,14 @@ function LdapCard() {
         ldap_user_filter: cfg.ldap_user_filter || '',
         is_enabled: true,
       });
-      setCfg(r.data);
-      setMsg({ ok: true, text: 'Connection saved.' });
+      setCfg(r.data); refresh();
+      setMsg({ ok: true, text: 'Directory connection saved.' });
     } catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
   };
   const test = async () => {
     if (!pw) { setMsg({ ok: false, text: 'Enter the bind password to test.' }); return; }
     setBusy('test'); setMsg(null);
-    try { const r = await ssoApi.testLdap(pw); setMsg({ ok: true, text: r.data.message || 'Bind succeeded.' }); }
+    try { const r = await ssoApi.testLdap(pw); refresh(); setMsg({ ok: true, text: r.data.message || 'Bind succeeded.' }); }
     catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
   };
   const sync = async () => {
@@ -920,67 +973,64 @@ function LdapCard() {
     setBusy('sync'); setMsg(null);
     try {
       const r = await ssoApi.syncLdap(pw);
-      setMsg({ ok: true, text: `Imported ${r.data.total_imported} user(s) - ${r.data.created} new, ${r.data.updated} updated, ${r.data.skipped} skipped.` });
+      setMsg({ ok: true, text: `Imported ${r.data.total_imported} user(s) — ${r.data.created} new, ${r.data.updated} updated, ${r.data.skipped} skipped.` });
     } catch (e) { setMsg({ ok: false, text: errText(e) }); } finally { setBusy(null); }
   };
 
-  const field = (label: string, key: keyof LdapConfig, placeholder: string) => (
+  const field = (label: string, key: keyof LdapConfig, placeholder: string, required = false) => (
     <div>
-      <label className="block text-[11px] font-medium text-slate-500 mb-0.5">{label}</label>
-      <input
-        value={(cfg[key] as string) || ''}
-        onChange={(e) => set(key, e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-primary-500"
-      />
+      <label className="block text-xs font-medium text-slate-700 mb-1">
+        {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+      </label>
+      <input value={(cfg[key] as string) || ''} onChange={(e) => set(key, e.target.value)}
+        placeholder={placeholder} className={INPUT_CLS} />
     </div>
   );
 
+  const busyAny = busy !== null;
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <Fingerprint className="h-4 w-4 text-slate-500" />
-        <span className="text-sm font-semibold text-slate-800">Active Directory / LDAP</span>
-        {cfg.last_test_status === 'ok' && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600"><CheckCircle className="h-3 w-3" /> bind ok</span>
+    <ModalShell title="Active Directory / LDAP"
+      subtitle="Import users from your on-prem directory. The bind password is used for Test / Sync and never stored."
+      onClose={onClose}>
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {field('LDAP server', 'ldap_server', 'ldap://dc01.bank.local:389', true)}
+        {field('Base DN', 'ldap_base_dn', 'DC=bank,DC=local', true)}
+        {field('Bind DN', 'ldap_bind_dn', 'CN=svc-ava,OU=Service,DC=bank,DC=local', true)}
+        {field('User filter', 'ldap_user_filter', '(&(objectClass=user)(objectCategory=person))')}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            Bind password <span className="ml-1 text-[10px] font-normal text-slate-400">(used for Test / Sync, never stored)</span>
+          </label>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••" className={INPUT_CLS} />
+        </div>
+        {msg && (
+          <div className={`flex items-start gap-1.5 text-xs ${msg.ok ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {msg.ok ? <CheckCircle className="h-3.5 w-3.5 mt-px shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />}
+            <span>{msg.text}</span>
+          </div>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {field('LDAP server', 'ldap_server', 'ldap://dc01.bank.local:389')}
-        {field('Base DN', 'ldap_base_dn', 'DC=bank,DC=local')}
-        {field('Bind DN', 'ldap_bind_dn', 'CN=svc-ava,OU=Service,DC=bank,DC=local')}
-        {field('User filter', 'ldap_user_filter', '(&(objectClass=user)(objectCategory=person))')}
-      </div>
-      <div className="mt-2">
-        <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Bind password <span className="text-slate-400">(used for Test / Sync, never stored)</span></label>
-        <input
-          type="password"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          placeholder="********"
-          className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-primary-500"
-        />
-      </div>
-      {msg && (
-        <div className={`mt-2 flex items-start gap-1.5 text-xs ${msg.ok ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {msg.ok ? <CheckCircle className="h-3.5 w-3.5 mt-px shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />}
-          <span>{msg.text}</span>
+      <footer className="flex items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
+        <div className="flex gap-2">
+          <button type="button" onClick={test} disabled={busyAny}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            {busy === 'test' ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpenCheck className="h-4 w-4" />} Test
+          </button>
+          <button type="button" onClick={sync} disabled={busyAny}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            {busy === 'sync' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Sync users
+          </button>
         </div>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={save} disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-[color:var(--color-on-base,#0a0a0a)] rounded text-sm disabled:opacity-50">
-          {busy === 'save' && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
-        </button>
-        <button type="button" onClick={test} disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded text-sm disabled:opacity-50">
-          {busy === 'test' && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Test connection
-        </button>
-        <button type="button" onClick={sync} disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded text-sm disabled:opacity-50">
-          {busy === 'sync' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Sync users
-        </button>
-      </div>
-    </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} disabled={busyAny}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="button" onClick={save} disabled={busyAny}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-[#0a0a0a] hover:bg-primary-700 disabled:opacity-50">
+            {busy === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />} Save
+          </button>
+        </div>
+      </footer>
+    </ModalShell>
   );
 }
