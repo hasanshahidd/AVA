@@ -742,7 +742,12 @@ def create_asset(
         except Exception:  # noqa: BLE001 — never block asset creation
             _os_normalized = _os_normalized or _os_family
 
-    from ..modules.compliance_plugins.services.security_classifier import manual_posture
+    from ..modules.compliance_plugins.services.security_classifier import manual_posture, apply_posture
+    from ..services.manual_telemetry import merge_manual_telemetry
+    try:
+        _platform_properties = merge_manual_telemetry(None, asset.telemetry) if asset.telemetry else None
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     db_asset = ITAsset(
         origin_source="manual",  # stamped once at birth; never mutated
         tenant_id=tenant_id,
@@ -814,6 +819,8 @@ def create_asset(
         security_posture=(manual_posture(asset.security_posture.antivirus_products,
                                          asset.security_posture.edr_products)
                           if asset.security_posture else None),
+        platform_properties=_platform_properties,
+        detected_software_json=asset.detected_software_json,
         # CMDB details + procurement / cost — manual entry.
         department=asset.department,
         assigned_user=asset.assigned_user,
@@ -835,6 +842,10 @@ def create_asset(
     # but the score is still re-derived from the inputs so the audit log
     # shows what the system would have chosen.
     recompute_asset_criticality(db_asset)
+
+    # Hand-entered software / security sections derive AV/EDR unless the form set them.
+    if (asset.telemetry or asset.detected_software_json) and not asset.security_posture:
+        apply_posture(db_asset)
 
     db.add(db_asset)
     db.commit()
@@ -1690,6 +1701,16 @@ def update_asset(
         _sp = update_data["security_posture"]
         update_data["security_posture"] = manual_posture(_sp.get("antivirus_products"), _sp.get("edr_products"))
 
+    # Telemetry edits merge into platform_properties per section; untouched sections stay.
+    _telemetry = update_data.pop("telemetry", None)
+    _repost = bool(_telemetry) or update_data.get("detected_software_json") is not None
+    if _telemetry:
+        from ..services.manual_telemetry import merge_manual_telemetry
+        try:
+            update_data["platform_properties"] = merge_manual_telemetry(asset.platform_properties, _telemetry)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
     for field, value in update_data.items():
         # ── Risk Posture v2 column rename translation ───────────────────
         # The wire field `operational_dependency` (v2 spec) maps to the
@@ -1715,6 +1736,11 @@ def update_asset(
         if field in ("confidentiality_rating", "integrity_rating", "availability_rating") and not value:
             continue
         setattr(asset, field, value)
+
+    # Hand-edited software / security sections re-derive AV/EDR, unless this request set them.
+    if _repost and update_data.get("security_posture") is None:
+        from ..modules.compliance_plugins.services.security_classifier import apply_posture
+        apply_posture(asset)
 
     # ePHI assets are auto-scoped to HIPAA so they surface in the HIPAA
     # framework's in-scope views. Add-only: never strips a manual scope.

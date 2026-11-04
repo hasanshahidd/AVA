@@ -5,6 +5,7 @@ import apiClient, { assetsApi } from '@/lib/api';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import PciAttributesFields from '@/components/assets/PciAttributesFields';
 import HipaaAttributesFields from '@/components/assets/HipaaAttributesFields';
+import TelemetryEditor, { SOFTWARE_KEY, prune } from './TelemetryEditor';
 import { ITAsset, AssetType } from '@/types';
 import { ComboBoxInput, type ComboBoxOption } from '@/components/ui';
 import {
@@ -189,7 +190,7 @@ const CRITICALITY_OPTIONS: ComboBoxOption[] = [
 ];
 
 
-export type AssetFormSection = 'basics' | 'technical' | 'identity' | 'compliance' | 'risk' | 'procurement';
+export type AssetFormSection = 'basics' | 'technical' | 'telemetry' | 'identity' | 'compliance' | 'risk' | 'procurement';
 const FLASH_MS = 4000;
 
 function FormSection({ id, title, hint, flash, children }: {
@@ -241,6 +242,8 @@ export function AssetModal({
       : [];
   const initialAv = ((initialData as any)?.security_posture?.antivirus_products || []).join(', ') as string;
   const initialEdr = ((initialData as any)?.security_posture?.edr_products || []).join(', ') as string;
+  // Scan telemetry categories the user touched: section key -> data (SOFTWARE_KEY -> package rows).
+  const [telemetryEdits, setTelemetryEdits] = useState<Record<string, any>>({});
 
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -477,6 +480,17 @@ export function AssetModal({
       warranty_expiry: formData.warranty_expiry || undefined,
       eol_date: formData.eol_date || undefined,
     };
+    // Touched telemetry only, blanks dropped. On Add an untouched-or-empty category is not created.
+    const { [SOFTWARE_KEY]: softwareEdit, ...sectionEdits } = telemetryEdits;
+    const telemetry: Record<string, any> = {};
+    for (const [k, v] of Object.entries(sectionEdits)) {
+      const p = prune(v);
+      const empty = p === undefined || (Array.isArray(p) && !p.length);
+      if (!empty) telemetry[k] = p;
+      else if (isEditMode) telemetry[k] = Array.isArray(v) ? [] : null;
+    }
+    if (Object.keys(telemetry).length) submitData.telemetry = telemetry;
+    if (softwareEdit !== undefined) submitData.detected_software_json = prune(softwareEdit) || [];
     if (isEditMode) {
       submitData.status = formData.status;
     }
@@ -856,6 +870,18 @@ export function AssetModal({
               </div>
             </div>
             )}
+            </FormSection>
+            )}
+
+            {(show.hardware || show.os) && (
+            <FormSection id="telemetry" title="Scan telemetry" hint="Same categories as the asset Overview — open one to see and edit its fields; edits stand until the next scan" flash={flash}>
+              <TelemetryEditor
+                platformProperties={(initialData as any)?.platform_properties}
+                software={(initialData as any)?.detected_software_json}
+                osFamily={formData.os_family || (initialData as any)?.os_family || ''}
+                edits={telemetryEdits}
+                onEdit={(k, v) => setTelemetryEdits((prev) => ({ ...prev, [k]: v }))}
+              />
             </FormSection>
             )}
 

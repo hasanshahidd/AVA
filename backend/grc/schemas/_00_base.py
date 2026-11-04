@@ -905,6 +905,10 @@ class ITAssetBase(BaseModel):
     fqdn: Optional[str] = None
     primary_mac: Optional[str] = None
     security_posture: Optional[ManualSecurityPosture] = None
+    # Hand-entered scan telemetry: platform_properties section key -> data (cpu, storage,
+    # network, services, firewall ...) and the installed-software list. Manual until rescanned.
+    telemetry: Optional[Dict[str, Any]] = None
+    detected_software_json: Optional[List[Dict[str, Any]]] = None
     # CMDB details + procurement / cost. All optional; manually entered on
     # the Add Asset form and also editable on the asset detail page. Accepted
     # on create so the full record can be captured in one step.
@@ -1004,6 +1008,10 @@ class ITAssetUpdate(BaseModel):
     fqdn: Optional[str] = None
     primary_mac: Optional[str] = None
     security_posture: Optional[ManualSecurityPosture] = None
+    # Hand-entered scan telemetry: platform_properties section key -> data (cpu, storage,
+    # network, services, firewall ...) and the installed-software list. Manual until rescanned.
+    telemetry: Optional[Dict[str, Any]] = None
+    detected_software_json: Optional[List[Dict[str, Any]]] = None
     department: Optional[str] = None
     assigned_user: Optional[str] = None
     purchase_cost: Optional[float] = None
