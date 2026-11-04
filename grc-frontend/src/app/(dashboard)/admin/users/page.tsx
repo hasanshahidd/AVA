@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, IfPermission, SearchInput, PageLoader } from '@/components/ui';
-import { BarChart3, Edit2, Plus, Trash2 } from 'lucide-react';
+import { BarChart3, Edit2, KeyRound, Plus, Trash2 } from 'lucide-react';
 import { adminApi, AdminUser, AdminRole } from '@/lib/api';
 import { authedFetch } from '@/lib/auth-fetch';
 
@@ -50,6 +50,9 @@ export default function UsersManagementPage() {
     role_ids: [] as number[],
   });
   const [saving, setSaving] = useState(false);
+  const [resetUser, setResetUser] = useState<AdminUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -121,6 +124,20 @@ export default function UsersManagementPage() {
       fetchData();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetUser) return;
+    try {
+      setResetting(true);
+      await adminApi.updateUser(resetUser.id, { password: newPassword });
+      setResetUser(null);
+      setNewPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reset password');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -250,6 +267,16 @@ export default function UsersManagementPage() {
               aria-label="Edit user"
             >
               <Edit2 size={16} />
+            </button>
+          </IfPermission>
+          <IfPermission required="admin:users:edit">
+            <button
+              onClick={() => { setResetUser(user); setNewPassword(''); }}
+              className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-600 transition-colors"
+              title="Reset password"
+              aria-label="Reset password"
+            >
+              <KeyRound size={16} />
             </button>
           </IfPermission>
           <IfPermission required="admin:users:delete">
@@ -512,6 +539,36 @@ export default function UsersManagementPage() {
             </form>
           </div>
         </>
+      )}
+
+      {resetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setResetUser(null)}>
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-slate-900">Reset password</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Set a new password for <span className="font-medium text-slate-700">{resetUser.display_name}</span> (@{resetUser.username}).
+            </p>
+            <input
+              type="password"
+              autoFocus
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="New password"
+              className="mt-3 w-full rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-primary-500"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setResetUser(null)} className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded text-sm">Cancel</button>
+              <button
+                type="button"
+                disabled={resetting || newPassword.length < 1}
+                onClick={handleResetPassword}
+                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-[color:var(--color-on-base,#0a0a0a)] rounded text-sm disabled:opacity-50"
+              >
+                {resetting ? 'Saving...' : 'Reset password'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

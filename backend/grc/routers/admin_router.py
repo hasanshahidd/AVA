@@ -724,6 +724,8 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
     role_ids: Optional[List[int]] = None
+    # Admin-set password reset. Empty/None leaves the password unchanged.
+    password: Optional[str] = None
 
 
 class RoleCreate(BaseModel):
@@ -946,6 +948,13 @@ def update_user(
         target_user.email = data.email
     if data.is_active is not None:
         target_user.is_active = data.is_active
+
+    if data.password:
+        from ..services.password_policy import get_active_password_policy, validate_password
+        _pw_ok, _pw_err = validate_password(data.password, get_active_password_policy(tenant_db))
+        if not _pw_ok:
+            raise HTTPException(status_code=400, detail=_pw_err or "Password does not meet the tenant policy")
+        target_user.password_hash = hash_password(data.password)
 
     if data.role_ids is not None:
         tenant_db.query(UserRole).filter(UserRole.user_id == user_id).delete()
