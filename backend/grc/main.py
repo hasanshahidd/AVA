@@ -233,6 +233,9 @@ from grc.modules.estate_overview.router import router as estate_overview_router;
 # AI Pentest assessments (isolated module: grc/modules/pentest)
 from grc.modules.pentest.router import router as pentest_router
 app.include_router(pentest_router)
+# Repo-lane "upload a folder" target (own file so it doesn't collide with the pentest router).
+from grc.modules.pentest.upload_router import router as pentest_upload_router
+app.include_router(pentest_upload_router)
 
 app.include_router(dashboard_router)
 app.include_router(enriched_dashboard_router)
