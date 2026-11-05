@@ -63,6 +63,13 @@ def _effective_status(a: ComplianceAgent, now: datetime) -> str:
     when the heartbeat goes quiet."""
     if a.status == "revoked":
         return a.status
+    if getattr(a, "kind", None) == "fleet":
+        # A fleet token is a reusable enrollment COMMAND (GPO-pushed to many machines), NOT a device -> it
+        # never heartbeats, so it must NOT read as a 'stale'/'pending' device. Show whether the token is
+        # still usable ('fleet') or past its 24h window ('expired'). Each machine it enrolled is its own
+        # 'spawned' child agent with its own heartbeat / active-stale status.
+        exp = getattr(a, "enrollment_expires_at", None)
+        return "expired" if (exp and now > exp) else "fleet"
     if a.status == "pending":
         # A never-used enrollment past its expiry reads 'expired', not PENDING forever — the orphan the
         # owner hit when a host enrolled on a DIFFERENT token and the unused one lingered as pending.
@@ -137,8 +144,12 @@ def _new_agent(db: Session, tenant_id: int, *, name: str, mode: str,
     agent = ComplianceAgent(
         tenant_id=tenant_id, agent_name=name, mode=(mode or "collector"),
         os_family=os_family, asset_id=asset_id, hostname=hostname,
-        status="pending", kind="single",
-        enrollment_token_hash=_hash(enr), enrollment_max_uses=1, enrollment_uses=0,
+        status="pending",
+        # DOMAIN-LOCKED command -> FLEET token: reusable for 24h, GPO-pushed to every domain machine
+        # (each spawns its own child agent, deduped by hostname). NO domain -> single-use, burns on first use.
+        kind=("fleet" if (allowed_domain and allowed_domain.strip()) else "single"),
+        enrollment_token_hash=_hash(enr),
+        enrollment_max_uses=(None if (allowed_domain and allowed_domain.strip()) else 1), enrollment_uses=0,
         enrollment_expires_at=now + ENROLLMENT_TTL,
         allowed_domain=(allowed_domain.strip() or None) if allowed_domain else None,
         created_by_user_id=user_id, created_at=now, updated_at=now,
@@ -287,24 +298,57 @@ def agent_enroll(body: AgentEnrollIn, db: Session = Depends(get_db)):
             403,
             f"This machine is not joined to the required domain "
             f"('{agent.allowed_domain}'); enrollment refused.")
+    # FLEET token (domain-locked, reusable): each machine spawns/UPDATES its OWN child agent, deduped by
+    # hostname so a re-install (even days later with a fresh command) maps to the SAME device, not a new one.
+    # The token is NOT burned (stays reusable until its 24h expiry). Single tokens keep burn-on-use.
+    if agent.kind == "fleet":
+        host = (body.hostname or "").strip()
+        target = None
+        if host:
+            target = (db.query(ComplianceAgent)
+                      .filter(ComplianceAgent.tenant_id == agent.tenant_id,
+                              ComplianceAgent.hostname == host,
+                              ComplianceAgent.kind == "spawned",
+                              ComplianceAgent.status != "revoked").first())
+        if target is None:
+            cbase = f"{(body.os_family or agent.os_family or 'agent')} - {host or 'host'}"
+            cname, k = cbase, 1
+            while db.query(ComplianceAgent.id).filter(
+                    ComplianceAgent.tenant_id == agent.tenant_id,
+                    ComplianceAgent.agent_name == cname).first():
+                k += 1
+                cname = f"{cbase} ({k})"
+            target = ComplianceAgent(
+                tenant_id=agent.tenant_id, agent_name=cname, mode=agent.mode,
+                os_family=body.os_family or agent.os_family, hostname=host or None,
+                status="pending", kind="spawned", spawned_from_agent_id=agent.id,
+                allowed_domain=agent.allowed_domain,
+                enrollment_max_uses=0, enrollment_uses=0,
+                created_by_user_id=agent.created_by_user_id, created_at=now, updated_at=now)
+            db.add(target)
+            db.flush()
+        agent.enrollment_uses = (agent.enrollment_uses or 0) + 1   # count enrolments; token stays reusable
+    else:
+        target = agent
+        agent.enrollment_token_hash = None  # single-use: burn it
+        agent.enrollment_uses = (agent.enrollment_uses or 0) + 1
+
     api_token = "aak_" + secrets.token_urlsafe(32)
-    agent.api_token_hash = _hash(api_token)
-    agent.status = "active"
-    agent.enrolled_at = now
-    agent.enrollment_uses = (agent.enrollment_uses or 0) + 1
-    agent.enrollment_token_hash = None  # single-use: burn it
-    agent.last_heartbeat_at = now
+    target.api_token_hash = _hash(api_token)
+    target.status = "active"
+    target.enrolled_at = now
+    target.last_heartbeat_at = now
     if body.hostname:
-        agent.hostname = body.hostname
+        target.hostname = body.hostname
     if body.os_family:
-        agent.os_family = body.os_family
+        target.os_family = body.os_family
     if body.agent_version:
-        agent.agent_version = body.agent_version
+        target.agent_version = body.agent_version
     if body.ip_address:
-        agent.ip_address = body.ip_address
-    agent.updated_at = now
+        target.ip_address = body.ip_address
+    target.updated_at = now
     db.commit()
-    return {"agent_id": agent.id, "api_token": api_token, "report_interval_s": 3600}
+    return {"agent_id": target.id, "api_token": api_token, "report_interval_s": 3600}
 
 
 def _is_link_local(ip: Optional[str]) -> bool:
