@@ -1076,14 +1076,29 @@ icacls "$dir" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI
 # under -ErrorAction Stop (and 2>$null does not always suppress it), so we lower
 # the preference here and let cmd own the redirection (no NativeCommandError).
 $ErrorActionPreference = "SilentlyContinue"
+# A running prior agent HOLDS ava-agent.exe open, so overwriting it below would fail
+# with 'file in use'. The SCM failure-action (restart/5000) would also resurrect the
+# process right after a kill and re-lock the file. So: clear the failure action FIRST
+# (a kill no longer triggers a restart), stop + fully DELETE the service (SCM can no
+# longer restart it), kill any lingering process, then WAIT until the .exe is actually
+# free before downloading. All best-effort — a fresh PC has no service/task.
+sc.exe failure AvaAgent reset= 0 actions= "" 2>$null | Out-Null
 sc.exe stop AvaAgent 2>$null | Out-Null
 cmd /c "schtasks /End /TN AvaAgent >nul 2>nul"
 cmd /c "schtasks /Delete /TN AvaAgent /F >nul 2>nul"
 Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+sc.exe delete AvaAgent 2>$null | Out-Null
 # Clear the saved token so this (re)install claims the FRESH enrollment — the new
 # agent takes over and the backend supersedes the old row (one agent per host).
 Remove-Item "$dir\\agent.json" -Force -ErrorAction SilentlyContinue
+# Block until ava-agent.exe can be opened for exclusive write (process gone + lock
+# released), re-killing if the SCM was mid-restart. Up to ~20s, then proceed anyway.
+$exe = "$dir\\ava-agent.exe"
+for ($i = 0; $i -lt 20; $i++) {{
+  if (-not (Test-Path $exe)) {{ break }}
+  try {{ $fh = [System.IO.File]::Open($exe, 'Open', 'ReadWrite', 'None'); $fh.Close(); break }}
+  catch {{ Stop-Process -Name ava-agent -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 1000 }}
+}}
 $ErrorActionPreference = "Stop"
 Write-Host "Downloading agent..."
 Invoke-WebRequest "$AvaUrl/api/agents/installer/windows/bin" -OutFile "$dir\\ava-agent.exe" -UseBasicParsing
