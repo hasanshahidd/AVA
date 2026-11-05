@@ -550,6 +550,65 @@ def _auto_cis_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
                      name=f"agent-cis-autoscan-t{tenant_id}-a{asset_id}").start()
 
 
+def _auto_vuln_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
+    """Enrolment ALSO triggers the host's VULN sweep — the agent can't reach a CVE
+    db itself, so it reports its installed-package / patch surface and HERE we turn
+    that into host-linked CVE findings the SAME way a pentest scan job does:
+    Windows -> KB->CVE patch-state, Linux/macOS -> packages -> grype on a synthesized
+    SBOM, then enrich + arm + adjudicate (the exact tail _run_scan_job runs for an
+    agent host). Runs in the background on the FIRST report (a re-install resets the
+    agent row, so it fires again); a later manual 'Scan' re-runs as normal. grype
+    runs a container (heavy, ~minutes), so this never runs inline on the report path.
+    Never raises into the report.
+    shortcut: fires once at install; re-run via manual Scan. Upgrade: re-fire when the
+    reported package-set changes."""
+    import threading
+    import logging
+    from types import SimpleNamespace
+
+    def _worker():
+        from sqlalchemy.orm import sessionmaker
+        from grc.modules.pentest import service as _pt
+        Sess = sessionmaker(bind=tenant_engine, expire_on_commit=False)
+        wdb = Sess()
+        log = logging.getLogger(__name__)
+        try:
+            asset = wdb.get(ITAsset, asset_id)
+            if asset is None:
+                return
+            recon = _pt._asset_recon(wdb, asset_id)
+            if not recon:
+                return
+            if not (recon.get("packages") or recon.get("windows")):
+                return  # nothing to match → don't spin up grype for an empty set
+            # recon carries os_family, not the OS caption; feed the asset's OS name so
+            # _agent_purl_maker distro-qualifies Linux purls (brew/windows ignore it).
+            recon = dict(recon)
+            recon.setdefault("os", asset.os_version or asset.os_normalized or "")
+            target = (asset.host_name or asset.ip_address or "") or ""
+            job = SimpleNamespace(asset_id=asset_id, tenant_id=tenant_id,
+                                  target=target, id=f"agent-vuln-a{asset_id}")
+            _pt._ingest_agent_recon(wdb, job, recon)
+            for _fn in (lambda: _pt._enrich_cve_metadata(wdb, asset_id, tenant_id),
+                        lambda: _pt._arm_cve_signals(wdb, asset_id, tenant_id),
+                        lambda: _pt._arm_service_version_signals(wdb, asset_id, tenant_id)):
+                try:
+                    _fn()
+                except Exception:
+                    log.warning("agent auto-vuln enrich/arm pass failed (non-fatal)", exc_info=True)
+            try:
+                _pt.llm_classify(wdb, tenant_id, asset_id, candidates_only=True)
+            except Exception:
+                log.warning("agent auto-vuln adjudicate failed (non-fatal)", exc_info=True)
+        except Exception:
+            log.exception("agent auto-vuln first scan failed (non-fatal)")
+        finally:
+            wdb.close()
+
+    threading.Thread(target=_worker, daemon=True,
+                     name=f"agent-vuln-autoscan-t{tenant_id}-a{asset_id}").start()
+
+
 def _recon_rows(asset_id: int, host: str, ports: list) -> list:
     """Normalized finding rows (the pentest _lrow shape) from recon open ports —
     one info row per port, affected_component = service + version (what the
@@ -653,9 +712,10 @@ def agent_report(body: ReportIn, authorization: Optional[str] = Header(default=N
             _ingest_recon_findings(db, agent.tenant_id, asset_id, _rh, body.recon)
         except Exception:
             db.rollback()
-    # Fresh install → auto-run CIS once, no click needed (guards inside).
+    # Fresh install → auto-run CIS + VULN once, no click needed (guards inside).
     if first_report and asset_id:
         _auto_cis_first_scan(db.get_bind(), agent.tenant_id, asset_id)
+        _auto_vuln_first_scan(db.get_bind(), agent.tenant_id, asset_id)
     return {"ok": True, "asset_id": asset_id}
 
 
