@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .registry import RunnerResult, register
 
@@ -211,6 +211,17 @@ def linux_ssh_runner(check_definition: Dict[str, Any], credentials: Dict[str, An
         except Exception:
             pass
 
+    return evaluate_ssh_result(check_definition, out, rc, err, command=command)
+
+
+def evaluate_ssh_result(check_definition: Dict[str, Any], out: str, rc: int,
+                        err: str = "", command: Optional[str] = None) -> RunnerResult:
+    """Score a linux_ssh/netdev_ssh check from its RAW output + exit status.
+
+    This is the SAME scoring the live SSH runner applies, factored out so an agent
+    that ran the check LOCALLY (macOS endpoint agent: no SSH, runs the command as
+    root and ships raw stdout) is scored IDENTICALLY to a credentialed SSH scan."""
+    command = command if command is not None else (check_definition.get("command") or "")
     expect = check_definition.get("expect") or {}
     ok, detail = _evaluate_ssh(out, rc, expect)
 
@@ -233,8 +244,8 @@ def linux_ssh_runner(check_definition: Dict[str, Any], credentials: Dict[str, An
             raw_output={
                 "command": command,
                 "exit_status": rc,
-                "stdout": out[:8192],
-                "stderr": err[:2048],
+                "stdout": (out or "")[:8192],
+                "stderr": (err or "")[:2048],
                 "expectation_detail": detail,
                 "suppressed_verdict": "passed",
             },
@@ -243,6 +254,7 @@ def linux_ssh_runner(check_definition: Dict[str, Any], credentials: Dict[str, An
     msg = (check_definition.get("pass_message") if ok else check_definition.get("fail_message")) or detail
 
     # Truncate stdout for storage (keep first 8KB).
+    out = out or ""
     if len(out) > 8192:
         stored_out = out[:8192] + f"\n…[truncated, total {len(out)} bytes]"
     else:
@@ -255,7 +267,7 @@ def linux_ssh_runner(check_definition: Dict[str, Any], credentials: Dict[str, An
             "command": command,
             "exit_status": rc,
             "stdout": stored_out,
-            "stderr": err[:2048],
+            "stderr": (err or "")[:2048],
             "expectation_detail": detail,
         },
     )

@@ -464,12 +464,15 @@ def _ensure_agent_connection(db: Session, agent: ComplianceAgent, asset: ITAsset
     locally and ships raw stdout; the server scores it). Either way the collector
     tag (assigned_collector_agent_id) makes execute_plugin create a PENDING agent
     job instead of a remote reach we don't have for a NAT'd / firewalled endpoint.
-    macOS has no local CIS engine yet → inventory only. The connection's
-    console_url is the asset host, so it matches ONLY this asset
-    (connection_matcher) and never another host. Idempotent on the agent id."""
+    macOS also uses ``linux_ssh`` — its CIS benchmark plugins are shell-command
+    checks (osascript/defaults/sw_vers), which the macOS endpoint agent runs
+    LOCALLY (as root) and ships raw stdout for the server to score, exactly like
+    the Windows path. The connection's console_url is the asset host, so it
+    matches ONLY this asset (connection_matcher) and never another host.
+    Idempotent on the agent id."""
     from grc.models import IntegrationConnection
     fam = (agent.os_family or "").lower()
-    itype = ("linux_ssh" if fam in ("linux", "unix")
+    itype = ("linux_ssh" if fam in ("linux", "unix", "darwin", "macos")
              else "windows_winrm" if fam == "windows" else None)
     if itype is None:
         return
@@ -803,12 +806,30 @@ def agent_jobs(authorization: Optional[str] = Header(default=None),
                 win = {"shell": (wcd.get("shell") or "powershell"),
                        "command": cmd,
                        "timeout": int(wcd.get("timeout_seconds") or 30)}
+        # macOS CIS: the benchmark plugins are shell-command checks (runner_type
+        # 'linux_ssh'). The macOS endpoint agent runs the command LOCALLY (as root,
+        # no creds) and ships raw stdout — the server scores it with the SAME
+        # evaluator the credentialed SSH path uses. Gate with the SSH read-only
+        # safety check so a mutating command never runs on the endpoint. Windows/
+        # Linux agents ignore this field (they run win/oscap respectively).
+        sh = None
+        if plugin.runner_type in ("linux_ssh", "netdev_ssh"):
+            from grc.modules.compliance_plugins.runners.ssh_runner import (
+                _is_command_safe as _ssh_safe, _sanitize_command as _ssh_sanitize,
+            )
+            scd = cd.get("linux_ssh") if isinstance(cd.get("linux_ssh"), dict) else cd
+            scmd = (scd or {}).get("command")
+            if scd and isinstance(scmd, str):
+                scmd = _ssh_sanitize(scmd)
+                if _ssh_safe(scmd)[0]:
+                    sh = {"command": scmd, "timeout": int(scd.get("timeout_seconds") or 30)}
         jobs.append({
             "run_id": run.id, "plugin_id": plugin.id,
             "rule_id": plugin.rule_id, "plugin_key": plugin.plugin_key,
             "benchmark": plugin.benchmark, "runner_type": plugin.runner_type,
             "oscap": cd.get("oscap"),  # {rule_id, datastream, profile} for linux oscap rules
             "win": win,                # {shell, command, timeout} for windows checks
+            "sh": sh,                  # {command, timeout} for macOS shell checks
         })
     if agent.pending_scan_at is not None:  # work pulled — clear the nudge
         agent.pending_scan_at = None
@@ -846,6 +867,14 @@ def agent_jobs_results(body: CisResultsIn,
             cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
             wcd = cd.get("windows_winrm") if isinstance(cd.get("windows_winrm"), dict) else cd
             result = evaluate_windows_result(wcd, r.stdout or "", int(r.exit_status), r.stderr or "")
+        elif plugin.runner_type in ("linux_ssh", "netdev_ssh") and r.exit_status is not None:
+            # macOS (and any shell-check) run locally by the agent: score the raw
+            # output with the SAME evaluator the credentialed SSH runner uses, so an
+            # agent verdict is identical to a credentialed-scan verdict.
+            from grc.modules.compliance_plugins.runners.ssh_runner import evaluate_ssh_result
+            cd = plugin.check_definition if isinstance(plugin.check_definition, dict) else {}
+            scd = cd.get("linux_ssh") if isinstance(cd.get("linux_ssh"), dict) else cd
+            result = evaluate_ssh_result(scd, r.stdout or "", int(r.exit_status), r.stderr or "")
         else:
             status = r.status if r.status in ("passed", "failed", "error", "skipped") else "error"
             result = RunnerResult(

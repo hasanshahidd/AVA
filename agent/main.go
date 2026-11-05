@@ -789,12 +789,17 @@ type cisWin struct {
 	Command string `json:"command"`
 	Timeout int    `json:"timeout"`
 }
+type cisSh struct {
+	Command string `json:"command"`
+	Timeout int    `json:"timeout"`
+}
 type cisJob struct {
 	RunID      int       `json:"run_id"`
 	RuleID     string    `json:"rule_id"`
 	RunnerType string    `json:"runner_type"`
 	Oscap      *cisOscap `json:"oscap"`
 	Win        *cisWin   `json:"win"` // windows: run the check locally, ship raw stdout
+	Sh         *cisSh    `json:"sh"`  // macOS: run the shell check locally, ship raw stdout
 }
 type cisResult struct {
 	RunID     int            `json:"run_id"`
@@ -901,7 +906,7 @@ func runOscap(apiToken, datastream, profile string) map[string]string {
 // cisRun pulls this agent's pending CIS rules, runs the benchmark locally with
 // oscap, and posts verdicts back. Linux only for now (Windows CIS is WinRM-based).
 func cisRun(apiToken string) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		return
 	}
 	rb, code, err := get(base()+"/api/agents/jobs", apiToken)
@@ -914,11 +919,74 @@ func cisRun(apiToken string) {
 	if json.Unmarshal(rb, &jr) != nil || len(jr.Jobs) == 0 {
 		return
 	}
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		runWindowsChecks(apiToken, jr.Jobs) // posts in batches as it goes
-	} else {
+	case "darwin":
+		runMacChecks(apiToken, jr.Jobs) // shell checks, batched (same as windows)
+	default:
 		postResults(apiToken, runLinuxOscap(apiToken, jr.Jobs)) // oscap is one shot
 	}
+}
+
+// runMacChecks runs each macOS CIS check locally via `sh -c` (the command was
+// already read-only-safety-gated server-side) and ships RAW output in BATCHES —
+// identical contract to runWindowsChecks: the server scores each batch with the
+// SAME evaluator the credentialed SSH path uses, the agent heartbeats between
+// batches so it never goes STALE mid-grind, and the next poll resumes only the
+// still-pending rules. Many macOS checks need root, so the agent must run as a
+// LaunchDaemon (root); a check that can't read its setting exits non-zero with no
+// stdout and the server records it as indeterminate (NOT a pass), never a crash.
+func runMacChecks(apiToken string, jobs []cisJob) {
+	cut := func(s string, n int) string {
+		if len(s) > n {
+			return s[:n]
+		}
+		return s
+	}
+	const batchN = 25
+	var batch []cisResult
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		postResults(apiToken, batch)
+		batch = batch[:0]
+		heartbeat(apiToken)
+	}
+	for _, j := range jobs {
+		if j.Sh == nil || j.Sh.Command == "" {
+			continue
+		}
+		to := j.Sh.Timeout
+		if to <= 0 {
+			to = 60
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(to)*time.Second)
+		cmd := exec.CommandContext(ctx, "/bin/sh", "-c", j.Sh.Command)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		cancel()
+		rc := 0
+		if err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				rc = ee.ExitCode()
+			} else {
+				rc = -1 // couldn't start / timed out — server treats as no-evidence
+			}
+		}
+		rcCopy := rc
+		batch = append(batch, cisResult{
+			RunID: j.RunID, ExitStatus: &rcCopy,
+			Stdout: cut(stdout.String(), 65536), Stderr: cut(stderr.String(), 8192),
+		})
+		if len(batch) >= batchN {
+			flush()
+		}
+	}
+	flush() // remainder
 }
 
 // postResults ships a batch of verdicts; the server scores + finalizes them.
