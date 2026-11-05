@@ -245,8 +245,9 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   // Click a header: same column flips direction; a new column sorts text A→Z, metrics high→low.
   const sortBy = (k: string) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(TEXT_SORTS.has(k) ? 1 : -1); } };
 
-  const anyFilter = !!(fSev || fDom || fStatus || fAsset || fExposed || fCve || fExploit || fEpss || fOwner) || scanMode !== 'all';
-  const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (fAsset ? 1 : 0) + (fExposed ? 1 : 0) + (fCve ? 1 : 0) + (fExploit ? 1 : 0) + (fEpss ? 1 : 0) + (fOwner ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
+  const assetActive = !!assetFilter && assetFilter !== 'all';
+  const anyFilter = !!(fSev || fDom || fStatus || assetActive || fExposed || fCve || fExploit || fEpss || fOwner) || scanMode !== 'all';
+  const activeCount = (fSev ? 1 : 0) + (fDom ? 1 : 0) + (fStatus ? 1 : 0) + (assetActive ? 1 : 0) + (fExposed ? 1 : 0) + (fCve ? 1 : 0) + (fExploit ? 1 : 0) + (fEpss ? 1 : 0) + (fOwner ? 1 : 0) + (scanMode !== 'all' ? 1 : 0);
 
   // Distinct column values + counts, computed once over the fetched list (`all`). Every option
   // counts the same population, so the numbers stay internally consistent within a funnel.
@@ -256,14 +257,13 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
       .map((k) => ({ value: k as string, label: SEV[k].label, count: list.filter((v) => normSev(v.severity) === k).length }))
       .filter((o) => o.count > 0);
 
-    const assetCounts = new Map<string, number>(); let noAsset = 0;
-    for (const v of list) {
-      const a = v.linked_assets ?? [];
-      if (!a.length) noAsset++; else for (const name of Array.from(new Set(a))) assetCounts.set(name, (assetCounts.get(name) || 0) + 1);
-    }
-    const asset = Array.from(assetCounts.entries()).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
-      .map(([name, c]) => ({ value: name, label: name, count: c }));
-    if (noAsset) asset.push({ value: NO_ASSET, label: 'No linked asset', count: noAsset });
+    // Asset options from the COMPLETE inventory (assetItems), NOT the capped page — otherwise only the
+    // newest-scanned host shows (the fetch is newest-first, limit 500). value = asset_id so selecting one
+    // refetches server-side (assetFilter); counts are folded from the loaded page where present.
+    const loadedByName = new Map<string, number>();
+    for (const v of list) for (const name of Array.from(new Set(v.linked_assets ?? []))) loadedByName.set(name, (loadedByName.get(name) || 0) + 1);
+    const asset = (assetItems ?? []).map((a) => ({ value: a.value, label: a.label, count: loadedByName.get(a.label) }))
+      .sort((x, y) => ((y.count || 0) - (x.count || 0)) || x.label.localeCompare(y.label));
 
     const hasCve = list.filter((v) => !!v.cve_id).length;
     const cve = [{ value: 'has', label: 'Has CVE', count: hasCve }, { value: 'no', label: 'No CVE', count: list.length - hasCve }].filter((o) => o.count > 0);
@@ -296,7 +296,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     ].filter((o) => o.count > 0);
 
     return { sev, asset, cve, exploit, epss, status, owner, exposed, provenance };
-  }, [all]);
+  }, [all, assetItems]);
 
   const domainOpts = DOM_RAIL.map((r) => ({ value: r.label, label: r.label, count: r.n }));
 
@@ -306,7 +306,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
   const colFilters: Record<string, { sections: ColSection[]; align?: 'left' | 'right' }> = {
     title: { sections: [{ key: 'prov', title: 'Scan provenance', value: scanMode === 'all' ? '' : scanMode, onChange: (v) => setScanMode((v || 'all') as 'all' | 'surface' | 'credentialed'), options: colOpts.provenance }] },
     asset: { sections: [
-      { key: 'asset', title: 'By linked asset', value: fAsset, onChange: setFAsset, options: colOpts.asset },
+      { key: 'asset', title: 'By linked asset', value: (assetFilter && assetFilter !== 'all') ? assetFilter : '', onChange: (v) => setAssetFilter?.(v || 'all'), options: colOpts.asset },
       { key: 'exposed', title: 'Exposure', value: fExposed, onChange: setFExposed, options: colOpts.exposed },
     ] },
     cve: { sections: [
@@ -322,7 +322,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
 
   const clearAll = () => {
     setFSev(''); setFDom(''); setFStatus(''); setScanMode('all');
-    setFAsset(''); setFExposed(''); setFCve(''); setFExploit(''); setFEpss(''); setFOwner('');
+    setFAsset(''); setFExposed(''); setFCve(''); setFExploit(''); setFEpss(''); setFOwner(''); setAssetFilter?.('all');
   };
 
   // Overview (cmd) flows at natural height so the whole page scrolls with the

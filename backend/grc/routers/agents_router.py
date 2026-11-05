@@ -61,8 +61,13 @@ _SUDO_WORD_RE = _re.compile(r'(^|[\s(|;&])(?:/usr/bin/)?sudo\s+')
 def _effective_status(a: ComplianceAgent, now: datetime) -> str:
     """Authoritative status: revoked/pending as stored; active decays to stale
     when the heartbeat goes quiet."""
-    if a.status in ("revoked", "pending"):
+    if a.status == "revoked":
         return a.status
+    if a.status == "pending":
+        # A never-used enrollment past its expiry reads 'expired', not PENDING forever — the orphan the
+        # owner hit when a host enrolled on a DIFFERENT token and the unused one lingered as pending.
+        exp = getattr(a, "enrollment_expires_at", None)
+        return "expired" if (exp and now > exp) else "pending"
     if a.last_heartbeat_at and (now - a.last_heartbeat_at) > STALE_AFTER:
         return "stale"
     return a.status or "active"

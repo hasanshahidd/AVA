@@ -17,7 +17,7 @@ type Agent = {
   hostname?: string | null;
   ip_address?: string | null;
   asset_id?: number | null;
-  status: 'pending' | 'active' | 'stale' | 'revoked';
+  status: 'pending' | 'active' | 'stale' | 'revoked' | 'expired';
   agent_version?: string | null;
   last_heartbeat_at?: string | null;
   last_result_at?: string | null;
@@ -30,6 +30,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
   stale: 'bg-amber-50 text-amber-700 border-amber-200',
   revoked: 'bg-slate-100 text-slate-600 border-slate-300',
+  expired: 'bg-slate-100 text-slate-500 border-slate-300',
 };
 
 function fmtAgo(iso?: string | null): string {
