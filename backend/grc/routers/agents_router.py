@@ -91,6 +91,8 @@ def _agent_dict(a: ComplianceAgent, now: datetime) -> Dict[str, Any]:
         "enrolled_at": a.enrolled_at.isoformat() if a.enrolled_at else None,
         "created_at": a.created_at.isoformat() if a.created_at else None,
         "allowed_domain": a.allowed_domain,
+        "kind": a.kind,
+        "spawned_from_agent_id": a.spawned_from_agent_id,
     }
 
 

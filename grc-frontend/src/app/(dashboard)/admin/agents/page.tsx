@@ -23,6 +23,8 @@ type Agent = {
   last_result_at?: string | null;
   enrolled_at?: string | null;
   created_at?: string | null;
+  kind?: string | null;
+  spawned_from_agent_id?: number | null;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -68,6 +70,7 @@ export default function AgentsAdminPage() {
   // Custom revoke modal state — replaces browser prompt+confirm
   const [revokeTarget, setRevokeTarget] = useState<Agent | null>(null);
   const [revokeReason, setRevokeReason] = useState('');
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const q = useQuery<{ items: Agent[] }>({
     queryKey: ['agents'],
@@ -250,49 +253,91 @@ export default function AgentsAdminPage() {
                   </td>
                 </tr>
               )}
-              {agents.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{a.agent_name}</div>
-                    {a.agent_version && (
-                      <div className="text-[10px] text-slate-500">v{a.agent_version}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-700 capitalize">{a.mode}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                    {a.hostname || <span className="text-slate-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-700 capitalize">{a.os_family || '—'}</td>
-                  <td className="px-4 py-3">
-                    {(() => {
-                      const eff = effectiveStatus(a);
-                      const isStale = eff === 'stale' && a.status === 'active';
-                      return (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase ${STATUS_COLORS[eff] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
-                          title={isStale ? 'Heartbeat not received in 5+ minutes' : undefined}
+              {(() => {
+                const kidsBy = new Map<number, Agent[]>();
+                const top: Agent[] = [];
+                for (const a of agents) {
+                  if (a.spawned_from_agent_id) {
+                    const arr = kidsBy.get(a.spawned_from_agent_id) ?? [];
+                    arr.push(a); kidsBy.set(a.spawned_from_agent_id, arr);
+                  } else { top.push(a); }
+                }
+                const restCells = (a: Agent) => (
+                  <>
+                    <td className="px-4 py-3 text-xs text-slate-700 capitalize">{a.mode}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                      {a.hostname || <span className="text-slate-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-700 capitalize">{a.os_family || '—'}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const eff = effectiveStatus(a);
+                        const isStale = eff === 'stale' && a.status === 'active';
+                        return (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase ${STATUS_COLORS[eff] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
+                            title={isStale ? 'Heartbeat not received in 5+ minutes' : undefined}
+                          >
+                            {eff}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600">{fmtAgo(a.last_heartbeat_at)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-600">{fmtAgo(a.last_result_at)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {a.status === 'revoked' ? (
+                        <span className="text-xs text-slate-400">revoked</span>
+                      ) : (
+                        <button
+                          onClick={() => { setRevokeTarget(a); setRevokeReason(''); }}
+                          className="text-xs text-rose-600 hover:underline"
                         >
-                          {eff}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{fmtAgo(a.last_heartbeat_at)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{fmtAgo(a.last_result_at)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {a.status === 'revoked' ? (
-                      <span className="text-xs text-slate-400">revoked</span>
-                    ) : (
-                      <button
-                        onClick={() => { setRevokeTarget(a); setRevokeReason(''); }}
-                        className="text-xs text-rose-600 hover:underline"
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                          Revoke
+                        </button>
+                      )}
+                    </td>
+                  </>
+                );
+                return top.flatMap((a) => {
+                  const kids = kidsBy.get(a.id) ?? [];
+                  const isOpen = expanded.has(a.id);
+                  const parent = (
+                    <tr key={a.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {kids.length > 0 ? (
+                            <button
+                              onClick={() => setExpanded((pr) => { const n = new Set(pr); if (n.has(a.id)) n.delete(a.id); else n.add(a.id); return n; })}
+                              className="text-slate-400 hover:text-slate-700 text-xs w-3"
+                            >{isOpen ? '▾' : '▸'}</button>
+                          ) : <span className="inline-block w-3" />}
+                          <div>
+                            <div className="font-medium text-slate-900">{a.agent_name}</div>
+                            {kids.length > 0 && (
+                              <div className="text-[10px] text-indigo-600">{kids.length} device{kids.length > 1 ? 's' : ''} enrolled</div>
+                            )}
+                            {a.agent_version && <div className="text-[10px] text-slate-500">v{a.agent_version}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      {restCells(a)}
+                    </tr>
+                  );
+                  const childRows = isOpen ? kids.map((c) => (
+                    <tr key={c.id} className="bg-slate-50/60">
+                      <td className="px-4 py-3">
+                        <div className="pl-7">
+                          <div className="font-medium text-slate-800 text-sm">{c.agent_name}</div>
+                          {c.agent_version && <div className="text-[10px] text-slate-500">v{c.agent_version}</div>}
+                        </div>
+                      </td>
+                      {restCells(c)}
+                    </tr>
+                  )) : [];
+                  return [parent, ...childRows];
+                });
+              })()}
             </tbody>
           </table>
         </div>
