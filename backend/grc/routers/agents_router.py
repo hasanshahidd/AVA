@@ -50,6 +50,14 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+# Matches a `sudo` / `/usr/bin/sudo` command WORD (at start or after a shell
+# delimiter) plus its trailing space — used to drop sudo from the agent CIS
+# payload, since the endpoint agent already runs as root. The macOS plugins use
+# plain `sudo <cmd>` (no -u/options), so removing the token leaves a valid cmd.
+import re as _re
+_SUDO_WORD_RE = _re.compile(r'(^|[\s(|;&])(?:/usr/bin/)?sudo\s+')
+
+
 def _effective_status(a: ComplianceAgent, now: datetime) -> str:
     """Authoritative status: revoked/pending as stored; active decays to stale
     when the heartbeat goes quiet."""
@@ -820,6 +828,13 @@ def agent_jobs(authorization: Optional[str] = Header(default=None),
             scd = cd.get("linux_ssh") if isinstance(cd.get("linux_ssh"), dict) else cd
             scmd = (scd or {}).get("command")
             if scd and isinstance(scmd, str):
+                # The endpoint agent runs as root (LaunchDaemon), so `sudo` is
+                # redundant for it — and the read-only safety gate BLOCKS sudo,
+                # which would otherwise silently drop every sudo-based macOS check.
+                # Strip the sudo token (command word only) for the AGENT payload;
+                # the STORED command is untouched, so the agentless SSH path (a
+                # non-root user that DOES need sudo) is unchanged.
+                scmd = _SUDO_WORD_RE.sub(lambda m: m.group(1), scmd)
                 scmd = _ssh_sanitize(scmd)
                 if _ssh_safe(scmd)[0]:
                     sh = {"command": scmd, "timeout": int(scd.get("timeout_seconds") or 30)}
