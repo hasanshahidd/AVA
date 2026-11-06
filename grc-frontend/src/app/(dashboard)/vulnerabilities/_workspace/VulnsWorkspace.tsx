@@ -161,6 +161,7 @@ export function VulnsWorkspace(props: VulnsWorkspaceProps) {
     searchTerm, setSearchTerm, canCreate, canDelete, onDelete, onView, onOpenFull, onTemplate, onBulkUpload, onImport, onAdd,
     bulkUploadState = 'idle', bulkUploadMsg, onBulkCreateTickets,
     assetItems = [],
+    assetFilter = 'all', setAssetFilter,
   } = props;
 
   // Independent filter axes, AND-combined — each surfaced as a column-header funnel
