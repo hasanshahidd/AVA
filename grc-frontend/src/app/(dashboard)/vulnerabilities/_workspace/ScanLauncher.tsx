@@ -56,9 +56,15 @@ type CredLite = { id: number; name: string; kind: string; username?: string };
  *  Uses a directory file input; the whole tree is uploaded + SAST-scanned server-side like a clone. */
 function FolderDropzone({ files, folderName, onChange }: { files: File[]; folderName: string; onChange: (f: File[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
   useEffect(() => {
     // webkitdirectory/directory aren't typed input props — set them so a whole folder is pickable.
-    if (inputRef.current) { inputRef.current.setAttribute('webkitdirectory', ''); inputRef.current.setAttribute('directory', ''); }
+    const el = inputRef.current;
+    if (el) { el.setAttribute('webkitdirectory', ''); el.setAttribute('directory', ''); }
+    // Clear the 'Reading folder…' state if the picker is dismissed without choosing.
+    const onCancel = () => setReading(false);
+    el?.addEventListener('cancel', onCancel);
+    return () => { el?.removeEventListener('cancel', onCancel); };
   }, []);
   const totalKb = Math.round(files.reduce((t, f) => t + f.size, 0) / 1024);
   return (
@@ -70,9 +76,16 @@ function FolderDropzone({ files, folderName, onChange }: { files: File[]; folder
           // what a SAST scan needs, so the upload stays fast and the count reflects real source files.
           const keep = picked.filter((f) => !/(^|\/)(node_modules|\.git)(\/|$)/.test(((f as any).webkitRelativePath as string) || f.name));
           onChange(keep.length ? keep : picked);
+          setReading(false);
         }} />
-      {files.length === 0 ? (
-        <label htmlFor="repo-folder-input"
+      {reading && files.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--subtle)', padding: '26px 16px', textAlign: 'center' }}>
+          <Loader2 width={22} height={22} className="spin" color="#005B96" />
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Reading folder…</span>
+          <span style={{ fontSize: 10.5, color: 'var(--faint)' }}>Large folders take a moment to read. Big repos are faster via “Paste repo URL”.</span>
+        </div>
+      ) : files.length === 0 ? (
+        <label htmlFor="repo-folder-input" onClick={() => setReading(true)}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--subtle)', padding: '26px 16px', textAlign: 'center' }}>
           <FolderUp width={22} height={22} color="#94a3b8" />
           <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Choose a folder to scan</span>
