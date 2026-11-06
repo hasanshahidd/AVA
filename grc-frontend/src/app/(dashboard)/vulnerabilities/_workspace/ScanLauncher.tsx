@@ -63,8 +63,14 @@ function FolderDropzone({ files, folderName, onChange }: { files: File[]; folder
   const totalKb = Math.round(files.reduce((t, f) => t + f.size, 0) / 1024);
   return (
     <div>
-      <input ref={inputRef} id="repo-folder-input" type="file" multiple style={{ display: 'none' }}
-        onChange={(e) => onChange(Array.from(e.target.files ?? []))} />
+      <input ref={inputRef} id="repo-folder-input" type="file" multiple {...({ webkitdirectory: '', directory: '' } as any)} style={{ display: 'none' }}
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? []);
+          // Drop version-control + dependency junk (node_modules/.git): huge + slow to upload and not
+          // what a SAST scan needs, so the upload stays fast and the count reflects real source files.
+          const keep = picked.filter((f) => !/(^|\/)(node_modules|\.git)(\/|$)/.test(((f as any).webkitRelativePath as string) || f.name));
+          onChange(keep.length ? keep : picked);
+        }} />
       {files.length === 0 ? (
         <label htmlFor="repo-folder-input"
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--subtle)', padding: '26px 16px', textAlign: 'center' }}>
