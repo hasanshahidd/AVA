@@ -23,7 +23,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Bug, Search, X, ChevronLeft } from 'lucide-react';
 import { InlineLinkPicker } from '@/components/ui';
 import { assetsApi, vulnManagementApi } from '@/lib/api';
@@ -242,6 +242,29 @@ export default function VulnerabilitiesPanel({
     }
     prevScanRunning.current = scanRunning;
   }, [scanRunning, assetId, queryClient]);
+
+  // Agent-managed hosts can't be remote-rescanned (data comes from agent telemetry) — detect via the
+  // asset's matched credential (kind 'agent') so we show an SLA/posture link instead of a Rescan that
+  // would just 409. Agentless hosts get a real Rescan that launches scan.start and shows the banner.
+  const { data: matchedCred = {} } = useQuery<Record<string, { cred_kind?: string }>>({
+    queryKey: ['asset-vuln-matched-cred', assetId],
+    queryFn: async () => (await vulnManagementApi.scan.matchedCredentials([assetId])).data ?? {},
+  });
+  const isAgentManaged = String(matchedCred[String(assetId)]?.cred_kind || '') === 'agent';
+  const rescan = useMutation({
+    mutationFn: async () => isAgentManaged
+      ? (await vulnManagementApi.agentVulnRescan(assetId)).data
+      : (await vulnManagementApi.scan.start(assetId)).data,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['asset-vuln-scan-latest', assetId] }); },
+    onError: (e: any) => { window.alert(e?.response?.data?.detail || 'Could not start the rescan.'); },
+  });
+  const rescanButton = (
+    <button type="button" onClick={() => rescan.mutate()} disabled={rescan.isPending || scanRunning}
+      title={isAgentManaged ? "Re-run the CVE match on this agent host's latest telemetry" : 'Launch a fresh scan of this asset'}
+      className="inline-flex items-center gap-1.5 h-[33px] px-3 rounded-[10px] border border-[#E8ECEE] bg-white text-[12px] font-semibold text-[#014A81] hover:bg-[#EFF5FA] disabled:opacity-60 whitespace-nowrap">
+      {rescan.isPending || scanRunning ? 'Scanning…' : 'Rescan'}
+    </button>
+  );
 
   const filtered = linkedDistinct.filter((v) => {
     if (sevFilter && (v.severity || '').toLowerCase() !== sevFilter) return false;
@@ -471,7 +494,7 @@ export default function VulnerabilitiesPanel({
                   {openCount} open{totalCount !== openCount ? ` · ${totalCount} total` : ''}
                 </span>
               </div>
-              {picker('Link Vulnerability')}
+              <div className="flex items-center gap-2">{rescanButton}{picker('Link Vulnerability')}</div>
             </div>
 
             {pageRows.length > 0 ? (
@@ -612,7 +635,7 @@ export default function VulnerabilitiesPanel({
           </div>
           <div className="text-[15px] font-semibold text-[#0F1F2B]">No Vulnerabilities Linked</div>
           <div className="text-[13px] text-[#8A95A1] mt-1">Link vulnerabilities to track asset exposure</div>
-          <div className="mt-4">{picker('Link First Vulnerability')}</div>
+          <div className="mt-4 flex items-center justify-center gap-2">{rescanButton}{picker('Link First Vulnerability')}</div>
         </div>
       )}
     </div>

@@ -2369,6 +2369,8 @@ export const advisoriesApi = {
 };
 
 export const vulnManagementApi = {
+  // Agent-managed hosts can't be remote-scanned — re-run the CVE match on their latest agent telemetry.
+  agentVulnRescan: (assetId: number) => apiClient.post(`/agents/vuln-rescan/${assetId}`),
   // Register-owned scanning: launch a live find-scan of ONE inventory asset FROM the
   // register (no pentest run, no exploit). Findings land in this register. Poll the job.
   scan: {

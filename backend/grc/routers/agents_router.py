@@ -189,6 +189,20 @@ def enroll_agent(body: EnrollIn, request: Request,
             "install": _install_hint(enr, body.os_family)}
 
 
+@router.post("/vuln-rescan/{asset_id}")
+def agent_vuln_rescan(asset_id: int, current_user: GRCUser = Depends(require_auth),
+                      db: Session = Depends(get_db)):
+    """Re-run the host-CVE match for an AGENT-managed asset on its latest telemetry. Agent hosts can't
+    be remote-scanned, so 'rescan' here re-evaluates the agent's reported inventory against the CVE DB.
+    Fire-and-forget: creates a trackable scan job the Vulnerabilities tab polls. Returns {ok}."""
+    tenant_id = get_user_primary_tenant(current_user, db)
+    asset = db.get(ITAsset, asset_id)
+    if asset is None or asset.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="asset not found")
+    _auto_vuln_first_scan(db.get_bind(), tenant_id, asset_id)
+    return {"ok": True}
+
+
 @router.post("/bulk-enroll")
 def bulk_enroll(body: BulkEnrollIn, current_user: GRCUser = Depends(require_auth),
                 db: Session = Depends(get_db)):
