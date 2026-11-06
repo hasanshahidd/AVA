@@ -634,6 +634,7 @@ def _auto_vuln_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
         Sess = sessionmaker(bind=tenant_engine, expire_on_commit=False)
         wdb = Sess()
         log = logging.getLogger(__name__)
+        sj = None
         try:
             asset = wdb.get(ITAsset, asset_id)
             if asset is None:
@@ -648,6 +649,15 @@ def _auto_vuln_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
             recon = dict(recon)
             recon.setdefault("os", asset.os_version or asset.os_normalized or "")
             target = (asset.host_name or asset.ip_address or "") or ""
+            # Trackable scan-job row so the asset Vulnerabilities tab can show a "scanning"
+            # state (parity with CIS) instead of a misleading empty list while this background
+            # CVE sweep runs. Fire-and-forget worker; this never blocks the agent report path.
+            from grc.models import PentestScanJob as _PSJ
+            from datetime import datetime as _dtnow
+            sj = _PSJ(tenant_id=tenant_id, asset_id=asset_id, target=target, lane="host",
+                      find_mcp="agent", status="running", stage="host-cve", progress=10,
+                      started_at=_dtnow.utcnow())
+            wdb.add(sj); wdb.commit()
             job = SimpleNamespace(asset_id=asset_id, tenant_id=tenant_id,
                                   target=target, id=f"agent-vuln-a{asset_id}")
             _pt._ingest_agent_recon(wdb, job, recon)
@@ -662,8 +672,14 @@ def _auto_vuln_first_scan(tenant_engine, tenant_id: int, asset_id: int) -> None:
                 _pt.llm_classify(wdb, tenant_id, asset_id, candidates_only=True)
             except Exception:
                 log.warning("agent auto-vuln adjudicate failed (non-fatal)", exc_info=True)
+            sj.status = "done"; sj.progress = 100; sj.finished_at = _dtnow.utcnow(); wdb.commit()
         except Exception:
             log.exception("agent auto-vuln first scan failed (non-fatal)")
+            if sj is not None:
+                try:
+                    sj.status = "failed"; sj.finished_at = _dtnow.utcnow(); wdb.commit()
+                except Exception:
+                    pass
         finally:
             wdb.close()
 

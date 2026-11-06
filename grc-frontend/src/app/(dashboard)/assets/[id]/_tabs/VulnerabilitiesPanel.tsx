@@ -22,11 +22,11 @@
  * assetId/canEdit props — it is rendered unchanged, exactly as the tab does today.
  */
 
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, Search, X, ChevronLeft } from 'lucide-react';
 import { InlineLinkPicker } from '@/components/ui';
-import { assetsApi } from '@/lib/api';
+import { assetsApi, vulnManagementApi } from '@/lib/api';
 import { AlertsPanel } from '@/components/shared/EntityExtras';
 // Reuse the register's full contextual finding detail verbatim (risk scoring +
 // pentest exploit-intel) so opening a linked finding here shows the SAME summary
@@ -221,6 +221,28 @@ export default function VulnerabilitiesPanel({
     queryFn: async () => (await assetsApi.vulnRiskProfile(assetId)).data,
   });
 
+  // Poll the host's latest scan so this tab shows a "scanning" state (parity with the CIS
+  // tab) while the enrolment CVE sweep — or a manual re-scan — runs, instead of a misleading
+  // empty list. Only polls while a job is live; refetches the asset once it finishes.
+  const queryClient = useQueryClient();
+  const scanLatestQ = useQuery<any>({
+    queryKey: ['asset-vuln-scan-latest', assetId],
+    queryFn: async () => (await vulnManagementApi.scan.latest(assetId)).data,
+    refetchInterval: (q: any) => {
+      const s = String(q.state.data?.status || '').toLowerCase();
+      return (s === 'running' || s === 'queued' || s === 'pending') ? 4000 : false;
+    },
+  });
+  const scanRunning = ['running', 'queued', 'pending'].includes(
+    String(scanLatestQ.data?.status || '').toLowerCase());
+  const prevScanRunning = useRef(false);
+  useEffect(() => {
+    if (prevScanRunning.current && !scanRunning) {
+      queryClient.invalidateQueries({ queryKey: ['asset-detail', assetId] });
+    }
+    prevScanRunning.current = scanRunning;
+  }, [scanRunning, assetId, queryClient]);
+
   const filtered = linkedDistinct.filter((v) => {
     if (sevFilter && (v.severity || '').toLowerCase() !== sevFilter) return false;
     if (search) {
@@ -269,6 +291,15 @@ export default function VulnerabilitiesPanel({
 
   return (
     <div className="flex flex-col gap-[14px]">
+      {scanRunning && (
+        <div className="flex items-center gap-2 rounded-[12px] border border-[#BFE0F0] bg-[#F3F9FC] px-3.5 py-2.5 text-[12.5px] text-[#014A81]">
+          <svg className="h-4 w-4 animate-spin flex-none text-[#005B96]" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
+          </svg>
+          <span>Scanning host — collecting vulnerabilities. Results appear here when the sweep finishes (usually a minute or two for a freshly enrolled host).</span>
+        </div>
+      )}
       {/* Risk score + posture summary on top — the risk score matters most, so it is
           lifted above the alerts. Only renders when the asset has findings. */}
       {totalCount > 0 && (
