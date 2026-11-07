@@ -53,7 +53,7 @@ const LINUX: Record<string, Spec> = {
 const SOFTWARE_SPEC: Spec = [{ name: 's', version: 's', publisher: 's', source: 's' }];
 export const SOFTWARE_KEY = '__installed_packages';
 
-// Same domains and order as the Overview (_overview-design.tsx DOMS).
+// Same domains and order as the Overview toggle pages (_overview-design.tsx).
 const DOMAINS: { key: string; label: string; sub: string; keys: string[] }[] = [
   { key: 'hardware', label: 'Hardware Telemetry', sub: 'Machine identity, compute, storage, network interfaces & firmware',
     keys: ['identity', 'cpu', 'memory', 'gpu', 'storage', 'storage_disks', 'storage_mounts', 'lvm', 'raid', 'network', 'net_addr', 'net_link', 'net_route', 'dns', 'firmware'] },

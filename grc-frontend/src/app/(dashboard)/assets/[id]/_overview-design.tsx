@@ -1,555 +1,197 @@
 'use client';
 
 /*
- * AssetOverview — GRC / compliance asset detail (Overview tab).
- * Design handoff, used VERBATIM. The only change from the delivered file is that
- * the inlined demo `ASSET` constant is replaced by an `A` prop, so the exact same
- * UI renders against live API data (see _overview-map.ts for the mapper).
+ * AssetOverview — asset detail Overview tab.
+ * Telemetry is shown as toggle pages (Hardware · Software · Security · Ownership &
+ * context for hosts; the kind's own groups for external / database / network /
+ * cloud / cluster / directory assets), each a dashboard of cards.
  *
- * Fonts: the design uses "Public Sans" (UI) and "IBM Plex Mono" (technical values).
- * Add them once in app/layout via next/font or a <link>, e.g.
- *   https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap
+ * Data: `A` from _overview-map.buildOverviewData. Hosts get curated cards built
+ * from the raw collector sections (A.raw.pp); every section a curated card does
+ * NOT claim — and every leftover field inside a claimed section — still renders
+ * through the generic section cards / "More details" rows, so no collected field
+ * is dropped. Missing data is shown as an honest muted state, never invented.
  */
 
 import React, { useMemo, useState } from 'react';
+import { MONO, CARD, TONE, dataOf, Card, Row, Muted, Sub, SectionCards, ProvenanceCard, HardwareCards, SoftwareCards, SecurityCards, securityReview, claimedKeys } from './_telemetry-cards';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// deterministic layout: which deep-inventory sections span full width vs share a row, and their order
-const LAYOUT: Record<string, 'half' | 'full'> = { CPU: 'half', Firmware: 'half', Memory: 'half', Storage: 'half', GPU: 'full', 'Microsoft Defender': 'half', BitLocker: 'half', Firewall: 'full', 'Operating System': 'full', 'Windows Update': 'half', 'Scheduled Tasks': 'half', Shares: 'full', Services: 'full', 'Network Adapters': 'full', 'Local Users': 'full', 'Local Groups': 'full' };
-const ORDER: Record<string, string[]> = { hardware: ['CPU', 'Firmware', 'Memory', 'Storage', 'GPU'], security: ['Microsoft Defender', 'BitLocker', 'Firewall'], system: ['Operating System', 'Windows Update', 'Scheduled Tasks', 'Shares', 'Services'] };
-
-const MONO = "font-['IBM_Plex_Mono',ui-monospace,monospace]";
-const SHADOW = 'shadow-[0_1px_2px_rgba(18,45,36,0.05),0_12px_26px_-18px_rgba(18,45,36,0.22)]';
-const CARD = `bg-white border border-[#e8ecee] rounded-2xl overflow-hidden ${SHADOW}`;
-const HOVER = 'transition-[box-shadow,transform] duration-200 hover:shadow-[0_10px_26px_-10px_rgba(18,45,36,0.30)] hover:-translate-y-0.5';
-const TONE: Record<string, string> = { ok: '#014A81', warn: '#9a6410', bad: '#b23a3a', muted: '#8a95a1' };
-
-function badgeCls(status: string) {
-  const map: Record<string, string> = {
-    discovered: 'text-[#014A81] bg-[#e7f5ee] border-[#B3CDE0]',
-    error: 'text-[#b23a3a] bg-[#fbeaea] border-[#fbeaea]',
-    permission_denied: 'text-[#9a6410] bg-[#fbf2df] border-[#fbf2df]',
-  };
-  return 'text-[9.5px] font-bold tracking-[0.04em] uppercase px-2 py-0.5 rounded-md border ' + (map[status] || 'text-[#3a4653] bg-[#fafbfc] border-[#e8ecee]');
-}
-
-function Cell({ label, value, tone, mono }: any) {
-  const empty = value === '—' || value === '' || value == null;
-  const v = empty ? 'Not set' : value;
-  const wide = !empty && typeof v === 'string' && v.length > 24;
-  const color = empty ? '#8a95a1' : TONE[tone] || '#0f1f2b';
-  return (
-    <div className={'min-w-0' + (wide ? ' sm:col-span-2' : '')}>
-      <div className="text-[10px] font-bold tracking-[0.05em] uppercase text-[#8a95a1] mb-0.5">{label}</div>
-      <div className={(mono ? MONO + ' text-[12px]' : 'text-[13px]') + ' break-words leading-snug'} style={{ color, fontStyle: empty ? 'italic' : undefined }}>{v}</div>
-    </div>
-  );
-}
-
-function KV({ items }: { items: any[] }) {
-  const inline = items.length <= 2;
-  return (
-    <div className={inline ? 'flex flex-wrap gap-x-8 gap-y-2' : 'grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-x-5 gap-y-3'}>
-      {items.map((it, i) => <Cell key={i} {...it} />)}
-    </div>
-  );
-}
-
-function ObjList({ label, objects }: { label?: string; objects: any[] }) {
-  return (
-    <div>
-      {label && <div className="text-[10px] font-bold tracking-[0.04em] uppercase text-[#3a4653] mb-2">{label}</div>}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2">
-        {objects.map((o, i) => (
-          <div key={i} className="border border-[#f0f3f5] bg-[#fafbfc] rounded-lg px-3 py-2.5">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-x-3.5 gap-y-2">
-              {o.map((it: any, j: number) => <Cell key={j} {...it} />)}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ items }: { items: any[] }) {
-  return (
-    <div className="flex gap-2.5">
-      {items.map((it, i) => (
-        <div key={i} className="flex-1 bg-[#fafbfc] border border-[#e8ecee] rounded-xl py-3 text-center">
-          <div className={'text-[22px] font-extrabold text-[#014A81] leading-none ' + MONO}>{it.value}</div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[#8a95a1] mt-1.5">{it.label}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SmallTable({ head, children }: { head: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="border border-[#f0f3f5] rounded-xl overflow-hidden">
-      <div className="max-h-[360px] overflow-auto">
-        <table className="w-full border-collapse text-[12px]">
-          <thead>{head}</thead>
-          <tbody>{children}</tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-const TH = 'text-left sticky top-0 bg-[#fafbfc] text-[#3a4653] font-bold text-[10px] tracking-[0.04em] uppercase px-3 py-2 border-b border-[#e8ecee]';
-const TD = 'px-3 py-2 border-b border-[#f0f3f5] align-top';
-
-function UsersTable({ rows }: { rows: any[] }) {
-  return (
-    <SmallTable head={<tr><th className={TH}>Account</th><th className={TH}>SID</th><th className={TH + ' text-center'}>Status</th></tr>}>
-      {rows.map((r, i) => {
-        const disabled = r[4] === '✓';
-        const full = r[0] && r[0] !== '—' ? r[0] : '';
-        return (
-          <tr key={i}>
-            <td className={TD}>
-              <div className="font-semibold text-[#0f1f2b]">{r[1]}</div>
-              {full && <div className="text-[#8a95a1] text-[11px]">{full}</div>}
-            </td>
-            <td className={TD + ' text-[#8a95a1] text-[10.5px] break-all ' + MONO}>{r[2]}</td>
-            <td className={TD + ' text-center'}>
-              <span className={'text-[10px] font-bold uppercase tracking-[0.03em] rounded-md px-2 py-0.5 border ' + (disabled ? 'text-[#8a95a1] bg-[#fafbfc] border-[#e8ecee]' : 'text-[#014A81] bg-[#e7f5ee] border-[#B3CDE0]')}>{disabled ? 'Disabled' : 'Enabled'}</span>
-            </td>
-          </tr>
-        );
-      })}
-    </SmallTable>
-  );
-}
-
-function GroupsTable({ rows }: { rows: any[] }) {
-  return (
-    <SmallTable head={<tr><th className={TH + ' w-[38%]'}>Group</th><th className={TH}>Description</th></tr>}>
-      {rows.map((r, i) => (
-        <tr key={i}>
-          <td className={TD + ' font-semibold text-[#0f1f2b]'}>{r[0]}</td>
-          <td className={TD + ' text-[#3a4653]'}>{r[1]}</td>
-        </tr>
-      ))}
-    </SmallTable>
-  );
-}
-
-// Generic table for any kind's big lists (DB databases, router interfaces, cloud
-// resources…). Reuses the exact TH/TD styling of the users/groups tables so it
-// reads as one system; the first column is emphasised like a name.
-function GenericTable({ headers, rows }: { headers: string[]; rows: any[] }) {
-  return (
-    <SmallTable head={<tr>{headers.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr>}>
-      {rows.map((r, i) => (
-        <tr key={i}>
-          {r.map((c: any, j: number) => (
-            <td key={j} className={TD + (j === 0 ? ' font-semibold text-[#0f1f2b]' : ' text-[#3a4653]')}>{c}</td>
-          ))}
-        </tr>
-      ))}
-    </SmallTable>
-  );
-}
-
-function Block({ b }: { b: any }) {
-  if (b.type === 'note') return <div className="text-[12.5px] text-[#8a95a1] italic leading-snug">{b.text}</div>;
-  if (b.type === 'kv') return <KV items={b.items} />;
-  if (b.type === 'sub') return (<div><div className="text-[10px] font-bold tracking-[0.04em] uppercase text-[#3a4653] mb-2">{b.label}</div><KV items={b.items} /></div>);
-  if (b.type === 'objlist') return <ObjList label={b.label} objects={b.objects} />;
-  if (b.type === 'stat') return <Stat items={b.items} />;
-  if (b.type === 'table' && b.variant === 'users') return <UsersTable rows={b.rows} />;
-  if (b.type === 'table' && b.variant === 'groups') return <GroupsTable rows={b.rows} />;
-  if (b.type === 'table') return <GenericTable headers={b.headers} rows={b.rows} />;
-  return null;
-}
-
-function secSummary(sec: any): string {
-  if (sec.rows) return `${sec.rows.length} rows`;
-  let n = 0;
-  for (const b of (sec.blocks || [])) {
-    if (b.type === 'table') return `${(b.rows || []).length} rows`;
-    if (b.type === 'objlist') n += (b.objects || []).length;
-    else if (b.items) n += b.items.length;
-  }
-  return n ? `${n} field${n === 1 ? '' : 's'}` : (sec.status || '');
-}
-function SectionCard({ sec }: { sec: any; span?: 'half' | 'full' }) {
-  return (
-    <details className="group border-t border-[#f0f3f5]">
-      <summary className="list-none cursor-pointer select-none flex items-center gap-2.5 px-3.5 py-[7px] hover:bg-[#f7fbfa]">
-        <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0 text-[#aeb8c2] transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-        <span className="text-[11.5px] font-semibold text-[#0f1f2b] flex-1 min-w-0">{sec.title}</span>
-        <span className="text-[10.5px] text-[#aeb8c2] whitespace-nowrap ml-2">{secSummary(sec)}</span>
-      </summary>
-      <div className="px-3.5 pb-3 pt-0.5 flex flex-col gap-3.5">
-        {(sec.blocks || []).map((b: any, i: number) => <Block key={i} b={b} />)}
-      </div>
-    </details>
-  );
-}
-
-function ProvenanceCard({ card, accent, kind, full }: { card: any; accent: string; kind: 'machine' | 'manual'; full?: boolean }) {
-  const setCount = kind === 'manual' ? card.fields.filter((f: any) => f.value !== '—' && f.value !== '' && f.value != null).length : 0;
-  return (
-    <div className={CARD + ' ' + HOVER + ' border-l-[3px] ' + accent + (full ? ' lg:col-span-2' : '')}>
-      <div className="flex items-center justify-between gap-3 px-[18px] py-[15px] border-b border-[#f0f3f5]">
-        <div className="text-[14px] font-bold text-[#0f1f2b]">{card.title}</div>
-        {kind === 'machine'
-          ? <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold tracking-[0.03em] uppercase text-[#014A81] bg-[#e7f5ee] border border-[#B3CDE0] px-2.5 py-[3px] rounded-full">{card.note}</span>
-          : <a onClick={card.onEdit} className="text-[12px] font-semibold text-[#014A81] cursor-pointer">Edit</a>}
-      </div>
-      <div className="px-[18px] py-4">
-        {kind === 'manual' && (
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="flex-1 h-1.5 bg-[#f4f6f7] rounded-full overflow-hidden"><div className="h-full bg-[#e2b33c]" style={{ width: (card.complete != null ? card.complete : Math.round((setCount / card.fields.length) * 100)) + '%' }} /></div>
-            <span className="text-[11px] font-bold text-[#c79a3a] whitespace-nowrap">{setCount} of {card.fields.length} set</span>
-          </div>
-        )}
-        {card.tiles && (
-          <div className="flex gap-2.5 mb-4">
-            {card.tiles.map((t: any, i: number) => (
-              <div key={i} className="flex-1 bg-[#fafbfc] border border-[#e8ecee] rounded-xl py-3 text-center">
-                <div className={'text-[24px] font-extrabold text-[#014A81] leading-none ' + MONO}>{t.num}</div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[#8a95a1] mt-1.5">{t.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-x-5 gap-y-3.5">
-          {card.fields.map((f: any, i: number) => <Cell key={i} {...f} />)}
-        </div>
-      </div>
-    </div>
-  );
-}
+/* ── main ───────────────────────────────────────────────────────────────── */
 
 type SurfaceFingerprint = { osGuess: string | null; product: string | null; sshBanner: string | null; httpServer: string | null; httpTitle: string | null; snmpSysdescr: string | null; confidence: number | null; evidence: string[] | null; hostname: string | null };
 type SurfaceFacts = { ip: string | null; mac: string | null; ports: number[] | null; deviceType: string | null; vendor: string | null; internetFacing: boolean; fingerprint?: SurfaceFingerprint | null };
 
+function SurfacePage({ A, surface }: { A: any; surface: SurfaceFacts }) {
+  const ports = surface.ports || [];
+  const fp = surface.fingerprint || null;
+  const cap = (s: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+  const facts: [string, string, boolean?][] = [['IP address', surface.ip || '—', true], ['MAC', surface.mac || '—', true], ['Device type', surface.deviceType || '—'], ['Vendor', surface.vendor || '—'], ['Internet-facing', surface.internetFacing ? 'Yes' : 'No']];
+  if (fp?.osGuess) facts.push(['OS (inferred)', cap(fp.osGuess)]);
+  if (fp?.product) facts.push(['Primary product', fp.product]);
+  if (fp?.hostname && fp.hostname !== surface.ip) facts.push(['Computer name', fp.hostname]);
+  const intel: [string, string][] = [];
+  if (fp?.sshBanner) intel.push(['SSH service', fp.sshBanner]);
+  if (fp?.httpServer) intel.push(['Web server', fp.httpServer + (fp.httpTitle ? ` — "${fp.httpTitle}"` : '')]);
+  else if (fp?.httpTitle) intel.push(['Web page', `"${fp.httpTitle}"`]);
+  if (fp?.snmpSysdescr) intel.push(['SNMP sysDescr', fp.snmpSysdescr]);
+  if (fp && (fp.confidence != null || (fp.evidence && fp.evidence.length))) intel.push(['Classification', `${surface.deviceType || 'host'}${fp.confidence != null ? ` · ${Math.round(fp.confidence * 100)}% confidence` : ''}${fp.evidence && fp.evidence.length ? ` · via ${fp.evidence.join(', ')}` : ''}`]);
+  const gate = (what: string) => (
+    <div className="flex items-center gap-3 rounded-xl border border-dashed border-[#dfe4e8] bg-[#fafbfc] px-3.5 py-2.5 lg:col-span-2">
+      <span className={'text-[12px] font-bold text-[#0f1f2b] ' + MONO}>{surface.ip || A.header?.name}</span>
+      <span className="text-[12px] text-[#6b7787] flex-1">{what}</span>
+      <span className="text-[11px] font-semibold text-[#6b7787] bg-[#eef1f3] border border-[#dfe4e8] rounded-md px-2 py-[2px] whitespace-nowrap">Requires credentials</span>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+      <Card title="Surface facts" meta="credential-free sweep · agentless">
+        {facts.map(([k, v, m]) => <Row key={k} label={k} value={v === '—' ? null : v} mono={m} />)}
+        <Sub>Open ports</Sub>
+        {ports.length ? <div className="flex flex-wrap gap-1.5">{ports.map((p) => <span key={p} className={'text-[11.5px] font-semibold text-[#28578f] bg-[#e7f0f8] border border-[#cfe0f0] rounded-md px-2 py-0.5 ' + MONO}>{p}</span>)}</div> : <Muted>No open ports recorded</Muted>}
+      </Card>
+      <Card title="Surface intelligence" meta="inferred, no credentials">
+        {intel.length ? intel.map(([k, v]) => <Row key={k} label={k} value={v} mono={k !== 'Classification'} />) : <Muted>No banners or service versions captured by the sweep</Muted>}
+      </Card>
+      {gate('Hardware · CPU · memory · storage · firmware')}
+      {gate('Operating system · installed software · patches · services')}
+      {gate('Defender · firewall · disk encryption · local users')}
+      <div className="lg:col-span-2 text-[11px] text-[#8a95a1]">Connect this asset with credentials (or install the agent) to collect deep telemetry.</div>
+    </div>
+  );
+}
+
 export default function AssetOverview({ A, surface, riskProfile }: { A: any; surface?: SurfaceFacts | null; riskProfile?: any }) {
-  // Default to the first collected domain — 'hardware' for a host, 'instance' for
-  // a database, 'account' for cloud, etc. — so the correct tab is highlighted.
-  const [deepTab, setDeepTab] = useState<string>(() => A.deep?.[0]?.key || 'hardware');
-  const [swQuery, setSwQuery] = useState('');
-  const [svcQuery, setSvcQuery] = useState('');
-  const [svcState, setSvcState] = useState<'all' | 'running' | 'stopped'>('all');
-  // Which KPI tile has its breakdown open (only the hygiene tile carries one).
+  const pp = A.raw?.pp || {};
+  const asset = A.raw?.asset || {};
+  const hostCurated = !!A.server && !surface;
+  const review = useMemo(() => securityReview(pp), [pp]);
+  const reviewTotal = Object.values(review).reduce((n, l) => n + l.length, 0);
+  const claimed = useMemo(() => (hostCurated ? claimedKeys(pp) : new Set<string>()), [pp, hostCurated]);
+
+  // Generic sections per host domain — whatever the curated cards don't claim.
+  const hostDoms = useMemo(() => {
+    const secsOf = (keys: string[]) => A.deep.filter((g: any) => keys.includes(g.key)).flatMap((g: any) => g.sections || []).filter((s: any) => !claimed.has(s.key));
+    const known = ['hardware', 'network', 'system', 'packagesservices', 'security', 'accountsaccess', 'accounts'];
+    return {
+      hardware: secsOf(['hardware', 'network']),
+      software: [...secsOf(['system', 'packagesservices']), ...A.deep.filter((g: any) => !known.includes(g.key)).flatMap((g: any) => g.sections || []).filter((s: any) => !claimed.has(s.key))],
+      security: secsOf(['security', 'accountsaccess', 'accounts']),
+    };
+  }, [A, claimed]);
+
+  const tabs: { key: string; label: string; sub?: string }[] = surface
+    ? [{ key: 'surface', label: 'Surface telemetry' }]
+    : hostCurated
+      ? [{ key: 'hardware', label: 'Hardware telemetry' }, { key: 'software', label: 'Software telemetry' }, { key: 'security', label: 'Security telemetry' }]
+      : A.deep.length
+        ? A.deep.map((g: any) => ({ key: 'g:' + g.key, label: g.pill || g.label, sub: g.sub }))
+        : [{ key: 'telemetry', label: A.external ? 'Outside-in telemetry' : 'Telemetry' }];
+  if (A.manual?.length) tabs.push({ key: 'ownership', label: 'Ownership & context' });
+  const [tab, setTab] = useState<string>(tabs[0].key);
+  const active = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
   const [openKpi, setOpenKpi] = useState<number | null>(null);
-  // Risk Before/After breakdown reveal (the 3rd card toggles the averaged parameter table).
   const [riskView, setRiskView] = useState<'before' | 'after' | null>(null);
 
-  const software = useMemo(() => {
-    const q = swQuery.trim().toLowerCase();
-    const rows = A.security.software;
-    return q ? rows.filter((p: any) => (p.name + ' ' + p.version).toLowerCase().includes(q)) : rows;
-  }, [A, swQuery]);
+  const idn = dataOf(pp, 'identity') || {};
+  const make = idn.manufacturer || asset.manufacturer;
+  const model = idn.model || asset.model;
+  const hw = model ? (make && !String(model).toLowerCase().startsWith(String(make).toLowerCase()) ? `${make} ${model}` : model) : make;
+  const osName = String(dataOf(pp, 'os')?.edition || asset.os_version || '').replace(/^Microsoft /, '');
+  const headLine = A.external ? A.header?.idline : [hw, osName, asset.ip_address].filter(Boolean).join(' · ');
+  const sectionCount = A.deep.reduce((n: number, g: any) => n + g.sections.length, 0);
 
-  const group = A.deep.find((g: any) => g.key === deepTab) || A.deep[0] || { key: 'hardware', sections: [] };
-  const deepSections = useMemo(() => {
-    const order = ORDER[group.key];
-    const secs = order ? [...group.sections].sort((a: any, b: any) => (order.indexOf(a.title) < 0 ? 99 : order.indexOf(a.title)) - (order.indexOf(b.title) < 0 ? 99 : order.indexOf(b.title))) : group.sections;
-    return secs;
-  }, [group]);
-
-  const svcSection = useMemo(() => (A.deep.find((g: any) => g.key === 'system') || { sections: [] }).sections.find((s: any) => s.variant === 'services'), [A]);
-  const svc = useMemo(() => {
-    if (!svcSection) return { rows: [], run: 0, stop: 0, total: 0 };
-    const rows = svcSection.rows;
-    const run = rows.filter((r: any) => r[4] === 'Running').length;
-    const stop = rows.filter((r: any) => r[4] === 'Stopped').length;
-    const q = svcQuery.trim().toLowerCase();
-    let f = rows;
-    if (svcState === 'running') f = f.filter((r: any) => r[4] === 'Running');
-    else if (svcState === 'stopped') f = f.filter((r: any) => r[4] === 'Stopped');
-    if (q) f = f.filter((r: any) => (r[1] + ' ' + r[5] + ' ' + r[0] + ' ' + r[2]).toLowerCase().includes(q));
-    return { rows: f, run, stop, total: rows.length };
-  }, [svcSection, svcQuery, svcState]);
-
-  const spanOf = (sec: any): 'half' | 'full' => {
-    const blocks = sec.blocks || [];
-    const wide = sec.variant === 'services' || blocks.some((b: any) => b.type === 'table') || blocks.some((b: any) => b.type === 'objlist' && (b.objects || []).length >= 3);
-    return LAYOUT[sec.title] || (wide ? 'full' : 'half');
-  };
-
-  const DOMS = useMemo(() => {
-    // External / outside-in assets (domains, EASM) have a different telemetry
-    // shape. The mapper (buildExternalDeep) already groups external_probe into
-    // ordered Domain & DNS / Web, TLS & Exposure / Infrastructure groups — consume
-    // them straight so the pills read in that exact order. `pill` = short jump-bar
-    // label; `label` = the longer telemetry header.
-    if (A.external) {
-      return A.deep
-        .filter((g: any) => (g.sections || []).length > 0)
-        .map((g: any) => ({ key: g.key, label: g.label, pill: g.pill || g.label, sub: g.sub, secs: g.sections }));
-    }
-    const sortedOf = (k: string, titles: string[]) => {
-      const g = A.deep.find((x: any) => x.key === k);
-      if (!g) return [];
-      return [...g.sections].sort((a: any, b: any) => (titles.indexOf(a.title) < 0 ? 99 : titles.indexOf(a.title)) - (titles.indexOf(b.title) < 0 ? 99 : titles.indexOf(b.title)));
-    };
-    const HW = ['Machine identity', 'Compute · CPU', 'Memory', 'GPU', 'Storage', 'Network interfaces', 'Firmware'];
-    const SW = ['Operating system', 'Updates & patching', 'Services', 'Scheduled tasks', 'Shares'];
-    const SEC = ['Endpoint protection', 'EDR / XDR', 'EDR', 'Antivirus', 'BitLocker', 'Defender', 'Firewall', 'Local users', 'Users', 'Local groups', 'Groups'];
-    const known = ['hardware', 'network', 'system', 'security', 'accountsaccess'];
-    const extras = A.deep.filter((g: any) => known.indexOf(g.key) < 0).flatMap((g: any) => g.sections || []);
-    const doms = [
-      { key: 'hardware', label: 'Hardware Telemetry', sub: 'Machine identity, compute, storage, network interfaces & firmware · agentless scan', secs: [...sortedOf('hardware', HW), ...sortedOf('network', HW)] },
-      { key: 'software', label: 'Software Telemetry', sub: 'Operating system, updates, services & system configuration · agentless scan', secs: [...sortedOf('system', SW), ...extras] },
-      { key: 'security', label: 'Security Telemetry', sub: 'Endpoint protection, encryption, firewall & accounts', secs: [...sortedOf('security', SEC), ...sortedOf('accountsaccess', SEC)] },
-    ];
-    return doms.filter((d) => d.secs.length > 0);
-  }, [A]);
-
-  // ── Surface (agentless) asset: field-gated overview ──────────────────────
-  // No credentialed collection ran, so the deep telemetry domains are empty.
-  // Show the sweep facts + an honest "requires credentials" gate instead of
-  // the blank KPI strip / telemetry cards the credentialed path renders.
-  if (surface) {
-    const ports = surface.ports || [];
-    const fp = surface.fingerprint || null;
-    const cap = (s: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
-    const facts: [string, string][] = [
-      ['IP address', surface.ip || '—'],
-      ['MAC', surface.mac || '—'],
-      ['Device type', surface.deviceType || '—'],
-      ['Vendor', surface.vendor || '—'],
-      ['Internet-facing', surface.internetFacing ? 'Yes' : 'No'],
-    ];
-    if (fp?.osGuess) facts.push(['OS (inferred)', cap(fp.osGuess)]);
-    if (fp?.product) facts.push(['Primary product', fp.product]);
-    if (fp?.hostname && fp.hostname !== surface.ip) facts.push(['Computer name', fp.hostname]);
-    // Credential-free "surface intelligence" — banners + service versions the
-    // sweep already captured; shown so the page isn't a bare IP + "needs creds".
-    const intel: [string, string][] = [];
-    if (fp?.sshBanner) intel.push(['SSH service', fp.sshBanner]);
-    if (fp?.httpServer) intel.push(['Web server', fp.httpServer + (fp.httpTitle ? ` — "${fp.httpTitle}"` : '')]);
-    else if (fp?.httpTitle) intel.push(['Web page', `"${fp.httpTitle}"`]);
-    if (fp?.snmpSysdescr) intel.push(['SNMP sysDescr', fp.snmpSysdescr]);
-    const classLine = fp && (fp.confidence != null || (fp.evidence && fp.evidence.length))
-      ? `${surface.deviceType || 'host'}${fp.confidence != null ? ` · ${Math.round(fp.confidence * 100)}% confidence` : ''}${fp.evidence && fp.evidence.length ? ` · via ${fp.evidence.join(', ')}` : ''}`
-      : null;
-    return (
-      <div className="inv2" style={{ fontSize: 13.5 }}>
-        {/* Surface facts */}
-        <div className={CARD + ' mb-2.5'}>
-          <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#eef1f3', color: '#6b7787' }}>
-              <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-bold text-[#0f1f2b]">Surface asset · agentless</div>
-              <div className="text-[10px] text-[#8a95a1]">Discovered by a credential-free sweep — only externally-visible facts are known</div>
-            </div>
-            <span className="text-[10px] font-semibold text-[#6b7787] bg-[#eef1f3] border border-[#dfe4e8] rounded-full px-2 py-[2px] whitespace-nowrap">Surface / Agentless</span>
-          </div>
-          <div className="p-4 grid grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3">
-            {facts.map(([k, val]) => (
-              <div key={k}>
-                <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide">{k}</div>
-                <div className={'text-[13px] text-[#0f1f2b] mt-0.5 ' + (k === 'IP address' || k === 'MAC' ? MONO : '')}>{val}</div>
-              </div>
-            ))}
-            <div className="col-span-2 lg:col-span-3">
-              <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide mb-1">Open ports</div>
-              {ports.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {ports.map((p) => <span key={p} className={'text-[11.5px] font-semibold text-[#28578f] bg-[#e7f0f8] border border-[#cfe0f0] rounded-md px-2 py-0.5 ' + MONO}>{p}</span>)}
-                </div>
-              ) : <div className="text-[12px] text-[#aeb8c2]">No open ports recorded</div>}
-            </div>
-            {intel.length > 0 && (
-              <div className="col-span-2 lg:col-span-3 border-t border-[#eef1f3] pt-3 mt-1">
-                <div className="text-[10px] text-[#8a95a1] uppercase tracking-wide mb-2">Surface intelligence · inferred, no credentials</div>
-                <div className="space-y-2">
-                  {intel.map(([k, v]) => (
-                    <div key={k} className="flex gap-3">
-                      <div className="text-[11px] text-[#8a95a1] w-28 flex-none">{k}</div>
-                      <div className={'text-[12px] text-[#0f1f2b] min-w-0 break-words ' + MONO}>{v}</div>
-                    </div>
-                  ))}
-                  {classLine && (
-                    <div className="flex gap-3">
-                      <div className="text-[11px] text-[#8a95a1] w-28 flex-none">Classification</div>
-                      <div className="text-[12px] text-[#0f1f2b]">{classLine}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Deep telemetry gate — OS / software / patches / hardware */}
-        <div className={CARD + ' mb-2.5'}>
-          <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#f6efe0', color: '#9a6410' }}>
-              <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-bold text-[#0f1f2b]">Operating system · software · patches · hardware</div>
-              <div className="text-[10px] text-[#8a95a1]">Deep inventory</div>
-            </div>
-          </div>
-          <div className="px-4 py-6 text-center">
-            <div className="text-[13px] font-semibold text-[#6b7787]">Requires credentials — not collected</div>
-            <div className="text-[11.5px] text-[#aeb8c2] mt-1 max-w-md mx-auto">Connect this asset with credentials to collect operating system, installed software, patch level and hardware telemetry.</div>
-          </div>
-        </div>
-
-        {/* Ownership & Business Context — manually maintained, still relevant for surface assets */}
-        {A.manual?.length > 0 && (
-          <section className={CARD + ' mb-2.5'}>
-            <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#fbf2df', color: '#9a6410' }}>
-                <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /></svg>
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[12.5px] font-bold text-[#0f1f2b]">Ownership &amp; Context</div>
-                <div className="text-[10px] text-[#8a95a1]">Ownership, business context &amp; procurement · manually maintained</div>
-              </div>
-            </div>
-            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
-              {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} accent="border-l-[#e2b33c]" kind="manual" full />)}
-            </div>
-          </section>
-        )}
-
-        <div className="text-center text-[#aeb8c2] text-[10.5px] mt-4">Surface overview · {A.header?.name} · agentless discovery · no credentialed collection</div>
-      </div>
-    );
-  }
+  const beforeRows = riskProfile && Array.isArray(riskProfile.before_groups) ? riskProfile.before_groups : [];
+  const afterRows = riskProfile && Array.isArray(riskProfile.groups) ? riskProfile.groups.flatMap((g: any) => g.rows || []) : [];
+  const riskRows = riskView === 'before' ? beforeRows : riskView === 'after' ? afterRows : [];
+  const hasRisk = riskProfile && riskProfile.raw != null;
+  const kpiCell = 'flex-1 min-w-[112px] px-3 py-1.5 border-r border-[#f0f3f5] last:border-r-0';
 
   return (
     <div className="inv2" style={{ fontSize: 13.5 }}>
-      {/* provenance legend + collection line */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mx-0.5 mb-2 text-[10px]">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#014A81]" /><span className="text-[#8a95a1]">Machine-collected</span></span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#e2b33c]" /><span className="text-[#8a95a1]">Manual · CMDB</span></span>
-        <span className="ml-auto text-[#aeb8c2]">{A.deep.reduce((n: number, g: any) => n + g.sections.length, 0)} machine-collected sections across {A.deep.length} domains{A.legend?.machine ? ` · ${A.legend.machine}` : ''}</span>
+      {/* header line */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-0.5 mb-1">
+        <h3 className="text-[16px] font-bold text-[#0f1f2b] m-0">{A.header?.name}</h3>
+        {headLine && <span className="text-[12px] text-[#6b7787]">{headLine}</span>}
+        <span className="ml-auto text-[11px] text-[#8a95a1] whitespace-nowrap">
+          {active === 'security' && reviewTotal > 0 && <b className="text-[#b45309] mr-3">{reviewTotal} item{reviewTotal > 1 ? 's' : ''} to review</b>}
+          {surface ? 'surface sweep · no credentialed collection' : <>{sectionCount} sections · {A.legend?.machine}</>}
+        </span>
       </div>
 
-      {/* KPI strip â one compact card, cells divided */}
-      {/* Asset-level Before / After vuln risk: two clickable cards, each opens ITS OWN parameter breakdown (no section headings). */}
-      {riskProfile && riskProfile.raw != null && (() => {
-        const beforeRows = Array.isArray(riskProfile.before_groups) ? riskProfile.before_groups : [];
-        const afterRows = Array.isArray(riskProfile.groups) ? riskProfile.groups.flatMap((g: any) => g.rows || []) : [];
-        const rows = riskView === 'before' ? beforeRows : riskView === 'after' ? afterRows : [];
-        const title = riskView === 'before'
-          ? `Before - the parameters behind the raw CVSS score, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}`
-          : `After - how this host's context scores the risk, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}`;
-        const cardCls = (active: boolean) => CARD + ' p-2.5 cursor-pointer ' + HOVER + (active ? ' ring-2 ring-[#2e63a8]' : '');
-        return (
-          <div className="mb-2.5">
-            <div className="grid grid-cols-2 gap-2">
-              <div className={cardCls(riskView === 'before')} onClick={() => setRiskView((v) => (v === 'before' ? null : 'before'))}
-                   title="Click to see the parameters behind the raw CVSS (before) score">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk Before Context</div>
-                  <span className="text-[10px] font-semibold text-[#2e63a8]">{riskView === 'before' ? 'Hide' : 'Parameters'}</span>
-                </div>
-                <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.bad }}>{riskProfile.raw}</span>
-                  <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
-                </div>
-                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Raw CVSS severity, the flaw in the abstract, averaged across {riskProfile.count} open finding{riskProfile.count === 1 ? '' : 's'}</div>
+      {/* toggle pages */}
+      <div className="flex gap-5 border-b border-[#e8ecee] mb-2.5 overflow-x-auto px-0.5">
+        {tabs.map((t) => (
+          <button key={t.key} type="button" title={t.sub} onClick={() => setTab(t.key)}
+            className={'text-[12.5px] whitespace-nowrap pb-1.5 -mb-px border-b-2 ' + (active === t.key ? 'font-semibold text-[#014A81] border-[#005B96]' : 'font-medium text-[#6b7787] border-transparent hover:text-[#0f1f2b]')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* KPI + risk strip (one compact row) */}
+      {!surface && (
+        <div className={CARD + ' mb-2.5 flex flex-wrap'}>
+          {A.kpis.map((k: any, i: number) => {
+            const openable = Array.isArray(k.breakdown) && k.breakdown.length > 0;
+            return (
+              <div key={i} onClick={openable ? () => setOpenKpi(openKpi === i ? null : i) : undefined} className={kpiCell + (openable ? ' cursor-pointer hover:bg-[#fafbfc]' : '')}>
+                <div className="text-[10px] text-[#8a95a1] whitespace-nowrap">{k.label}{openable && <span className="ml-1 text-[#005B96]">{openKpi === i ? '▴' : '▾'}</span>}</div>
+                <div className={'text-[17px] font-bold leading-none mt-0.5 ' + MONO} style={{ color: k.tone ? (k.tone === 'muted' ? '#8a95a1' : TONE[k.tone]) : '#0f1f2b' }}>{k.value}</div>
+                <div className="text-[9.5px] mt-0.5" style={{ color: k.tone === 'ok' ? '#1f7a54' : k.tone === 'warn' ? '#9a6410' : '#aeb8c2' }}>{k.sub}</div>
               </div>
-              <div className={cardCls(riskView === 'after')} onClick={() => setRiskView((v) => (v === 'after' ? null : 'after'))}
-                   title="Click to see the context parameters that score the risk on this host">
-                <div className="flex items-center justify-between">
-                  <div className="text-[10px] text-[#8a95a1] uppercase tracking-[0.04em] font-bold">Risk After Context</div>
-                  <span className="text-[10px] font-semibold text-[#2e63a8]">{riskView === 'after' ? 'Hide' : 'Parameters'}</span>
-                </div>
-                <div className="flex items-baseline gap-1.5 mt-1.5">
-                  <span className={'text-[19px] font-extrabold leading-none ' + MONO} style={{ color: TONE.ok }}>{riskProfile.contextual}</span>
-                  <span className="text-[12px] text-[#aeb8c2]">/ 100</span>
-                </div>
-                <div className="text-[10px] text-[#8a95a1] mt-1 leading-snug">Scored on this host: exposure, exploitability, KEV and criticality{riskProfile.internet_facing ? ' (internet-facing)' : ''}</div>
-              </div>
+            );
+          })}
+          {hasRisk && (['before', 'after'] as const).map((v) => (
+            <div key={v} onClick={() => setRiskView((x) => (x === v ? null : v))} className={kpiCell + ' cursor-pointer hover:bg-[#fafbfc]' + (riskView === v ? ' bg-[#EFF5FA]' : '')}
+              title={v === 'before' ? 'Raw CVSS severity averaged across open findings — click for parameters' : 'Scored on this host: exposure, exploitability, KEV and criticality — click for parameters'}>
+              <div className="text-[10px] text-[#8a95a1] whitespace-nowrap">Risk {v} context <span className="text-[#005B96]">{riskView === v ? '▴' : '▾'}</span></div>
+              <div className="flex items-baseline gap-1 mt-0.5"><span className={'text-[17px] font-bold leading-none ' + MONO} style={{ color: v === 'before' ? TONE.bad : TONE.ok }}>{v === 'before' ? riskProfile.raw : riskProfile.contextual}</span><span className="text-[10px] text-[#aeb8c2]">/ 100</span></div>
+              <div className="text-[9.5px] mt-0.5 text-[#aeb8c2]">{v === 'before' ? `raw CVSS · ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}` : `in context${riskProfile.internet_facing ? ' · internet-facing' : ''}`}</div>
             </div>
-            {riskView && rows.length > 0 && (
-              <div className="rounded-2xl border-2 border-[#2e63a8] bg-[#e9f1fb] p-[16px] mt-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-[12px] font-bold text-[#0f1f2b]">{title}</div>
-                  <button onClick={(e) => { e.stopPropagation(); setRiskView(null); }} className="text-[11.5px] font-semibold text-[#2e63a8] whitespace-nowrap">Close</button>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {rows.map((r: any, ri: number) => {
-                    const pct = r.max ? Math.max(0, Math.min(100, (r.pts / r.max) * 100)) : 0;
-                    return (
-                      <div key={ri} className="flex items-center gap-3">
-                        <div className="w-56 flex-none">
-                          <div className="text-[12px] font-semibold text-[#0f1f2b]">{r.label}</div>
-                          <div className="text-[10.5px] text-[#8a95a1]">{r.evidence}</div>
-                        </div>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white">
-                          <div className="h-full rounded-full" style={{ width: Math.max(2, pct) + '%', background: '#2e63a8' }} />
-                        </div>
-                        <div className={'w-16 flex-none text-right text-[12px] font-semibold tabular-nums text-[#0f1f2b] ' + MONO}>{r.pts} / {r.max}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          ))}
+        </div>
+      )}
+
+      {riskView && riskRows.length > 0 && (
+        <div className="rounded-xl border border-[#9cc0dd] bg-[#EFF5FA] p-3 mb-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-[12px] font-bold text-[#0f1f2b]">{riskView === 'before' ? `Before — the parameters behind the raw CVSS score, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}` : `After — how this host's context scores the risk, across ${riskProfile.count} open finding${riskProfile.count === 1 ? '' : 's'}`}</div>
+            <button onClick={() => setRiskView(null)} className="text-[11.5px] font-semibold text-[#005B96] whitespace-nowrap">Close</button>
           </div>
-        );
-      })()}
-      <div className={CARD + ' mb-2.5 flex flex-wrap'}>
-        {A.kpis.map((k: any, i: number) => {
-          const col = k.tone === 'muted' ? '#8a95a1' : TONE[k.tone] || '#0f1f2b';
-          const openable = Array.isArray(k.breakdown) && k.breakdown.length > 0;
-          const isOpen = openKpi === i;
-          return (
-            <div key={i} onClick={openable ? () => setOpenKpi(isOpen ? null : i) : undefined}
-              className={'flex-1 min-w-[104px] px-3 py-1.5 border-r border-[#f0f3f5] last:border-r-0 ' + (openable ? 'cursor-pointer hover:bg-[#fafbfc]' : '')}>
-              <div className="text-[10px] text-[#8a95a1] whitespace-nowrap">{k.label}{openable && <span className="ml-1 text-[10px] text-[#2e63a8]">{isOpen ? '▴' : '▾'}</span>}</div>
-              <div className={'text-[18px] font-bold leading-none mt-0.5 ' + MONO} style={{ color: k.tone ? col : '#0f1f2b' }}>{k.value}</div>
-              {k.bar != null && <div className="h-[4px] bg-[#f0f3f5] rounded-full mt-1.5 overflow-hidden"><div className="h-full" style={{ width: (k.bar || 2) + '%', background: k.tone === 'warn' ? '#e2b33c' : '#014A81' }} /></div>}
-              <div className="text-[9.5px] mt-0.5" style={{ color: k.tone === 'ok' ? '#1f7a54' : k.tone === 'warn' ? '#9a6410' : '#aeb8c2' }}>{k.sub}</div>
-            </div>
-          );
-        })}
-      </div>
+          <div className="mt-2 grid lg:grid-cols-2 gap-x-6 gap-y-1.5">
+            {riskRows.map((r: any, ri: number) => (
+              <div key={ri} className="flex items-center gap-3">
+                <div className="w-48 flex-none"><div className="text-[12px] font-semibold text-[#0f1f2b]">{r.label}</div><div className="text-[10.5px] text-[#8a95a1]">{r.evidence}</div></div>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[#005B96]" style={{ width: Math.max(2, r.max ? Math.min(100, (r.pts / r.max) * 100) : 0) + '%' }} /></div>
+                <div className={'w-16 flex-none text-right text-[12px] font-semibold tabular-nums text-[#0f1f2b] ' + MONO}>{r.pts} / {r.max}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Hygiene breakdown â revealed only when its KPI cell is clicked. */}
       {openKpi != null && Array.isArray(A.kpis[openKpi]?.breakdown) && (() => {
         const k = A.kpis[openKpi];
         return (
-          <div className="rounded-2xl border-2 border-[#2e63a8] bg-[#e9f1fb] p-[16px] mb-3.5">
+          <div className="rounded-xl border border-[#9cc0dd] bg-[#EFF5FA] p-3 mb-2.5">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[13px] font-bold text-[#0f1f2b]">{k.breakdownTitle || 'Score breakdown'}</div>
-                {k.breakdownNote && <p className="mt-0.5 text-[11.5px] text-[#3a4653] max-w-3xl">{k.breakdownNote}</p>}
-              </div>
-              <button onClick={() => setOpenKpi(null)} className="text-[11.5px] font-semibold text-[#2e63a8] whitespace-nowrap">Close ✕</button>
+              <div><div className="text-[12.5px] font-bold text-[#0f1f2b]">{k.breakdownTitle || 'Score breakdown'}</div>{k.breakdownNote && <p className="mt-0.5 text-[11px] text-[#3a4653] max-w-3xl">{k.breakdownNote}</p>}</div>
+              <button onClick={() => setOpenKpi(null)} className="text-[11.5px] font-semibold text-[#005B96] whitespace-nowrap">Close ✕</button>
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-2 grid lg:grid-cols-2 gap-x-6 gap-y-1.5">
               {k.breakdown.map((r: any, i: number) => {
                 const na = r.applicable === false;
                 const pct = Math.max(0, Math.min(100, r.pct ?? 0));
-                const bar = r.tone === 'ok' ? '#1f7a54' : r.tone === 'warn' ? '#e2b33c' : '#b23a3a';
                 return (
                   <div key={i} className={'flex items-center gap-3' + (na ? ' opacity-60' : '')}>
-                    <div className="w-52 flex-none">
-                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0f1f2b]">
-                        {r.label}
-                        {r.weightPct != null
-                          ? <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#3a4653]">{r.weightPct}%</span>
-                          : <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#8a95a1]">N/A</span>}
-                      </div>
+                    <div className="w-48 flex-none">
+                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0f1f2b]">{r.label}<span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#3a4653]">{r.weightPct != null ? `${r.weightPct}%` : 'N/A'}</span></div>
                       <div className="text-[10.5px] text-[#8a95a1]">{r.value}</div>
                     </div>
-                    {na ? (
-                      <div className="flex-1 text-[10.5px] italic text-[#aeb8c2]">not counted in the score</div>
-                    ) : (
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white">
-                        <div className="h-full rounded-full" style={{ width: Math.max(2, pct) + '%', background: bar }} />
-                      </div>
-                    )}
+                    {na ? <div className="flex-1 text-[10.5px] italic text-[#aeb8c2]">not counted in the score</div>
+                      : <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full" style={{ width: Math.max(2, pct) + '%', background: r.tone === 'ok' ? '#1f7a54' : r.tone === 'warn' ? '#e2b33c' : '#b23a3a' }} /></div>}
                     <div className={'w-10 flex-none text-right text-[12px] font-semibold tabular-nums text-[#0f1f2b] ' + MONO}>{na ? '—' : pct}</div>
                   </div>
                 );
@@ -559,170 +201,30 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
         );
       })()}
 
-      {/* domain jump pills */}
-      <div className="flex gap-1.5 flex-wrap mb-2.5">
-        {DOMS.map((g: any) => (
-          <button key={g.key} onClick={() => document.getElementById('dom-' + g.key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="text-[11px] font-semibold rounded-full px-2.5 py-1 bg-white text-[#3a4653] border border-[#e8ecee] hover:border-[#014A81] whitespace-nowrap">{g.pill || g.label}</button>
-        ))}
-        {A.manual.length > 0 && (
-          <button onClick={() => document.getElementById('dom-manual')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="text-[11px] font-semibold rounded-full px-2.5 py-1 bg-white text-[#3a4653] border border-[#e8ecee] hover:border-[#014A81] whitespace-nowrap">Ownership &amp; Context</button>
-        )}
-      </div>
-
-      {/* access / absence notes */}
-      {(A.deepNote?.denied?.length > 0 || A.deepNote?.absent?.length > 0) && (
-        <div className="mb-3.5 space-y-1.5">
-          {A.deepNote.denied?.length > 0 && (
-            <div className="rounded-xl border border-[#ead9ae] bg-[#fbf7ec] px-3.5 py-2.5 text-[11.5px] text-[#7a6427]">
-              <b>Needs elevated access</b> (root / sudo): {A.deepNote.denied.join(' · ')}.
-            </div>
-          )}
-          {A.deepNote.absent?.length > 0 && (
-            <div className="text-[11.5px] text-[#8a95a1] px-1">Not present on this host: {A.deepNote.absent.join(' · ')}.</div>
-          )}
+      {/* access / absence notes — honest, on every telemetry page */}
+      {active !== 'ownership' && (A.deepNote?.denied?.length > 0 || A.deepNote?.absent?.length > 0) && (
+        <div className="mb-2.5 flex flex-col gap-1">
+          {A.deepNote.denied?.length > 0 && <div className="rounded-lg border border-[#ead9ae] bg-[#fbf7ec] px-3 py-1.5 text-[11.5px] text-[#7a6427]"><b>Needs elevated access</b> (root / sudo): {A.deepNote.denied.join(' · ')}.</div>}
+          {A.deepNote.absent?.length > 0 && <div className="text-[11px] text-[#8a95a1] px-1">Not present on this host: {A.deepNote.absent.join(' · ')}.</div>}
         </div>
       )}
 
-      {/* External host with no outside-in data yet — honest callout, not blank cards. */}
-      {A.external && DOMS.length === 0 && (
-        <div className="rounded-2xl border border-[#ead9ae] bg-[#fbf7ec] px-4 py-3.5 mb-2.5 text-[12px] text-[#7a6427]">
-          <b>No outside-in data collected yet.</b> Run <b>Rescan domain</b> to probe DNS, TLS, HTTP posture and email security for this host — telemetry appears here once the crawl completes.
+      {/* pages */}
+      {active === 'surface' && surface && <SurfacePage A={A} surface={surface} />}
+      {active === 'hardware' && <><HardwareCards A={A} /><SectionCards secs={hostDoms.hardware} /></>}
+      {active === 'software' && <><SoftwareCards A={A} /><SectionCards secs={hostDoms.software} /></>}
+      {active === 'security' && <><SecurityCards A={A} review={review} /><SectionCards secs={hostDoms.security} /></>}
+      {active.startsWith('g:') && <div className="-mt-2.5"><SectionCards secs={(A.deep.find((g: any) => 'g:' + g.key === active) || { sections: [] }).sections} /></div>}
+      {active === 'telemetry' && (
+        A.external
+          ? <div className="rounded-xl border border-[#ead9ae] bg-[#fbf7ec] px-4 py-3 text-[12px] text-[#7a6427]"><b>No outside-in data collected yet.</b> Run <b>Rescan domain</b> to probe DNS, TLS, HTTP posture and email security for this host — telemetry appears here once the crawl completes.</div>
+          : <div className={CARD + ' px-4 py-6 text-center'}><div className="text-[13px] font-semibold text-[#6b7787]">No deep inventory collected for this asset yet</div><div className="text-[11.5px] text-[#aeb8c2] mt-1">Connect it with credentials (or a database login for an application) to collect its telemetry.</div></div>
+      )}
+      {active === 'ownership' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+          {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} span={i === 0 ? 2 : undefined} className={i === 0 ? 'lg:row-span-2' : ''} />)}
         </div>
       )}
-
-      {/* ALL telemetry domains, stacked */}
-      {DOMS.map((g: any) => {
-        const secs = g.secs;
-        const hasSvc = g.key === 'software';
-        const sub = g.sub;
-        const badRev = (A.security.signals || []).filter((x: any) => x.tone === 'bad').length;
-        const badge = g.key === 'hardware' ? (A.legend?.machine || '')
-          : hasSvc ? `${svc.total} services · ${A.security.software.length} packages`
-          : g.key === 'security' && badRev > 0 ? `${badRev} items to review` : '';
-        const tile = g.key === 'hardware' ? ['#e9f1fb', '#2e63a8'] : g.key === 'security' ? ['#fbeaea', '#b23a3a'] : ['#eeebfa', '#6a54c9'];
-        return (
-          <section key={g.key} id={'dom-' + g.key} className={CARD + ' mb-2.5 scroll-mt-16 overflow-hidden'}>
-            <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: tile[0], color: tile[1] }}>
-                {g.key === 'hardware'
-                  ? <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M7 20h10M12 16v4" /></svg>
-                  : g.key === 'security'
-                    ? <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z" /></svg>
-                    : <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5v8" /><path d="M3 8v8l9 5 9-5" /></svg>}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-[12.5px] font-bold text-[#0f1f2b]">{g.label}</div>
-                {sub && <div className="text-[10px] text-[#8a95a1]">{sub}</div>}
-              </div>
-              {badge && <span className="text-[10px] font-semibold text-[#014A81] bg-[#EFF5FA] border border-[#B3CDE0] rounded-full px-2 py-[2px] whitespace-nowrap inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#014A81]" />{badge}</span>}
-            </div>
-            <div>
-              {secs.map((sec: any, i: number) => {
-                if (sec.variant === 'services') {
-                  const chip = (key: 'all' | 'running' | 'stopped', lbl: string) => (
-                    <button onClick={() => setSvcState(key)} className={'text-[11.5px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap border ' + (svcState === key ? 'bg-[#014A81] text-white border-[#014A81]' : 'bg-white text-[#3a4653] border-[#e8ecee]')}>{lbl}</button>
-                  );
-                  return (
-                    <details key={i} className="group border-t border-[#f0f3f5]">
-                      <summary className="list-none cursor-pointer select-none flex items-center gap-2.5 px-3.5 py-[7px] hover:bg-[#f7fbfa]">
-                        <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0 text-[#aeb8c2] transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-                        <span className="text-[11.5px] font-semibold text-[#0f1f2b] flex-1 min-w-0">{sec.title}</span>
-                        <span className="text-[10.5px] text-[#aeb8c2] whitespace-nowrap ml-2">{svc.total} · {svc.run} running</span>
-                      </summary>
-                      <div className="px-3.5 pb-3">
-                        <div className="flex flex-wrap gap-2 items-center mb-3">
-                          <input value={svcQuery} onChange={(e) => setSvcQuery(e.target.value)} placeholder="Search services…" className="flex-1 min-w-[220px] text-[12.5px] px-3 py-[7px] border border-[#e8ecee] rounded-lg bg-[#fafbfc] outline-none focus:border-[#014A81]" />
-                          <div className="flex gap-1.5">{chip('all', 'All ' + svc.total)}{chip('running', 'Running ' + svc.run)}{chip('stopped', 'Stopped ' + svc.stop)}</div>
-                        </div>
-                        <div className="border border-[#f0f3f5] rounded-xl overflow-hidden">
-                          <div className="max-h-[430px] overflow-auto">
-                            <table className="w-full border-collapse text-[12px]">
-                              <thead><tr><th className={TH}>Service</th><th className={TH}>State</th><th className={TH}>Start</th><th className={TH}>Account</th></tr></thead>
-                              <tbody>
-                                {svc.rows.map((r: any, j: number) => {
-                                  const running = r[4] === 'Running';
-                                  return (
-                                    <tr key={j}>
-                                      <td className={TD}><div className={'font-semibold text-[#0f1f2b] text-[11.5px] ' + MONO}>{r[1]}</div><div className="text-[#8a95a1] text-[11px] mt-px">{r[5]}</div></td>
-                                      <td className={TD}><span className={'inline-block text-[10.5px] rounded-md px-2 py-0.5 border ' + (running ? 'font-bold text-[#014A81] bg-[#e7f5ee] border-[#B3CDE0]' : 'font-semibold text-[#8a95a1] bg-[#fafbfc] border-[#e8ecee]')}>{r[4]}</span></td>
-                                      <td className={TD + ' text-[#3a4653]'}>{r[3]}</td>
-                                      <td className={TD + ' text-[#3a4653] text-[11px]'}>{r[0]}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                        {svc.rows.length === 0 && <div className="py-4 text-center text-[#aeb8c2] text-[12px]">No services match.</div>}
-                      </div>
-                    </details>
-                  );
-                }
-                return <SectionCard key={i} sec={sec} />;
-              })}
-              {hasSvc && A.security.software.length > 0 && (
-                <details className="group border-t border-[#f0f3f5]">
-                  <summary className="list-none cursor-pointer select-none flex items-center gap-2.5 px-3.5 py-[7px] hover:bg-[#f7fbfa]">
-                    <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0 text-[#aeb8c2] transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-                    <span className="text-[11.5px] font-semibold text-[#0f1f2b] flex-1 min-w-0">Installed packages</span>
-                    <span className="text-[10.5px] text-[#aeb8c2] whitespace-nowrap ml-2">{A.security.software.length} packages</span>
-                  </summary>
-                  <div className="px-3.5 pb-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap mb-2.5">
-                      <input value={swQuery} onChange={(e) => setSwQuery(e.target.value)} placeholder="Search packages…" className="w-full sm:w-[260px] text-[12.5px] px-3 py-[7px] border border-[#e8ecee] rounded-lg bg-[#fafbfc] outline-none focus:border-[#014A81]" />
-                    </div>
-                    <div className="border border-[#f0f3f5] rounded-xl overflow-hidden">
-                      <div className="max-h-[320px] overflow-auto">
-                        <table className="w-full border-collapse text-[12.5px]">
-                          <thead><tr><th className={TH + ' text-[10.5px] px-3.5 py-[9px]'}>Package</th><th className={TH + ' text-[10.5px] px-3.5 py-[9px] w-[160px]'}>Version</th><th className={TH + ' text-[10.5px] px-3.5 py-[9px] w-[150px]'}>Tracked</th></tr></thead>
-                          <tbody>
-                            {software.map((p: any, i: number) => {
-                              const setup = p.tracked && p.tracked.indexOf('set up') >= 0;
-                              const dash = !p.tracked || p.tracked === '—';
-                              return (
-                                <tr key={i} onClick={p.onClick} className={p.onClick ? 'cursor-pointer hover:bg-[#fafbfc]' : undefined}>
-                                  <td className="px-3.5 py-2 border-b border-[#f0f3f5] text-[#0f1f2b] font-medium">{p.name}</td>
-                                  <td className={'px-3.5 py-2 border-b border-[#f0f3f5] text-[#3a4653] text-[11.5px] ' + MONO}>{p.version}</td>
-                                  <td className="px-3.5 py-2 border-b border-[#f0f3f5]"><span className={setup ? 'text-[11.5px] font-semibold text-[#014A81] cursor-pointer' : dash ? 'text-[#aeb8c2]' : 'text-[11.5px] font-semibold text-[#014A81]'}>{dash ? '—' : p.tracked}</span></td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      {software.length === 0 && <div className="py-6 text-center text-[#aeb8c2] text-[12.5px]">No packages match “{swQuery}”.</div>}
-                    </div>
-                    <div className="text-[11px] text-[#aeb8c2] mt-2">Full posture summary & SBOM export live in the Software tab →</div>
-                  </div>
-                </details>
-              )}
-            </div>
-          </section>
-        );
-      })}
-
-      {/* Ownership & Business Context â manually maintained cards */}
-      {A.manual.length > 0 && (
-        <section id="dom-manual" className={CARD + ' mb-2.5 scroll-mt-16 overflow-hidden'}>
-          <div className="flex items-center gap-3 px-3.5 py-2 bg-[#fafbfc]">
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-none" style={{ background: '#fbf2df', color: '#9a6410' }}>
-              <svg viewBox="0 0 24 24" className="w-[15px] h-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /></svg>
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-bold text-[#0f1f2b]">Ownership &amp; Context</div>
-              <div className="text-[10px] text-[#8a95a1]">Ownership, business context, procurement & collection · manually maintained</div>
-            </div>
-          </div>
-          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-stretch">
-            {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} accent="border-l-[#e2b33c]" kind="manual" full />)}
-          </div>
-        </section>
-      )}
-
-      <div className="text-center text-[#aeb8c2] text-[10.5px] mt-4">Overview · {A.header.name} · all figures reflect the latest {A.external ? 'outside-in probe' : 'agentless collection'}</div>
     </div>
   );
 }

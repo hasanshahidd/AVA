@@ -101,7 +101,11 @@ const CRIT_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, lo
 // Uniform pill — nowrap + flex:none so a row's tag line never wraps and every
 // row stays the same height (was: verbose tags wrapping unevenly).
 const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: '1px 7px', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap', flex: 'none' });
-const td: React.CSSProperties = { padding: '9px 10px', borderBottom: '1px solid #F0F3F5', color: '#3A4653' };
+const td: React.CSSProperties = { padding: '9px 10px', borderBottom: '1px solid #F0F3F5', color: '#3A4653', verticalAlign: 'middle' };
+// Empty cell — quiet, so sparse ownership columns don't shout across the row.
+const none = (t = '—') => <span style={{ color: '#C4CCD3', fontWeight: 400 }}>{t}</span>;
+// The ownership/context group sits at the end, set off by a hairline.
+const ctxTd: React.CSSProperties = { ...td, borderLeft: '1px solid #EEF1F3' };
 // Prominent header bar — brand blue, bold white (owner ask). Sticky over the body.
 const th: React.CSSProperties = { textAlign: 'left', padding: '9px 10px', borderBottom: '1px solid #0A4C84', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#fff', fontWeight: 700, position: 'sticky', top: 0, background: '#005B96', zIndex: 1, whiteSpace: 'nowrap' };
 // Clamp wide free-text cells so all columns fit one view without a right-scroll.
@@ -110,15 +114,19 @@ const clip: React.CSSProperties = { maxWidth: 128, overflow: 'hidden', textOverf
 const HEADS: { key: string; label: string; sortable: boolean }[] = [
   { key: 'name', label: 'Asset', sortable: true },
   { key: 'type', label: 'Type', sortable: true },
-  { key: 'owner', label: 'Owner', sortable: true },
-  { key: 'department', label: 'Department', sortable: true },
-  { key: 'dataclass', label: 'Data Class', sortable: true },
-  { key: 'bizfn', label: 'Business Function', sortable: true },
   { key: 'crit', label: 'Criticality', sortable: true },
   { key: 'cia', label: 'CIA', sortable: false },
   { key: 'scan', label: 'Last scan', sortable: true },
   { key: 'value', label: 'Value', sortable: true },
   { key: 'status', label: 'Status', sortable: true },
+];
+// Ownership / context columns — mostly unset on discovered assets, so they sit at
+// the END (after PCI / HIPAA) instead of splitting the row's real signals.
+const HEADS_CTX: { key: string; label: string; sortable: boolean }[] = [
+  { key: 'owner', label: 'Owner', sortable: true },
+  { key: 'department', label: 'Department', sortable: true },
+  { key: 'dataclass', label: 'Data Class', sortable: true },
+  { key: 'bizfn', label: 'Business Function', sortable: true },
 ];
 const SORTERS: Record<string, (a: ITAsset, b: ITAsset) => number> = {
   name: (a, b) => (a.name || '').localeCompare(b.name || ''),
@@ -243,6 +251,13 @@ export default function InventoryRedesign(p: Props) {
   // Click a header: same column flips direction, a new column sorts text A→Z and
   // metrics high→low by default.
   const sortBy = (k: string) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(TEXT_SORTS.has(k) ? 1 : -1); } };
+  const headCell = (h: { key: string; label: string; sortable: boolean }, divider = false) => (
+    <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none', ...(divider ? { borderLeft: '1px solid rgba(255,255,255,.22)' } : null) }}
+      onClick={h.sortable ? () => sortBy(h.key) : undefined}
+      title={h.sortable ? `Sort by ${h.label}` : undefined}>
+      {h.label}{sort === h.key ? <span style={{ marginLeft: 4 }}>{dir === -1 ? '▾' : '▴'}</span> : null}
+    </th>
+  );
 
   // Nest external subdomains under their apex. Apex rows get a ▸ toggle + "N subs"
   // badge; children are inserted right after the apex only when it's expanded.
@@ -420,15 +435,10 @@ export default function InventoryRedesign(p: Props) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'auto' }}>
                   <thead><tr>
                     <th style={{ ...th, width: 34 }}><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} style={{ accentColor: '#fff', width: 15, height: 15 }} /></th>
-                    {HEADS.map((h) => (
-                      <th key={h.key} style={{ ...th, cursor: h.sortable ? 'pointer' : 'default', userSelect: 'none' }}
-                        onClick={h.sortable ? () => sortBy(h.key) : undefined}
-                        title={h.sortable ? `Sort by ${h.label}` : undefined}>
-                        {h.label}{sort === h.key ? <span style={{ marginLeft: 4 }}>{dir === -1 ? '▾' : '▴'}</span> : null}
-                      </th>
-                    ))}
+                    {HEADS.map((h) => headCell(h))}
                     <th style={{ ...th, width: 34 }}>PCI</th>
                     <th style={{ ...th, width: 44 }}>HIPAA</th>
+                    {HEADS_CTX.map((h, i) => headCell(h, i === 0))}
                     <th style={{ ...th, width: 34 }}></th>
                   </tr></thead>
                   <tbody>
@@ -474,15 +484,11 @@ export default function InventoryRedesign(p: Props) {
                             </div>
                           </td>
                           <td style={{ ...td, ...clip }} title={laneLabel(a)}>{laneLabel(a)}</td>
-                          <td style={{ ...td, ...clip }} title={a.owner_name || ''}>{a.owner_name ? a.owner_name : <span style={{ color: '#A32B2B', fontWeight: 600 }}>Unassigned</span>}</td>
-                          <td style={{ ...td, ...clip }} title={a.department || ''}>{a.department || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
-                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={a.data_classification || ''}>{a.data_classification || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
-                          <td style={{ ...td, ...clip }} title={a.business_function || ''}>{a.business_function || <span style={{ color: '#C4CCD3' }}>—</span>}</td>
-                          <td style={td}>{ck ? <span style={{ background: ck.bg, color: ck.fg, borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{a.criticality}</span> : <span style={{ color: '#B4BDC6' }}>—</span>}</td>
-                          <td style={td}>{hasCia(a) ? <span className="mono">{a.confidentiality_rating}·{a.integrity_rating}·{a.availability_rating}</span> : <span style={{ color: '#8A5A0C' }}>— assess</span>}</td>
+                          <td style={td}>{ck ? <span style={{ background: ck.bg, color: ck.fg, borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 600, textTransform: 'capitalize' }}>{a.criticality}</span> : none()}</td>
+                          <td style={td}>{hasCia(a) ? <span className="mono">{a.confidentiality_rating}·{a.integrity_rating}·{a.availability_rating}</span> : <span title="CIA not assessed yet" style={{ color: '#B0894A', fontSize: 11 }}>assess</span>}</td>
                           <td style={td}>{lastScan(a)}</td>
                           <td style={td}>{val(a)}</td>
-                          <td style={td}>{st && stMap[st] ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#3A4653' }}><i style={{ width: 7, height: 7, borderRadius: '50%', background: stMap[st].c }} />{stMap[st].l}</span> : <span style={{ color: '#B4BDC6' }}>—</span>}</td>
+                          <td style={td}>{st && stMap[st] ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#3A4653' }}><i style={{ width: 7, height: 7, borderRadius: '50%', background: stMap[st].c }} />{stMap[st].l}</span> : none()}</td>
                           <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             {p.onBulkUpdate && p.canEdit ? (
                               <input type="checkbox" checked={!!a.cde_environment}
@@ -503,6 +509,10 @@ export default function InventoryRedesign(p: Props) {
                               <span title={a.ephi_environment ? 'In HIPAA scope' : 'Not in HIPAA scope'} style={{ color: a.ephi_environment ? '#4F46E5' : '#C4CCD3' }}>{a.ephi_environment ? '✓' : '—'}</span>
                             )}
                           </td>
+                          <td style={{ ...ctxTd, ...clip }} title={a.owner_name || ''}>{a.owner_name ? <span style={{ color: '#0F1F2B', fontWeight: 500 }}>{a.owner_name}</span> : <span style={{ color: '#B98585', fontStyle: 'italic' }}>Unassigned</span>}</td>
+                          <td style={{ ...td, ...clip }} title={a.department || ''}>{a.department || none()}</td>
+                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={a.data_classification || ''}>{a.data_classification || none()}</td>
+                          <td style={{ ...td, ...clip }} title={a.business_function || ''}>{a.business_function || none()}</td>
                           <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             <RowActionsMenu actions={[
                               { key: 'view', label: 'View', icon: Eye, onClick: () => p.onView(a) },

@@ -68,7 +68,7 @@ const dataOf = (o: any) => (sec(o) ? o.data : undefined);
 const statusOf = (o: any) => (sec(o) ? o.status : 'unavailable');
 
 // object -> Cell items (scalars only), dropping empties.
-function toItems(obj: any, opts: { tones?: Record<string, string> } = {}): any[] {
+export function toItems(obj: any, opts: { tones?: Record<string, string> } = {}): any[] {
   if (!obj || typeof obj !== 'object') return [];
   return Object.entries(obj)
     .filter(([, v]) => !isEmpty(v))
@@ -93,7 +93,7 @@ function genericTable(rows: any[]) {
 }
 
 // Turn ANY section's data into design blocks, by shape.
-function blocksFor(key: string, data: any): any[] {
+export function blocksFor(key: string, data: any): any[] {
   if (data === null || data === undefined) return [];
   if (Array.isArray(data)) {
     if (!data.length) return [{ type: 'kv', items: [{ label: humanize(key), value: 'None' }] }];
@@ -251,7 +251,7 @@ function buildDeep(pp: any, kind: string, linux = false): { groups: any[]; notes
 
   const build = (key: string) => {
     const enh = sectionBlocks(key, dataOf(pp[key]));
-    return { title: humanize(key === 'os' ? 'operating_system' : key), status: statusOf(pp[key]), ...enh, ...(enh.sectionExtra || {}) };
+    return { key, title: humanize(key === 'os' ? 'operating_system' : key), status: statusOf(pp[key]), ...enh, ...(enh.sectionExtra || {}) };
   };
   const groups: { key: string; label: string; sections: any[] }[] = [];
   const plan = linux ? LINUX_GROUPS : (KIND_GROUPS[kind] || KIND_GROUPS.server);
@@ -944,6 +944,7 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
           { label: 'Category', value: dash(asset?.asset_type) },
           { label: 'Assigned User', value: dash(asset?.assigned_user) },
           { label: 'Owner', value: dash(asset?.owner_name) },
+          { label: 'Primary Owner', value: dash(asset?.primary_owner_name) },
           { label: 'Custodian', value: dash(asset?.custodian) },
           { label: 'Department', value: dash(asset?.department) },
           { label: 'Environment', value: dash(asset?.environment) },
@@ -969,6 +970,17 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
           { label: 'Valuation', value: dash(asset?.valuation) },
         ],
       },
+      {
+        title: 'Scope & Risk Context', note: 'Manual entry', onEdit: o.onEdit && (() => o.onEdit!('identity')),
+        fields: [
+          { label: 'Confidentiality', value: dash(asset?.confidentiality_rating), mono: true },
+          { label: 'Integrity', value: dash(asset?.integrity_rating), mono: true },
+          { label: 'Availability', value: dash(asset?.availability_rating), mono: true },
+          { label: 'Criticality Score', value: typeof asset?.criticality_score === 'number' ? asset.criticality_score.toFixed(1) : '—', mono: true },
+          { label: 'PCI Scope (CDE)', value: asset?.cde_environment ? 'In scope' : 'Not in scope' },
+          { label: 'HIPAA Scope (ePHI)', value: asset?.ephi_environment ? 'In scope' : 'Not in scope' },
+        ],
+      },
     ],
     security: {
       // An external (EASM) host was never logged into, so AV / EDR / packages are
@@ -984,11 +996,17 @@ export function buildOverviewData(asset: any, o: OverviewOpts = {}): any {
       software: (software || []).map((s: any) => ({
         name: s.name || '—',
         version: s.version || '—',
+        source: s.source || '—',
         tracked: s.promoted_asset_id ? `Asset #${s.promoted_asset_id}` : (s.benchmark_available ? 'Click to set up' : '—'),
         onClick: s.software_key && o.onSoftwareClick ? () => o.onSoftwareClick!(s) : undefined,
       })),
     },
     deep: deep.groups,
     deepNote: deep.notes,
+    // Raw collected data for the curated telemetry cards (_overview-design reads the
+    // section shapes directly; anything it doesn't curate still renders via `deep`).
+    kind,
+    server: kind === 'server' && !isApp && !outside,
+    raw: { pp, asset, posture },
   };
 }
