@@ -85,7 +85,7 @@ function Rest({ data, used }: { data: any; used: string[] }) {
   return (
     <>
       {scalars.map((it: any, i: number) => <Row key={i} label={it.label} value={it.value} mono={it.mono} tone={it.tone} />)}
-      {Object.keys(nested).length > 0 && <div className="mt-1.5 flex flex-col gap-2">{blocksFor('details', nested).map((b: any, i: number) => <Block key={i} b={b} />)}</div>}
+      {Object.keys(nested).length > 0 && <div className="mt-1.5 flex flex-col gap-2 sm:col-span-2">{blocksFor('details', nested).map((b: any, i: number) => <Block key={i} b={b} />)}</div>}
     </>
   );
 }
@@ -217,12 +217,12 @@ function Tile({ n, label, sub, on, onClick }: { n: any; label: string; sub?: Rea
   );
 }
 
-export function ProvenanceCard({ card, span, className }: { card: any; span?: 2; className?: string }) {
+export function ProvenanceCard({ card, wide }: { card: any; wide?: boolean }) {
   const setCount = card.fields.filter((f: any) => f.value !== '—' && f.value !== '' && f.value != null).length;
   return (
-    <Card span={span} className={className} title={card.title} meta={<span className="inline-flex items-center gap-2"><span className="text-[#c79a3a] font-semibold">{setCount} of {card.fields.length} set</span>{card.onEdit && <a onClick={card.onEdit} className="text-[11.5px] font-semibold text-[#005B96] cursor-pointer">Edit</a>}</span>}>
+    <Card span={wide ? 2 : undefined} title={card.title} meta={<span className="inline-flex items-center gap-2"><span className="text-[#c79a3a] font-semibold">{setCount} of {card.fields.length} set</span>{card.onEdit && <a onClick={card.onEdit} className="text-[11.5px] font-semibold text-[#005B96] cursor-pointer">Edit</a>}</span>}>
       <div className="h-1 bg-[#f4f6f7] rounded-full overflow-hidden mb-2.5"><div className="h-full bg-[#e2b33c]" style={{ width: Math.round((setCount / card.fields.length) * 100) + '%' }} /></div>
-      <div className={'grid gap-x-6 ' + (span === 2 ? 'sm:grid-cols-2' : '')}>
+      <div className={'grid grid-flow-row-dense gap-x-6 sm:grid-cols-2 ' + (wide ? 'lg:grid-cols-4' : '')}>
         {card.fields.map((f: any, i: number) => <Row key={i} label={f.label} value={f.value === '—' ? null : f.value} mono={f.mono} tone={f.tone} emptyText="Not set" />)}
       </div>
     </Card>
@@ -257,7 +257,8 @@ export function HardwareCards({ A }: { A: any }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
-      <Card title="System" meta={`${Object.keys(idn).length} fields`}>
+      <Card title="System" span={2} meta={`${Object.keys(idn).length} fields`}>
+        <div className="grid sm:grid-cols-2 grid-flow-row-dense gap-x-6">
         <Row label="Make" value={idn.manufacturer || asset?.manufacturer} />
         <Row label="Model" value={idn.model || asset?.model} mono />
         <Row label="Product" value={fw?.motherboard?.product} mono />
@@ -266,19 +267,7 @@ export function HardwareCards({ A }: { A: any }) {
         <Row label="Hostname" value={idn.hostname || asset?.host_name} mono />
         {has(idn.domain || idn.workgroup) && <Row label={idn.part_of_domain ? 'Domain' : 'Workgroup'} value={idn.part_of_domain ? idn.domain : (idn.workgroup || idn.domain)} />}
         <Rest data={idn} used={['manufacturer', 'model', 'serial', 'fqdn', 'hostname', 'domain', 'workgroup', 'part_of_domain', ...(idn.bios_serial === idn.serial ? ['bios_serial'] : []), ...(sec(pp, 'os') ? [] : ['distribution', 'distro_id', 'distro_version', 'kernel'])]} />
-      </Card>
-
-      <Card title="CPU" meta={isObj(cpu) ? `${Object.keys(cpu).length} fields` : undefined}>
-        {isObj(cpu) ? (
-          <>
-            <div className="text-[13px] font-semibold text-[#0f1f2b] mb-1 truncate" title={cpu.model}>{String(cpu.model || '—').replace(/\(R\)|\(TM\)/g, '')}</div>
-            {has(cpu.physical_cores) && <Row label="Cores / threads" value={`${cpu.physical_cores} / ${cpu.logical_processors ?? '—'}`} mono />}
-            {has(cpu.clock_mhz) && <Row label="Base clock" value={`${(cpu.clock_mhz / 1000).toFixed(2)} GHz`} mono />}
-            <Row label="Architecture" value={cpu.architecture} mono />
-            <Row label="Manufacturer" value={cpu.manufacturer || cpu.vendor} />
-            <Rest data={cpu} used={['model', 'physical_cores', 'logical_processors', 'clock_mhz', 'architecture', 'manufacturer', 'vendor']} />
-          </>
-        ) : <Muted>CPU not collected</Muted>}
+        </div>
       </Card>
 
       <Card title="Memory" meta={dimms.length ? `${dimms.length} DIMM${dimms.length > 1 ? 's' : ''}` : undefined}>
@@ -302,38 +291,17 @@ export function HardwareCards({ A }: { A: any }) {
         ) : <Muted>Memory not collected</Muted>}
       </Card>
 
-      <Card title="Storage" meta={disks.length ? `${disks.length} disk${disks.length > 1 ? 's' : ''}` : undefined}>
-        {isObj(sto) ? (
+      <Card title="CPU" meta={isObj(cpu) ? `${Object.keys(cpu).length} fields` : undefined}>
+        {isObj(cpu) ? (
           <>
-            {disks.map((d, i) => (
-              <div key={i} className="mb-1.5">
-                <div className="text-[12px] text-[#0f1f2b]">{d.model || d.name || 'Disk'} <span className={MONO + ' text-[#6b7787]'}>{d.size_gb != null ? `${d.size_gb} GB` : d.size || ''}</span></div>
-                <div className={'text-[10px] text-[#8a95a1] break-all ' + MONO}>{[d.media_type, d.bus_type || d.interface, d.model && d.name, d.serial && `S/N ${d.serial}`].filter(Boolean).join(' · ')}</div>
-                <Rest data={d} used={['model', 'name', 'size_gb', 'size', 'media_type', 'bus_type', 'interface', 'serial']} />
-              </div>
-            ))}
-            <div className="flex flex-col gap-1.5 mt-1">
-              {vols.map((v, i) => {
-                const cap = v.capacity_gb, free = v.free_gb;
-                const used = typeof cap === 'number' && typeof free === 'number' ? cap - free : null;
-                const pct = used != null && cap ? (used / cap) * 100 : parseFloat(String(v.use_pct || '').replace('%', '')) || 0;
-                const label = `${v.drive_letter || v.mount_point || v.mount || '—'} ${v.type || v.filesystem || ''}`.trim();
-                return (
-                  <div key={i} title={v.mount ? `${v.filesystem || ''} · ${v.available || ''} available` : undefined}>
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[11.5px] text-[#3a4653] w-[92px] truncate">{label}</span>
-                      <Bar pct={pct} />
-                      <span className={MONO + ' text-[11px] text-[#3a4653] whitespace-nowrap'}>{used != null ? `${used} of ${cap} GB` : `${v.used || '—'} of ${v.size || '—'}`}</span>
-                    </div>
-                    {(v.mount || free != null) && <div className={'text-[10px] text-[#8a95a1] pl-[102px] truncate ' + MONO}>{v.mount ? [v.filesystem, v.available && `${v.available} free`, v.use_pct].filter(Boolean).join(' · ') : `${free} GB free`}</div>}
-                    <Rest data={v} used={['capacity_gb', 'free_gb', 'drive_letter', 'mount_point', 'mount', 'type', 'filesystem', 'used', 'size', 'use_pct', 'available']} />
-                  </div>
-                );
-              })}
-            </div>
-            <Rest data={sto} used={['physical_disks', 'volumes', 'mounts']} />
+            <div className="text-[13px] font-semibold text-[#0f1f2b] mb-1 truncate" title={cpu.model}>{String(cpu.model || '—').replace(/\(R\)|\(TM\)/g, '')}</div>
+            {has(cpu.physical_cores) && <Row label="Cores / threads" value={`${cpu.physical_cores} / ${cpu.logical_processors ?? '—'}`} mono />}
+            {has(cpu.clock_mhz) && <Row label="Base clock" value={`${(cpu.clock_mhz / 1000).toFixed(2)} GHz`} mono />}
+            <Row label="Architecture" value={cpu.architecture} mono />
+            <Row label="Manufacturer" value={cpu.manufacturer || cpu.vendor} />
+            <Rest data={cpu} used={['model', 'physical_cores', 'logical_processors', 'clock_mhz', 'architecture', 'manufacturer', 'vendor']} />
           </>
-        ) : <Muted>Storage not collected</Muted>}
+        ) : <Muted>CPU not collected</Muted>}
       </Card>
 
       <Card title="Firmware & GPU" span={2} meta={gpus.length ? `${gpus.length} GPU${gpus.length > 1 ? 's' : ''}` : undefined}>
@@ -364,6 +332,44 @@ export function HardwareCards({ A }: { A: any }) {
             )) : <Muted>GPU not collected</Muted>}
           </div>
         </div>
+      </Card>
+
+      <Card title="Storage" span={3} meta={disks.length ? `${disks.length} disk${disks.length > 1 ? 's' : ''}` : undefined}>
+        {isObj(sto) ? (
+          <>
+            <div className="grid lg:grid-cols-2 gap-x-6">
+            <div>
+            {disks.map((d, i) => (
+              <div key={i} className="mb-1.5">
+                <div className="text-[12px] text-[#0f1f2b]">{d.model || d.name || 'Disk'} <span className={MONO + ' text-[#6b7787]'}>{d.size_gb != null ? `${d.size_gb} GB` : d.size || ''}</span></div>
+                <div className={'text-[10px] text-[#8a95a1] break-all ' + MONO}>{[d.media_type, d.bus_type || d.interface, d.model && d.name, d.serial && `S/N ${d.serial}`].filter(Boolean).join(' · ')}</div>
+                <Rest data={d} used={['model', 'name', 'size_gb', 'size', 'media_type', 'bus_type', 'interface', 'serial']} />
+              </div>
+            ))}
+            </div>
+            <div className="flex flex-col gap-1.5 mt-1 lg:mt-0">
+              {vols.map((v, i) => {
+                const cap = v.capacity_gb, free = v.free_gb;
+                const used = typeof cap === 'number' && typeof free === 'number' ? cap - free : null;
+                const pct = used != null && cap ? (used / cap) * 100 : parseFloat(String(v.use_pct || '').replace('%', '')) || 0;
+                const label = `${v.drive_letter || v.mount_point || v.mount || '—'} ${v.type || v.filesystem || ''}`.trim();
+                return (
+                  <div key={i} title={v.mount ? `${v.filesystem || ''} · ${v.available || ''} available` : undefined}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[11.5px] text-[#3a4653] w-[92px] truncate">{label}</span>
+                      <Bar pct={pct} />
+                      <span className={MONO + ' text-[11px] text-[#3a4653] whitespace-nowrap'}>{used != null ? `${used} of ${cap} GB` : `${v.used || '—'} of ${v.size || '—'}`}</span>
+                    </div>
+                    {(v.mount || free != null) && <div className={'text-[10px] text-[#8a95a1] pl-[102px] truncate ' + MONO}>{v.mount ? [v.filesystem, v.available && `${v.available} free`, v.use_pct].filter(Boolean).join(' · ') : `${free} GB free`}</div>}
+                    <Rest data={v} used={['capacity_gb', 'free_gb', 'drive_letter', 'mount_point', 'mount', 'type', 'filesystem', 'used', 'size', 'use_pct', 'available']} />
+                  </div>
+                );
+              })}
+            </div>
+            </div>
+            <Rest data={sto} used={['physical_disks', 'volumes', 'mounts']} />
+          </>
+        ) : <Muted>Storage not collected</Muted>}
       </Card>
 
       <Card title="Network adapters" span={3} meta={nics.length ? <span>{nics.length} adapters{folded.length ? <> · {folded.length} WAN miniports {showFolded ? 'shown' : 'folded'} <a className="text-[#005B96] font-semibold cursor-pointer ml-1" onClick={() => setShowFolded((v) => !v)}>{showFolded ? 'fold' : 'show'}</a></> : null}</span> : undefined}>
@@ -569,119 +575,128 @@ export function SecurityCards({ A, review }: { A: any; review: Record<string, st
   const RL = ({ k }: { k: string }) => (review[k].length ? <div className="flex flex-wrap gap-1 mt-2">{review[k].map((t, i) => <Pill key={i} on={false} warn>{t}</Pill>)}</div> : null);
   const meta = (k: string, fallback?: string) => (review[k].length ? `${review[k].length} to review` : fallback);
 
+  // Three balanced stacks (last card in each grows) so no card is left half-empty.
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
-      <Card title="Antivirus & EDR" warn={review.av.length > 0} meta={meta('av')}>
-        {isObj(sp) ? (
-          <>
-            {(sp.antivirus || []).map((a: any, i: number) => <Row key={'a' + i} label={i === 0 ? 'Antivirus' : 'Also present'} value={<span className="inline-flex items-center gap-1.5"><span className={MONO + ' text-[11.5px]'}>{a.name}</span>{a.up_to_date != null && <span className="text-[10px] text-[#8a95a1]">{a.up_to_date ? 'up to date' : 'out of date'}</span>}</span>} title={a.state_hex ? `state ${a.state_hex}` : undefined} />)}
-            {(sp.edr_xdr || []).map((e: any, i: number) => (
-              <React.Fragment key={'e' + i}>
-                <Row label={e.type || 'EDR'} value={e.product} mono />
-                <Row label="EDR service" value={<Pill on={!!e.running} warn={!e.running}>{e.service ? `${e.service} · ` : ''}{e.status || (e.running ? 'Running' : 'Stopped')}</Pill>} />
-              </React.Fragment>
-            ))}
-            {!(sp.edr_xdr || []).length && <Row label="EDR" value={sp.edr_present === false ? 'None detected' : null} />}
-            {(sp.antivirus || []).some((a: any) => a.state_hex) && <Row label="AV state" value={(sp.antivirus || []).map((a: any) => a.state_hex).filter(Boolean).join(', ')} mono />}
-            <Rest data={sp} used={['antivirus', 'edr_xdr', 'edr_present']} />
-          </>
-        ) : (
-          <>
-            <Row label="Antivirus" value={posture?.has_antivirus ? (posture.antivirus_products || []).join(', ') : null} />
-            <Row label="EDR" value={posture?.has_edr ? (posture.edr_products || []).join(', ') : null} />
-          </>
-        )}
-        <RL k="av" />
-      </Card>
+    <div className="flex flex-col gap-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+        <div className="flex flex-col gap-2.5">
+          <Card title="Antivirus & EDR" warn={review.av.length > 0} meta={meta('av')}>
+            {isObj(sp) ? (
+              <>
+                {(sp.antivirus || []).map((a: any, i: number) => <Row key={'a' + i} label={i === 0 ? 'Antivirus' : 'Also present'} value={<span className="inline-flex items-center gap-1.5"><span className={MONO + ' text-[11.5px]'}>{a.name}</span>{a.up_to_date != null && <span className="text-[10px] text-[#8a95a1]">{a.up_to_date ? 'up to date' : 'out of date'}</span>}</span>} title={a.state_hex ? `state ${a.state_hex}` : undefined} />)}
+                {(sp.edr_xdr || []).map((e: any, i: number) => (
+                  <React.Fragment key={'e' + i}>
+                    <Row label={e.type || 'EDR'} value={e.product} mono />
+                    <Row label="EDR service" value={<Pill on={!!e.running} warn={!e.running}>{e.service ? `${e.service} · ` : ''}{e.status || (e.running ? 'Running' : 'Stopped')}</Pill>} />
+                  </React.Fragment>
+                ))}
+                {!(sp.edr_xdr || []).length && <Row label="EDR" value={sp.edr_present === false ? 'None detected' : null} />}
+                {(sp.antivirus || []).some((a: any) => a.state_hex) && <Row label="AV state" value={(sp.antivirus || []).map((a: any) => a.state_hex).filter(Boolean).join(', ')} mono />}
+                <Rest data={sp} used={['antivirus', 'edr_xdr', 'edr_present']} />
+              </>
+            ) : (
+              <>
+                <Row label="Antivirus" value={posture?.has_antivirus ? (posture.antivirus_products || []).join(', ') : null} />
+                <Row label="EDR" value={posture?.has_edr ? (posture.edr_products || []).join(', ') : null} />
+              </>
+            )}
+            <RL k="av" />
+          </Card>
 
-      <Card title="Defender" warn={review.defender.length > 0} meta={meta('defender', isObj(df) ? `${Object.keys(df).length} fields` : undefined)}>
-        {isObj(df) ? (
-          <>
-            <Row label="Real-time protection" value={onOff(df.realtime_protection, true)} />
-            <Row label="Antivirus engine" value={onOff(df.antivirus_enabled, true)} />
-            <Row label="Antispyware" value={onOff(df.antispyware_enabled, true)} />
-            <Row label="Signature age" value={df.signature_age_days != null ? `${df.signature_age_days} day${df.signature_age_days === 1 ? '' : 's'}` : null} mono />
-            <Row label="Signatures" value={df.signature_version} mono />
-            <Row label="Engine" value={df.engine_version} mono />
-            <Row label="Tamper protection" value={onOff(df.tamper_protected, true)} />
-            <Rest data={df} used={['realtime_protection', 'antivirus_enabled', 'antispyware_enabled', 'signature_age_days', 'signature_version', 'engine_version', 'tamper_protected']} />
-          </>
-        ) : <Muted>Defender status not collected</Muted>}
-        <RL k="defender" />
-      </Card>
-
-      <Card title="Host firewall" warn={review.firewall.length > 0} meta={meta('firewall', Array.isArray(fwl) ? `${fwl.length} profiles` : undefined)}>
-        {Array.isArray(fwl) ? (
-          <div className="flex flex-col gap-1.5">
-            {fwl.map((p: any, i: number) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-[#e8ecee] bg-[#fafbfc] px-2.5 py-1.5">
-                <div><div className="text-[12px] font-semibold text-[#0f1f2b]">{p.profile}</div><div className="text-[10px] text-[#8a95a1]">in {words(p.default_inbound || '—')} · out {words(p.default_outbound || '—')}</div></div>
-                {onOff(p.enabled, true)}
+          <Card title="Disk encryption" warn={review.disk.length > 0} meta={meta('disk', bl.length ? `BitLocker · ${bl.length} volume${bl.length > 1 ? 's' : ''}` : undefined)}>
+            {bl.length ? bl.map((v: any, i: number) => (
+              <div key={i}>
+                <Row label={`Volume ${v.mount_point || ''}`} value={words(v.volume_status)} mono />
+                <Row label="Protection" value={v.protection_status != null ? <Pill on={/^on$/i.test(v.protection_status)} warn={/^off$/i.test(v.protection_status)}>{v.protection_status}</Pill> : null} />
+                <Row label="Method" value={v.encryption_method ? String(v.encryption_method).replace(/^XtsAes(\d+)/i, 'XTS-AES $1').replace(/^Aes(\d+)/i, 'AES $1') : null} mono />
+                <Row label="Encrypted" value={v.encryption_percentage != null ? `${v.encryption_percentage}%` : null} mono />
+                <Rest data={v} used={['mount_point', 'volume_status', 'protection_status', 'encryption_method', 'encryption_percentage']} />
               </div>
-            ))}
-          </div>
-        ) : <Muted>Firewall profiles not collected</Muted>}
-      </Card>
+            )) : <Muted>Disk encryption not collected</Muted>}
+            <RL k="disk" />
+          </Card>
 
-      <Card title="Disk encryption" warn={review.disk.length > 0} meta={meta('disk', bl.length ? `BitLocker · ${bl.length} volume${bl.length > 1 ? 's' : ''}` : undefined)}>
-        {bl.length ? bl.map((v: any, i: number) => (
-          <div key={i}>
-            <Row label={`Volume ${v.mount_point || ''}`} value={words(v.volume_status)} mono />
-            <Row label="Protection" value={v.protection_status != null ? <Pill on={/^on$/i.test(v.protection_status)} warn={/^off$/i.test(v.protection_status)}>{v.protection_status}</Pill> : null} />
-            <Row label="Method" value={v.encryption_method ? String(v.encryption_method).replace(/^XtsAes(\d+)/i, 'XTS-AES $1').replace(/^Aes(\d+)/i, 'AES $1') : null} mono />
-            <Row label="Encrypted" value={v.encryption_percentage != null ? `${v.encryption_percentage}%` : null} mono />
-            <Rest data={v} used={['mount_point', 'volume_status', 'protection_status', 'encryption_method', 'encryption_percentage']} />
-          </div>
-        )) : <Muted>Disk encryption not collected</Muted>}
-        <RL k="disk" />
-      </Card>
+          <Card title="What runs here" className="flex-1" meta={cats.length ? 'from installed packages' : undefined}>
+            {cats.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {cats.map(([k, n]) => <span key={k} className="text-[11.5px] font-semibold rounded-md border border-[#9cc0dd] bg-[#EFF5FA] text-[#014A81] px-2 py-[2px]">{words(k).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())} <span className={MONO + ' font-normal text-[#5f7a91]'}>{n as number}</span></span>)}
+              </div>
+            ) : <Muted>No package categories yet</Muted>}
+            {Array.isArray(posture?.security_tools) && posture.security_tools.length > 0 && <div className="text-[10.5px] text-[#8a95a1] mt-2">Security tools: {posture.security_tools.join(', ')}</div>}
+          </Card>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          <Card title="Defender" warn={review.defender.length > 0} meta={meta('defender', isObj(df) ? `${Object.keys(df).length} fields` : undefined)}>
+            {isObj(df) ? (
+              <>
+                <Row label="Real-time protection" value={onOff(df.realtime_protection, true)} />
+                <Row label="Antivirus engine" value={onOff(df.antivirus_enabled, true)} />
+                <Row label="Antispyware" value={onOff(df.antispyware_enabled, true)} />
+                <Row label="Signature age" value={df.signature_age_days != null ? `${df.signature_age_days} day${df.signature_age_days === 1 ? '' : 's'}` : null} mono />
+                <Row label="Signatures" value={df.signature_version} mono />
+                <Row label="Engine" value={df.engine_version} mono />
+                <Row label="Tamper protection" value={onOff(df.tamper_protected, true)} />
+                <Rest data={df} used={['realtime_protection', 'antivirus_enabled', 'antispyware_enabled', 'signature_age_days', 'signature_version', 'engine_version', 'tamper_protected']} />
+              </>
+            ) : <Muted>Defender status not collected</Muted>}
+            <RL k="defender" />
+          </Card>
 
-      <Card title="Local users" span={2} meta={<span>{Array.isArray(users) ? `${users.length} users` : ''}{Array.isArray(groups) ? ` · ${groups.length} groups` : ''}{(Array.isArray(users) || Array.isArray(groups)) && <a className="text-[#005B96] font-semibold cursor-pointer ml-2" onClick={() => setShowAccounts((v) => !v)}>{showAccounts ? 'Hide table' : 'Full table'}</a>}</span>}>
-        {Array.isArray(users) ? (
-          <>
-            <div className="flex flex-wrap gap-1.5">
-              {users.map((u: any, i: number) => (
-                <span key={i} title={[u.full_name, u.sid].filter(Boolean).join(' · ')} className={'text-[11.5px] rounded-md border px-2 py-[2px] ' + (u.disabled ? 'border-[#e8ecee] bg-[#fafbfc] text-[#6b7787]' : 'border-[#cfe0f0] bg-[#EFF5FA] text-[#0f1f2b] font-semibold')}>
-                  {u.name}{u.disabled ? <span className="font-normal text-[#aeb8c2]"> disabled</span> : ''}{u.lockout ? <span className="font-semibold text-[#9a6410]"> locked</span> : ''}
-                </span>
-              ))}
-            </div>
-            <div className="text-[10.5px] text-[#8a95a1] mt-2">Administrators group membership is not collected by this scan.</div>
-          </>
-        ) : <Muted>Local accounts not collected</Muted>}
-        {showAccounts && (
-          <div className="grid lg:grid-cols-2 gap-2 mt-2">
+          <Card title="Host firewall" className="flex-1" warn={review.firewall.length > 0} meta={meta('firewall', Array.isArray(fwl) ? `${fwl.length} profiles` : undefined)}>
+            {Array.isArray(fwl) ? (
+              <div className="flex flex-col gap-1.5">
+                {fwl.map((p: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-[#e8ecee] bg-[#fafbfc] px-2.5 py-1.5">
+                    <div><div className="text-[12px] font-semibold text-[#0f1f2b]">{p.profile}</div><div className="text-[10px] text-[#8a95a1]">in {words(p.default_inbound || '—')} · out {words(p.default_outbound || '—')}</div></div>
+                    {onOff(p.enabled, true)}
+                  </div>
+                ))}
+              </div>
+            ) : <Muted>Firewall profiles not collected</Muted>}
+          </Card>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          <Card title="Update state" meta={wu ? 'Windows Update' : isObj(su) ? su.update_manager || 'Security updates' : undefined}>
+            {isObj(wu) ? (
+              <>
+                <Row label="Last installed" value={wu.last_installed ? String(wu.last_installed).replace(/^(\d\d)\/(\d\d)\/(\d{4}).*/, '$3-$1-$2') : null} mono />
+                <Row label="Days since patch" value={wu.days_since_last_patch} mono tone={typeof wu.days_since_last_patch === 'number' && wu.days_since_last_patch > 30 ? 'warn' : undefined} />
+                <Row label="Hotfixes installed" value={wu.hotfix_count} mono />
+                <Row label="Last hotfix" value={wu.last_hotfix} mono />
+                {Array.isArray(wu.recent_hotfixes) && wu.recent_hotfixes.length > 0 && (
+                  <div className="mt-1.5 border-t border-[#f0f3f5] pt-1">
+                    {wu.recent_hotfixes.map((h: any, i: number) => <div key={i} className={'flex justify-between gap-2 text-[10.5px] text-[#6b7787] ' + MONO}><span>{h.id}</span><span className="truncate">{h.type}</span><span>{String(h.installed || '').replace(/^(\d\d)\/(\d\d)\/(\d{4}).*/, '$3-$1-$2')}</span></div>)}
+                  </div>
+                )}
+                <Rest data={wu} used={['last_installed', 'days_since_last_patch', 'hotfix_count', 'last_hotfix', 'recent_hotfixes']} />
+              </>
+            ) : isObj(su) ? <Rest data={su} used={[]} /> : <Muted>Patch state not collected</Muted>}
+          </Card>
+
+          <Card title="Local users" className="flex-1" meta={<span>{Array.isArray(users) ? `${users.length} users` : ''}{Array.isArray(groups) ? ` · ${groups.length} groups` : ''}{(Array.isArray(users) || Array.isArray(groups)) && <a className="text-[#005B96] font-semibold cursor-pointer ml-2" onClick={() => setShowAccounts((v) => !v)}>{showAccounts ? 'Hide table' : 'Full table'}</a>}</span>}>
+            {Array.isArray(users) ? (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {users.map((u: any, i: number) => (
+                    <span key={i} title={[u.full_name, u.sid].filter(Boolean).join(' · ')} className={'text-[11.5px] rounded-md border px-2 py-[2px] ' + (u.disabled ? 'border-[#e8ecee] bg-[#fafbfc] text-[#6b7787]' : 'border-[#cfe0f0] bg-[#EFF5FA] text-[#0f1f2b] font-semibold')}>
+                      {u.name}{u.disabled ? <span className="font-normal text-[#aeb8c2]"> disabled</span> : ''}{u.lockout ? <span className="font-semibold text-[#9a6410]"> locked</span> : ''}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-[10.5px] text-[#8a95a1] mt-2">Administrators group membership is not collected by this scan.</div>
+              </>
+            ) : <Muted>Local accounts not collected</Muted>}
+          </Card>
+        </div>
+      </div>
+      {showAccounts && (
+        <Card title="Local accounts" span={3} meta={<a className="text-[#005B96] font-semibold cursor-pointer" onClick={() => setShowAccounts(false)}>Hide table</a>}>
+          <div className="grid lg:grid-cols-2 gap-2">
             {Array.isArray(users) && <UsersTable rows={users.map((u: any) => [u.full_name || '—', u.name || '—', u.sid || '—', u.lockout ? '✓' : '✗', u.disabled ? '✓' : '✗'])} />}
             {Array.isArray(groups) && <GenericTable headers={['Group', 'Description']} rows={groups.map((g: any) => [g.name || '—', g.description || '—'])} />}
           </div>
-        )}
-      </Card>
-
-      <Card title="Update state" meta={wu ? 'Windows Update' : isObj(su) ? su.update_manager || 'Security updates' : undefined}>
-        {isObj(wu) ? (
-          <>
-            <Row label="Last installed" value={wu.last_installed ? String(wu.last_installed).replace(/^(\d\d)\/(\d\d)\/(\d{4}).*/, '$3-$1-$2') : null} mono />
-            <Row label="Days since patch" value={wu.days_since_last_patch} mono tone={typeof wu.days_since_last_patch === 'number' && wu.days_since_last_patch > 30 ? 'warn' : undefined} />
-            <Row label="Hotfixes installed" value={wu.hotfix_count} mono />
-            <Row label="Last hotfix" value={wu.last_hotfix} mono />
-            {Array.isArray(wu.recent_hotfixes) && wu.recent_hotfixes.length > 0 && (
-              <div className="mt-1.5 border-t border-[#f0f3f5] pt-1">
-                {wu.recent_hotfixes.map((h: any, i: number) => <div key={i} className={'flex justify-between gap-2 text-[10.5px] text-[#6b7787] ' + MONO}><span>{h.id}</span><span className="truncate">{h.type}</span><span>{String(h.installed || '').replace(/^(\d\d)\/(\d\d)\/(\d{4}).*/, '$3-$1-$2')}</span></div>)}
-              </div>
-            )}
-            <Rest data={wu} used={['last_installed', 'days_since_last_patch', 'hotfix_count', 'last_hotfix', 'recent_hotfixes']} />
-          </>
-        ) : isObj(su) ? <Rest data={su} used={[]} /> : <Muted>Patch state not collected</Muted>}
-      </Card>
-
-      <Card title="What runs here" span={2} meta={cats.length ? 'from installed packages' : undefined}>
-        {cats.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {cats.map(([k, n]) => <span key={k} className="text-[11.5px] font-semibold rounded-md border border-[#9cc0dd] bg-[#EFF5FA] text-[#014A81] px-2 py-[2px]">{words(k).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())} <span className={MONO + ' font-normal text-[#5f7a91]'}>{n as number}</span></span>)}
-          </div>
-        ) : <Muted>No package categories yet</Muted>}
-        {Array.isArray(posture?.security_tools) && posture.security_tools.length > 0 && <div className="text-[10.5px] text-[#8a95a1] mt-2">Security tools: {posture.security_tools.join(', ')}</div>}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

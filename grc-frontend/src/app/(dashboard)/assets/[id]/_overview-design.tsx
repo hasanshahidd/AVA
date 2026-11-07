@@ -221,8 +221,8 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
           : <div className={CARD + ' px-4 py-6 text-center'}><div className="text-[13px] font-semibold text-[#6b7787]">No deep inventory collected for this asset yet</div><div className="text-[11.5px] text-[#aeb8c2] mt-1">Connect it with credentials (or a database login for an application) to collect its telemetry.</div></div>
       )}
       {active === 'ownership' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
-          {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} span={i === 0 ? 2 : undefined} className={i === 0 ? 'lg:row-span-2' : ''} />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+          {A.manual.map((c: any, i: number) => <ProvenanceCard key={i} card={c} wide={i === 0} />)}
         </div>
       )}
     </div>

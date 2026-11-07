@@ -120,27 +120,19 @@ const HEADS: { key: string; label: string; sortable: boolean }[] = [
   { key: 'value', label: 'Value', sortable: true },
   { key: 'status', label: 'Status', sortable: true },
 ];
-// Ownership / context columns — mostly unset on discovered assets, so they sit at
-// the END (after PCI / HIPAA) instead of splitting the row's real signals.
-const HEADS_CTX: { key: string; label: string; sortable: boolean }[] = [
-  { key: 'owner', label: 'Owner', sortable: true },
-  { key: 'department', label: 'Department', sortable: true },
-  { key: 'dataclass', label: 'Data Class', sortable: true },
-  { key: 'bizfn', label: 'Business Function', sortable: true },
-];
+// Owner · Department · Data Class · Business Function share ONE column at the end —
+// mostly unset on discovered assets, so four empty columns became one quiet cell.
+const HEAD_OWN = { key: 'owner', label: 'Ownership', sortable: true };
 const SORTERS: Record<string, (a: ITAsset, b: ITAsset) => number> = {
   name: (a, b) => (a.name || '').localeCompare(b.name || ''),
   type: (a, b) => laneLabel(a).localeCompare(laneLabel(b)),
   owner: (a, b) => (a.owner_name || '').localeCompare(b.owner_name || ''),
-  department: (a, b) => (a.department || '').localeCompare(b.department || ''),
-  dataclass: (a, b) => (a.data_classification || '').localeCompare(b.data_classification || ''),
-  bizfn: (a, b) => (a.business_function || '').localeCompare(b.business_function || ''),
   crit: (a, b) => (CRIT_ORDER[critOf(a)] || 0) - (CRIT_ORDER[critOf(b)] || 0),
   scan: (a, b) => new Date(a.last_seen_at || 0).getTime() - new Date(b.last_seen_at || 0).getTime(),
   value: (a, b) => (a.valuation || a.purchase_cost || 0) - (b.valuation || b.purchase_cost || 0),
   status: (a, b) => (a.status || '').localeCompare(b.status || ''),
 };
-const TEXT_SORTS = new Set(['name', 'type', 'owner', 'department', 'dataclass', 'bizfn', 'status']);
+const TEXT_SORTS = new Set(['name', 'type', 'owner', 'status']);
 
 // ── EASM subdomain roll-up ──────────────────────────────────────────────────
 // registrableDomain (apex) is the full Public Suffix List, imported from @/lib/domains.
@@ -438,14 +430,14 @@ export default function InventoryRedesign(p: Props) {
                     {HEADS.map((h) => headCell(h))}
                     <th style={{ ...th, width: 34 }}>PCI</th>
                     <th style={{ ...th, width: 44 }}>HIPAA</th>
-                    {HEADS_CTX.map((h, i) => headCell(h, i === 0))}
+                    {headCell(HEAD_OWN, true)}
                     <th style={{ ...th, width: 34 }}></th>
                   </tr></thead>
                   <tbody>
                     {p.loading ? (
-                      <tr><td colSpan={15} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
+                      <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
                     ) : rows.length === 0 ? (
-                      <tr><td colSpan={15} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
+                      <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
                     ) : orderedRows.map((a) => {
                       const tl = TILE[typeKey(a)] || { bg: '#E4E9ED', fg: '#78838F' };
                       const ck = CRIT[critOf(a)];
@@ -509,10 +501,17 @@ export default function InventoryRedesign(p: Props) {
                               <span title={a.ephi_environment ? 'In HIPAA scope' : 'Not in HIPAA scope'} style={{ color: a.ephi_environment ? '#4F46E5' : '#C4CCD3' }}>{a.ephi_environment ? '✓' : '—'}</span>
                             )}
                           </td>
-                          <td style={{ ...ctxTd, ...clip }} title={a.owner_name || ''}>{a.owner_name ? <span style={{ color: '#0F1F2B', fontWeight: 500 }}>{a.owner_name}</span> : <span style={{ color: '#B98585', fontStyle: 'italic' }}>Unassigned</span>}</td>
-                          <td style={{ ...td, ...clip }} title={a.department || ''}>{a.department || none()}</td>
-                          <td style={{ ...td, ...clip, textTransform: 'capitalize' }} title={a.data_classification || ''}>{a.data_classification || none()}</td>
-                          <td style={{ ...td, ...clip }} title={a.business_function || ''}>{a.business_function || none()}</td>
+                          <td style={ctxTd} title={[`Owner: ${a.owner_name || 'not set'}`, `Department: ${a.department || 'not set'}`, `Data class: ${a.data_classification || 'not set'}`, `Business function: ${a.business_function || 'not set'}`].join('\n')}>
+                            {a.owner_name || a.department || a.data_classification || a.business_function ? (
+                              <div style={{ maxWidth: 220, lineHeight: 1.35 }}>
+                                <div style={{ ...clip, maxWidth: 220, color: a.owner_name ? '#0F1F2B' : '#B98585', fontWeight: a.owner_name ? 500 : 400, fontStyle: a.owner_name ? 'normal' : 'italic' }}>{a.owner_name || 'No owner'}</div>
+                                <div style={{ ...clip, maxWidth: 220, fontSize: 10.5, color: '#78838F' }}>{[a.department, a.data_classification && a.data_classification.charAt(0).toUpperCase() + a.data_classification.slice(1), a.business_function].filter(Boolean).join(' · ')}</div>
+                              </div>
+                            ) : p.canEdit ? (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); p.onEdit(a); }} title="Set owner, department, data class and business function"
+                                style={{ border: '1px dashed #C9D3DC', background: 'transparent', color: '#78838F', borderRadius: 999, padding: '2px 10px', fontSize: 10.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Assign owner</button>
+                            ) : none('Not assigned')}
+                          </td>
                           <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             <RowActionsMenu actions={[
                               { key: 'view', label: 'View', icon: Eye, onClick: () => p.onView(a) },
@@ -528,7 +527,7 @@ export default function InventoryRedesign(p: Props) {
                 </table>
                 )}
               </div>
-              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>{mode === 'uncredential' ? 'Credential-free sweep view — click a device for the captured detail; Apply credentials to pull full richness.' : <>Empty cells are honest — <b style={{ color: '#55606D' }}>Unassigned</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn&rsquo;t set.</>}</div>
+              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>{mode === 'uncredential' ? 'Credential-free sweep view — click a device for the captured detail; Apply credentials to pull full richness.' : <>Empty cells are honest — <b style={{ color: '#55606D' }}>Assign owner</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn&rsquo;t set.</>}</div>
             </div>
           ) : (
             <div className="fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
