@@ -254,7 +254,7 @@ export function AttackSurface({ devices, easm }: { devices: Qs<Devices>; easm: Q
   return (
     <Card title="Attack surface" sub="Discovered vs managed" href="/asset-discovery" cta="Open Discovery" busy={busyOf(devices, easm)} className="xl:col-span-4">
       {devices.isLoading ? <Loading rows={4} /> : !devices.data ? <Unavailable what="Discovery" href="/asset-discovery" /> : total === 0 ? (
-        <Empty compact icon={<Radar size={16} />} title="Nothing discovered yet" body="Run a network sweep or an external (EASM) scan to map the attack surface." href="/asset-discovery" cta="Start discovery" />
+        <Empty compact icon={<Radar size={16} />} title="Nothing discovered yet" body="Run network discovery or an external (EASM) scan to map the attack surface." href="/asset-discovery" cta="Start discovery" />
       ) : (
         <div className="flex flex-1 flex-col justify-between">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-2">

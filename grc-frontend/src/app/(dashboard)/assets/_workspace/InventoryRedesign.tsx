@@ -463,7 +463,7 @@ export default function InventoryRedesign(p: Props) {
                                   {agentManaged(a)
                                     ? <span title="Managed by an installed Ava agent (local collector)" style={chip('#CFF2E7', '#0B6B4F')}>Agent</span>
                                     : (a.scan_depth ?? 'credentialed') === 'surface'
-                                      ? <span title="Discovered by an agentless sweep — no credentials" style={chip('#EEF1F3', '#6B7787')}>Agentless</span>
+                                      ? <span title="Found by network discovery — no credentials" style={chip('#EEF1F3', '#6B7787')}>Agentless</span>
                                       : <span title="Credentialed remote scan (deep)" style={chip('#E7F0F8', '#28578F')}>Credentialed</span>}
                                   {nSubs > 0 ? <span style={chip('#E4EDF6', '#3A5A80')}>{nSubs} sub{nSubs > 1 ? 's' : ''}</span> : null}
                                   {a.internet_facing ? <span title="Internet-facing" style={chip('#DBE8FA', '#28578F')}>Internet</span> : null}
@@ -527,7 +527,7 @@ export default function InventoryRedesign(p: Props) {
                 </table>
                 )}
               </div>
-              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>{mode === 'uncredential' ? 'Credential-free sweep view — click a device for the captured detail; Apply credentials to pull full richness.' : <>Empty cells are honest — <b style={{ color: '#55606D' }}>Assign owner</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn&rsquo;t set.</>}</div>
+              <div style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--muted2)', borderTop: '1px solid var(--bd2)' }}>{mode === 'uncredential' ? 'Credential-free discovery view — click a device for the captured detail; Apply credentials to pull full richness.' : <>Empty cells are honest — <b style={{ color: '#55606D' }}>Assign owner</b>, <b style={{ color: '#55606D' }}>—</b> and <b style={{ color: '#55606D' }}>Never</b> mean the fact isn&rsquo;t set.</>}</div>
             </div>
           ) : (
             <div className="fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -562,7 +562,7 @@ function UncredentialView({ rows, onOpen }: { rows: ITAsset[]; onOpen: (a: ITAss
   }, [rows]);
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
   if (rows.length === 0) {
-    return <div style={{ padding: 28, textAlign: 'center', color: '#78838F', fontSize: 12.5 }}>No uncredentialed assets yet. Run a network sweep from Asset Discovery — discovered hosts land here automatically, no credentials needed.</div>;
+    return <div style={{ padding: 28, textAlign: 'center', color: '#78838F', fontSize: 12.5 }}>No uncredentialed assets yet. Run network discovery from Asset Discovery — discovered hosts land here automatically, no credentials needed.</div>;
   }
   return (
     <div>
@@ -624,7 +624,7 @@ function UncredPopup({ asset, onClose, onConnect }: { asset: ITAsset; onClose: (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid #EEF1F3' }}>
           <div style={{ minWidth: 0 }}>
             <h3 style={{ fontSize: 14, color: '#0F1F2B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.host_name || asset.name || asset.ip_address || 'Swept device'}</h3>
-            <span style={{ fontSize: 11, color: '#78838F' }}>What the credential-free sweep captured</span>
+            <span style={{ fontSize: 11, color: '#78838F' }}>What credential-free discovery captured</span>
           </div>
           <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#78838F', flex: 'none' }}><X size={18} /></button>
         </div>
@@ -634,7 +634,7 @@ function UncredPopup({ asset, onClose, onConnect }: { asset: ITAsset; onClose: (
           <Row k="Device type" v={<span style={{ textTransform: 'capitalize' }}>{asset.device_type || asset.platform_kind || '—'}</span>} />
           <Row k="Subnet (CIDR)" v={<span className="mono">{asset.network_segment || '—'}</span>} />
           <Row k="Open ports" v={asset.open_ports && asset.open_ports.length ? <span className="mono">{asset.open_ports.join(', ')}</span> : 'none detected'} />
-          <Row k="Scan mode" v="Uncredential (sweep)" />
+          <Row k="Scan mode" v="Agentless (discovery)" />
           <Row k="Depth" v={asset.scan_depth === 'credentialed' ? 'Credentialed' : 'Surface / agentless'} />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '12px 18px', borderTop: '1px solid #EEF1F3', background: '#FAFBFC', borderRadius: '0 0 14px 14px' }}>

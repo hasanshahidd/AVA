@@ -14,7 +14,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { MONO, CARD, TONE, dataOf, Card, Row, Muted, Sub, SectionCards, ProvenanceCard, HardwareCards, SoftwareCards, SecurityCards, securityReview, claimedKeys } from './_telemetry-cards';
+import { MONO, CARD, TONE, Card, Row, Muted, Sub, SectionCards, ProvenanceCard, HardwareCards, SoftwareCards, SecurityCards, securityReview, claimedKeys } from './_telemetry-cards';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -46,13 +46,13 @@ function SurfacePage({ A, surface }: { A: any; surface: SurfaceFacts }) {
   );
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-      <Card title="Surface facts" meta="credential-free sweep · agentless">
+      <Card title="Surface facts" meta="credential-free discovery · agentless">
         {facts.map(([k, v, m]) => <Row key={k} label={k} value={v === '—' ? null : v} mono={m} />)}
         <Sub>Open ports</Sub>
         {ports.length ? <div className="flex flex-wrap gap-1.5">{ports.map((p) => <span key={p} className={'text-[11.5px] font-semibold text-[#28578f] bg-[#e7f0f8] border border-[#cfe0f0] rounded-md px-2 py-0.5 ' + MONO}>{p}</span>)}</div> : <Muted>No open ports recorded</Muted>}
       </Card>
       <Card title="Surface intelligence" meta="inferred, no credentials">
-        {intel.length ? intel.map(([k, v]) => <Row key={k} label={k} value={v} mono={k !== 'Classification'} />) : <Muted>No banners or service versions captured by the sweep</Muted>}
+        {intel.length ? intel.map(([k, v]) => <Row key={k} label={k} value={v} mono={k !== 'Classification'} />) : <Muted>No banners or service versions captured by network discovery</Muted>}
       </Card>
       {gate('Hardware · CPU · memory · storage · firmware')}
       {gate('Operating system · installed software · patches · services')}
@@ -64,10 +64,8 @@ function SurfacePage({ A, surface }: { A: any; surface: SurfaceFacts }) {
 
 export default function AssetOverview({ A, surface, riskProfile }: { A: any; surface?: SurfaceFacts | null; riskProfile?: any }) {
   const pp = A.raw?.pp || {};
-  const asset = A.raw?.asset || {};
   const hostCurated = !!A.server && !surface;
   const review = useMemo(() => securityReview(pp), [pp]);
-  const reviewTotal = Object.values(review).reduce((n, l) => n + l.length, 0);
   const claimed = useMemo(() => (hostCurated ? claimedKeys(pp) : new Set<string>()), [pp, hostCurated]);
 
   // Generic sections per host domain — whatever the curated cards don't claim.
@@ -94,13 +92,6 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
   const [openKpi, setOpenKpi] = useState<number | null>(null);
   const [riskView, setRiskView] = useState<'before' | 'after' | null>(null);
 
-  const idn = dataOf(pp, 'identity') || {};
-  const make = idn.manufacturer || asset.manufacturer;
-  const model = idn.model || asset.model;
-  const hw = model ? (make && !String(model).toLowerCase().startsWith(String(make).toLowerCase()) ? `${make} ${model}` : model) : make;
-  const osName = String(dataOf(pp, 'os')?.edition || asset.os_version || '').replace(/^Microsoft /, '');
-  const headLine = A.external ? A.header?.idline : [hw, osName, asset.ip_address].filter(Boolean).join(' · ');
-  const sectionCount = A.deep.reduce((n: number, g: any) => n + g.sections.length, 0);
 
   const beforeRows = riskProfile && Array.isArray(riskProfile.before_groups) ? riskProfile.before_groups : [];
   const afterRows = riskProfile && Array.isArray(riskProfile.groups) ? riskProfile.groups.flatMap((g: any) => g.rows || []) : [];
@@ -110,18 +101,8 @@ export default function AssetOverview({ A, surface, riskProfile }: { A: any; sur
 
   return (
     <div className="inv2" style={{ fontSize: 13.5 }}>
-      {/* header line */}
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-0.5 mb-1">
-        <h3 className="text-[16px] font-bold text-[#0f1f2b] m-0">{A.header?.name}</h3>
-        {headLine && <span className="text-[12px] text-[#6b7787]">{headLine}</span>}
-        <span className="ml-auto text-[11px] text-[#8a95a1] whitespace-nowrap">
-          {active === 'security' && reviewTotal > 0 && <b className="text-[#b45309] mr-3">{reviewTotal} item{reviewTotal > 1 ? 's' : ''} to review</b>}
-          {surface ? 'surface sweep · no credentialed collection' : <>{sectionCount} sections · {A.legend?.machine}</>}
-        </span>
-      </div>
-
       {/* toggle pages */}
-      <div className="flex gap-5 border-b border-[#e8ecee] mb-2.5 overflow-x-auto px-0.5">
+      <div className="flex gap-5 border-b border-[#e8ecee] mb-2.5 overflow-x-auto overflow-y-hidden px-0.5">
         {tabs.map((t) => (
           <button key={t.key} type="button" title={t.sub} onClick={() => setTab(t.key)}
             className={'text-[12.5px] whitespace-nowrap pb-1.5 -mb-px border-b-2 ' + (active === t.key ? 'font-semibold text-[#014A81] border-[#005B96]' : 'font-medium text-[#6b7787] border-transparent hover:text-[#0f1f2b]')}>

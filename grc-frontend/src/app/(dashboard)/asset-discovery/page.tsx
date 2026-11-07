@@ -70,7 +70,7 @@ function SweepProgress({ active, onIdle }: { active: boolean; onIdle?: () => voi
     <div style={{ marginTop: 12, padding: '12px 14px', border: '1px solid var(--as-border)', borderRadius: 10, background: 'var(--as-subtle)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 12.5, color: 'var(--as-ink)' }}>
-          {s.running ? 'Trying your login…' : s.error ? 'Sweep stopped' : 'Finished'}
+          {s.running ? 'Trying your login…' : s.error ? 'Discovery stopped' : 'Finished'}
         </strong>
         <span className="as-mono" style={{ fontSize: 12, color: 'var(--as-secondary)' }}>
           {s.done} / {s.total}
@@ -83,7 +83,7 @@ function SweepProgress({ active, onIdle }: { active: boolean; onIdle?: () => voi
         <span style={{ color: 'var(--as-good)' }}><strong>{s.connected}</strong> connected</span>
         <span style={{ color: 'var(--as-danger-text)' }}><strong>{s.rejected}</strong> rejected the login</span>
         {s.unreachable > 0 && (
-          <span style={{ color: 'var(--as-blue)' }} title="The host answered the sweep, but WinRM/SSH is not listening — the login was never tested">
+          <span style={{ color: 'var(--as-blue)' }} title="The host answered network discovery, but WinRM/SSH is not listening — the login was never tested">
             <strong>{s.unreachable}</strong> service not reachable
           </span>
         )}
@@ -93,7 +93,7 @@ function SweepProgress({ active, onIdle }: { active: boolean; onIdle?: () => voi
           </span>
         )}
         {s.unknown_type > 0 && (
-          <span style={{ color: 'var(--as-faint)' }} title="The sweep saw no Windows or Linux port, so no login type applies">
+          <span style={{ color: 'var(--as-faint)' }} title="Network discovery saw no Windows or Linux port, so no login type applies">
             <strong>{s.unknown_type}</strong> type unknown
           </span>
         )}
@@ -108,7 +108,7 @@ function SweepProgress({ active, onIdle }: { active: boolean; onIdle?: () => voi
             ? <>The {s.connected} that accepted it were scanned in depth and are now in IT Asset Inventory.</>
             : <>Nothing accepted this login. Check the Status column for each device&apos;s reason — a local account only works on the machine it exists on.</>}
           {s.no_login > 0 && <> {s.no_login} device{s.no_login === 1 ? '' : 's'} were never tried because no login of their type covers them — add one and run this again.</>}
-          {s.unreachable > 0 && <> {s.unreachable} answered the sweep but had no WinRM/SSH service listening — that is not a password problem: enable remote management on those machines, or onboard them with an agent.</>}
+          {s.unreachable > 0 && <> {s.unreachable} answered network discovery but had no WinRM/SSH service listening — that is not a password problem: enable remote management on those machines, or onboard them with an agent.</>}
         </div>
       )}
     </div>
@@ -326,12 +326,12 @@ function Overview({ go }: { go: (t?: string) => void }) {
       <section className="surface-grid">
         <article className="surface-card surface-network">
           <header>
-            <div><span className="surface-label"><i></i> INTERNAL DISCOVERY</span><h3>Network sweep</h3><p>Owned CIDR ranges, devices, services and authenticated enrichment.</p></div>
+            <div><span className="surface-label"><i></i> INTERNAL DISCOVERY</span><h3>Network discovery</h3><p>Owned CIDR ranges, devices, services and authenticated enrichment.</p></div>
             <button className="btn btn-sm btn-secondary" onClick={() => go('discover')}>Open network</button>
           </header>
           {!netScope ? <Empty text="No network campaign yet." hint="Create one in Discover → Connect." /> : (<>
             <div className="surface-scope">
-              <div><span>Active scope</span><b>{netScope.name || netScope.label || 'Network sweep'}</b><code>{scopeText(netScope)}</code></div>
+              <div><span>Active scope</span><b>{netScope.name || netScope.label || 'Network discovery'}</b><code>{scopeText(netScope)}</code></div>
               <div className="run-state"><i></i><span>{netRun ? `Latest run ${netRun.status}` : 'Never run'}<small>{netRun ? fmt(netRun.finished_at || netRun.created_at) : '—'}</small></span></div>
             </div>
             <div className="surface-numbers">
@@ -387,7 +387,7 @@ function Overview({ go }: { go: (t?: string) => void }) {
               <div key={w.label}><i style={{ height: `${Math.round((w.net / wkMax) * 100)}%` }}></i><em style={{ height: `${Math.round((w.easm / wkMax) * 100)}%` }}></em><span>{w.label}</span></div>
             ))}
           </div>
-          <div className="chart-legend"><span><i></i>Network sweeps</span><span><i></i>EASM runs</span></div>
+          <div className="chart-legend"><span><i></i>Network discovery</span><span><i></i>EASM runs</span></div>
         </article>
       </section>
 
@@ -497,7 +497,7 @@ function Campaigns({ onConnect }: { onConnect?: () => void }) {
 
       <div className="discovery-switch">
         <button className={'network' + (methodView === 'network' ? ' active' : '')} onClick={() => setMethodView('network')}>
-          <span className="method-symbol">⌁</span><span><b>Network sweep</b><small>Owned CIDRs · devices · ports · services</small></span><em>{netCount} campaign{netCount === 1 ? '' : 's'}</em>
+          <span className="method-symbol">⌁</span><span><b>Network discovery</b><small>Owned CIDRs · devices · ports · services</small></span><em>{netCount} campaign{netCount === 1 ? '' : 's'}</em>
         </button>
         <button className={'easm' + (methodView === 'easm' ? ' active' : '')} onClick={() => setMethodView('easm')}>
           <span className="method-symbol">↗</span><span><b>External EASM</b><small>Apex domains · subdomains · DNS · TLS</small></span><em>{easmCount} domain{easmCount === 1 ? '' : 's'}</em>
@@ -506,7 +506,7 @@ function Campaigns({ onConnect }: { onConnect?: () => void }) {
 
       <div className="method-workbench">
         <div className={'workbench-head' + (methodView === 'easm' ? ' easm' : '')}>
-          <div><span className="surface-label"><i></i> {methodView === 'easm' ? 'EXTERNAL ATTACK SURFACE' : 'INTERNAL NETWORK'}</span><h3>{methodView === 'easm' ? 'EASM domain workspace' : 'Network sweep workspace'}</h3><p>{methodView === 'easm' ? 'Owned apex → subdomains via CT & DNS.' : 'Devices found here move to Connect or Review.'}</p></div>
+          <div><span className="surface-label"><i></i> {methodView === 'easm' ? 'EXTERNAL ATTACK SURFACE' : 'INTERNAL NETWORK'}</span><h3>{methodView === 'easm' ? 'EASM domain workspace' : 'Network discovery workspace'}</h3><p>{methodView === 'easm' ? 'Owned apex → subdomains via CT & DNS.' : 'Devices found here move to Connect or Review.'}</p></div>
           <div className="actions"><button className="btn btn-secondary" onClick={refresh}>↻ Refresh</button></div>
         </div>
         <div className="workbench-grid">
@@ -533,7 +533,7 @@ function Campaigns({ onConnect }: { onConnect?: () => void }) {
             <button className="empty-campaign" onClick={() => setShowNew(true)}><span>+</span><b>Add another {methodView === 'easm' ? 'domain' : 'network scope'}</b><small>Create a separate campaign for each owned {methodView === 'easm' ? 'apex domain' : 'range'}.</small></button>
           </div>
           <aside className="panel network-insight">
-            <div className="panel-head"><div><h3>Latest {methodView === 'easm' ? 'EASM' : 'sweep'} result</h3><span>{insightRun ? nameOf(insightRun) : 'No runs yet'}</span></div></div>
+            <div className="panel-head"><div><h3>Latest {methodView === 'easm' ? 'EASM' : 'network discovery'} result</h3><span>{insightRun ? nameOf(insightRun) : 'No runs yet'}</span></div></div>
             {!insightRun ? <div style={{ padding: 16 }}><Empty text="No runs yet." hint="Run a campaign to see results here." /></div> : (<>
               <div className="big-result"><b>{insightRun.hosts_seen}</b><span>{methodView === 'easm' ? 'hostnames' : 'live hosts'}</span><em>{durOf(insightRun)}</em></div>
               <div className="result-breakdown">
@@ -581,7 +581,7 @@ function NewCampaignForm({ onDone }: { onDone: () => void }) {
         <div><label style={label}>Name</label><input className="as-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Corp network" /></div>
         <div><label style={label}>Method</label>
           <select className="as-input" value={method} onChange={(e) => setMethod(e.target.value)}>
-            <option value="network">Network sweep</option>
+            <option value="network">Network discovery</option>
             {/* Active Directory is NOT a discovery method here — it's a Connect
                 login type (Connect → Add connection → Identity → Active Directory /
                 LDAP), run against devices that Discover already found. Listing it as
@@ -1172,7 +1172,7 @@ function Runs() {
     (!q || (String(nameById.get(r.campaign_id) || '') + ' ' + r.id).toLowerCase().includes(q.toLowerCase())));
   return (
     <div className="disc-cc">
-      <div className="page-line"><div><h2>Scan history</h2><p>Network sweeps bring devices. EASM brings apex domains, subdomains and public exposure evidence.</p></div></div>
+      <div className="page-line"><div><h2>Scan history</h2><p>Network discovery brings devices. EASM brings apex domains, subdomains and public exposure evidence.</p></div></div>
       <section className="panel">
         <div className="toolbar">
           <div className="method-filter">
@@ -1196,7 +1196,7 @@ function Runs() {
                         <td data-arrow>{open === r.id ? '▾' : '▸'}</td>
                         <td>{fmt(r.finished_at || r.created_at)}</td>
                         <td><b>{nameById.get(r.campaign_id) || `#${r.campaign_id}`}</b><span className="sub">Run #{r.id}</span></td>
-                        <td><span className={'pill ' + (m === 'easm' ? 'pill-amber' : 'pill-blue')}>{m === 'easm' ? 'External EASM' : 'Network sweep'}</span></td>
+                        <td><span className={'pill ' + (m === 'easm' ? 'pill-amber' : 'pill-blue')}>{m === 'easm' ? 'External EASM' : 'Network discovery'}</span></td>
                         <td><span className={'pill ' + (r.status === 'succeeded' ? 'pill-green' : r.status === 'failed' ? 'pill-red' : r.status === 'running' ? 'pill-blue' : 'pill-gray')}>{r.status}</span></td>
                         <td>{r.hosts_seen} {m === 'easm' ? 'hostnames' : 'devices'}</td>
                         <td>{(r.in_inventory ?? 0) > 0 ? `${r.in_inventory} adopted` : (r.assets_new ?? 0) > 0 ? `${r.assets_new} new` : 'Connect or adopt'}</td>
@@ -2573,7 +2573,7 @@ function AddConnectionModal({ onClose }: { onClose: () => void }) {
                 <p style={{ fontSize: 12, color: 'var(--as-faint)', marginTop: 8, maxWidth: 620, lineHeight: 1.6 }}>
                   Windows and Linux ask only for a login — discovery already found the devices, so it is
                   applied to them. Databases, cloud accounts and network devices are named individually,
-                  because a network sweep can&apos;t find them.
+                  because network discovery can&apos;t find them.
                 </p>
               )}
               {(ptype === 'windows' || ptype === 'linux') && (

@@ -681,7 +681,7 @@ def trigger_run(
             400,
             "This campaign only has Active Directory OUs, and AD enumeration "
             "needs stored credentials, which aren't built yet. Add a CIDR or IP "
-            "range scope to run a network sweep now.",
+            "range scope to run network discovery now.",
         )
 
     if not _acquire_run_lock(tid, campaign_id):
@@ -1714,7 +1714,7 @@ def connect_all_discovered(
                 transport = _t(o)
                 if transport is None:
                     o.resolution_note = (
-                        "type unknown: the sweep saw no Windows (445/3389) or "
+                        "type unknown: network discovery saw no Windows (445/3389) or "
                         "Linux (22) port, so no login type applies"
                     )
                     wdb.commit()
@@ -1730,8 +1730,8 @@ def connect_all_discovered(
                 if _port_state(o, transport) == "closed":
                     svc = "WinRM (5985/5986)" if transport == "windows" else "SSH (22)"
                     o.resolution_note = (
-                        f"{svc} is not open on {o.ip_address} — the host answered the "
-                        f"sweep but the agentless service is disabled or firewalled. "
+                        f"{svc} is not open on {o.ip_address} — the host answered network "
+                        f"discovery but the agentless service is disabled or firewalled. "
                         f"Enable it, or onboard this machine with an agent."
                     )
                     wdb.commit()
@@ -1934,7 +1934,7 @@ def connect_selected(
 
                 transport = _t(o)
                 if transport is None:
-                    o.resolution_note = ("type unknown: the sweep saw no Windows (445/3389) "
+                    o.resolution_note = ("type unknown: network discovery saw no Windows (445/3389) "
                                          "or Linux (22) port, so no login type applies")
                     wdb.commit(); _sweep_update(tid, done=1, unknown_type=1); continue
 

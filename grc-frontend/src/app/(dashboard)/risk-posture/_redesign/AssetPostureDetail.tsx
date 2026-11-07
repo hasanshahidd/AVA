@@ -295,7 +295,7 @@ export default function AssetPostureDetail({ assetId }: { assetId: number }) {
     postureQ.refetch();
     toast.toast({ title: 'Recalculating', message: 'Re-scoring this asset from live signals.', type: 'info' });
   };
-  const reprobe = () => toast.toast({ title: 'Re-probe queued', message: 'External assets are re-scored on the next EASM discovery sweep — there is no on-demand probe.', type: 'info' });
+  const reprobe = () => toast.toast({ title: 'Re-probe queued', message: 'External assets are re-scored on the next EASM discovery run — there is no on-demand probe.', type: 'info' });
 
   // Back = return to wherever the user came from (usually the asset's Risk &
   // Controls tab). Falls back to the posture dashboard on a cold deep-link.
@@ -415,7 +415,7 @@ export default function AssetPostureDetail({ assetId }: { assetId: number }) {
 
         <Card title="Why this score" sub={`weighted outside-in signals · total ${data.score ?? '—'}/100 · bar = signal severity, number = points added`} grow>
           {comps.length === 0 ? (
-            <div style={{ fontSize: 12, color: MUTED }}>{d.health?.reason || 'Not probed yet — run an external discovery sweep to grade exposure.'}</div>
+            <div style={{ fontSize: 12, color: MUTED }}>{d.health?.reason || 'Not probed yet — run an external discovery to grade exposure.'}</div>
           ) : comps.map(([k, c]) => {
             const pct = Math.round((c.score ?? 0) * 100);
             const link = k === 'exploitability' ? <Link href="/vulnerabilities" style={lnkStyle}>Findings →</Link>
@@ -429,12 +429,12 @@ export default function AssetPostureDetail({ assetId }: { assetId: number }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(280px,100%),1fr))', gap: 12, alignItems: 'stretch' }}>
           <Card title="Top contributors" sub="fix these to shrink the external surface" grow>
             {contribs.length === 0 ? (
-              <div style={{ fontSize: 11.5, color: MUTED }}>No outside-in contributors flagged — exposure hygiene looks clean on the last sweep.</div>
+              <div style={{ fontSize: 11.5, color: MUTED }}>No outside-in contributors flagged — exposure hygiene looks clean on the last discovery run.</div>
             ) : contribs.slice(0, 4).map((x, i) => <ContribRow key={i} dot={x.col} title={x.title} meta={x.meta} />)}
-            <div style={{ fontSize: 10, color: FAINT, marginTop: 'auto', paddingTop: 8 }}>Verified by the next EASM sweep — the sweep is this asset&apos;s re-scan.</div>
+            <div style={{ fontSize: 10, color: FAINT, marginTop: 'auto', paddingTop: 8 }}>Verified by the next EASM discovery run — that run is this asset&apos;s re-scan.</div>
           </Card>
 
-          <Card title="Outside-in probe" sub={probe.probed_at ? `last sweep · ${String(probe.probed_at).slice(0, 10)}` : 'not yet probed'} grow>
+          <Card title="Outside-in probe" sub={probe.probed_at ? `last discovery · ${String(probe.probed_at).slice(0, 10)}` : 'not yet probed'} grow>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
               <Kv k="Server" v={probe.server || '—'} c={probe.server ? '#C0682F' : undefined} />
               <Kv k="Response" v={probe.response_time_ms != null ? `${probe.response_time_ms} ms` : '—'} />

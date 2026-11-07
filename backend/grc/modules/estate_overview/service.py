@@ -55,7 +55,7 @@ ROOTS_CAP = 8    # top registrable domains the external surface hangs off
 ENVIRONMENTS = ("production", "staging", "development", "test", "dr")
 DATA_CLASSES = ("restricted", "confidential", "internal", "public")  # most → least sensitive
 REGULATED = ("pci", "phi", "pii", "financial", "multiple")           # 'none' counted apart
-ORIGIN_LABELS = (("easm", "External discovery"), ("network_sweep", "Network sweep"),
+ORIGIN_LABELS = (("easm", "External discovery"), ("network_sweep", "Network discovery"),
                  ("connect", "Credentialed connect"), ("agent", "Endpoint agent"),
                  ("import", "Imported register"), ("manual", "Manual entry"))
 # Security-relevant software families (security_posture.categories), counted as the

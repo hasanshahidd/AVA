@@ -320,7 +320,7 @@ export default function VulnerabilitiesPanel({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" />
           </svg>
-          <span>Scanning host — collecting vulnerabilities. Results appear here when the sweep finishes (usually a minute or two for a freshly enrolled host).</span>
+          <span>Scanning host — collecting vulnerabilities. Results appear here when the scan finishes (usually a minute or two for a freshly enrolled host).</span>
         </div>
       )}
       {/* Risk score + posture summary on top — the risk score matters most, so it is

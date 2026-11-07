@@ -111,9 +111,9 @@ def diagnose(s: Dict[str, Any]) -> Dict[str, Any]:
         if code == "unknown_type":
             return _dx("type_unknown", "actionable",
                        f"Ava can't tell what {name} is",
-                       "The sweep saw no Windows (445/3389/5985) or Linux (22) port, so there's no correct login KIND to even try. "
+                       "Network discovery saw no Windows (445/3389/5985) or Linux (22) port, so there's no correct login KIND to even try. "
                        "Guessing one would be a guaranteed failed login.",
-                       ["Re-run discovery so the sweep can capture its management ports,",
+                       ["Re-run discovery so it can capture its management ports,",
                         "or enable a remote-management service (WinRM/SSH) on the device so its OS can be inferred."],
                        safe_to_retry=True, lockout_risk=False)
         # code == "error" or anything else
@@ -149,7 +149,7 @@ def diagnose(s: Dict[str, Any]) -> Dict[str, Any]:
                    if "wmi" in alt else "SNMP reads the device with a community string (UDP · 161)")
             return _dx("ready_alt_method", "actionable",
                        f"{name} is ready — reachable via {pretty}",
-                       f"{login_word} is off on this host, but {pretty} answered the sweep, so Ava can still log in that "
+                       f"{login_word} is off on this host, but {pretty} answered network discovery, so Ava can still log in that "
                        f"way — {how}. You do NOT need to turn {login_word} on to bring this device in.",
                        [f"Click Connect and leave the method on Auto (it uses the door that answered), or pick {pretty} explicitly, then choose your login.",
                         f"Optional only: enabling {login_word} later gives a fuller OS/software read, but it is not required to connect now."],
@@ -164,14 +164,14 @@ def diagnose(s: Dict[str, Any]) -> Dict[str, Any]:
                        safe_to_retry=True, lockout_risk=False)
         # unknown / none
         unknown_steps = [
-            "Re-run the discovery campaign so a fresh sweep checks the login port and resolves this to open or closed.",
+            "Re-run the discovery campaign so a fresh discovery run checks the login port and resolves this to open or closed.",
             f"You can also just try Connect now — if {login_word} is up it works; if not, follow the 'turned off' fix.",
         ]
         if is_win:
             unknown_steps.append("No WinRM? On the Connect panel switch the method to WMI (DCOM · 135) or SNMP (UDP · 161) — neither needs WinRM.")
         return _dx("login_port_unknown", "actionable",
                    f"Ava hasn't confirmed {login_word} on {name}",
-                   f"This looks like {'Windows' if is_win else 'Linux'} (from its OS guess or open ports), but the last sweep never "
+                   f"This looks like {'Windows' if is_win else 'Linux'} (from its OS guess or open ports), but the last discovery run never "
                    f"probed the {login_word} login port, so its state is unknown. Ava will still let you try — the attempt fast-fails "
                    f"as 'unreachable' (never a lockout) if the port is really closed.",
                    unknown_steps,
@@ -182,7 +182,7 @@ def diagnose(s: Dict[str, Any]) -> Dict[str, Any]:
         labels = ", ".join(sorted({(x.get("label") or x.get("kind") or "").strip() for x in svc if x}))
         return _dx("service_typed", "actionable",
                    f"{name} runs a service you connect to directly",
-                   f"The sweep found a service port ({labels}). This device is reached with the service's own login, not a Windows/Linux "
+                   f"Network discovery found a service port ({labels}). This device is reached with the service's own login, not a Windows/Linux "
                    f"host login.",
                    [f"Click Connect and choose the typed option ({labels}), then add a matching credential.",
                     "Database logins need a read-only account; LDAP needs a read bind; Kubernetes needs a token/RBAC."],
