@@ -16,7 +16,8 @@ import ChangeEntryCard from './ChangeEntryCard';
 import SummaryRail from './SummaryRail';
 import {
   BORDER, CATEGORY_ORDER, FAINT, INK, MUTED, SEC, NO_FILTERS, SOURCE_ORDER, type ChangeEntry, type Filters,
-  actorOf, applyFilters, categoryMeta, dayKey, dayLabel, fieldLabel, fieldsOf, fmtValue, sourceMeta, sourceOf, summarise,
+  actorOf, applyFilters, categoryMeta, categoryOfField, dayKey, dayLabel, fieldLabel, fieldsOf, fmtValue, isTelemetry,
+  sectionLabel, sectionOf, sourceMeta, sourceOf, summarise,
 } from './model';
 
 function Chip({ on, color, label, count, onClick }: {
@@ -41,15 +42,16 @@ function csvOf(items: ChangeEntry[]): string {
     const s = String(v ?? '');
     return `"${(/^\s*[=+\-@]|^[\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
   };
-  const rows = [['Date', 'Time', 'Who', 'Source', 'Category', 'Field', 'Before', 'After']];
+  const rows = [['Date', 'Time', 'Who', 'Source', 'Category', 'Section', 'Field', 'Change', 'Before', 'After']];
   for (const e of items) {
     const d = e.created_at ? new Date(e.created_at) : null;
     const base = [d ? d.toISOString().slice(0, 10) : '', d ? d.toISOString().slice(11, 19) + 'Z' : '',
       actorOf(e), sourceMeta(sourceOf(e)).label];
     const fs = fieldsOf(e);
-    if (!fs.length) rows.push([...base, '', e.action, '', e.detail ?? '']);
+    if (!fs.length) rows.push([...base, '', '', e.action, '', '', e.detail ?? '']);
     for (const f of fs) {
-      rows.push([...base, categoryMeta(f.category || 'other').label, fieldLabel(f.field), fmtValue(f.old), fmtValue(f.new)]);
+      rows.push([...base, categoryMeta(categoryOfField(f)).label, isTelemetry(f) ? sectionLabel(sectionOf(f)) : '',
+        fieldLabel(f), f.change || 'changed', fmtValue(f.old, f.old_label), fmtValue(f.new, f.new_label)]);
     }
   }
   return rows.map((r) => r.map(esc).join(',')).join('\n');

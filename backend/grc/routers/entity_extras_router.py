@@ -110,6 +110,9 @@ class HistoryOut(BaseModel):
     # Field-level diff + source for the change-history timeline (asset.updated rows).
     source: Optional[str] = None
     fields: Optional[List[Dict[str, Any]]] = None
+    sections: Optional[Dict[str, Any]] = None    # per-section added/removed/changed totals
+    total_fields: Optional[int] = None
+    truncated: Optional[int] = None
 
 
 @router.get("/history/{entity_type}/{entity_id}", response_model=List[HistoryOut])
@@ -131,6 +134,7 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
         .limit(1000)  # shortcut: newest 1000 rows; page this if an asset ever exceeds it
         .all()
     )
+    names = _ref_names(db, rows)
     out: List[HistoryOut] = []
     for r in rows:
         changes = r.changes if isinstance(r.changes, dict) else None
@@ -152,18 +156,56 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
             actor_name=actor,
             created_at=r.timestamp,
             source=(changes.get("source") if changes else None),
-            fields=_with_categories(changes.get("fields") if changes else None),
+            fields=_with_categories(changes.get("fields") if changes else None, names),
+            sections=(changes.get("sections") if changes else None),
+            total_fields=(changes.get("total_fields") if changes else None),
+            truncated=(changes.get("truncated") if changes else None),
         ))
     return out
 
 
-def _with_categories(fields: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
-    """Rows journalled before categories existed get theirs at read time."""
+_USER_REF_FIELDS = {"owner_id", "primary_owner_id", "secondary_owner_id", "business_owner_id", "escalation_contact_id"}
+_ASSET_REF_FIELDS = {"parent_asset_id", "replacement_asset_id"}
+
+
+def _ref_names(db: Session, rows: List[AuditLog]) -> Dict[str, Dict[int, str]]:
+    """Display names for user / asset ids that appear as old/new values."""
+    want: Dict[str, set] = {"user": set(), "asset": set()}
+    for r in rows:
+        for f in ((r.changes or {}).get("fields") or []) if isinstance(r.changes, dict) else []:
+            kind = "user" if f.get("field") in _USER_REF_FIELDS else "asset" if f.get("field") in _ASSET_REF_FIELDS else None
+            if kind:
+                want[kind].update(v for v in (f.get("old"), f.get("new")) if isinstance(v, int))
+    out: Dict[str, Dict[int, str]] = {"user": {}, "asset": {}}
+    if want["user"]:
+        for u in db.query(GRCUser).filter(GRCUser.id.in_(want["user"])).all():
+            out["user"][u.id] = getattr(u, "display_name", None) or getattr(u, "username", None) or f"User #{u.id}"
+    if want["asset"]:
+        for a in db.query(ITAsset.id, ITAsset.name).filter(ITAsset.id.in_(want["asset"])).all():
+            out["asset"][a.id] = a.name
+    return out
+
+
+def _with_categories(fields: Optional[List[Dict[str, Any]]],
+                     names: Optional[Dict[str, Dict[int, str]]] = None) -> Optional[List[Dict[str, Any]]]:
+    """Re-file plain column fields into the asset-record categories (older rows
+    used a coarser set) and attach display names for user / asset references."""
     if not isinstance(fields, list):
         return None
-    from ..services.asset_change_log import category_of
-    return [{**f, "category": f.get("category") or category_of(f.get("field", ""))}
-            for f in fields if isinstance(f, dict)]
+    from ..services.asset_change_log import column_category
+    names = names or {"user": {}, "asset": {}}
+    out = []
+    for f in fields:
+        if not isinstance(f, dict):
+            continue
+        name = f.get("field", "")
+        row = {**f, "category": column_category(name) or f.get("category") or "other"}
+        kind = "user" if name in _USER_REF_FIELDS else "asset" if name in _ASSET_REF_FIELDS else None
+        if kind:
+            row["old_label"] = names[kind].get(f.get("old")) if isinstance(f.get("old"), int) else None
+            row["new_label"] = names[kind].get(f.get("new")) if isinstance(f.get("new"), int) else None
+        out.append(row)
+    return out
 
 
 @router.get("/asset-change-summary")
