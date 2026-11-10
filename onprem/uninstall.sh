@@ -49,7 +49,7 @@ if [ $PURGE = 1 ]; then
   apt-get purge -y -q postgresql-18 'postgresql-client-18' postgresql-common redis-server nginx nginx-common docker.io containerd \
      nmap openscap-scanner sshpass tesseract-ocr python3.11 python3.11-venv python3.11-dev >/dev/null
   apt-get autoremove -y -q --purge >/dev/null
-  rm -rf /var/lib/postgresql /var/lib/redis /var/lib/docker /etc/postgresql
+  rm -rf /var/lib/postgresql /var/lib/redis /var/lib/docker /var/lib/containerd /etc/postgresql
 fi
 rm -f /usr/local/sbin/caiva-uninstall
 echo "[uninstall] done — CAIVA removed"
