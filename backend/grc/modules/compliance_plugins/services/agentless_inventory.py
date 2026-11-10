@@ -18,6 +18,7 @@ listening sockets. Nothing here writes to the remote host.
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import io
 import json
 import logging
@@ -1380,6 +1381,7 @@ def resolve_connection_for_asset(
     )
 
 
+@change_source("scan")
 def probe_and_store(
     db: Session, asset: ITAsset, connection: IntegrationConnection,
 ) -> dict[str, Any]:

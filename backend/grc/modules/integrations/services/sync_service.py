@@ -1,3 +1,4 @@
+from grc.services.asset_change_log import change_source
 import ipaddress
 import logging
 import os
@@ -428,6 +429,7 @@ class SyncService:
         ).all()
 
     @staticmethod
+    @change_source("connector")
     def _sync_assets(
         db: Session,
         adapter: BaseAdapter,
@@ -573,6 +575,7 @@ class SyncService:
         return synced_assets
 
     @staticmethod
+    @change_source("connector")
     def _sync_vulnerabilities(
         db: Session,
         adapter: BaseAdapter,

@@ -128,7 +128,7 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
             AuditLog.resource_id == entity_id,          # resource_id is Integer
         )
         .order_by(AuditLog.timestamp.desc())
-        .limit(200)
+        .limit(1000)  # shortcut: newest 1000 rows; page this if an asset ever exceeds it
         .all()
     )
     out: List[HistoryOut] = []
@@ -152,9 +152,18 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
             actor_name=actor,
             created_at=r.timestamp,
             source=(changes.get("source") if changes else None),
-            fields=(changes.get("fields") if changes else None),
+            fields=_with_categories(changes.get("fields") if changes else None),
         ))
     return out
+
+
+def _with_categories(fields: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    """Rows journalled before categories existed get theirs at read time."""
+    if not isinstance(fields, list):
+        return None
+    from ..services.asset_change_log import category_of
+    return [{**f, "category": f.get("category") or category_of(f.get("field", ""))}
+            for f in fields if isinstance(f, dict)]
 
 
 @router.get("/asset-change-summary")
@@ -320,9 +329,12 @@ def asset_alerts(asset_id: int, db: Session = Depends(get_db),
     if change_rows:
         lc = change_rows[0].changes if isinstance(change_rows[0].changes, dict) else {}
         n = len(change_rows)
-        detail_txt = lc.get("detail") or "This asset's details were changed recently."
-        if lc.get("source"):
-            detail_txt = f"{detail_txt} Most recent source: {lc['source']}."
+        by_source: Dict[str, int] = {}
+        for r in change_rows:
+            src = (r.changes or {}).get("source") if isinstance(r.changes, dict) else None
+            by_source[src or "manual"] = by_source.get(src or "manual", 0) + 1
+        mix = ", ".join(f"{c} {s}" for s, c in sorted(by_source.items(), key=lambda kv: -kv[1]))
+        detail_txt = f"Latest: {lc.get('detail') or 'details changed'}. By source: {mix}."
         alerts.append(AlertOut(
             severity="info", kind="change",
             title=f"{n} configuration change{'s' if n != 1 else ''} in the last 7 days",

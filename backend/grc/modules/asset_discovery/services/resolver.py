@@ -31,6 +31,7 @@ from confirmed inventory instead of dumping raw scan hits into the register.
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import ipaddress
 import logging
 from datetime import datetime
@@ -153,6 +154,7 @@ def _record_external_identity(db: Session, tenant_id: int, asset_id: int,
         ))
 
 
+@change_source("discovery")
 def _merge_into(db: Session, asset: ITAsset, obs: DiscoveryObservation) -> None:
     """Enrich an existing asset from an observation. Fills blanks only; never
     clobbers a curated value. Always bumps last-seen."""
@@ -244,6 +246,7 @@ def _display_name(obs: DiscoveryObservation, cls: Dict[str, Any]) -> str:
     return obs.ip_address or "discovered-host"
 
 
+@change_source("discovery")
 def _apply_classification(asset: ITAsset, cls: Dict[str, Any], *, fill_only: bool) -> None:
     """Write the protocol-aware classification onto an asset. On create
     (fill_only=False) sets everything; on merge (fill_only=True) fills blanks
@@ -277,6 +280,7 @@ def _apply_classification(asset: ITAsset, cls: Dict[str, Any], *, fill_only: boo
     asset.platform_properties = pp
 
 
+@change_source("discovery")
 def _apply_surface(asset: ITAsset, raw: Dict[str, Any]) -> None:
     """Carry the sweep's SURFACE evidence (open ports / banners / device type)
     onto the asset under platform_properties['surface']. These live in the
@@ -376,6 +380,7 @@ def _prior_ignored(db: Session, tenant_id: int, obs: DiscoveryObservation) -> bo
     return db.query(q.exists()).scalar()
 
 
+@change_source("discovery")
 def _mark_internet_facing(asset: ITAsset) -> None:
     """Assert internet exposure and re-rate criticality so the exposure boost
     lands. An external (outside-in) sighting is proof of a public face; the

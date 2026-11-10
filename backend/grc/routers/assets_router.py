@@ -561,7 +561,9 @@ def bulk_update_assets(
         .filter(ITAsset.id.in_(payload.asset_ids), ITAsset.tenant_id.in_(user_tenants))
         .all()
     )
+    from ..services.asset_change_log import mark_source
     for asset in assets:
+        mark_source(asset, "manual", user_id=getattr(current_user, "id", None))
         for col, value in clean.items():
             setattr(asset, col, value)
     db.commit()
@@ -1675,9 +1677,9 @@ def update_asset(
     
     update_data = asset_update.model_dump(exclude_unset=True)
 
-    # Snapshot tracked fields up-front so we can journal a field-level diff below.
-    from ..services.asset_change_log import record_asset_changes, snapshot as _asset_snapshot
-    _before_change = _asset_snapshot(asset)
+    # The change journal (before_flush) records the field diff; label it as this user's edit.
+    from ..services.asset_change_log import mark_source
+    mark_source(asset, "manual", user_id=getattr(current_user, "id", None))
 
     # Validate any criticality override before applying any fields so we
     # don't half-update the row.
@@ -1804,10 +1806,6 @@ def update_asset(
             asset.criticality = str(_chosen).lower().strip()
             asset.criticality_manual_override = True
 
-    # Journal the field-level diff (manual edit) before the single commit so
-    # the change rows persist atomically with the asset update.
-    record_asset_changes(db, asset, _before_change, source="manual",
-                         user_id=getattr(current_user, "id", None))
     db.commit()
     db.refresh(asset)
     return asset

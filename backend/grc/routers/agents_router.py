@@ -16,6 +16,7 @@ long-lived API token. Only SHA-256 hashes are stored; plaintext is returned once
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import hashlib
 import secrets
 from datetime import datetime, timedelta
@@ -412,6 +413,7 @@ def _apply_deep_identity(asset: ITAsset, pp: Dict[str, Any]) -> None:
         asset.ip_address = ip
 
 
+@change_source("agent")
 def _upsert_asset_from_report(db: Session, agent: ComplianceAgent, body: ReportIn, now: datetime) -> int:
     """Land the agent's locally-collected inventory on an ITAsset — additive,
     mirroring the agentless credentialed path (platform_properties + software).

@@ -23,6 +23,7 @@ which is what the dedup match queries below look for.
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import logging
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
@@ -42,6 +43,7 @@ MANUAL_FIELDS = frozenset({
 })
 
 
+@change_source("connector")
 def upsert_cloud_asset(
     db: Session,
     *,

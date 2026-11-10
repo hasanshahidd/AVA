@@ -621,6 +621,9 @@ def get_tenant_engine(slug: str) -> Engine:
             )
             _tenant_engines[slug] = engine
             _tenant_sessions[slug] = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
+            # Registers the asset change-journal listener in every process that
+            # opens a tenant DB (API and workers). Local import: it imports models.
+            from .services import asset_change_log  # noqa: F401
             # Run any registered idempotent schema self-heals so this engine
             # is safe to use immediately. Local import avoids a circular
             # dependency at module-load time (the migrations module imports

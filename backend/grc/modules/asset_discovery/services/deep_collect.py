@@ -20,6 +20,7 @@ Safety / isolation:
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import ipaddress
 import logging
 import os
@@ -599,6 +600,7 @@ def _ensure_integration_connection(db: Session, asset: ITAsset,
     db.flush()
 
 
+@change_source("discovery")
 def promote_observation_typed(db: Session, obs: DiscoveryObservation,
                               kind: str, integration_type: str,
                               creds: Dict[str, Any]) -> ITAsset:
@@ -720,6 +722,7 @@ def _fill_columns_from_deep(asset: ITAsset, sections: Dict[str, Any]) -> None:
                 _set(col, v[:255])
 
 
+@change_source("discovery")
 def collect_host(db: Session, asset: ITAsset, profile: CredentialProfile,
                  transport: str) -> Dict[str, Any]:
     """Authenticate to one host, inventory it, and write the result onto the
