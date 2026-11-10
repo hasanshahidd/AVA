@@ -8,7 +8,7 @@
  */
 
 export type ChangeField = {
-  field: string; section?: string; category?: string; change?: 'changed' | 'added' | 'removed';
+  field: string; section?: string; category?: string; change?: 'changed' | 'added' | 'removed' | 'updated';  // updated = older row, values not recorded
   old: unknown; new: unknown; old_label?: string | null; new_label?: string | null;
 };
 export type SectionTotals = { category: string; added: number; removed: number; changed: number };

@@ -203,3 +203,11 @@ def test_huge_package_churn_is_capped_but_totals_are_complete(db):
     ch = _rows(db)[0].changes
     assert len(ch["fields"]) == acl.MAX_FIELDS and ch["total_fields"] == 500
     assert ch["truncated"] == 500 - acl.MAX_FIELDS and ch["sections"]["packages"]["changed"] == 500
+
+
+def test_history_reads_legacy_name_only_rows():
+    from grc.routers.entity_extras_router import _with_categories
+    rows = _with_categories(["confidentiality_rating", "is_internet_facing", {"field": "name", "old": "a", "new": "b"}])
+    assert [(r["field"], r["category"], r.get("change")) for r in rows] == [
+        ("confidentiality_rating", "business", "updated"), ("is_internet_facing", "identity", "updated"),
+        ("name", "identity", None)]

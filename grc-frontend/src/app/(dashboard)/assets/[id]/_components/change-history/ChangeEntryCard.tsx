@@ -24,6 +24,7 @@ const MONO_RE = /(ip_address|mac|fqdn|host_name|serial|build|version|path|known_
 function Value({ f, which }: { f: ChangeField; which: 'old' | 'new' }) {
   const v = which === 'old' ? f.old : f.new;
   const lbl = which === 'old' ? f.old_label : f.new_label;
+  if (f.change === 'updated') return <span className="text-[11.5px] italic" style={{ color: FAINT }}>not recorded</span>;
   if (isEmpty(v)) return <span className="text-[11.5px] italic" style={{ color: FAINT }}>{which === 'old' && f.change === 'added' ? '—' : 'empty'}</span>;
   const mono = MONO_RE.test(f.field) ? "font-['IBM_Plex_Mono',ui-monospace,monospace] text-[11.5px]" : 'text-[12.5px]';
   return (

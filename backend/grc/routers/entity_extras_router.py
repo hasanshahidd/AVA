@@ -173,6 +173,8 @@ def _ref_names(db: Session, rows: List[AuditLog]) -> Dict[str, Dict[int, str]]:
     want: Dict[str, set] = {"user": set(), "asset": set()}
     for r in rows:
         for f in ((r.changes or {}).get("fields") or []) if isinstance(r.changes, dict) else []:
+            if not isinstance(f, dict):
+                continue
             kind = "user" if f.get("field") in _USER_REF_FIELDS else "asset" if f.get("field") in _ASSET_REF_FIELDS else None
             if kind:
                 want[kind].update(v for v in (f.get("old"), f.get("new")) if isinstance(v, int))
@@ -196,6 +198,9 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
     names = names or {"user": {}, "asset": {}}
     out = []
     for f in fields:
+        if isinstance(f, str):
+            # Older journal rows recorded only which fields changed, not the values.
+            f = {"field": f, "change": "updated", "old": None, "new": None}
         if not isinstance(f, dict):
             continue
         name = f.get("field", "")
