@@ -12,8 +12,12 @@ for a in "$@"; do case "$a" in
 [ $CONFIRM = 1 ] || { sed -n 2,5p "$0"; echo "Refusing without --yes-delete-all-data"; exit 2; }
 
 echo "[uninstall] services"
-systemctl disable --now caiva-backend caiva-worker caiva-frontend caiva-setup 2>/dev/null
+# one unit at a time: a single missing/transient unit (caiva-setup) aborts a multi-unit call
+for u in caiva-backend caiva-worker caiva-frontend caiva-setup; do
+  systemctl stop "$u" 2>/dev/null; systemctl disable "$u" 2>/dev/null
+done
 rm -f /etc/systemd/system/caiva-*.service; systemctl daemon-reload
+pkill -f '/opt/caiva/' 2>/dev/null || true   # anything still running from the removed tree
 if command -v docker >/dev/null; then
   docker rm -f ava-msfrpcd >/dev/null 2>&1
   [ $KEEP_LANES = 1 ] || docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^ava-' | xargs -r docker rmi -f >/dev/null 2>&1
