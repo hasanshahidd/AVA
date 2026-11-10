@@ -24,7 +24,9 @@ printf "\n${B}   ▄▀▀ ▄▀▄ █ █ █ ▄▀▄${R}\n${B}   ▀▄▄
 
 SELF=$(readlink -f "$0"); HERE=$(dirname "$SELF")
 DIR=/opt/caiva-installer; BUNDLE=$DIR/__NAME__
-free=$(df -BG --output=avail / | tail -1 | tr -dc 0-9); [ "$free" -ge 100 ] || { echo "Need >=100 GB free on / (have ${free} GB)"; exit 1; }
+# room for: unpacked copy of this file + installed platform (and loaded lane images if inside)
+need=$(( 100 + $(stat -c %s "$SELF") * 3 / 1073741824 ))
+free=$(df -BG --output=avail / | tail -1 | tr -dc 0-9); [ "$free" -ge "$need" ] || { echo "Need >=${need} GB free on / (have ${free} GB)"; exit 1; }
 if [ ! -f "$BUNDLE/.unpacked" ]; then
   echo -e "${D}unpacking…${R}"
   mkdir -p "$DIR"; rm -rf "$BUNDLE"

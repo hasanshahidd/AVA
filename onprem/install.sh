@@ -87,8 +87,9 @@ prepare() {
   if [ -f "$B/artifacts/wordlists.tar.zst" ] && [ ! -d /root/wordlists ]; then zstd -dc "$B/artifacts/wordlists.tar.zst" | tar -x -C /root; fi
 
   step lanes "pentest lane images"
-  # caiva-lanes-<ver>.tar.zst ships as a separate file next to the .run (tens of GB)
+  # lanes are inside an all-in-one bundle, or a caiva-lanes-<ver>.tar.zst next to the .run
   local LANES=${CAIVA_LANES:-}
+  [ -z "$LANES" ] && [ -s "$B/lanes/lanes.tar.zst" ] && LANES="$B/lanes/lanes.tar.zst"
   if [ -n "$LANES" ] && [ -s "$LANES" ]; then
     [ -f "$LANES.sha256" ] && { (cd "$(dirname "$LANES")" && sha256sum -c --quiet "$(basename "$LANES").sha256") || die "lane file checksum mismatch"; }
     zstd -dc "$LANES" | docker load || die "lane images failed to load"
