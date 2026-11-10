@@ -44,7 +44,8 @@ command -v nginx >/dev/null && { nginx -t >/dev/null 2>&1 && systemctl reload ng
 if [ $PURGE = 1 ]; then
   echo "[uninstall] OS packages"
   export DEBIAN_FRONTEND=noninteractive
-  systemctl stop postgresql redis-server nginx docker 2>/dev/null
+  systemctl stop postgresql redis-server nginx docker docker.socket containerd 2>/dev/null
+  systemctl disable docker.socket docker 2>/dev/null
   apt-get purge -y -q postgresql-18 'postgresql-client-18' postgresql-common redis-server nginx nginx-common docker.io containerd \
      nmap openscap-scanner sshpass tesseract-ocr python3.11 python3.11-venv python3.11-dev >/dev/null
   apt-get autoremove -y -q --purge >/dev/null

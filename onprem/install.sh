@@ -58,7 +58,17 @@ prepare() {
   apt-get install -y -q "${LOCAL[@]}" $PKGS || die "OS package install failed"
   rm -f /etc/apt/sources.list.d/caiva-offline.list
   node -e 'process.exit(+process.versions.node.split(".")[0] >= 18 ? 0 : 1)' || die "Node.js >= 18 required"
-  systemctl enable --now postgresql redis-server docker nginx
+  systemctl daemon-reload
+  # A previous uninstall can leave docker.socket in a stale/failed state ("configuration
+  # changed while running") — reset it so the fresh docker binds its socket again.
+  systemctl reset-failed docker.socket docker.service containerd.service 2>/dev/null || true
+  systemctl enable postgresql redis-server nginx docker.socket docker >/dev/null 2>&1 || true
+  systemctl restart postgresql redis-server nginx containerd
+  systemctl restart docker.socket docker
+  for svc in postgresql redis-server nginx docker; do
+    systemctl is-active --quiet "$svc" || die "service $svc failed to start — journalctl -u $svc"
+  done
+  docker info >/dev/null 2>&1 || die "Docker engine not responding — journalctl -u docker"
 
   step app "application → $DEST"
   mkdir -p "$DEST"
