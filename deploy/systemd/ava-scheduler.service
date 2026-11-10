@@ -1,0 +1,13 @@
+[Unit]
+Description=Ava scheduler (grc.celery_app worker + embedded beat: periodic refresh/sync/discovery jobs)
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service
+
+[Service]
+WorkingDirectory=/root/AVA/backend
+ExecStart=/bin/bash /root/AVA/backend/run-scheduler.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -49,3 +49,20 @@ sudo systemctl disable --now ava-enrich-sweep.timer
 sudo rm /etc/systemd/system/ava-enrich-sweep.{service,timer}
 sudo systemctl daemon-reload
 ```
+
+## ava-scheduler.service (periodic jobs)
+
+`grc.celery_app` defines a full `beat_schedule` (KEV/EPSS daily refresh, Exploit-DB
+weekly, MSRC daily, exception-expiry daily, cloud sync 6h, connector sync hourly,
+scheduled network discovery every 5m, Help Desk CMDB sync 6h, zombie-scan reconcile
+5m) — all on the `parsing` queue. Nothing ran them before: `run-worker.sh` serves only
+`grc.modules.pentest.tasks`. `run-scheduler.sh` runs ONE `grc.celery_app` worker with
+embedded beat (`-B`) consuming `parsing,celery`.
+
+Install (prod):
+    cp deploy/systemd/ava-scheduler.service /etc/systemd/system/
+    systemctl daemon-reload && systemctl enable --now ava-scheduler
+
+⚠ On first start, beat immediately runs every OVERDUE job (all due discovery campaigns
+and connector syncs fan out at once). Start it in a quiet window. Run exactly ONE
+instance — `-B` embedded beat must not run twice or schedules double-fire.
