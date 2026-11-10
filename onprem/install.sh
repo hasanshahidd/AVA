@@ -65,6 +65,7 @@ prepare() {
   cp -a "$B/app/." "$DEST/"
   mkdir -p "$DEST/onprem" "$DEST/scan-ingest" "$DEST/backend/uploads"
   cp "$B/onprem_init.py" "$DEST/onprem/"
+  install -m 755 "$B/uninstall.sh" /usr/local/sbin/caiva-uninstall
   rm -rf "$DEST/agent-dist"; cp -a "$B/artifacts/agent-dist" "$DEST/agent-dist"
   [ -e /root/AVA ] || ln -s "$DEST" /root/AVA       # some modules still use the prod path
 

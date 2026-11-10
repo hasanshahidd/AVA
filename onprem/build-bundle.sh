@@ -73,7 +73,7 @@ sudo -u postgres pg_dump -Fc --no-owner --no-acl "cyber_$SEED" > "$B/seed/tenant
 sudo -u postgres pg_dump -Fc --no-owner --no-acl --schema-only cyber_master > "$B/seed/master.dump"
 
 log "7/8 installer, setup wizard, manifest"
-cp "$HERE"/install.sh "$HERE"/onprem_init.py "$B/"
+cp "$HERE"/install.sh "$HERE"/uninstall.sh "$HERE"/onprem_init.py "$B/"
 cp -r "$HERE/templates" "$HERE/setup" "$B/"
 cat > "$B/MANIFEST" <<EOF
 caiva_version="$SHA"
