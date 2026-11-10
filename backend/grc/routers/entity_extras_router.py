@@ -16,7 +16,7 @@ same tenant-scoping.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -107,6 +107,9 @@ class HistoryOut(BaseModel):
     detail: Optional[str] = None
     actor_name: Optional[str] = None
     created_at: Optional[datetime] = None
+    # Field-level diff + source for the change-history timeline (asset.updated rows).
+    source: Optional[str] = None
+    fields: Optional[List[Dict[str, Any]]] = None
 
 
 @router.get("/history/{entity_type}/{entity_id}", response_model=List[HistoryOut])
@@ -148,8 +151,36 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
             detail=detail,
             actor_name=actor,
             created_at=r.timestamp,
+            source=(changes.get("source") if changes else None),
+            fields=(changes.get("fields") if changes else None),
         ))
     return out
+
+
+@router.get("/asset-change-summary")
+def asset_change_summary(days: int = 30, db: Session = Depends(get_db),
+                         current_user: GRCUser = Depends(require_auth)):
+    """Per-asset recent-change counts for the inventory 'Changes' column.
+    Returns {asset_id: {count, last_at}} for the caller's tenants."""
+    from sqlalchemy import func as _func
+    tenants = get_user_tenants(current_user, db) or []
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
+    rows = (
+        db.query(AuditLog.resource_id, _func.count(AuditLog.id), _func.max(AuditLog.timestamp))
+        .filter(
+            AuditLog.tenant_id.in_(tenants),
+            AuditLog.resource_type == "it_asset",
+            AuditLog.action == "asset.updated",
+            AuditLog.timestamp >= since,
+        )
+        .group_by(AuditLog.resource_id)
+        .all()
+    )
+    items = {
+        str(rid): {"count": int(cnt or 0), "last_at": (ts.isoformat() if ts else None)}
+        for rid, cnt, ts in rows if rid is not None
+    }
+    return {"items": items, "days": days}
 
 
 # ─── Alerts (derived, no table) ──────────────────────────────────────────────
@@ -272,6 +303,31 @@ def asset_alerts(asset_id: int, db: Session = Depends(get_db),
                 title=f"Not seen for {days} days",
                 detail="No scan or agent contact recently — the record may be stale.",
             ))
+
+    # Recent configuration changes — surface the field-level change journal as an
+    # alert so an edit / scan / connector change is noticed, not just logged.
+    change_rows = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.resource_type == "it_asset",
+            AuditLog.resource_id == asset_id,
+            AuditLog.action == "asset.updated",
+            AuditLog.timestamp >= now - timedelta(days=7),
+        )
+        .order_by(AuditLog.timestamp.desc())
+        .all()
+    )
+    if change_rows:
+        lc = change_rows[0].changes if isinstance(change_rows[0].changes, dict) else {}
+        n = len(change_rows)
+        detail_txt = lc.get("detail") or "This asset's details were changed recently."
+        if lc.get("source"):
+            detail_txt = f"{detail_txt} Most recent source: {lc['source']}."
+        alerts.append(AlertOut(
+            severity="info", kind="change",
+            title=f"{n} configuration change{'s' if n != 1 else ''} in the last 7 days",
+            detail=detail_txt,
+        ))
 
     # Overlay the stored human response onto each derived alert.
     states = {

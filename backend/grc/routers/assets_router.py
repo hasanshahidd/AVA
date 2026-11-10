@@ -1675,6 +1675,10 @@ def update_asset(
     
     update_data = asset_update.model_dump(exclude_unset=True)
 
+    # Snapshot tracked fields up-front so we can journal a field-level diff below.
+    from ..services.asset_change_log import record_asset_changes, snapshot as _asset_snapshot
+    _before_change = _asset_snapshot(asset)
+
     # Validate any criticality override before applying any fields so we
     # don't half-update the row.
     from ..services.asset_criticality import is_valid_bucket
@@ -1800,6 +1804,10 @@ def update_asset(
             asset.criticality = str(_chosen).lower().strip()
             asset.criticality_manual_override = True
 
+    # Journal the field-level diff (manual edit) before the single commit so
+    # the change rows persist atomically with the asset update.
+    record_asset_changes(db, asset, _before_change, source="manual",
+                         user_id=getattr(current_user, "id", None))
     db.commit()
     db.refresh(asset)
     return asset

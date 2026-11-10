@@ -52,6 +52,11 @@ function prettify(action: string) {
   const t = action.replace(/[_.-]+/g, ' ').trim();
   return t ? t[0].toUpperCase() + t.slice(1) : action;
 }
+function fmtVal(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '∅';
+  const s = String(v);
+  return s.length > 28 ? s.slice(0, 27) + '…' : s;
+}
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -97,6 +102,7 @@ function FilterChip({
 export default function HistoryPanel({ entityType, entityId }: { entityType: Entity; entityId: number }) {
   const { enabled: guideEnabled } = useGuide();
   const [filter, setFilter] = useState('all');
+  const [srcFilter, setSrcFilter] = useState('all');
 
   // Data layer — identical to the shared EntityExtras HistoryPanel.
   const q = useQuery({
@@ -113,8 +119,17 @@ export default function HistoryPanel({ entityType, entityId }: { entityType: Ent
     return Array.from(counts.entries()).map(([action, count]) => ({ action, count, color: colorFor(action) }));
   }, [items]);
 
+  // Change sources present (manual / scan / discovery / connector / agent), for the source filter.
+  const sources = useMemo(() => {
+    const set = new Set<string>();
+    for (const h of items) if (h.source) set.add(h.source);
+    return Array.from(set);
+  }, [items]);
+
   const groups = useMemo(() => {
-    const filtered = filter === 'all' ? items : items.filter((h) => h.action === filter);
+    const filtered = items.filter((h) =>
+      (filter === 'all' || h.action === filter) &&
+      (srcFilter === 'all' || h.source === srcFilter));
     const out: { key: string; label: string; entries: typeof items }[] = [];
     for (const h of filtered) {
       const key = dayKey(h.created_at);
@@ -123,7 +138,7 @@ export default function HistoryPanel({ entityType, entityId }: { entityType: Ent
       else out.push({ key, label: dayLabel(h.created_at), entries: [h] });
     }
     return out;
-  }, [items, filter]);
+  }, [items, filter, srcFilter]);
 
   return (
     <div className="font-['Poppins',system-ui,sans-serif] text-[13.5px]" style={{ color: INK }}>
@@ -182,6 +197,17 @@ export default function HistoryPanel({ entityType, entityId }: { entityType: Ent
               ))}
             </div>
 
+            {/* SOURCE FILTER ROW — manual edit / scan / network discovery / connector / agent */}
+            {sources.length > 0 && (
+              <div className="flex items-center gap-[6px] flex-wrap px-4 py-[9px]" style={{ borderBottom: `1px solid ${BORDER2}` }}>
+                <span className="text-[10px] font-bold uppercase tracking-[0.05em] mr-0.5" style={{ color: FAINT }}>Source</span>
+                <FilterChip active={srcFilter === 'all'} color={INK} label="All" count={items.length} onClick={() => setSrcFilter('all')} />
+                {sources.map((s) => (
+                  <FilterChip key={s} active={srcFilter === s} color={colorFor(s)} label={prettify(s)} count={items.filter((h) => h.source === s).length} onClick={() => setSrcFilter(s)} />
+                ))}
+              </div>
+            )}
+
             {/* TIMELINE */}
             <div className="relative px-[18px] pt-[14px] pb-1">
               <div className="absolute left-[23px] top-[6px] bottom-[14px] w-[2px]" style={{ background: BORDER }} />
@@ -211,7 +237,21 @@ export default function HistoryPanel({ entityType, entityId }: { entityType: Ent
                             by <b className="font-semibold" style={{ color: SEC }}>{h.actor_name || 'system'}</b>
                             {' · '}
                             <span className="font-['IBM_Plex_Mono',ui-monospace,monospace] text-[10.5px]">{h.action}</span>
+                            {h.source && <> · <span style={{ color: SEC }}>{prettify(h.source)}</span></>}
                           </div>
+                          {Array.isArray(h.fields) && h.fields.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-[6px]">
+                              {h.fields.slice(0, 6).map((f, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 rounded-[6px] px-[6px] py-[2px] text-[10px]" style={{ background: '#F4F7F9', border: `1px solid ${BORDER}` }}>
+                                  <b className="font-semibold" style={{ color: SEC }}>{prettify(String(f.field))}</b>
+                                  <span style={{ color: FAINT, textDecoration: 'line-through' }}>{fmtVal(f.old)}</span>
+                                  <span style={{ color: MUTED }}>{'→'}</span>
+                                  <span style={{ color: AC_STRONG, fontWeight: 600 }}>{fmtVal(f.new)}</span>
+                                </span>
+                              ))}
+                              {h.fields.length > 6 && <span className="text-[10px] self-center" style={{ color: FAINT }}>+{h.fields.length - 6} more</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

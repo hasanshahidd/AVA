@@ -4501,7 +4501,12 @@ export const entityExtrasApi = {
   addNote: (entityType: 'asset' | 'vulnerability', entityId: number, body: string) =>
     apiClient.post(`/notes/${entityType}/${entityId}`, { body }),
   history: (entityType: 'asset' | 'vulnerability', entityId: number) =>
-    apiClient.get<Array<{ id: number; action: string; detail?: string; actor_name?: string; created_at?: string }>>(`/history/${entityType}/${entityId}`),
+    apiClient.get<Array<{ id: number; action: string; detail?: string; actor_name?: string; created_at?: string;
+      source?: string; fields?: Array<{ field: string; old: unknown; new: unknown }> }>>(`/history/${entityType}/${entityId}`),
+  // Per-asset recent-change counts for the inventory 'Changes' column.
+  assetChangeSummary: (days?: number) =>
+    apiClient.get<{ items: Record<string, { count: number; last_at: string | null }>; days: number }>(
+      '/asset-change-summary', { params: days ? { days } : undefined }),
   assetAlerts: (assetId: number) =>
     apiClient.get<Array<{
       severity: string; title: string; detail: string; kind: string;
