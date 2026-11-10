@@ -234,6 +234,8 @@ def _dispatch_sync(adapter, conn: IntegrationConnection, db: Session) -> SyncRes
         result = adapter.run_sync(since=conn.last_sync_at)
         _persist_transcripts(result, conn, db)
         return result
+    if cat == "cmdb":
+        return _sync_cmdb(adapter, conn, db)
     # Unknown category — run the health probe equivalent.
     return adapter.run_sync() if hasattr(adapter, "run_sync") else SyncResult(success=False, errors=[f"Unknown category {cat}"])
 
@@ -424,3 +426,170 @@ def _persist_transcripts(result: SyncResult, conn: IntegrationConnection, db: Se
     except Exception:
         logger.exception("Failed to commit transcript-derived meetings")
         db.rollback()
+
+
+# ─── CMDB fan-out (external CI import → assets) ──────────────────────
+
+_PUSH_CAP = 500  # shortcut: per-sync push-back cap; raise when a client needs more
+
+
+def _cfg_truthy(value) -> bool:
+    """Config flags arrive as strings from the setup form; treat only
+    affirmative values as on (so the string \"false\" is correctly off)."""
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _sync_cmdb(adapter, conn: IntegrationConnection, db: Session) -> SyncResult:
+    """Pull configuration items and upsert them onto ITAssets, matching on
+    serial / MAC / FQDN / hostname / IP / name. Never blanks an existing field;
+    stamps provenance (source_system / last_seen_source). Optionally pushes
+    assets back as CIs when provider_config['push_assets'] is set."""
+    from ...models import ITAsset
+    result = SyncResult(success=True)
+    try:
+        cis = adapter.fetch_cis(since=conn.last_sync_at)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("cmdb fetch_cis failed")
+        return SyncResult(success=False, errors=[str(exc)])
+
+    try:
+        from ...services.asset_criticality import recompute_for_asset
+    except Exception:  # noqa: BLE001
+        recompute_for_asset = None
+
+    source = f"cmdb:{conn.integration_type}"
+    created = updated = 0
+    for ci in cis:
+        try:
+            with db.begin_nested():
+                asset = _match_ci_asset(db, conn.tenant_id, ci)
+                is_new = asset is None
+                if is_new:
+                    asset = ITAsset(tenant_id=conn.tenant_id,
+                                    name=ci.name or ci.host_name or ci.ip_address or ci.source_id or "CI")
+                    db.add(asset)
+                _apply_ci(asset, ci, conn.integration_type, source)
+                db.flush()
+                if recompute_for_asset:
+                    try:
+                        recompute_for_asset(db, asset)
+                    except Exception:  # noqa: BLE001
+                        pass
+            created += 1 if is_new else 0
+            updated += 0 if is_new else 1
+        except Exception as exc:  # noqa: BLE001 — one bad CI must not kill the sync
+            result.errors.append(f"{ci.source_id or ci.name}: {exc}")
+    db.commit()
+
+    result.items_pulled = created
+    result.items_updated = updated
+    result.details["cmdb"] = {"fetched": len(cis), "created": created, "updated": updated}
+
+    if _cfg_truthy((conn.provider_config or {}).get("push_assets")):
+        try:
+            result.details["push"] = _push_assets_as_cis(adapter, conn, db)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("cmdb push_assets failed")
+            result.errors.append(f"push: {exc}")
+
+    result.success = not result.errors
+    return result
+
+
+def _match_ci_asset(db: Session, tenant_id: int, ci):
+    """Find the existing ITAsset a CI refers to. Strongest key first: serial,
+    then MAC, FQDN, hostname, IP, finally case-insensitive name."""
+    from sqlalchemy import func
+    from ...models import ITAsset
+    q = db.query(ITAsset).filter(ITAsset.tenant_id == tenant_id)
+    if ci.serial_number:
+        a = q.filter(ITAsset.serial_number == ci.serial_number).first()
+        if a:
+            return a
+    if ci.mac_address:
+        a = q.filter(func.lower(ITAsset.primary_mac) == ci.mac_address.lower()).first()
+        if a:
+            return a
+    if ci.fqdn:
+        a = q.filter(func.lower(ITAsset.fqdn) == ci.fqdn.lower()).first()
+        if a:
+            return a
+    if ci.host_name:
+        a = q.filter(func.lower(ITAsset.host_name) == ci.host_name.lower()).first()
+        if a:
+            return a
+    if ci.ip_address:
+        a = q.filter(ITAsset.ip_address == ci.ip_address).first()
+        if a:
+            return a
+    if ci.name:
+        a = q.filter(func.lower(ITAsset.name) == ci.name.lower()).first()
+        if a:
+            return a
+    return None
+
+
+def _apply_ci(asset, ci, integration_type: str, source: str) -> None:
+    """Copy CI fields onto the asset. Only sets a column when the CI actually
+    provides a value (never blanks an existing field). Sets required asset_type
+    on create and stamps provenance + the remote CI id."""
+    def put(col, val):
+        if val not in (None, "") and hasattr(asset, col):
+            setattr(asset, col, val)
+
+    put("host_name", ci.host_name)
+    put("ip_address", ci.ip_address)
+    put("fqdn", ci.fqdn)
+    put("primary_mac", ci.mac_address)
+    put("serial_number", ci.serial_number)
+    put("manufacturer", ci.manufacturer)
+    put("model", ci.model)
+    put("location", ci.location)
+    put("os_version", ci.os_name)
+    if not getattr(asset, "asset_type", None):
+        asset.asset_type = "infrastructure"
+    put("source_system", integration_type)
+    put("last_seen_source", source)
+    if hasattr(asset, "last_seen_at"):
+        asset.last_seen_at = datetime.utcnow()
+    if hasattr(asset, "origin_source") and not getattr(asset, "origin_source", None):
+        asset.origin_source = "cmdb"
+    # Remote CI id → platform_properties, so push-back + provenance stay idempotent.
+    if hasattr(asset, "platform_properties"):
+        props = dict(getattr(asset, "platform_properties", None) or {})
+        cmdb = dict(props.get("cmdb") or {})
+        cmdb[integration_type] = {"ci_id": ci.source_id, "ci_type": ci.ci_type}
+        props["cmdb"] = cmdb
+        asset.platform_properties = props
+
+
+def _push_assets_as_cis(adapter, conn: IntegrationConnection, db: Session) -> Dict[str, Any]:
+    """Create CIs in the CMDB for assets not yet linked to one for this
+    connection. Idempotent via the stored cmdb.<provider>.ci_id marker; capped."""
+    from ...models import ITAsset
+    pushed = failed = 0
+    assets = db.query(ITAsset).filter(ITAsset.tenant_id == conn.tenant_id).all()
+    for a in assets:
+        if pushed >= _PUSH_CAP:
+            break
+        marker = ((getattr(a, "platform_properties", None) or {}).get("cmdb") or {}).get(conn.integration_type)
+        if marker and marker.get("ci_id"):
+            continue  # already in the CMDB
+        try:
+            ci_id = adapter.push_ci(a)
+            if ci_id and hasattr(a, "platform_properties"):
+                props = dict(getattr(a, "platform_properties", None) or {})
+                cmdb = dict(props.get("cmdb") or {})
+                cmdb[conn.integration_type] = {"ci_id": ci_id, "pushed": True}
+                props["cmdb"] = cmdb
+                a.platform_properties = props
+                db.commit()
+            pushed += 1
+        except NotImplementedError:
+            break  # pull-only connector
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            failed += 1
+    return {"pushed": pushed, "failed": failed, "capped": pushed >= _PUSH_CAP}

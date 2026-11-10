@@ -108,6 +108,9 @@ def _bootstrap() -> None:
         "grc.modules.connectors.providers.servicenow",
         "grc.modules.connectors.providers.bmc_remedy",
         "grc.modules.connectors.providers.halo_itsm",
+        "grc.modules.connectors.providers.broadcom_service_desk",
+        # CMDB — external configuration-item import → assets
+        "grc.modules.connectors.providers.broadcom_cmdb",
         # SIEM — exploitation-signal pulls
         "grc.modules.connectors.providers.splunk",
         "grc.modules.connectors.providers.wazuh",

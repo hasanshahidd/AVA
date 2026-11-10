@@ -409,3 +409,58 @@ class EasmSourceAdapter(BaseConnectorAdapter):
             result.success = False
             result.errors.append(str(exc))
         return result
+
+
+# ─── CMDB (Broadcom CMDB / external asset-import connectors) ─────────
+
+@dataclass
+class ConfigurationItem:
+    """A configuration item pulled from an external CMDB, normalised for
+    mapping onto an ITAsset."""
+    source_id: str
+    name: str
+    ci_type: Optional[str] = None
+    host_name: Optional[str] = None
+    ip_address: Optional[str] = None
+    mac_address: Optional[str] = None
+    fqdn: Optional[str] = None
+    serial_number: Optional[str] = None
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    os_name: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = None
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+
+class CmdbAdapter(BaseConnectorAdapter):
+    """Inbound: pull configuration items and map them onto CAIVA assets.
+    Optional outbound: push CAIVA assets back as CIs (adapter-specific).
+
+    The connector sync (sync_runner._sync_cmdb) calls fetch_cis() directly and
+    owns the CI→ITAsset upsert, so the adapter never needs DB access — mirroring
+    how the ticketing fan-out orchestrates the TicketingAdapter."""
+    category = "cmdb"
+
+    @abstractmethod
+    def fetch_cis(self, *, since: Optional[datetime] = None, limit: int = 5000) -> List["ConfigurationItem"]:
+        """Pull configuration items. `since` is advisory (incremental where the
+        source supports it)."""
+
+    def push_ci(self, asset: Any) -> Optional[str]:
+        """Push one CAIVA asset to the CMDB as a CI, returning its remote id.
+        Default: pull-only (not supported)."""
+        raise NotImplementedError("This CMDB connector is pull-only")
+
+    def run_sync(self, *, since: Optional[datetime] = None) -> SyncResult:
+        """Generic fetch+count. The real CI→asset upsert lives in the sync
+        dispatcher; this exists only for the health-probe / unknown-dispatch path."""
+        result = SyncResult(success=True)
+        try:
+            cis = self.fetch_cis(since=since)
+            result.items_pulled = len(cis)
+        except Exception as exc:
+            logger.exception("CMDB fetch_cis failed")
+            result.success = False
+            result.errors.append(str(exc))
+        return result
