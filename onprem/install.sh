@@ -241,7 +241,7 @@ configure() {
     "$([ -f /etc/caiva/tls/caiva-ca.crt ] && echo "Local CA: /etc/caiva/tls/caiva-ca.crt — push to endpoints before rolling out agents
 ")" > $CRED
   chmod 600 $CRED
-  jq -n --arg url "https://$HOST" --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PW" '{url:$url,admin_email:$e,admin_password:$p}' > "$STATE/result.json"
+  jq -n --arg url "https://$HOST" --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PW" --argjson ca "$([ -f /etc/caiva/tls/caiva-ca.crt ] && echo true || echo false)"     '{url:$url,admin_email:$e,admin_password:$p,local_ca:$ca}' > "$STATE/result.json"
   chmod 600 "$STATE/result.json"
   echo "=== DONE — CAIVA is running at https://$HOST (credentials: $CRED)"
 }

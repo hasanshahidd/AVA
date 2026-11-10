@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CAIVA Setup</title>
+<link rel="icon" id="favicon" href="data:,">
+<style>
+:root{
+  --primary:#005B96; --primary-dk:#004A7A; --accent:#19A8E6;
+  --bg:#F4F7FA; --card:#FFFFFF; --text:#1B2733; --muted:#5B6B7B; --line:#DCE3EA; --soft:#EEF3F7;
+  --ok:#1E7F4A; --ok-bg:#E8F5EE; --warn:#9A5B00; --warn-bg:#FFF5E1; --bad:#B42318; --bad-bg:#FDECEA;
+  --radius:10px; --focus:0 0 0 3px rgba(25,168,230,.35);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 "Poppins","Segoe UI",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:#fff;border-bottom:1px solid var(--line);height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+header .lockup svg{height:34px;width:auto;display:block}
+header .meta{color:var(--muted);font-size:13px}
+header .meta b{color:var(--text);font-weight:600}
+main{flex:1;width:100%;max-width:1120px;margin:0 auto;padding:28px 24px 40px;display:grid;grid-template-columns:240px 1fr;gap:24px;align-items:start}
+/* stepper */
+nav.stepper ol{list-style:none;margin:0;padding:0;position:relative}
+nav.stepper li{position:relative;padding:0 0 22px 0}
+nav.stepper li:not(:last-child)::after{content:"";position:absolute;left:15px;top:34px;bottom:4px;width:2px;background:var(--line)}
+nav.stepper li.done:not(:last-child)::after{background:var(--primary)}
+.st-btn{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;padding:0;text-align:left;font:inherit;color:var(--muted);cursor:default;border-radius:8px}
+.st-btn.can{cursor:pointer}
+.st-btn.can:hover .st-label{color:var(--primary)}
+.st-btn:focus-visible{outline:none;box-shadow:var(--focus)}
+.st-num{flex:none;width:32px;height:32px;border-radius:50%;border:2px solid var(--line);background:#fff;display:grid;place-items:center;font-weight:600;font-size:13px;transition:all .2s}
+.st-label{font-weight:500}
+.st-sub{display:block;font-size:12px;color:var(--muted);font-weight:400}
+li.current .st-num{border-color:var(--primary);color:var(--primary)}
+li.current .st-label{color:var(--text);font-weight:600}
+li.done .st-num{background:var(--primary);border-color:var(--primary);color:#fff}
+li.done .st-label{color:var(--text)}
+li.failed .st-num{background:var(--bad);border-color:var(--bad);color:#fff}
+/* card */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 1px 2px rgba(16,24,40,.04);display:flex;flex-direction:column;min-height:520px}
+.card-body{padding:28px 32px;flex:1}
+.card-foot{border-top:1px solid var(--line);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#FBFCFD;border-radius:0 0 var(--radius) var(--radius)}
+.card-foot .spacer{flex:1}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 24px}
+h2{font-size:14px;font-weight:600;margin:24px 0 10px}
+.panel{animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+/* form */
+.field{margin:0 0 18px;max-width:520px}
+.field label,.files label,.label{display:block;font-weight:500;margin:0 0 6px}
+.req{color:var(--bad)}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea{width:100%;height:40px;padding:8px 12px;border:1px solid #C8D2DC;border-radius:8px;font:inherit;color:var(--text);background:#fff;transition:border-color .15s,box-shadow .15s}
+textarea{height:auto;min-height:84px;resize:vertical;font-family:ui-monospace,Consolas,"Cascadia Mono",monospace;font-size:13px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:var(--focus)}
+input[aria-invalid=true],textarea[aria-invalid=true]{border-color:var(--bad)}
+.err{color:var(--bad);font-size:12.5px;margin:6px 0 0;min-height:0}
+.err:empty{display:none}
+.prefix{display:flex;align-items:center}
+.prefix span{height:40px;display:flex;align-items:center;padding:0 10px;border:1px solid #C8D2DC;border-right:0;border-radius:8px 0 0 8px;background:var(--soft);color:var(--muted);font-size:13px}
+.prefix input{border-radius:0 8px 8px 0}
+.radio{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0 0 10px;cursor:pointer;max-width:520px;transition:border-color .15s,background .15s}
+.radio:has(input:checked){border-color:var(--primary);background:#F3F8FC}
+.radio input{margin:3px 0 0;accent-color:var(--primary)}
+.radio b{font-weight:500;display:block}
+.radio small{color:var(--muted)}
+.files{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px;margin:4px 0 0 0}
+input[type=file]{font:inherit;font-size:13px;width:100%;padding:6px;border:1px dashed #C8D2DC;border-radius:8px;background:#FBFCFD}
+input[type=file]:focus{outline:none;box-shadow:var(--focus)}
+details.group{border:1px solid var(--line);border-radius:8px;margin:0 0 18px;max-width:620px}
+details.group summary{cursor:pointer;padding:12px 14px;font-weight:500;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:8px}
+details.group summary::-webkit-details-marker{display:none}
+details.group summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+details.group[open] summary::after{transform:rotate(225deg)}
+details.group summary:focus-visible{outline:none;box-shadow:var(--focus)}
+details.group .inner{padding:4px 14px 2px;border-top:1px solid var(--line)}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:0 12px;max-width:520px}
+.section{border-top:1px solid var(--line);padding-top:20px;margin-top:4px}
+.opt{font-size:11px;font-weight:600;color:var(--muted);background:var(--soft);border-radius:4px;padding:1px 6px;margin-left:6px;letter-spacing:.02em;text-transform:uppercase;vertical-align:1px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:8px;border:1px solid #C8D2DC;background:#fff;color:var(--text);font:inherit;font-weight:500;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--soft)}
+.btn:focus-visible{outline:none;box-shadow:var(--focus)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dk)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.lg{height:48px;padding:0 28px;font-size:15px}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px}
+.link{background:none;border:0;color:var(--primary);font:inherit;font-size:12.5px;cursor:pointer;padding:0;text-decoration:underline}
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:12px;margin:0 0 20px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:14px;position:relative}
+.tile .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:22px;font-weight:600;margin:4px 0 2px}
+.tile .v.sm{font-size:15px;line-height:1.35;margin-top:8px}
+.tile .r{font-size:12px;color:var(--muted)}
+.tile .badge{position:absolute;top:12px;right:12px}
+.tile.ok{border-left:3px solid var(--ok)} .tile.warn{border-left:3px solid #E0A33A} .tile.bad{border-left:3px solid var(--bad)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+.badge.ok{background:var(--ok-bg);color:var(--ok)} .badge.warn{background:var(--warn-bg);color:var(--warn)} .badge.bad{background:var(--bad-bg);color:var(--bad)}
+.note{border-radius:8px;padding:12px 14px;margin:0 0 14px;display:flex;gap:10px;align-items:flex-start}
+.note svg{flex:none;margin-top:2px}
+.note.info{background:#F0F7FC;border:1px solid #CFE3F2}
+.note.warn{background:var(--warn-bg);border:1px solid #F1D59B;color:#5E3B00}
+.note.bad{background:var(--bad-bg);border:1px solid #F4C2BD;color:#7A1A12}
+.note.ok{background:var(--ok-bg);border:1px solid #BFE3CD;color:#14532D}
+.note ul{margin:4px 0 0;padding-left:18px}
+/* review */
+.review{display:grid;gap:14px}
+.rv{border:1px solid var(--line);border-radius:8px}
+.rv-h{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FBFCFD;border-bottom:1px solid var(--line);border-radius:8px 8px 0 0;font-weight:600}
+.rv dl{margin:0;padding:10px 14px;display:grid;grid-template-columns:200px 1fr;gap:6px 16px}
+.rv dt{color:var(--muted)} .rv dd{margin:0;word-break:break-word}
+.mono{font-family:ui-monospace,Consolas,"Cascadia Mono",monospace;font-size:13px}
+.dim{color:var(--muted)}
+/* install */
+.progress{height:8px;background:var(--soft);border-radius:999px;overflow:hidden;margin:6px 0 4px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));width:0;transition:width .5s ease}
+.prog-meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px;margin-bottom:18px}
+.steps{list-style:none;margin:0 0 18px;padding:0;border:1px solid var(--line);border-radius:8px}
+.steps li{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.steps li:last-child{border-bottom:0}
+.steps li.pending{color:var(--muted)}
+.steps li.running{background:#F3F8FC;font-weight:500}
+.steps li .s{margin-left:auto;font-size:12px;color:var(--muted)}
+.ic{width:20px;height:20px;flex:none;display:grid;place-items:center}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid #B7C3CF}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid #CFE3F2;border-top-color:var(--primary);animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.logbox{margin:8px 0 0;background:#0F1B26;color:#D6E2EC;border-radius:8px;padding:12px 14px;height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all;font:12px/1.55 ui-monospace,Consolas,"Cascadia Mono",monospace}
+/* ready */
+.ready{text-align:center;padding:12px 0}
+.ready .mark svg{width:84px;height:84px}
+.ready h1{font-size:24px;margin-top:8px}
+.url{color:var(--muted);margin:10px 0 26px}
+.cred{max-width:520px;margin:0 auto;text-align:left;border:1px solid var(--line);border-radius:8px}
+.cred .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.cred .row:last-child{border-bottom:0}
+.cred .k{width:90px;color:var(--muted);flex:none}
+.cred .v{flex:1;word-break:break-all}
+.ready .note{max-width:520px;margin:16px auto 0;text-align:left}
+.center{text-align:center;padding:48px 16px}
+.center svg.big{width:48px;height:48px;margin-bottom:12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:900px){
+  main{grid-template-columns:1fr;padding:16px}
+  nav.stepper ol{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+  nav.stepper li{padding:0}
+  nav.stepper li::after{display:none}
+  nav.stepper .st-sub{display:none}
+  nav.stepper li:not(.current) .st-label{display:none}
+  .card-body,.card-foot{padding-left:20px;padding-right:20px}
+  .rv dl{grid-template-columns:1fr} .rv dt{margin-top:6px}
+  .files,.grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="lockup" aria-label="CAIVA">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 120" role="img" aria-label="CAIVA" fill="none" style="color:#005B96">
+  <!-- Horizontal lockup: mark + wordmark. The wordmark is live <text>; for final delivery
+       set it in the brand font or convert to outlines so it renders identically everywhere. -->
+  <g transform="translate(6 12) scale(0.8)">
+    <g stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M102 48 L102 36 L60 12 L18 36 L18 84 L60 108 L102 84 L102 72" stroke-width="5.5"/>
+      <path d="M102 48 L82 48" stroke-width="5.5"/>
+      <path d="M102 72 L82 72" stroke-width="5.5"/>
+      <path d="M56 34 L78 47 L78 73 L56 86 L34 73 L34 47 Z" stroke-width="4"/>
+      <g stroke-width="4">
+        <path d="M56 34 L56 60"/><path d="M78 47 L56 60"/><path d="M78 73 L56 60"/>
+        <path d="M56 86 L56 60"/><path d="M34 73 L56 60"/><path d="M34 47 L56 60"/>
+      </g>
+    </g>
+    <g fill="currentColor">
+      <circle cx="56" cy="34" r="5"/><circle cx="78" cy="47" r="5"/><circle cx="78" cy="73" r="5"/>
+      <circle cx="56" cy="86" r="5"/><circle cx="34" cy="73" r="5"/><circle cx="34" cy="47" r="5"/>
+    </g>
+    <circle cx="56" cy="60" r="8" fill="#19A8E6"/>
+  </g>
+  <text x="122" y="78" fill="currentColor"
+        font-family="'Inter Tight','Inter','Segoe UI',Arial,sans-serif"
+        font-weight="800" font-size="60" letter-spacing="2">CAIVA</text>
+</svg>
+  </div>
+  <div class="meta">Cyber Assurance &middot; Platform setup <span id="hdrVer"></span></div>
+</header>
+
+<template id="markTpl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="CAIVA" fill="none" style="color:#005B96">
+  <!-- Set `color` in CSS to re-theme: #005B96 on light, #FFFFFF on dark. Cyan node is the fixed accent. -->
+  <g stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
+    <!-- shield outline, open on the right to read as a C -->
+    <path d="M102 48 L102 36 L60 12 L18 36 L18 84 L60 108 L102 84 L102 72" stroke-width="5.5"/>
+    <path d="M102 48 L82 48" stroke-width="5.5"/>
+    <path d="M102 72 L82 72" stroke-width="5.5"/>
+    <!-- network ring -->
+    <path d="M56 34 L78 47 L78 73 L56 86 L34 73 L34 47 Z" stroke-width="4"/>
+    <!-- spokes to centre -->
+    <g stroke-width="4">
+      <path d="M56 34 L56 60"/><path d="M78 47 L56 60"/><path d="M78 73 L56 60"/>
+      <path d="M56 86 L56 60"/><path d="M34 73 L56 60"/><path d="M34 47 L56 60"/>
+    </g>
+  </g>
+  <!-- outer nodes -->
+  <g fill="currentColor">
+    <circle cx="56" cy="34" r="5"/><circle cx="78" cy="47" r="5"/><circle cx="78" cy="73" r="5"/>
+    <circle cx="56" cy="86" r="5"/><circle cx="34" cy="73" r="5"/><circle cx="34" cy="47" r="5"/>
+  </g>
+  <!-- centre accent node -->
+  <circle cx="56" cy="60" r="8" fill="#19A8E6"/>
+</svg></template>
+
+<main>
+  <nav class="stepper" aria-label="Setup progress"><ol id="stepper"></ol></nav>
+
+  <form class="card" id="card" novalidate autocomplete="off">
+    <div class="card-body" id="body" aria-live="polite">
+
+      <!-- 0 Welcome -->
+      <section class="panel" data-step="0" hidden>
+        <h1>Welcome to CAIVA setup</h1>
+        <p class="lead">The installer has prepared this server. Review the system check below, then configure your organization. Setup takes a few minutes and runs entirely on this server.</p>
+        <div class="tiles" id="tiles"></div>
+        <div id="checkNotes"></div>
+      </section>
+
+      <!-- 1 Organization -->
+      <section class="panel" data-step="1" hidden>
+        <h1>Organization</h1>
+        <p class="lead">Identifies your organization inside the platform and creates the first administrator.</p>
+        <div class="field">
+          <label for="org">Organization name <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="org" name="org" required maxlength="120" aria-describedby="org-err">
+          <p class="err" id="org-err"></p>
+        </div>
+        <div class="field">
+          <label for="slug">Tenant ID <span class="req" aria-hidden="true">*</span></label>
+          <input type="text" id="slug" name="slug" required maxlength="31" spellcheck="false" class="mono" aria-describedby="slug-hint slug-err">
+          <p class="hint" id="slug-hint">Derived from the organization name. Lowercase letters and digits, 2&ndash;31 characters, starting with a letter. Cannot be changed after installation.</p>
+          <p class="err" id="slug-err"></p>
+        </div>
+        <div class="field">
+          <label for="admin_email">Administrator email <span class="req" aria-hidden="true">*</span></label>
+          <input type="email" id="admin_email" name="admin_email" required maxlength="254" spellcheck="false" aria-describedby="admin_email-hint admin_email-err">
+          <p class="hint" id="admin_email-hint">Sign-in name of the first administrator. A one-time password is generated at the end of setup.</p>
+          <p class="err" id="admin_email-err"></p>
+        </div>
+      </section>
+
+      <!-- 2 Access -->
+      <section class="panel" data-step="2" hidden>
+        <h1>Access</h1>
+        <p class="lead">How users on your network reach the platform.</p>
+        <div class="field">
+          <label for="host">Host name or IP address <span class="req" aria-hidden="true">*</span></label>
+          <div class="prefix"><span aria-hidden="true">https://</span><input type="text" id="host" name="host" required maxlength="253" spellcheck="false" class="mono" aria-describedby="host-hint host-err"></div>
+          <p class="hint" id="host-hint">Users will open <span class="mono" id="hostPreview">https://&lt;host&gt;</span> in their browser. Use a DNS name if you have one (for example caiva.bank.local); it must resolve to this server.</p>
+          <p class="err" id="host-err"></p>
+        </div>
+        <div class="section">
+          <span class="label" id="cert-l">TLS certificate</span>
+          <div role="radiogroup" aria-labelledby="cert-l">
+            <label class="radio"><input type="radio" name="cert_mode" value="self" checked><span><b>Generate a self-signed certificate</b><small>Browsers will show a trust warning until you replace it with a certificate from your internal CA.</small></span></label>
+            <label class="radio"><input type="radio" name="cert_mode" value="upload"><span><b>Upload certificate and private key (PEM)</b><small>Certificate chain and unencrypted private key issued for the host name above.</small></span></label>
+          </div>
+          <div class="files" id="certFiles" hidden>
+            <div><label for="cert">Certificate (.pem / .crt)</label><input type="file" id="cert" name="cert" accept=".pem,.crt,.cer" aria-describedby="cert-err"><p class="err" id="cert-err"></p></div>
+            <div><label for="key">Private key (.pem / .key)</label><input type="file" id="key" name="key" accept=".pem,.key" aria-describedby="key-err"><p class="err" id="key-err"></p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 Optional services -->
+      <section class="panel" data-step="3" hidden>
+        <h1>Optional services</h1>
+        <p class="lead">Everything on this page can be skipped. The platform works fully offline without these services, and each can be configured later from Administration.</p>
+        <div class="field" style="max-width:620px">
+          <label for="openai_key">AI assistant API key (OpenAI)<span class="opt">Optional</span></label>
+          <input type="password" id="openai_key" name="openai_key" maxlength="300" spellcheck="false" class="mono" placeholder="sk-..." aria-describedby="openai-hint openai_key-err">
+          <p class="hint" id="openai-hint">If left blank, AI features stay off. With a key, the server needs outbound HTTPS to the OpenAI API.</p>
+          <p class="err" id="openai_key-err"></p>
+        </div>
+        <details class="group" id="smtpGroup">
+          <summary>Email (SMTP) for alerts and reports<span class="opt" style="margin-left:auto;margin-right:10px">Optional</span></summary>
+          <div class="inner">
+            <p class="hint" style="margin:10px 0 14px">Used to send alerts and scheduled reports. Leave empty to disable email.</p>
+            <div class="grid2">
+              <div class="field"><label for="smtp_host">SMTP server</label><input type="text" id="smtp_host" name="smtp_host" spellcheck="false" class="mono" placeholder="smtp.bank.local"><p class="err" id="smtp_host-err"></p></div>
+              <div class="field"><label for="smtp_port">Port</label><input type="number" id="smtp_port" name="smtp_port" min="1" max="65535" placeholder="587" aria-describedby="smtp_port-err"><p class="err" id="smtp_port-err"></p></div>
+            </div>
+            <div class="field"><label for="smtp_user">Username</label><input type="text" id="smtp_user" name="smtp_user" spellcheck="false"></div>
+            <div class="field"><label for="smtp_password">Password</label><input type="password" id="smtp_password" name="smtp_password"></div>
+            <div class="field"><label for="smtp_from">From address</label><input type="email" id="smtp_from" name="smtp_from" spellcheck="false" placeholder="caiva@bank.local" aria-describedby="smtp_from-err"><p class="err" id="smtp_from-err"></p></div>
+          </div>
+        </details>
+        <div class="field" style="max-width:620px">
+          <label for="exploit_scope">Exploit-validation scope<span class="opt">Optional</span></label>
+          <textarea id="exploit_scope" name="exploit_scope" rows="3" spellcheck="false" placeholder="10.10.0.0/16&#10;192.168.5.20" aria-describedby="scope-hint exploit_scope-err"></textarea>
+          <p class="hint" id="scope-hint">Exploit tests only ever run against these IP addresses and CIDR ranges. Leave blank to keep exploit tests disabled. One per line, or separated by spaces or commas.</p>
+          <p class="err" id="exploit_scope-err"></p>
+        </div>
+      </section>
+
+      <!-- 4 Review / 5 Install / 6 Ready / messages: rendered by script -->
+      <section class="panel" data-step="4" hidden></section>
+      <section class="panel" data-step="5" hidden></section>
+      <section class="panel" data-step="6" hidden></section>
+      <section class="panel" data-step="msg" hidden></section>
+    </div>
+    <div class="card-foot" id="foot">
+      <button type="button" class="btn" id="back">Back</button>
+      <span class="spacer"></span>
+      <span class="err" id="footErr" role="alert"></span>
+      <button type="submit" class="btn primary" id="next">Next</button>
+    </div>
+  </form>
+</main>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var params = new URLSearchParams(location.search);
+var MOCK = params.has('mock');
+var STEPS = [
+  {label:'System check', sub:'Requirements'},
+  {label:'Organization', sub:'Tenant and administrator'},
+  {label:'Access', sub:'Host and certificate'},
+  {label:'Optional services', sub:'AI, email, exploit scope'},
+  {label:'Review', sub:'Confirm and install'},
+  {label:'Install', sub:'Configure services'},
+  {label:'Ready', sub:'Sign in'}
+];
+var REC = {cpu:[8,4], ram_gb:[32,16], disk_free_gb:[500,100]};   // [recommended, minimum]
+var POLL_MS = 2000;
+var S = {step:0, state:null, slugTouched:false, pollTimer:null, logTimer:null, tickTimer:null, busy:false, dead:false};
+
+/* ---------- token ---------- */
+var token = '';
+try {
+  if (params.get('token')) sessionStorage.setItem('caiva_setup_token', params.get('token'));
+  token = sessionStorage.getItem('caiva_setup_token') || '';
+} catch (e) { token = params.get('token') || ''; }
+if (params.has('token')) {
+  params.delete('token');
+  var q = params.toString();
+  try { history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (e) {}
+}
+
+/* ---------- helpers ---------- */
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function val(id){ return ($(id).value || '').trim(); }
+function certMode(){ return document.querySelector('input[name=cert_mode]:checked').value; }
+var ICON = {
+  check:'<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  x:'<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  warn:'<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l7 12.5H1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3.5M8 11.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  info:'<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="#005B96" stroke-width="1.5"/><path d="M8 7v4.5M8 4.6v.1" stroke="#005B96" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  lock:'<svg class="big" viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="21" width="28" height="20" rx="3" fill="none" stroke="#005B96" stroke-width="2.5"/><path d="M16 21v-6a8 8 0 0116 0v6" fill="none" stroke="#005B96" stroke-width="2.5"/><circle cx="24" cy="31" r="2.5" fill="#19A8E6"/></svg>'
+};
+function ApiError(status, message, data){ this.status = status; this.message = message; this.data = data; }
+
+/* ---------- API ---------- */
+function api(method, path, body){
+  if (MOCK) return mockApi(method, path, body);
+  return fetch(path, {method:method, body:body, cache:'no-store', headers:{'X-Setup-Token': token}})
+    .catch(function(){ throw new ApiError(0, 'Could not reach the setup service. Check that the installer is still running on this server, then try again.'); })
+    .then(function(res){
+      if (res.status === 401) { showMessage('expired'); throw new ApiError(401, 'Setup link expired or invalid.'); }
+      var json = (res.headers.get('content-type') || '').indexOf('json') >= 0;
+      return (json ? res.json() : res.text()).catch(function(){ return null; }).then(function(data){
+        if (!res.ok) throw new ApiError(res.status, (data && data.error) || ('The setup service returned an error (HTTP ' + res.status + ').'), data);
+        return data;
+      });
+    });
+}
+
+/* ---------- stepper + navigation ---------- */
+function renderStepper(){
+  var failed = S.state && S.state.phase === 'failed';
+  $('stepper').innerHTML = STEPS.map(function(s, i){
+    var cls = i < S.step ? 'done' : (i === S.step ? (failed && i === 5 ? 'failed current' : 'current') : '');
+    var can = i < S.step && S.step <= 4;
+    var num = i < S.step ? ICON.check : (failed && i === 5 ? ICON.x : (i + 1));
+    return '<li class="' + cls + '"><button type="button" class="st-btn' + (can ? ' can' : '') + '" data-go="' + i + '"' +
+      (can ? '' : ' tabindex="-1" aria-disabled="true"') + (i === S.step ? ' aria-current="step"' : '') + '>' +
+      '<span class="st-num">' + num + '</span><span><span class="st-label">' + s.label + '</span><span class="st-sub">' + s.sub + '</span></span></button></li>';
+  }).join('');
+}
+function go(step){
+  S.step = step;
+  document.querySelectorAll('section.panel').forEach(function(p){ p.hidden = p.getAttribute('data-step') !== String(step); });
+  if (step === 4) renderReview();
+  renderStepper();
+  var pre = step <= 4;
+  $('foot').hidden = !pre;
+  $('back').hidden = step === 0;
+  $('next').textContent = step === 4 ? 'Install' : 'Next';
+  $('next').disabled = step === 0 && !(S.state && S.state.checks && S.state.checks.ok);
+  $('footErr').textContent = '';
+  var first = document.querySelector('section.panel[data-step="' + step + '"] input:not([type=radio]):not([type=hidden]), section.panel[data-step="' + step + '"] textarea');
+  if (first && step >= 1 && step <= 3) first.focus();
+  window.scrollTo(0, 0);
+}
+$('stepper').addEventListener('click', function(e){
+  var b = e.target.closest('.st-btn.can'); if (b) go(+b.getAttribute('data-go'));
+});
+$('back').addEventListener('click', function(){ if (S.step > 0) go(S.step - 1); });
+$('card').addEventListener('submit', function(e){
+  e.preventDefault();
+  if (S.busy || $('next').disabled || S.step > 4) return;
+  if (S.step === 4) return install();
+  if (validate(S.step)) go(S.step + 1);
+});
+
+/* ---------- validation ---------- */
+var SLUG_RE = /^[a-z][a-z0-9]{1,30}$/;
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var HOST_RE = /^(\[[0-9a-fA-F:.]+\]|[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?)(:\d{1,5})?$/;
+function setErr(id, msg){
+  var el = $(id); if (el && el.setAttribute) el.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  var e = $(id + '-err'); if (e) e.textContent = msg || '';
+  return !msg;
+}
+function isIPv4(s){ var p = s.split('.'); return p.length === 4 && p.every(function(o){ return /^\d{1,3}$/.test(o) && +o <= 255; }); }
+function scopeTokens(){ return val('exploit_scope').split(/[\s,;]+/).filter(Boolean); }
+function badScopeToken(t){
+  var m = t.split('/'); if (m.length > 2) return true;
+  var v6 = m[0].indexOf(':') >= 0;
+  if (v6 ? !/^[0-9a-fA-F:]+$/.test(m[0]) : !isIPv4(m[0])) return true;
+  return m.length === 2 && !(/^\d{1,3}$/.test(m[1]) && +m[1] <= (v6 ? 128 : 32));
+}
+function validate(step){
+  var ok = true, firstBad = null;
+  function chk(id, msg){ if (!setErr(id, msg)) { ok = false; firstBad = firstBad || $(id); } }
+  if (step === 1) {
+    chk('org', val('org') ? '' : 'Enter the organization name.');
+    var s = val('slug');
+    chk('slug', !s ? 'Enter a tenant ID.' : (SLUG_RE.test(s) ? '' : 'Use 2–31 lowercase letters or digits, starting with a letter.'));
+    var em = val('admin_email');
+    chk('admin_email', !em ? 'Enter the administrator email.' : (EMAIL_RE.test(em) ? '' : 'Enter a valid email address, for example admin@bank.com.'));
+  }
+  if (step === 2) {
+    var h = val('host').replace(/^https?:\/\//i, '').replace(/\/+$/, ''); $('host').value = h;
+    chk('host', !h ? 'Enter the host name or IP address users will open.' : (HOST_RE.test(h) ? '' : 'Enter a host name or IP address only, without a path.'));
+    var up = certMode() === 'upload';
+    chk('cert', up && !$('cert').files.length ? 'Choose the certificate file.' : '');
+    chk('key', up && !$('key').files.length ? 'Choose the private key file.' : '');
+  }
+  if (step === 3) {
+    var port = val('smtp_port');
+    chk('smtp_port', port && !(/^\d+$/.test(port) && +port >= 1 && +port <= 65535) ? 'Port must be between 1 and 65535.' : '');
+    chk('smtp_host', !val('smtp_host') && (val('smtp_user') || val('smtp_from') || port) ? 'Enter the SMTP server, or clear the other email fields.' : '');
+    chk('smtp_from', val('smtp_from') && !EMAIL_RE.test(val('smtp_from')) ? 'Enter a valid sender address.' : '');
+    var bad = scopeTokens().filter(badScopeToken);
+    chk('exploit_scope', bad.length ? 'Not a valid IP address or CIDR range: ' + bad.slice(0, 3).join(', ') : '');
+    if (!ok && firstBad && firstBad.closest('details')) firstBad.closest('details').open = true;
+  }
+  if (firstBad) firstBad.focus();
+  return ok;
+}
+function deriveSlug(name){ return name.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^[0-9]+/, '').slice(0, 31); }
+$('org').addEventListener('input', function(){ if (!S.slugTouched) $('slug').value = deriveSlug($('org').value); });
+$('slug').addEventListener('input', function(){ S.slugTouched = true; this.value = this.value.toLowerCase(); if (!this.value) S.slugTouched = false; });
+$('host').addEventListener('input', function(){ $('hostPreview').textContent = 'https://' + (val('host') || '<host>'); });
+document.querySelectorAll('input[name=cert_mode]').forEach(function(r){
+  r.addEventListener('change', function(){ $('certFiles').hidden = certMode() !== 'upload'; setErr('cert', ''); setErr('key', ''); });
+});
+['org','slug','admin_email','host','smtp_port','smtp_host','smtp_from','exploit_scope','cert','key'].forEach(function(id){
+  $(id).addEventListener('change', function(){ if ($(id).getAttribute('aria-invalid') === 'true') validate(S.step); });
+});
+
+/* ---------- step 0: system check ---------- */
+function tileState(k, v){
+  var r = REC[k]; if (v == null) return 'warn';
+  if (v >= r[0] * 0.95) return 'ok';      // 5% slack: a 32 GB machine reports ~31 GB usable
+  return v >= r[1] ? 'warn' : 'bad';
+}
+function renderChecks(st){
+  var c = st.checks || {};
+  $('hdrVer').innerHTML = st.version ? '&middot; Version <b class="mono">' + esc(st.version) + '</b>' : '';
+  function tile(k, label, v, unit){
+    var s = tileState(k, v), r = REC[k];
+    var txt = {ok:'OK', warn:'Below recommended', bad:'Below minimum'}[s];
+    return '<div class="tile ' + s + '"><span class="badge ' + s + '">' + txt + '</span><div class="k">' + label + '</div>' +
+      '<div class="v">' + (v == null ? '&ndash;' : esc(v)) + (v == null ? '' : ' <span style="font-size:14px;font-weight:500">' + unit + '</span>') + '</div>' +
+      '<div class="r">Recommended ' + r[0] + ' ' + unit + ' &middot; minimum ' + r[1] + '</div></div>';
+  }
+  $('tiles').innerHTML =
+    '<div class="tile"><div class="k">Version</div><div class="v sm mono">' + esc(st.version || 'unknown') + '</div><div class="r">Installer bundle</div></div>' +
+    '<div class="tile"><div class="k">Operating system</div><div class="v sm">' + esc(c.os || 'unknown') + '</div><div class="r">Ubuntu 24.04 LTS required</div></div>' +
+    tile('cpu', 'CPU', c.cpu, 'vCPU') + tile('ram_gb', 'Memory', c.ram_gb, 'GB') + tile('disk_free_gb', 'Free disk', c.disk_free_gb, 'GB');
+  var notes = '';
+  if (!c.ok) notes += '<div class="note bad" role="alert">' + ICON.x + '<div><b>This server does not meet the minimum requirements.</b> Resolve the issues below and run the installer again.</div></div>';
+  else notes += '<div class="note ok">' + ICON.check + '<div>This server meets the requirements to continue.</div></div>';
+  var w = c.warnings || [];
+  if (w.length) notes += '<div class="note warn">' + ICON.warn + '<div><b>Warnings</b><ul>' + w.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div></div>';
+  notes += '<div class="note info">' + ICON.info + '<div>' + (st.lanes_included
+    ? '<b>Pentest lanes included.</b> The exploit-validation lane images are part of this bundle and will be installed.'
+    : '<b>Pentest lanes not included.</b> This bundle does not contain the exploit-validation lane images; the rest of the platform is installed normally.') + '</div></div>';
+  $('checkNotes').innerHTML = notes;
+  if (!val('host') && st.suggested_host) { $('host').value = st.suggested_host; $('hostPreview').textContent = 'https://' + st.suggested_host; }
+}
+
+/* ---------- step 4: review ---------- */
+function renderReview(){
+  var mask = function(v){ return v ? '<span class="mono">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>' + (v.length > 8 ? ' <span class="dim">ending ' + esc(v.slice(-4)) + '</span>' : '') : '<span class="dim">Not set</span>'; };
+  var or = function(v){ return v ? esc(v) : '<span class="dim">Not set</span>'; };
+  var smtp = val('smtp_host');
+  var scope = scopeTokens();
+  function block(title, step, rows){
+    return '<div class="rv"><div class="rv-h">' + title + '<button type="button" class="link" data-edit="' + step + '">Edit</button></div><dl>' +
+      rows.map(function(r){ return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('') + '</dl></div>';
+  }
+  var p = document.querySelector('section[data-step="4"]');
+  p.innerHTML = '<h1>Review</h1><p class="lead">Check the configuration. Installation starts when you select Install; it cannot be paused.</p>' +
+    '<div id="installErr"></div><div class="review">' +
+    block('Organization', 1, [['Organization name', esc(val('org'))], ['Tenant ID', '<span class="mono">' + esc(val('slug')) + '</span>'], ['Administrator email', esc(val('admin_email'))]]) +
+    block('Access', 2, [['Platform address', '<span class="mono">https://' + esc(val('host')) + '</span>'],
+      ['TLS certificate', certMode() === 'self' ? 'Self-signed (generated)' : 'Uploaded: ' + esc($('cert').files[0] && $('cert').files[0].name) + ', ' + esc($('key').files[0] && $('key').files[0].name)]]) +
+    block('Optional services', 3, [['AI assistant key', val('openai_key') ? mask(val('openai_key')) : '<span class="dim">Not set &mdash; AI features off</span>'],
+      ['Email (SMTP)', smtp ? esc(smtp) + (val('smtp_port') ? ':' + esc(val('smtp_port')) : '') + (val('smtp_user') ? ' &middot; user ' + esc(val('smtp_user')) : '') : '<span class="dim">Not set &mdash; email off</span>'],
+      ['SMTP password', smtp ? mask(val('smtp_password')) : '<span class="dim">&ndash;</span>'],
+      ['Sender address', smtp ? or(val('smtp_from')) : '<span class="dim">&ndash;</span>'],
+      ['Exploit-validation scope', scope.length ? '<span class="mono">' + esc(scope.join('  ')) + '</span>' : '<span class="dim">Not set &mdash; exploit tests disabled</span>']]) +
+    '</div>';
+  p.querySelectorAll('[data-edit]').forEach(function(b){ b.addEventListener('click', function(){ go(+b.getAttribute('data-edit')); }); });
+}
+
+/* ---------- install ---------- */
+var FIELD_STEP = [[/org|organi[sz]ation/i, 1, 'org'], [/slug|tenant/i, 1, 'slug'], [/admin|email/i, 1, 'admin_email'],
+  [/host/i, 2, 'host'], [/key file|private key/i, 2, 'key'], [/cert/i, 2, 'cert'],
+  [/openai|api key/i, 3, 'openai_key'], [/smtp/i, 3, 'smtp_host'], [/scope|cidr|exploit/i, 3, 'exploit_scope']];
+function install(){
+  var fd = new FormData();
+  ['org','slug','host','admin_email','openai_key','smtp_host','smtp_port','smtp_user','smtp_password','smtp_from'].forEach(function(k){ if (val(k)) fd.append(k, val(k)); });
+  fd.append('cert_mode', certMode());
+  if (certMode() === 'upload') { fd.append('cert', $('cert').files[0]); fd.append('key', $('key').files[0]); }
+  var scope = scopeTokens(); if (scope.length) fd.append('exploit_scope', scope.join(' '));
+  S.busy = true; $('next').disabled = true; $('back').disabled = true; $('next').textContent = 'Starting…';
+  api('POST', '/api/install', fd).then(function(){
+    try { sessionStorage.setItem('caiva_setup_started', String(Date.now())); } catch (e) {}
+    S.state = Object.assign({}, S.state, {phase:'installing'});
+    enterInstall();
+  }).catch(function(err){
+    if (err.status === 401) return;
+    var msg = err.message, hit = null;
+    if (err.status === 400) {
+      var f = err.data && err.data.field;   // assumed optional: server may name the field
+      hit = FIELD_STEP.filter(function(m){ return f ? m[2] === f : m[0].test(msg); })[0];
+    }
+    if (hit) { go(hit[1]); setErr(hit[2], msg); var c = $(hit[2]).closest('details'); if (c) c.open = true; $(hit[2]).focus(); }
+    else { var box = $('installErr'); if (box) box.innerHTML = '<div class="note bad" role="alert">' + ICON.x + '<div><b>Installation could not start.</b> ' + esc(msg) + '</div></div>'; }
+  }).then(function(){
+    S.busy = false; $('back').disabled = false;
+    if (S.step === 4) { $('next').disabled = false; $('next').textContent = 'Install'; }
+  });
+}
+
+function enterInstall(){
+  go(5);
+  var p = document.querySelector('section[data-step="5"]');
+  p.innerHTML = '<h1 id="instTitle">Installing CAIVA</h1><p class="lead" id="instLead">Configuring the platform on this server. You can leave this page open; refreshing it is safe.</p>' +
+    '<div id="instErr"></div>' +
+    '<div class="progress" role="progressbar" aria-label="Installation progress" aria-valuemin="0" aria-valuemax="100" id="pbar"><i id="pfill"></i></div>' +
+    '<div class="prog-meta"><span id="pcount"></span><span>Elapsed <span class="mono" id="elapsed">0:00</span></span></div>' +
+    '<ul class="steps" id="instSteps"></ul>' +
+    '<div style="display:flex;gap:10px;align-items:center"><button type="button" class="btn sm" id="logToggle" aria-expanded="false" aria-controls="logbox">Show details</button><span id="retryWrap"></span></div>' +
+    '<pre class="logbox" id="logbox" hidden tabindex="0" aria-label="Installation log"></pre>';
+  $('logToggle').addEventListener('click', function(){ setLog(!S.logOpen); });
+  clearInterval(S.tickTimer); S.tickTimer = setInterval(tick, 1000); tick();
+  startPolling();
+  if (S.state && S.state.steps) renderInstall(S.state);
+}
+function startPolling(){
+  clearInterval(S.pollTimer);
+  S.pollTimer = setInterval(poll, POLL_MS); poll();
+}
+function stopPolling(){ clearInterval(S.pollTimer); S.pollTimer = null; }
+function poll(){
+  api('GET', '/api/state').then(function(st){ S.state = st; $('instErr') && ($('instErr').innerHTML = ''); route(st); })
+    .catch(function(err){ if (err.status !== 401 && $('instErr')) $('instErr').innerHTML = '<div class="note warn">' + ICON.warn + '<div>Lost contact with the setup service: ' + esc(err.message) + ' Retrying&hellip;</div></div>'; });
+}
+function startedAt(){ try { return +sessionStorage.getItem('caiva_setup_started') || 0; } catch (e) { return 0; } }
+function tick(){
+  var t0 = startedAt(); if (!t0) { try { sessionStorage.setItem('caiva_setup_started', String(Date.now())); } catch (e) {} t0 = Date.now(); }
+  var s = Math.max(0, Math.floor((Date.now() - t0) / 1000));
+  if ($('elapsed')) $('elapsed').textContent = Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2);
+}
+function renderInstall(st){
+  var steps = st.steps || [], done = steps.filter(function(s){ return s.status === 'done'; }).length;
+  var pct = steps.length ? Math.round(done / steps.length * 100) : 0;
+  $('pfill').style.width = pct + '%'; $('pbar').setAttribute('aria-valuenow', pct);
+  $('pcount').textContent = done + ' of ' + steps.length + ' steps complete';
+  var word = {pending:'Pending', running:'In progress', done:'Done', failed:'Failed'};
+  $('instSteps').innerHTML = steps.map(function(s){
+    var ic = s.status === 'done' ? '<span style="color:var(--ok)">' + ICON.check + '</span>' : s.status === 'running' ? '<span class="spin" aria-hidden="true"></span>'
+      : s.status === 'failed' ? '<span style="color:var(--bad)">' + ICON.x + '</span>' : '<span class="dot" aria-hidden="true"></span>';
+    return '<li class="' + esc(s.status) + '"><span class="ic">' + ic + '</span>' + esc(s.label) + '<span class="s">' + (word[s.status] || esc(s.status)) + '</span></li>';
+  }).join('');
+  var failed = st.phase === 'failed';
+  $('instTitle').textContent = failed ? 'Installation failed' : 'Installing CAIVA';
+  $('instLead').textContent = failed ? 'A step did not complete. Review the error and log, fix the cause on the server if needed, then retry. Completed steps are not repeated.'
+    : 'Configuring the platform on this server. You can leave this page open; refreshing it is safe.';
+  if (failed) {
+    $('instErr').innerHTML = '<div class="note bad" role="alert">' + ICON.x + '<div><b>Error:</b> ' + esc(st.error || 'The installer reported a failure without details. See the log below.') + '</div></div>';
+    if (!$('retryBtn')) { $('retryWrap').innerHTML = '<button type="button" class="btn primary sm" id="retryBtn">Retry installation</button>'; $('retryBtn').addEventListener('click', retry); }
+    if (!S.logOpen) setLog(true);
+  } else $('retryWrap').innerHTML = '';
+}
+function retry(){
+  var b = $('retryBtn'); b.disabled = true; b.textContent = 'Retrying…';
+  api('POST', '/api/retry').then(function(){ S.state.phase = 'installing'; $('instErr').innerHTML = ''; $('retryWrap').innerHTML = ''; renderStepper(); startPolling(); })
+    .catch(function(err){ if (err.status === 401) return; b.disabled = false; b.textContent = 'Retry installation';
+      $('instErr').innerHTML = '<div class="note bad" role="alert">' + ICON.x + '<div><b>Retry failed to start:</b> ' + esc(err.message) + '</div></div>'; });
+}
+function setLog(open){
+  S.logOpen = open; $('logbox').hidden = !open;
+  $('logToggle').textContent = open ? 'Hide details' : 'Show details'; $('logToggle').setAttribute('aria-expanded', String(open));
+  clearInterval(S.logTimer);
+  if (open) { fetchLog(); S.logTimer = setInterval(fetchLog, POLL_MS); }
+}
+function fetchLog(){
+  var box = $('logbox'); if (!box) return;
+  api('GET', '/api/log?lines=60').then(function(txt){
+    var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.textContent = txt || '(log is empty)';
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }).catch(function(err){ if (err.status !== 401) box.textContent = 'Could not load the install log: ' + err.message; });
+  if (S.state && S.state.phase !== 'installing' && S.state.phase !== 'failed') clearInterval(S.logTimer);
+}
+
+/* ---------- ready ---------- */
+function enterReady(st){
+  stopPolling(); clearInterval(S.tickTimer); clearInterval(S.logTimer);
+  go(6);
+  var r = st.result || {};
+  var p = document.querySelector('section[data-step="6"]');
+  p.innerHTML = '<div class="ready"><div class="mark">' + $('markTpl').innerHTML + '</div><h1>CAIVA is ready</h1>' +
+    '<p class="lead" style="margin-bottom:22px">Installation completed. Sign in with the administrator account below.</p>' +
+    (r.url ? '<a class="btn primary lg" href="' + esc(r.url) + '" target="_blank" rel="noopener">Open CAIVA</a><div class="url mono">' + esc(r.url) + '</div>' : '') +
+    '<div class="cred">' + credRow('Email', r.admin_email) + credRow('Password', r.admin_password) + '</div>' +
+    '<div class="note warn" role="note">' + ICON.warn + '<div><b>Store it securely and change it after first sign-in.</b> It is also saved on the server in <code>/root/caiva-credentials.txt</code> (root only).</div></div>' +
+    (r.local_ca ? '<div class="note" role="note">' + ICON.warn + '<div><b>Before rolling out endpoint agents:</b> distribute the CAIVA certificate authority <code>/etc/caiva/tls/caiva-ca.crt</code> to your endpoints (e.g. Group Policy) so agents trust this server.</div></div>' : '') +
+    '<p class="hint" style="margin-top:18px">This setup page closes automatically 15 minutes after installation.</p></div>';
+  p.querySelectorAll('[data-copy]').forEach(function(b){ b.addEventListener('click', function(){ copy(b); }); });
+}
+function credRow(k, v){
+  return '<div class="row"><span class="k">' + k + '</span><span class="v mono">' + esc(v || '–') + '</span>' +
+    (v ? '<button type="button" class="btn sm" data-copy="' + esc(v) + '" aria-label="Copy ' + k.toLowerCase() + '">Copy</button>' : '') + '</div>';
+}
+function copy(btn){
+  var text = btn.getAttribute('data-copy');
+  var done = function(ok){ btn.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(function(){ btn.textContent = 'Copy'; }, 1600); };
+  var fallback = function(){
+    var t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} t.remove(); done(ok);
+  };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback); else fallback();
+}
+
+/* ---------- full-card messages ---------- */
+function showMessage(kind, detail){
+  S.dead = kind === 'expired'; stopPolling(); clearInterval(S.logTimer); clearInterval(S.tickTimer);
+  document.querySelectorAll('section.panel').forEach(function(p){ p.hidden = p.getAttribute('data-step') !== 'msg'; });
+  $('foot').hidden = true;
+  var p = document.querySelector('section[data-step="msg"]');
+  p.innerHTML = kind === 'expired'
+    ? '<div class="center" role="alert">' + ICON.lock + '<h1>Setup link expired or invalid</h1><p class="lead" style="max-width:460px;margin:8px auto 0">Use the link printed by the installer on the server console. It contains a one-time token and is only valid for this setup session.</p></div>'
+    : '<div class="center" role="alert">' + ICON.lock + '<h1>Setup service unavailable</h1><p class="lead" style="max-width:480px;margin:8px auto 18px">' + esc(detail) + '</p><button type="button" class="btn primary" id="reloadBtn">Try again</button></div>';
+  if ($('reloadBtn')) $('reloadBtn').addEventListener('click', function(){ p.hidden = true; $('foot').hidden = false; load(); });
+}
+
+/* ---------- routing by phase ---------- */
+function route(st){
+  if (S.dead) return;
+  if (st.phase === 'done') return enterReady(st);
+  if (st.phase === 'installing' || st.phase === 'failed') {
+    if (S.step !== 5) enterInstall();
+    renderStepper(); renderInstall(st);
+    if (st.phase === 'failed') stopPolling();
+    return;
+  }
+  renderChecks(st);
+  if (S.step === 0) go(0);
+}
+function load(){
+  api('GET', '/api/state').then(function(st){ S.state = st; route(st); })
+    .catch(function(err){ if (err.status !== 401) showMessage('down', err.message); });
+}
+
+/* ---------- dev mock (?mock=1, ?mock=fail) ---------- */
+var M = null;
+function mockApi(method, path, body){
+  if (!M) M = {phase:'ready', idx:-1, failAt: params.get('mock') === 'fail' ? 3 : -1, log:['[setup] wizard opened'], result:null, timer:null,
+    steps:[['preflight','System preflight'],['database','Database'],['images','Load application images'],['lanes','Pentest lanes'],['certificate','TLS certificate'],
+           ['tenant','Create tenant'],['admin','Administrator account'],['services','Start services'],['health','Health check']]};
+  return new Promise(function(resolve, reject){ setTimeout(function(){ try { resolve(mockHandle(method, path, body)); } catch (e) { reject(e); } }, 250); });
+}
+function mockStep(){
+  if (M.phase !== 'installing') return clearInterval(M.timer);
+  if (M.idx === M.failAt) { M.phase = 'failed'; M.failAt = -1; M.log.push('ERROR: ' + M.steps[M.idx][1] + ': docker load exited with status 1 (no space left on device)'); return clearInterval(M.timer); }
+  M.log.push('=== [' + new Date().toTimeString().slice(0, 8) + '] ' + M.steps[M.idx][0] + ' ok');
+  M.idx++;
+  if (M.idx >= M.steps.length) { M.phase = 'done'; M.result = {url:'https://' + M.host, admin_email:M.email, admin_password:'Kq7v-2mXp-9TzR-4bLw'}; return clearInterval(M.timer); }
+  for (var i = 0; i < 3; i++) M.log.push('  ' + M.steps[M.idx][0] + ': ' + ['preparing', 'applying configuration', 'verifying'][i]);
+}
+function mockHandle(method, path, body){
+  if (path === '/api/state') return {phase:M.phase, version:'da4e82b', suggested_host:'10.0.0.5', lanes_included:true,
+    checks:{os:'Ubuntu 24.04.1 LTS', cpu:8, ram_gb:31, disk_free_gb:480, ok:true, warnings:['Swap is disabled; 4 GB swap is recommended for large scans.']},
+    steps:M.steps.map(function(s, i){ return {key:s[0], label:s[1], status: M.idx < 0 || i > M.idx ? 'pending' : i < M.idx ? 'done' : M.phase === 'failed' ? 'failed' : 'running'}; }),
+    error: M.phase === 'failed' ? 'Step "' + M.steps[M.idx][1] + '" failed: no space left on device while loading images.' : null, result:M.result};
+  if (path.indexOf('/api/log') === 0) return M.log.slice(-60).join('\n');
+  if (path === '/api/install') {
+    if (body.get('slug') === 'admin') throw new ApiError(400, 'Tenant ID "admin" is reserved; choose another.', {error:'reserved'});
+    M.host = body.get('host'); M.email = body.get('admin_email'); M.phase = 'installing'; M.idx = 0;
+    M.log.push('[setup] install requested for ' + body.get('org') + ' (' + body.get('slug') + ')');
+    M.timer = setInterval(mockStep, 1500); return {ok:true};
+  }
+  if (path === '/api/retry') { M.phase = 'installing'; M.log.push('[setup] retry requested'); M.timer = setInterval(mockStep, 1500); return {ok:true}; }
+  throw new ApiError(404, 'Not found');
+}
+
+/* ---------- boot ---------- */
+try { $('favicon').href = 'data:image/svg+xml,' + encodeURIComponent($('markTpl').innerHTML.trim()); } catch (e) {}
+go(0);
+$('next').disabled = true;
+load();
+})();
+</script>
+</body>
+</html>
