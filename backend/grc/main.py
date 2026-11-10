@@ -397,5 +397,36 @@ def root():
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "healthy"}
+def health_check(response: Response):
+    """Liveness + readiness. Probes the master DB and Redis broker so HA / monitoring
+    actually sees a dependency failure instead of a blind 'healthy'. Returns 503 with
+    per-component status when any dependency is down; stays fast with short timeouts."""
+    checks: dict[str, str] = {}
+    ok = True
+
+    try:
+        from sqlalchemy import text as _text
+        from grc.db import MasterSession
+        _m = MasterSession()
+        try:
+            _m.execute(_text("SELECT 1"))
+            checks["database"] = "ok"
+        finally:
+            _m.close()
+    except Exception as e:  # noqa: BLE001 — health must never raise
+        checks["database"] = f"error: {type(e).__name__}"
+        ok = False
+
+    try:
+        import redis as _redis
+        _url = os.environ.get("REDIS_URL") or os.environ.get("CELERY_BROKER_URL") or "redis://127.0.0.1:6379/0"
+        _c = _redis.Redis.from_url(_url, socket_connect_timeout=1, socket_timeout=1)
+        _c.ping()
+        checks["redis"] = "ok"
+    except Exception as e:  # noqa: BLE001
+        checks["redis"] = f"error: {type(e).__name__}"
+        ok = False
+
+    if not ok:
+        response.status_code = 503
+    return {"status": "healthy" if ok else "degraded", "checks": checks}
