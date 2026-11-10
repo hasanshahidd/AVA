@@ -17,6 +17,7 @@ testable in isolation.
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import logging
 import os
 from datetime import datetime
@@ -218,6 +219,7 @@ def escalate_assets(slug: str, asset_ids) -> Dict[str, Any]:
     return _run_escalation(slug, {"asset_ids": ids}, lambda _db: ids)
 
 
+@change_source("connector")
 def _dispatch_sync(adapter, conn: IntegrationConnection, db: Session) -> SyncResult:
     """Route to the right adapter call based on category."""
     cat = (conn.category or "").lower()
@@ -570,6 +572,7 @@ def _push_assets_as_cis(adapter, conn: IntegrationConnection, db: Session) -> Di
     connection. Idempotent via the stored cmdb.<provider>.ci_id marker; capped."""
     from ...models import ITAsset
     pushed = failed = 0
+    errors: List[str] = []
     assets = db.query(ITAsset).filter(ITAsset.tenant_id == conn.tenant_id).all()
     for a in assets:
         if pushed >= _PUSH_CAP:
@@ -577,9 +580,14 @@ def _push_assets_as_cis(adapter, conn: IntegrationConnection, db: Session) -> Di
         marker = ((getattr(a, "platform_properties", None) or {}).get("cmdb") or {}).get(conn.integration_type)
         if marker and marker.get("ci_id"):
             continue  # already in the CMDB
+        if not any(getattr(a, c, None) for c in ("host_name", "ip_address", "primary_mac", "serial_number", "fqdn")):
+            continue  # no hardware identity (apps, software, cloud services) — not a CMDB hardware CI
         try:
             ci_id = adapter.push_ci(a)
-            if ci_id and hasattr(a, "platform_properties"):
+            if not ci_id:
+                # No id → no idempotency marker → it would be re-created every sync.
+                raise RuntimeError("CMDB accepted the CI but returned no id; not marking as pushed")
+            if hasattr(a, "platform_properties"):
                 props = dict(getattr(a, "platform_properties", None) or {})
                 cmdb = dict(props.get("cmdb") or {})
                 cmdb[conn.integration_type] = {"ci_id": ci_id, "pushed": True}
@@ -589,7 +597,9 @@ def _push_assets_as_cis(adapter, conn: IntegrationConnection, db: Session) -> Di
             pushed += 1
         except NotImplementedError:
             break  # pull-only connector
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             db.rollback()
             failed += 1
-    return {"pushed": pushed, "failed": failed, "capped": pushed >= _PUSH_CAP}
+            if len(errors) < 5:
+                errors.append(f"{a.name}: {exc}")
+    return {"pushed": pushed, "failed": failed, "capped": pushed >= _PUSH_CAP, "errors": errors}

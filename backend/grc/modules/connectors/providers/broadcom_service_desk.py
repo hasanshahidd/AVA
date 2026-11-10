@@ -1,102 +1,63 @@
 """Broadcom Service Desk (CA Service Desk Manager / Clarity SM) adapter —
 two-way vulnerability ticketing.
 
-Pushes:
-  * Vulnerabilities / exceptions → an Incident on the configured object
-    (default the Incident area `in`).
+Pushes:   vulnerabilities / exceptions → an Incident (REST object ``in``).
+Pulls:    status (+ optional resolution text) for known ticket numbers,
+          normalised into our status taxonomy.
+Resolves: closing writes the resolved status and logs the resolution note as an
+          activity-log comment (``alg``, type LOG) on the ticket.
 
-Pulls back:
-  * The configured status field + resolution for known request numbers
-    (`ref_num`), normalised into our status taxonomy.
-
-Auth is CA SDM's REST access-key flow:
-  * `POST /caisd-rest/rest_access` (HTTP Basic: username + password) → a JSON
-    body `{"rest_access": {"access_key": "...", "@id": N}}`.
-  * Every subsequent call carries header `X-AccessKey: <access_key>`.
-  * A 401 triggers one re-login + retry. Access keys time out server-side on
-    their own, so there is no explicit logout.
-
-CA SDM object/area names, the status field and its values, and the SREL
-handles (priority, group, category) vary per instance, so they are
-operator-configurable (see META) rather than hardcoded — mirroring the
-BMC Helix adapter.
-
-API reference: https://techdocs.broadcom.com/us/en/ca-enterprise-software/business-management/ca-service-management/17-3.html
+Wire contract and auth live in ``_ca_sdm`` (shared with Broadcom CMDB).
+Object name, status values, group/category names and the affected end user
+vary per instance, so they are operator-configurable (see META).
 """
 from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Optional
 
-import requests
-
-from ..base import (
-    ConnectionTestResult,
-    TicketingAdapter,
-    TicketRequest,
-    TicketStatus,
-)
+from ..base import ConnectionTestResult, TicketingAdapter, TicketRequest, TicketStatus
 from ..registry import ProviderField, ProviderMeta
+from ._ca_sdm import CaSdmRestMixin, as_list, cn_path, srel, sym, wc_quote
 
 logger = logging.getLogger(__name__)
 
-_HTTP_TIMEOUT = 30
-_REST = "/caisd-rest"
+# Our severity → CA SDM out-of-the-box priority (COMMON_NAME "1" highest … "5").
+_OUR_SEV_TO_CA_PRIORITY = {"critical": "1", "high": "2", "medium": "3", "low": "4", "info": "5"}
 
-# Our severity → CA SDM priority common name. CA SDM out-of-the-box priorities
-# are 1 (highest) … 5 (lowest); the `priority` attribute is an SREL, so we send
-# the common-name string and the operator can override the whole field via
-# `extra_fields` when their instance names priorities differently.
-_OUR_SEV_TO_CA_PRIORITY = {
-    "critical": "1",
-    "high": "2",
-    "medium": "3",
-    "low": "4",
-}
-
-# Default out-of-the-box CA SDM status symbols → our taxonomy. The
-# operator-configured open/resolved/closed values are layered on top of this
-# in `_normalise_status`, so a customised instance still maps correctly.
+# Out-of-the-box CA SDM status COMMON_NAMEs → our taxonomy. Operator-configured
+# open/resolved/closed values are layered on top in `_normalise_status`.
 _DEFAULT_STATUS_NORMALISED = {
-    "open": "new",
-    "new": "new",
-    "work in progress": "in_progress",
-    "in progress": "in_progress",
-    "wip": "in_progress",
-    "hold": "on_hold",
-    "pending": "on_hold",
-    "awaiting": "on_hold",
-    "resolved": "resolved",
-    "closed": "closed",
-    "cancelled": "cancelled",
-    "canceled": "cancelled",
+    "open": "new", "new": "new",
+    "acknowledged": "in_progress", "work in progress": "in_progress", "in progress": "in_progress",
+    "researching": "in_progress", "wip": "in_progress",
+    "hold": "on_hold", "pending": "on_hold", "awaiting end user response": "on_hold",
+    "resolved": "resolved", "problem-fixed": "resolved", "avoided": "resolved",
+    "closed": "closed", "closed-unresolved": "closed",
+    "cancelled": "cancelled", "canceled": "cancelled",
 }
 
-_DEFAULT_INCIDENT_OBJECT = "in"   # CA SDM REST area for Incidents
-_DEFAULT_STATUS_FIELD = "status"
-_DEFAULT_REF_FIELD = "ref_num"
-_DEFAULT_RESOLUTION_FIELD = "resolution"
+_DEFAULT_OBJECT = "in"
+_STATUS_BATCH = 25
 
 
-class BroadcomServiceDeskAdapter(TicketingAdapter):
+class BroadcomServiceDeskAdapter(CaSdmRestMixin, TicketingAdapter):
     provider = "broadcom_service_desk"
+    product_label = "Broadcom Service Desk"
 
-    # ─── Config accessors ───────────────────────────────────────────
+    # ─── Config ─────────────────────────────────────────────────────
 
     def _object(self) -> str:
-        return self.config.get("incident_object") or _DEFAULT_INCIDENT_OBJECT
+        return (self.config.get("incident_object") or _DEFAULT_OBJECT).strip()
 
     def _status_field(self) -> str:
-        return self.config.get("status_field") or _DEFAULT_STATUS_FIELD
+        return (self.config.get("status_field") or "status").strip()
 
     def _ref_field(self) -> str:
-        return self.config.get("ref_field") or _DEFAULT_REF_FIELD
+        return (self.config.get("ref_field") or "ref_num").strip()
 
-    def _resolution_field(self) -> str:
-        return self.config.get("resolution_field") or _DEFAULT_RESOLUTION_FIELD
-
-    def _assignment_group(self, override: Optional[str]) -> Optional[str]:
-        return override or self.config.get("assignment_group") or self.config.get("default_group")
+    def _resolution_field(self) -> Optional[str]:
+        return (self.config.get("resolution_field") or "").strip() or None
 
     def _normalise_status(self, raw: Optional[str]) -> str:
         s = (raw or "").strip().lower()
@@ -108,241 +69,156 @@ class BroadcomServiceDeskAdapter(TicketingAdapter):
             (self.config.get("status_closed") or "").strip().lower(): "closed",
         }
         overrides.pop("", None)
-        return overrides.get(s) or _DEFAULT_STATUS_NORMALISED.get(s, "new")
+        return overrides.get(s) or _DEFAULT_STATUS_NORMALISED.get(s, "in_progress")
 
-    # ─── Auth ───────────────────────────────────────────────────────
-
-    def _login(self) -> str:
-        token = self.oauth_tokens.get("access_key")
-        if token:
-            return token
-        user = self.credentials.get("username")
-        pwd = self.credentials.get("password")
-        if not (user and pwd):
-            raise RuntimeError("Broadcom Service Desk credentials missing username/password")
-        resp = requests.post(
-            f"{self.console_url}{_REST}/rest_access",
-            auth=(user, pwd),
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
-            json={"rest_access": {}},
-            verify=self.verify_ssl,
-            timeout=_HTTP_TIMEOUT,
-        )
-        if resp.status_code not in (200, 201):
-            # Never echo the credentials; only the server's own reply.
+    def _customer_ref(self) -> Dict[str, str]:
+        """Affected end user (mandatory on CA SDM incidents) as an SREL by
+        contact id. Defaults to the integration service account's own contact."""
+        cached = self.oauth_tokens.get("customer_id")
+        if cached:
+            return {"@id": cached}
+        userid = (self.config.get("customer_userid") or self.credentials.get("username") or "").strip()
+        rows, _ = self._collection("cnt", attrs=["userid"], wc=f"userid='{wc_quote(userid)}'", size=1)
+        if not rows or not rows[0].get("@id"):
             raise RuntimeError(
-                f"Broadcom Service Desk login failed ({resp.status_code}): {resp.text[:200]}"
-            )
-        body = resp.json() if resp.text else {}
-        key = (body.get("rest_access") or {}).get("access_key")
-        if not key:
-            raise RuntimeError("Broadcom Service Desk login returned no access_key")
-        self.oauth_tokens["access_key"] = key
-        return key
+                f"Broadcom Service Desk: no contact with userid '{userid}' — set 'Affected end user' to a valid userid")
+        self.oauth_tokens["customer_id"] = str(rows[0]["@id"])
+        return {"@id": self.oauth_tokens["customer_id"]}
 
-    def _request(self, method: str, path: str, **kwargs) -> requests.Response:
-        """Issue an access-key'd request, re-logging-in + retrying once on 401."""
-        url = f"{self.console_url}{_REST}{path}"
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
-        headers.update(kwargs.pop("headers", None) or {})
-        kwargs.setdefault("timeout", _HTTP_TIMEOUT)
-        kwargs.setdefault("verify", self.verify_ssl)
-
-        resp: Optional[requests.Response] = None
-        for attempt in (1, 2):
-            headers["X-AccessKey"] = self._login()
-            resp = requests.request(method, url, headers=headers, **kwargs)
-            if resp.status_code == 401 and attempt == 1:
-                self.oauth_tokens.pop("access_key", None)  # force re-login + retry
-                continue
-            return resp
-        return resp  # type: ignore[return-value]
-
-    # ─── BaseConnectorAdapter ───────────────────────────────────────
+    # ─── Connection test: auth + read tickets + resolve the end user ─
 
     def test_connection(self) -> ConnectionTestResult:
         try:
-            key = self._login()
+            read = self._test_read(self._object())
+            self._customer_ref()
             return ConnectionTestResult(
                 success=True,
-                message="Authenticated to Broadcom Service Desk successfully.",
-                details={"access_key_acquired": bool(key)},
+                message=(f"Connected to Broadcom Service Desk: authenticated, read access to "
+                         f"'{read['object']}' ({read['total_records'] if read['total_records'] is not None else '?'} records), "
+                         f"affected end user resolved."),
+                details=read,
             )
-        except Exception as exc:
-            logger.exception("Broadcom Service Desk test_connection failed")
+        except Exception as exc:  # noqa: BLE001 — surface the reason to the operator
+            logger.warning("Broadcom Service Desk test_connection failed: %s", exc)
             return ConnectionTestResult(success=False, message=str(exc))
 
     # ─── TicketingAdapter ───────────────────────────────────────────
 
     def create_ticket(self, request: TicketRequest) -> str:
         obj = self._object()
-        ref_field = self._ref_field()
         values: Dict[str, Any] = {
             "summary": (request.summary or "")[:240],
-            "description": request.description,
-            "priority": _OUR_SEV_TO_CA_PRIORITY.get((request.severity or "").lower(), "3"),
+            "description": request.description or "",
+            "priority": srel(_OUR_SEV_TO_CA_PRIORITY.get((request.severity or "").lower(), "3")),
+            "customer": self._customer_ref(),
         }
-        status_open = self.config.get("status_open")
-        if status_open:
-            values["status"] = status_open
-        category = self.config.get("default_category")
-        if category:
-            values["category"] = category
-        ag = self._assignment_group(request.assignment_group)
-        if ag:
-            values["group"] = ag
-        # Operator-supplied field overrides win (required fields + SREL handle
-        # formats differ per instance).
-        values.update(request.extra_fields or {})
+        if self.config.get("status_open"):
+            values[self._status_field()] = srel(self.config["status_open"])
+        if self.config.get("default_category"):
+            values["category"] = srel(self.config["default_category"])
+        group = request.assignment_group or self.config.get("default_group")
+        if group:
+            values["group"] = srel(group)
+        values.update(request.extra_fields or {})   # operator overrides win
 
-        resp = self._request("POST", f"/{obj}", json={obj: values})
+        resp = self._request("POST", f"/{obj}", attrs=[self._ref_field()], json={obj: values})
         if resp.status_code not in (200, 201):
-            raise RuntimeError(
-                f"Broadcom Service Desk create_ticket failed ({resp.status_code}): {resp.text[:300]}"
-            )
-        body = resp.json() if resp.text else {}
-        rec = body.get(obj) or body
-        number = rec.get(ref_field) or rec.get("id") or rec.get("persistent_id")
+            raise RuntimeError(f"Broadcom Service Desk create_ticket failed ({resp.status_code}): {resp.text[:300]}")
+        rec = (resp.json() if resp.text else {}).get(obj) or {}
+        number = rec.get(self._ref_field()) or rec.get("@COMMON_NAME")
         if not number:
-            raise RuntimeError("Broadcom Service Desk returned no ref_num / id")
+            raise RuntimeError("Broadcom Service Desk returned no ticket number")
         return str(number)
 
     def update_ticket(self, external_id: str, fields: Dict[str, Any]) -> bool:
+        return self._put(external_id, fields) is not None
+
+    def _put(self, external_id: str, fields: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         obj = self._object()
-        # CA SDM REST updates an object by POSTing the changed attributes to its
-        # ref_num-scoped URL.
-        resp = self._request(
-            "POST",
-            f"/{obj}/{external_id}",
-            json={obj: fields},
-        )
+        resp = self._request("PUT", cn_path(obj, external_id), json={obj: fields})
         if resp.status_code in (200, 204):
-            return True
+            return (resp.json() if resp.text else {}).get(obj) or {}
         if resp.status_code == 404:
-            logger.warning("Broadcom Service Desk update_ticket: %s not found", external_id)
-            return False
-        raise RuntimeError(
-            f"Broadcom Service Desk update_ticket failed ({resp.status_code}): {resp.text[:300]}"
-        )
+            logger.warning("Broadcom Service Desk: ticket %s not found", external_id)
+            return None
+        raise RuntimeError(f"Broadcom Service Desk update_ticket failed ({resp.status_code}): {resp.text[:300]}")
 
     def close_ticket(self, external_id: str, resolution_note: str) -> bool:
-        resolved = self.config.get("status_resolved") or "Resolved"
-        return self.update_ticket(external_id, {
-            self._status_field(): resolved,
-            self._resolution_field(): resolution_note,
-        })
+        fields: Dict[str, Any] = {self._status_field(): srel(self.config.get("status_resolved") or "Resolved")}
+        if self._resolution_field():
+            fields[self._resolution_field()] = resolution_note
+        rec = self._put(external_id, fields)
+        if rec is None:
+            return False
+        if resolution_note and rec.get("@id"):
+            self._log_comment(rec["@id"], resolution_note)
+        return True
+
+    def _log_comment(self, ticket_id: str, text: str) -> None:
+        """Best-effort activity-log comment; the status change already landed."""
+        try:
+            resp = self._request("POST", "/alg", json={"alg": {
+                "call_req_id": {"@id": str(ticket_id)}, "type": {"@REL_ATTR": "LOG"},
+                "description": text[:4000]}})
+            if resp.status_code not in (200, 201):
+                logger.warning("Broadcom Service Desk: resolution comment not logged (%s)", resp.status_code)
+        except Exception:  # noqa: BLE001
+            logger.warning("Broadcom Service Desk: resolution comment not logged", exc_info=True)
 
     def fetch_statuses(self, external_ids: List[str]) -> List[TicketStatus]:
-        if not external_ids:
+        ids = [str(x) for x in external_ids if x]
+        if not ids:
             return []
-        obj = self._object()
-        ref_field = self._ref_field()
-        status_field = self._status_field()
-        resolution_field = self._resolution_field()
-        results: List[TicketStatus] = []
-
-        # One WHERE per ref_num keeps the query simple and instance-portable
-        # (CA SDM WHERE clauses don't take an IN list of strings reliably).
-        for ext in external_ids:
-            resp = self._request(
-                "GET",
-                f"/{obj}",
-                params={"WHERE": f"{ref_field} = '{_escape(ext)}'"},
-            )
-            if resp.status_code == 404:
-                continue
-            if resp.status_code != 200:
-                raise RuntimeError(
-                    f"Broadcom Service Desk fetch_statuses failed ({resp.status_code}): "
-                    f"{resp.text[:300]}"
-                )
-            body = resp.json() if resp.text else {}
-            # A collection comes back under the pluralised object key; be lenient.
-            rows = body.get("collection", {}).get(obj) if isinstance(body.get("collection"), dict) else None
-            if rows is None:
-                rows = body.get(obj)
-            for rec in _as_list(rows):
-                raw_status = _sym(rec.get(status_field))
-                results.append(TicketStatus(
-                    external_id=str(rec.get(ref_field) or ext),
-                    status=raw_status,
-                    normalised_status=self._normalise_status(raw_status),
-                    resolution_note=rec.get(resolution_field),
-                    extra={status_field: raw_status},
+        obj, ref_f, st_f, res_f = self._object(), self._ref_field(), self._status_field(), self._resolution_field()
+        attrs = [ref_f, st_f] + ([res_f] if res_f else [])
+        out: List[TicketStatus] = []
+        for i in range(0, len(ids), _STATUS_BATCH):
+            chunk = ids[i:i + _STATUS_BATCH]
+            wc = " OR ".join(f"{ref_f}='{wc_quote(x)}'" for x in chunk)
+            rows, _ = self._collection(obj, attrs=attrs, wc=wc, size=len(chunk))
+            for rec in as_list(rows):
+                raw = sym(rec.get(st_f))
+                out.append(TicketStatus(
+                    external_id=str(rec.get(ref_f) or rec.get("@COMMON_NAME") or ""),
+                    status=raw, normalised_status=self._normalise_status(raw),
+                    resolution_note=(sym(rec.get(res_f)) or None) if res_f else None,
+                    extra={st_f: raw},
                 ))
-        return results
+        return out
 
 
-def _escape(value: str) -> str:
-    """Escape a value for a CA SDM WHERE clause (single-quote delimited)."""
-    return str(value).replace("'", "''")
-
-
-def _as_list(value: Any) -> List[Dict[str, Any]]:
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]
-
-
-def _sym(value: Any) -> str:
-    """CA SDM SREL attributes serialise as a nested object carrying a symbol
-    (`@COMMON_NAME` / `name` / `sym`). Flatten to the display string."""
-    if isinstance(value, dict):
-        return str(value.get("@COMMON_NAME") or value.get("name") or value.get("sym") or "")
-    return str(value or "")
+def _f(key, label, **kw) -> ProviderField:
+    kw.setdefault("is_credential", False)
+    kw.setdefault("required", False)
+    kw.setdefault("kind", "text")
+    return ProviderField(key=key, label=label, **kw)
 
 
 META = ProviderMeta(
     provider="broadcom_service_desk",
     label="Broadcom Service Desk",
     category="ticketing",
-    description="Two-way ticket sync with Broadcom Service Desk (CA SDM / Clarity SM). Push vulnerabilities as Incidents; resolutions sync back.",
+    description="Two-way ticket sync with Broadcom Service Desk (CA SDM / Clarity SM). Push vulnerabilities as Incidents; status and resolutions sync back.",
     auth_method="basic",
     fields=[
-        ProviderField(key="console_url", label="CA SDM REST base URL",
-                      kind="url", placeholder="https://servicedesk.example.com:8050",
-                      help_text="Base URL of your CA SDM REST endpoint (the host serving /caisd-rest).",
-                      is_credential=False),
-        ProviderField(key="username", label="Service account username",
-                      kind="text", required=True),
-        ProviderField(key="password", label="Service account password",
-                      kind="password", required=True),
-        ProviderField(key="incident_object", label="Incident object/area",
-                      kind="text", required=False, placeholder=_DEFAULT_INCIDENT_OBJECT,
-                      help_text="CA SDM REST object used for tickets. Default: in (Incident). Use cr for Requests.",
-                      is_credential=False),
-        ProviderField(key="default_group", label="Default assignment group",
-                      kind="text", required=False,
-                      help_text="Tickets without a per-request group fall back to this group's name.",
-                      is_credential=False),
-        ProviderField(key="default_category", label="Default category",
-                      kind="text", required=False,
-                      help_text="Category (area) name applied to created tickets, if your instance requires one.",
-                      is_credential=False),
-        ProviderField(key="status_open", label="Open status value",
-                      kind="text", required=False, placeholder="Open",
-                      help_text="Status symbol set on new tickets / treated as open. Default: Open.",
-                      is_credential=False),
-        ProviderField(key="status_resolved", label="Resolved status value",
-                      kind="text", required=False, placeholder="Resolved",
-                      help_text="Status symbol written when closing a ticket, mapped to 'resolved'. Default: Resolved.",
-                      is_credential=False),
-        ProviderField(key="status_closed", label="Closed status value",
-                      kind="text", required=False, placeholder="Closed",
-                      help_text="Status symbol mapped to 'closed' when syncing back. Default: Closed.",
-                      is_credential=False),
-        ProviderField(key="status_field", label="Status field name",
-                      kind="text", required=False, placeholder=_DEFAULT_STATUS_FIELD,
-                      help_text="Name of the status attribute on your instance. Default: status.",
-                      is_credential=False),
-        ProviderField(key="ref_field", label="Ticket number field name",
-                      kind="text", required=False, placeholder=_DEFAULT_REF_FIELD,
-                      help_text="Attribute holding the human ticket number used for sync-back queries. Default: ref_num.",
-                      is_credential=False),
-        ProviderField(key="resolution_field", label="Resolution field name",
-                      kind="text", required=False, placeholder=_DEFAULT_RESOLUTION_FIELD,
-                      help_text="Attribute holding the resolution note. Default: resolution.",
-                      is_credential=False),
+        _f("console_url", "CA SDM REST base URL", kind="url", required=True,
+           placeholder="https://servicedesk.example.com:8050",
+           help_text="Host and port serving /caisd-rest (CA SDM REST Web Services, default port 8050)."),
+        ProviderField(key="username", label="Service account username", kind="text", required=True),
+        ProviderField(key="password", label="Service account password", kind="password", required=True),
+        _f("customer_userid", "Affected end user (userid)",
+           help_text="Contact set as the incident's affected end user (mandatory in CA SDM). Defaults to the service account."),
+        _f("incident_object", "Ticket object", placeholder=_DEFAULT_OBJECT,
+           help_text="REST object for tickets: in (Incident, default), cr (Request), pr (Problem)."),
+        _f("default_group", "Default assignment group", help_text="Group name (as shown in CA SDM) for new tickets."),
+        _f("default_category", "Default category", help_text="Incident area / category name, e.g. Security.Vulnerability."),
+        _f("status_open", "Open status", placeholder="Open", help_text="Status name set on new tickets. Blank = CA SDM default."),
+        _f("status_resolved", "Resolved status", placeholder="Resolved", help_text="Status name written when CAIVA resolves a ticket."),
+        _f("status_closed", "Closed status", placeholder="Closed", help_text="Status name read back as closed."),
+        _f("status_field", "Status attribute", placeholder="status"),
+        _f("ref_field", "Ticket number attribute", placeholder="ref_num"),
+        _f("resolution_field", "Resolution text attribute",
+           help_text="Optional custom attribute that holds resolution text. The note is always logged as an activity comment."),
     ],
     adapter_cls=BroadcomServiceDeskAdapter,
     docs_url="https://techdocs.broadcom.com/us/en/ca-enterprise-software/business-management/ca-service-management/17-3.html",

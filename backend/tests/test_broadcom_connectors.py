@@ -1,246 +1,213 @@
-"""Self-tests for the two Broadcom connectors — CA SDM Service Desk (ticketing)
-and CA CMDB (asset import). All HTTP is mocked; no live Broadcom endpoint is
-required. Covers: access-key login, ticket create/status parsing, CI parsing,
-and the CI→asset field mapping (`_apply_ci`).
+"""End-to-end proof of the Broadcom connectors over real HTTP against a strict
+CA SDM REST mock (tests/ca_sdm_mock.py), with the real sync runner and the
+asset change journal on a real SQLAlchemy session.
+
+Service Desk: test-connection, ticket push (priority/customer/status SRELs),
+status + resolution sync-back, close with activity-log comment, access-key
+expiry → re-login, bad credentials / unreachable host.
+CMDB: test-connection, paged CI import matched on serial / MAC / hostname / IP,
+inactive CIs filtered, new CIs created, change journal labelled "connector",
+optional push-back (idempotent).
 """
-import json
+from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-from grc.modules.connectors.base import (
-    CmdbAdapter,
-    ConfigurationItem,
-    TicketingAdapter,
-    TicketRequest,
-)
-from grc.modules.connectors.providers import broadcom_service_desk as bsd
-from grc.modules.connectors.providers import broadcom_cmdb as bcm
+from grc.models import AuditLog, ITAsset
+from grc.modules.connectors import sync_runner
+from grc.modules.connectors.base import TicketRequest
+from grc.modules.connectors.providers.broadcom_cmdb import BroadcomCmdbAdapter
+from grc.modules.connectors.providers.broadcom_service_desk import BroadcomServiceDeskAdapter
 from grc.modules.connectors.registry import PROVIDER_REGISTRY
 
-
-class FakeResp:
-    def __init__(self, status=200, body=None, text=None):
-        self.status_code = status
-        self._body = body
-        self.text = text if text is not None else (json.dumps(body) if body is not None else "")
-        self.headers = {}
-
-    def json(self):
-        return self._body
+from tests import ca_sdm_mock as mock
 
 
-class FakeRequests:
-    """Stand-in for the `requests` module. `post` answers login; `request`
-    answers everything else, routed by (method, url) through `handler`."""
-    def __init__(self, handler):
-        self.handler = handler
-        self.calls = []
-
-    def post(self, url, **kw):
-        self.calls.append(("POST", url, kw))
-        return self.handler("POST", url, kw)
-
-    def request(self, method, url, **kw):
-        self.calls.append((method, url, kw))
-        return self.handler(method, url, kw)
+@pytest.fixture()
+def sdm():
+    srv, state, url = mock.serve()
+    yield state, url
+    srv.shutdown()
 
 
-# ── registry guard ───────────────────────────────────────────────────
+def _creds(pwd=mock.PASSWORD):
+    return {"username": mock.USER, "password": pwd}
 
-def test_both_providers_registered():
-    sd = PROVIDER_REGISTRY.get("broadcom_service_desk")
-    cm = PROVIDER_REGISTRY.get("broadcom_cmdb")
-    assert sd is not None and sd.category == "ticketing" and sd.beta is False
-    assert cm is not None and cm.category == "cmdb" and cm.beta is False
-    # Password must be a credential (encrypted), URL/config must not be.
-    assert {f.key: f.is_credential for f in sd.fields}["password"] is True
-    assert {f.key: f.is_credential for f in sd.fields}["console_url"] is False
+
+def _desk(url, **cfg):
+    return BroadcomServiceDeskAdapter(console_url=url, credentials=_creds(), config=cfg)
+
+
+def _cmdb(url, **cfg):
+    return BroadcomCmdbAdapter(console_url=url, credentials=_creds(), config=cfg)
+
+
+def test_both_providers_registered_not_beta():
+    for key, cat in (("broadcom_service_desk", "ticketing"), ("broadcom_cmdb", "cmdb")):
+        meta = PROVIDER_REGISTRY[key]
+        assert meta.category == cat and meta.beta is False
+        flags = {f.key: f.is_credential for f in meta.fields}
+        assert flags["password"] is True and flags["console_url"] is False
 
 
 # ── Service Desk ─────────────────────────────────────────────────────
 
-def _sd_adapter():
-    return bsd.BroadcomServiceDeskAdapter(
-        console_url="https://sd.example:8050",
-        credentials={"username": "svc", "password": "secret"},
-        config={"status_resolved": "Resolved"},
-    )
+def test_service_desk_test_connection(sdm):
+    _state, url = sdm
+    r = _desk(url).test_connection()
+    assert r.success, r.message
+    assert "read access to 'in'" in r.message
 
 
-def test_service_desk_login_and_create(monkeypatch):
-    def handler(method, url, kw):
-        if url.endswith("/rest_access"):
-            assert kw.get("auth") == ("svc", "secret")
-            return FakeResp(200, {"rest_access": {"access_key": "KEY123"}})
-        if method == "POST" and url.endswith("/caisd-rest/in"):
-            assert kw["headers"]["X-AccessKey"] == "KEY123"
-            assert kw["json"]["in"]["summary"].startswith("SQLi")
-            return FakeResp(201, {"in": {"ref_num": "I1234"}})
-        raise AssertionError(f"unexpected {method} {url}")
-
-    fake = FakeRequests(handler)
-    monkeypatch.setattr(bsd, "requests", fake)
-    a = _sd_adapter()
-    assert a.test_connection().success is True
-    num = a.create_ticket(TicketRequest(
-        kind="vulnerability", summary="SQLi on web01", description="d",
-        severity="critical", external_id="V1"))
-    assert num == "I1234"
+def test_service_desk_bad_password_and_unreachable(sdm):
+    _state, url = sdm
+    bad = BroadcomServiceDeskAdapter(console_url=url, credentials=_creds("wrong"), config={}).test_connection()
+    assert not bad.success and "login rejected (401)" in bad.message and "wrong" not in bad.message
+    down = _desk("http://127.0.0.1:9").test_connection()
+    assert not down.success and "cannot reach" in down.message
 
 
-def test_service_desk_fetch_statuses_normalises(monkeypatch):
-    def handler(method, url, kw):
-        if url.endswith("/rest_access"):
-            return FakeResp(200, {"rest_access": {"access_key": "K"}})
-        if method == "GET" and url.endswith("/caisd-rest/in"):
-            return FakeResp(200, {"collection": {"in": [
-                {"ref_num": "I1234", "status": {"@COMMON_NAME": "Resolved"}, "resolution": "patched"}
-            ]}})
-        raise AssertionError(f"unexpected {method} {url}")
+def test_service_desk_push_sync_back_and_close(sdm):
+    state, url = sdm
+    desk = _desk(url, default_group="Security Operations", default_category="Security.Vulnerability")
+    ref = desk.create_ticket(TicketRequest(summary="CVE-2024-6387 on web01", description="regreSSHion",
+                                           severity="critical", kind="vulnerability", external_id="7"))
+    row = next(r for r in state.objs["in"] if r["ref_num"] == ref)
+    assert row["priority"] == {"@COMMON_NAME": "1"}
+    assert row["group"] == {"@COMMON_NAME": "Security Operations"}
+    assert row["customer"]["@id"] == state.objs["cnt"][0]["@id"]   # resolved from the service account
 
-    monkeypatch.setattr(bsd, "requests", FakeRequests(handler))
-    a = _sd_adapter()
-    out = a.fetch_statuses(["I1234"])
-    assert len(out) == 1
-    assert out[0].external_id == "I1234"
-    assert out[0].normalised_status == "resolved"
-    assert out[0].resolution_note == "patched"
+    (st,) = desk.fetch_statuses([ref])
+    assert (st.external_id, st.status, st.normalised_status) == (ref, "Open", "new")
+
+    row["status"] = {"@COMMON_NAME": "Work In Progress"}             # analyst picks it up in CA SDM
+    assert desk.fetch_statuses([ref])[0].normalised_status == "in_progress"
+    row["status"] = {"@COMMON_NAME": "Resolved"}                     # analyst resolves it
+    assert desk.fetch_statuses([ref, "no-such"])[0].normalised_status == "resolved"
+
+    assert desk.close_ticket(ref, "Patched to OpenSSH 9.8p1") is True
+    assert row["status"] == {"@COMMON_NAME": "Resolved"}
+    (log,) = state.objs["alg"]
+    assert log["call_req_id"] == {"@id": row["@id"]} and "9.8p1" in log["description"]
+    assert desk.close_ticket("99999", "x") is False
 
 
-def test_service_desk_close_sets_resolved(monkeypatch):
-    seen = {}
+def test_service_desk_batches_status_queries(sdm):
+    state, url = sdm
+    desk = _desk(url)
+    refs = [desk.create_ticket(TicketRequest(summary=f"t{i}", description="", severity="low",
+                                             kind="vulnerability", external_id=str(i))) for i in range(30)]
+    before = sum(1 for r in state.requests if r == "GET in")
+    assert {s.external_id for s in desk.fetch_statuses(refs)} == set(refs)
+    assert sum(1 for r in state.requests if r == "GET in") - before == 2   # 25 + 5
 
-    def handler(method, url, kw):
-        if url.endswith("/rest_access"):
-            return FakeResp(200, {"rest_access": {"access_key": "K"}})
-        if method == "POST" and "/caisd-rest/in/" in url:
-            seen.update(kw["json"]["in"])
-            return FakeResp(200, {})
-        raise AssertionError(f"unexpected {method} {url}")
 
-    monkeypatch.setattr(bsd, "requests", FakeRequests(handler))
-    a = _sd_adapter()
-    assert a.close_ticket("I1234", "fixed") is True
-    assert seen["status"] == "Resolved"
-    assert seen["resolution"] == "fixed"
+def test_expired_access_key_relogs_once(sdm):
+    state, url = sdm
+    desk = _desk(url)
+    desk.test_connection()
+    logins = state.logins
+    state.expire_keys()
+    assert desk.fetch_statuses(["1"]) == []
+    assert state.logins == logins + 1
 
 
 # ── CMDB ─────────────────────────────────────────────────────────────
 
-def _cmdb_adapter(config=None):
-    return bcm.BroadcomCmdbAdapter(
-        console_url="https://sd.example:8050",
-        credentials={"username": "svc", "password": "secret"},
-        config=config or {},
-    )
+@pytest.fixture()
+def db(monkeypatch):
+    eng = create_engine("sqlite://")
+    ITAsset.__table__.metadata.create_all(eng, tables=[ITAsset.__table__, AuditLog.__table__])
+    import grc.services.asset_criticality as crit
+    monkeypatch.setattr(crit, "recompute_for_asset", lambda *a, **k: None)
+    s = sessionmaker(bind=eng, autoflush=False, future=True)()
+    yield s
+    s.close()
 
 
-def test_cmdb_fetch_cis_parses_and_paginates(monkeypatch):
-    def handler(method, url, kw):
-        if url.endswith("/rest_access"):
-            return FakeResp(200, {"rest_access": {"access_key": "K"}})
-        if method == "GET" and url.endswith("/caisd-rest/nr"):
-            # one short page → loop stops after first fetch
-            return FakeResp(200, {"collection": {"nr": [
-                {"id": "C1", "name": "web01", "dns_name": "web01.corp",
-                 "ip_address": "10.0.0.5", "mac_address": "AA:BB:CC",
-                 "serial_number": "SN1", "class": {"@COMMON_NAME": "Server"}},
-            ]}})
-        raise AssertionError(f"unexpected {method} {url}")
-
-    monkeypatch.setattr(bcm, "requests", FakeRequests(handler))
-    a = _cmdb_adapter()
-    cis = a.fetch_cis()
-    assert len(cis) == 1
-    ci = cis[0]
-    assert isinstance(ci, ConfigurationItem)
-    assert ci.source_id == "C1"
-    assert ci.host_name == "web01.corp"
-    assert ci.ip_address == "10.0.0.5"
-    assert ci.serial_number == "SN1"
-    assert ci.ci_type == "Server"
+def _seed_cis(state):
+    ci = lambda **kw: state.add("nr", {"delete_flag": 0, "is_ci": 1, "class": {"@COMMON_NAME": "Server"}, **kw})
+    ci(name="DB-PROD-01", serial_number="SN-123", system_name="dbprod01", alarm_id="10.0.0.5",
+       manufacturer={"@COMMON_NAME": "Dell"}, model={"@COMMON_NAME": "PowerEdge R750"},
+       location={"@COMMON_NAME": "London DC1"})
+    ci(name="Core switch", mac_address="AA:BB:CC:00:11:22", alarm_id="10.0.0.1")
+    ci(name="mail", system_name="MAIL01")
+    ci(name="Printer 4F", alarm_id="10.0.4.40", location={"@COMMON_NAME": "HQ Floor 4"})
+    ci(name="New SAN", serial_number="SAN-9", system_name="san01")
+    ci(name="Retired box", system_name="old01", delete_flag=1)
+    for i in range(120):                         # forces a second page (size=100)
+        ci(name=f"vm-{i:03d}", system_name=f"vm{i:03d}")
 
 
-def test_cmdb_push_ci(monkeypatch):
-    class DummyAsset:
-        name = "db01"; host_name = "db01.corp"; ip_address = "10.0.0.9"
-        primary_mac = None; serial_number = "SN9"; manufacturer = "Dell"; model = "R740"
-
-    def handler(method, url, kw):
-        if url.endswith("/rest_access"):
-            return FakeResp(200, {"rest_access": {"access_key": "K"}})
-        if method == "POST" and url.endswith("/caisd-rest/nr"):
-            vals = kw["json"]["nr"]
-            assert vals["name"] == "db01" and vals["serial_number"] == "SN9"
-            return FakeResp(201, {"nr": {"id": "NEWCI"}})
-        raise AssertionError(f"unexpected {method} {url}")
-
-    monkeypatch.setattr(bcm, "requests", FakeRequests(handler))
-    a = _cmdb_adapter()
-    assert a.push_ci(DummyAsset()) == "NEWCI"
+def _conn(**cfg):
+    return SimpleNamespace(id=1, tenant_id=1, category="cmdb", integration_type="broadcom_cmdb",
+                           provider_config=cfg, last_sync_at=None)
 
 
-def test_pull_only_push_raises():
-    # The base CmdbAdapter.push_ci default is pull-only.
-    class PullOnly(CmdbAdapter):
-        provider = "x"
-        def test_connection(self):  # pragma: no cover - not exercised
-            ...
-        def fetch_cis(self, *, since=None, limit=5000):
-            return []
-    with pytest.raises(NotImplementedError):
-        PullOnly(console_url="", credentials={}).push_ci(object())
+def test_cmdb_test_connection_counts_cis(sdm):
+    state, url = sdm
+    _seed_cis(state)
+    r = _cmdb(url).test_connection()
+    assert r.success and r.details["total_records"] == 126
 
 
-# ── CI → asset mapping (the sync fan-out helper) ─────────────────────
+def test_cmdb_import_matches_journals_and_filters(sdm, db):
+    state, url = sdm
+    _seed_cis(state)
+    a_serial = ITAsset(tenant_id=1, name="db-prod", asset_type="server", serial_number="SN-123")
+    a_mac = ITAsset(tenant_id=1, name="sw-core", asset_type="network", primary_mac="aa:bb:cc:00:11:22")
+    a_host = ITAsset(tenant_id=1, name="mail01", asset_type="server", host_name="mail01")
+    a_ip = ITAsset(tenant_id=1, name="prn", asset_type="printer", ip_address="10.0.4.40")
+    db.add_all([a_serial, a_mac, a_host, a_ip])
+    db.commit()
 
-def test_apply_ci_maps_fields_and_stamps_provenance():
-    from grc.modules.connectors.sync_runner import _apply_ci
+    res = sync_runner._dispatch_sync(_cmdb(url), _conn(), db)
+    assert res.success, res.errors
+    assert res.details["cmdb"] == {"fetched": 125, "created": 121, "updated": 4}
+    assert db.query(ITAsset).count() == 125                       # 4 matched + 121 new, none duplicated
+    assert db.query(ITAsset).filter(ITAsset.host_name == "old01").count() == 0   # inactive CI skipped
 
-    class DummyAsset:
-        asset_type = None
-        host_name = ip_address = fqdn = primary_mac = None
-        serial_number = manufacturer = model = location = os_version = None
-        source_system = last_seen_source = last_seen_at = origin_source = None
-        name = "web01"
-        platform_properties = None
+    db.refresh(a_serial)
+    assert (a_serial.manufacturer, a_serial.model, a_serial.location, a_serial.ip_address) == \
+        ("Dell", "PowerEdge R750", "London DC1", "10.0.0.5")
+    assert a_serial.platform_properties["cmdb"]["broadcom_cmdb"]["ci_type"] == "Server"
 
-    ci = ConfigurationItem(
-        source_id="C1", name="web01", ci_type="Server",
-        host_name="web01.corp", ip_address="10.0.0.5", mac_address="AA:BB",
-        serial_number="SN1", manufacturer="HP", model="DL380", os_name="RHEL 8",
-        location="DC1",
-    )
-    a = DummyAsset()
-    _apply_ci(a, ci, "broadcom_cmdb", "cmdb:broadcom_cmdb")
-
-    assert a.host_name == "web01.corp"
-    assert a.primary_mac == "AA:BB"
-    assert a.serial_number == "SN1"
-    assert a.os_version == "RHEL 8"
-    assert a.asset_type == "infrastructure"           # required col set on create
-    assert a.source_system == "broadcom_cmdb"
-    assert a.last_seen_source == "cmdb:broadcom_cmdb"
-    assert a.origin_source == "cmdb"
-    assert a.platform_properties["cmdb"]["broadcom_cmdb"]["ci_id"] == "C1"
+    rows = db.query(AuditLog).filter(AuditLog.action == "asset.updated").all()
+    assert {r.resource_id for r in rows} == {a_serial.id, a_mac.id, a_host.id, a_ip.id}
+    assert all(r.changes["source"] == "connector" for r in rows)
+    serial_row = next(r for r in rows if r.resource_id == a_serial.id)
+    by = {f["field"]: f for f in serial_row.changes["fields"]}
+    assert by["manufacturer"] == {"field": "manufacturer", "category": "platform", "old": None, "new": "Dell"}
+    assert by["ip_address"]["category"] == "identity"
 
 
-def test_apply_ci_never_blanks_existing():
-    from grc.modules.connectors.sync_runner import _apply_ci
+def test_cmdb_push_back_is_opt_in_and_idempotent(sdm, db):
+    state, url = sdm
+    _seed_cis(state)
+    db.add_all([ITAsset(tenant_id=1, name="caiva-only-01", asset_type="server", host_name="caivaonly01",
+                        ip_address="10.9.9.9"),
+                ITAsset(tenant_id=1, name="Payroll SaaS", asset_type="application")])  # no hardware identity
+    db.commit()
 
-    class DummyAsset:
-        asset_type = "application"
-        host_name = "keep.me"
-        ip_address = fqdn = primary_mac = None
-        serial_number = manufacturer = model = location = os_version = None
-        source_system = last_seen_source = last_seen_at = origin_source = None
-        name = "web01"
-        platform_properties = None
+    sync_runner._dispatch_sync(_cmdb(url), _conn(), db)
+    assert not any(r["name"] == "caiva-only-01" for r in state.objs["nr"])   # off by default
 
-    # CI provides no host_name → must NOT blank the existing one.
-    ci = ConfigurationItem(source_id="C2", name="web01", ip_address="10.0.0.6")
-    a = DummyAsset()
-    _apply_ci(a, ci, "broadcom_cmdb", "cmdb:broadcom_cmdb")
-    assert a.host_name == "keep.me"      # preserved
-    assert a.ip_address == "10.0.0.6"    # updated
-    assert a.asset_type == "application"  # not overwritten
+    res = sync_runner._dispatch_sync(_cmdb(url), _conn(push_assets="true"), db)
+    assert res.details["push"]["pushed"] == 1 and res.details["push"]["failed"] == 0
+    pushed = next(r for r in state.objs["nr"] if r["name"] == "caiva-only-01")
+    assert pushed["class"] == {"@COMMON_NAME": "Discovered Hardware"}
+    assert (pushed["system_name"], pushed["alarm_id"]) == ("caivaonly01", "10.9.9.9")
+
+    res2 = sync_runner._dispatch_sync(_cmdb(url), _conn(push_assets="true"), db)
+    assert res2.details["push"]["pushed"] == 0                                  # already linked
+    assert sum(r["name"] == "caiva-only-01" for r in state.objs["nr"]) == 1
+    assert sync_runner._cfg_truthy("false") is False
+
+
+def test_cmdb_paging_survives_a_server_size_cap(sdm):
+    state, url = sdm
+    _seed_cis(state)
+    state.max_size = 30                    # server returns 30 even though we ask for 100
+    assert len(_cmdb(url).fetch_cis()) == 125
