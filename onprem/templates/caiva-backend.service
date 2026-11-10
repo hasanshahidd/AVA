@@ -1,0 +1,14 @@
+[Unit]
+Description=CAIVA backend (FastAPI :4000)
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+WorkingDirectory=/opt/caiva/backend
+EnvironmentFile=/opt/caiva/backend/.env
+ExecStart=/opt/caiva/backend/venv/bin/uvicorn main:app --host 127.0.0.1 --port 4000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

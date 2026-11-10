@@ -1,0 +1,13 @@
+[Unit]
+Description=CAIVA frontend (Next.js :3000)
+After=network.target caiva-backend.service
+
+[Service]
+WorkingDirectory=/opt/caiva/grc-frontend
+EnvironmentFile=/opt/caiva/grc-frontend/.env.production.local
+ExecStart=/usr/bin/node /opt/caiva/grc-frontend/node_modules/next/dist/bin/next start -p 3000 -H 127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
