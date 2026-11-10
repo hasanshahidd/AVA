@@ -10,8 +10,14 @@ from ..schemas import (
     MessageResponse
 )
 from .auth_router import require_auth
+# Writes to the tenant registry are admin-only. require_permission grants the
+# Administrator role and the tenant's primary-contact admin, and 403s everyone
+# else — before, any authenticated user could create / edit / delete tenants.
+from .admin_router import require_permission
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
+
+_MANAGE_TENANTS = "admin:tenants:manage"
 
 
 @router.get("", response_model=List[TenantResponse])
@@ -29,7 +35,7 @@ def list_tenants(
 def create_tenant(
     tenant: TenantCreate,
     db: Session = Depends(get_db),
-    current_user: GRCUser = Depends(require_auth)
+    _admin: TenantUser = Depends(require_permission(_MANAGE_TENANTS))
 ):
     existing = db.query(Tenant).filter(Tenant.slug == tenant.slug).first()
     if existing:
@@ -73,7 +79,7 @@ def update_tenant(
     tenant_id: int,
     tenant_update: TenantUpdate,
     db: Session = Depends(get_db),
-    current_user: GRCUser = Depends(require_auth)
+    _admin: TenantUser = Depends(require_permission(_MANAGE_TENANTS))
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -106,7 +112,7 @@ def update_tenant(
 def delete_tenant(
     tenant_id: int,
     db: Session = Depends(get_db),
-    current_user: GRCUser = Depends(require_auth)
+    _admin: TenantUser = Depends(require_permission(_MANAGE_TENANTS))
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -174,7 +180,7 @@ def add_user_to_tenant(
     tenant_id: int,
     tenant_user: TenantUserCreate,
     db: Session = Depends(get_db),
-    current_user: GRCUser = Depends(require_auth)
+    _admin: TenantUser = Depends(require_permission(_MANAGE_TENANTS))
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -251,7 +257,7 @@ def create_business_unit(
     tenant_id: int,
     business_unit: BusinessUnitCreate,
     db: Session = Depends(get_db),
-    current_user: GRCUser = Depends(require_auth)
+    _admin: TenantUser = Depends(require_permission(_MANAGE_TENANTS))
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
