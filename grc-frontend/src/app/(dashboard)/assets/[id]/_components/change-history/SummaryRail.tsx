@@ -9,7 +9,7 @@
 import type { ReactNode } from 'react';
 import {
   ACCENT, BORDER, BRAND, FAINT, INK, MUTED, SEC, type Filters, type Summary,
-  categoryMeta, fieldLabel, fmtDate, sourceMeta,
+  categoryMeta, fmtDate, sourceMeta,
 } from './model';
 
 const CARD = 'rounded-[12px] bg-white';
@@ -96,7 +96,7 @@ export default function SummaryRail({ summary, filters, onFilter }: {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Changes" value={s.entries} sub={`${s.fieldChanges} field edits`} />
+        <Stat label="Changes" value={s.entries} sub={`${s.fieldChanges} field-level changes`} />
         <Stat label="Contributors" value={s.byActor.length} sub={`${s.bySource.length} source${s.bySource.length === 1 ? '' : 's'}`} />
         <Stat label="First change" value={<span className="text-[14px]">{fmtDate(s.first)}</span>} />
         <Stat label="Latest change" value={<span className="text-[14px]">{fmtDate(s.last)}</span>} />
@@ -106,7 +106,7 @@ export default function SummaryRail({ summary, filters, onFilter }: {
         <Bars max={srcMax} active={filters.source} onPick={(k) => onFilter({ source: k })}
           rows={s.bySource.map(([k, n]) => ({ key: k, label: sourceMeta(k).label, color: sourceMeta(k).color, count: n }))} />
       </Panel>
-      <Panel title="By category (field edits)">
+      <Panel title="By category">
         <Bars max={catMax} active={filters.category} onPick={(k) => onFilter({ category: k })}
           rows={s.byCategory.map(([k, n]) => ({ key: k, label: categoryMeta(k).label, color: categoryMeta(k).color, count: n }))} />
       </Panel>
@@ -114,8 +114,8 @@ export default function SummaryRail({ summary, filters, onFilter }: {
         <Bars max={actMax} active={filters.actor} onPick={(k) => onFilter({ actor: k })}
           rows={s.byActor.slice(0, 8).map(([k, n]) => ({ key: k, label: k, color: '#4A6A85', count: n }))} />
       </Panel>
-      <Panel title="Most-changed fields">
-        <Bars max={fldMax} active="" rows={s.topFields.map(([k, n]) => ({ key: k, label: fieldLabel(k), color: ACCENT, count: n }))} />
+      <Panel title="Most-changed fields & sections">
+        <Bars max={fldMax} active="" rows={s.topFields.map(([k, n]) => ({ key: k, label: k, color: ACCENT, count: n }))} />
       </Panel>
     </div>
   );

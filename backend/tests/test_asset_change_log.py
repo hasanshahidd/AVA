@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import AuditLog, ITAsset
 from grc.services.asset_change_log import (
-    CATEGORIES, FIELD_CATEGORIES, TRACKED_FIELDS, change_source, mark_source,
+    CATEGORIES, COLUMN_CATEGORIES, SECTION_CATEGORIES, TRACKED_COLUMNS, change_source, mark_source,
 )
 
 
@@ -30,10 +30,14 @@ def _rows(db):
     return db.query(AuditLog).filter(AuditLog.action == "asset.updated").order_by(AuditLog.id).all()
 
 
-def test_every_tracked_field_is_categorised():
-    assert len(TRACKED_FIELDS) == 37
-    assert set(FIELD_CATEGORIES.values()) == set(CATEGORIES)
-    assert all(hasattr(ITAsset, f) for f in TRACKED_FIELDS)
+def test_every_asset_column_is_journalled_and_categorised():
+    # Every column except bookkeeping is tracked, and each has an explicit
+    # asset-record category (a new column must be filed, not land in "other").
+    assert {"platform_properties", "security_posture", "purchase_cost", "owning_team_id"} <= set(TRACKED_COLUMNS)
+    assert not {"id", "tenant_id", "created_at", "last_seen_at"} & set(TRACKED_COLUMNS)
+    uncategorised = [c for c in TRACKED_COLUMNS if c != "platform_properties" and c not in COLUMN_CATEGORIES]
+    assert uncategorised == []
+    assert set(COLUMN_CATEGORIES.values()) | set(SECTION_CATEGORIES.values()) <= set(CATEGORIES)
 
 
 def test_context_label_and_exact_old_values_after_commit(db):
@@ -45,7 +49,8 @@ def test_context_label_and_exact_old_values_after_commit(db):
     assert row.resource_type == "it_asset" and row.resource_id == a.id
     assert row.changes["source"] == "discovery"
     by = {f["field"]: f for f in row.changes["fields"]}
-    assert by["os_version"] == {"field": "os_version", "category": "platform", "old": None, "new": "22.04"}
+    assert by["os_version"] == {"field": "os_version", "section": "os_version", "category": "software",
+                                "change": "changed", "old": None, "new": "22.04"}
     assert by["primary_mac"]["category"] == "identity"
 
 
@@ -56,7 +61,8 @@ def test_explicit_mark_carries_actor(db):
     db.commit()
     (row,) = _rows(db)
     assert (row.user_id, row.changes["source"]) == (7, "manual")
-    assert row.changes["fields"][0] == {"field": "name", "category": "identity", "old": "web01", "new": "web01-renamed"}
+    f = row.changes["fields"][0]
+    assert (f["field"], f["category"], f["old"], f["new"]) == ("name", "identity", "web01", "web01-renamed")
 
 
 def test_decorated_writer_labels_its_changes(db):
@@ -81,7 +87,7 @@ def test_unlabelled_change_outside_request_is_system(db):
 def test_no_row_for_noop_or_untracked_change(db):
     a = _asset(db, status="active")
     a.status = "active"
-    a.platform_properties = {"x": 1}  # untracked column
+    a.last_seen_source = "agent"      # bookkeeping column, not journalled
     db.commit()
     assert _rows(db) == []
 
@@ -120,9 +126,80 @@ def test_label_never_leaks_onto_a_later_change(db):
 
 def test_listener_failure_never_breaks_the_write(db, monkeypatch):
     import grc.services.asset_change_log as acl
-    monkeypatch.setattr(acl, "_field_changes", lambda a: 1 / 0)
+    monkeypatch.setattr(acl, "diff_asset", lambda a: 1 / 0)
     a = _asset(db)
     a.location = "HQ"
     db.commit()                            # the asset write still lands
     db.refresh(a)
     assert a.location == "HQ" and _rows(db) == []
+
+
+def _pp(**sections):
+    return {k: {"status": "discovered", "collected_at": "t0", "data": v} for k, v in sections.items()}
+
+
+def test_telemetry_is_deep_diffed_by_asset_record_category(db):
+    a = _asset(db, platform_properties=_pp(
+        cpu={"model": "Xeon E5", "cores": 8, "load_percentage": 12},
+        memory={"total_gb": 32, "available_gb": 20},
+        packages={"items": [{"name": "openssl", "version": "3.0.2"}, {"name": "curl", "version": "7.81"}]},
+        defender={"real_time_protection_enabled": True},
+        local_users=[{"name": "admin", "enabled": True}],
+        identity={"uptime_hours": 10, "bios_version": "1.2"},
+    ))
+    with change_source("scan"):
+        a.platform_properties = _pp(
+            cpu={"model": "Xeon E5", "cores": 16, "load_percentage": 88},          # cores real, load volatile
+            memory={"total_gb": 32, "available_gb": 2},                           # volatile only
+            packages={"items": [{"name": "openssl", "version": "3.0.13"},          # upgraded
+                                {"name": "nginx", "version": "1.24"}]},            # curl removed, nginx added
+            defender={"real_time_protection_enabled": False},
+            local_users=[{"name": "admin", "enabled": True}, {"name": "svc_backup", "enabled": True}],
+            identity={"uptime_hours": 99, "bios_version": "1.2"},                 # volatile only
+        )
+    db.commit()
+    (row,) = _rows(db)
+    by = {f["field"]: f for f in row.changes["fields"]}
+    assert set(by) == {
+        "cpu.data.cores", "packages.data.items[openssl].version", "packages.data.items[curl]",
+        "packages.data.items[nginx]", "defender.data.real_time_protection_enabled", "local_users.data[svc_backup]",
+    }
+    assert by["cpu.data.cores"]["category"] == "hardware"
+    assert by["packages.data.items[openssl].version"] == {
+        "field": "packages.data.items[openssl].version", "section": "packages", "category": "software",
+        "change": "changed", "old": "3.0.2", "new": "3.0.13"}
+    assert (by["packages.data.items[curl]"]["change"], by["packages.data.items[curl]"]["old"]) == ("removed", "curl 7.81")
+    assert (by["packages.data.items[nginx]"]["change"], by["packages.data.items[nginx]"]["new"]) == ("added", "nginx 1.24")
+    assert by["defender.data.real_time_protection_enabled"]["category"] == "security"
+    assert by["local_users.data[svc_backup]"]["change"] == "added"
+    assert row.changes["sections"]["packages"] == {"category": "software", "added": 1, "removed": 1, "changed": 1}
+    assert row.changes["source"] == "scan" and row.changes["total_fields"] == 6
+
+
+def test_volatile_only_rescan_writes_nothing(db):
+    a = _asset(db, platform_properties=_pp(memory={"total_gb": 32, "free_gb": 9}, identity={"uptime_hours": 1}))
+    a.platform_properties = _pp(memory={"total_gb": 32, "free_gb": 3}, identity={"uptime_hours": 50})
+    db.commit()
+    assert _rows(db) == []
+
+
+def test_business_procurement_and_json_columns(db):
+    a = _asset(db, known_ips=["10.0.0.1"])
+    a.purchase_cost, a.cde_environment, a.known_ips = 1200.0, True, ["10.0.0.1", "10.0.0.2"]
+    a.security_posture = {"has_antivirus": True}
+    db.commit()
+    by = {(f["field"], f["change"]): f for f in _rows(db)[0].changes["fields"]}
+    assert by[("purchase_cost", "changed")]["category"] == "procurement"
+    assert by[("cde_environment", "changed")]["category"] == "business"
+    assert by[("known_ips", "added")]["new"] == "10.0.0.2"
+    assert by[("security_posture.has_antivirus", "changed")]["category"] == "security"
+
+
+def test_huge_package_churn_is_capped_but_totals_are_complete(db):
+    import grc.services.asset_change_log as acl
+    a = _asset(db, platform_properties=_pp(packages=[{"name": f"p{i}", "version": "1"} for i in range(500)]))
+    a.platform_properties = _pp(packages=[{"name": f"p{i}", "version": "2"} for i in range(500)])
+    db.commit()
+    ch = _rows(db)[0].changes
+    assert len(ch["fields"]) == acl.MAX_FIELDS and ch["total_fields"] == 500
+    assert ch["truncated"] == 500 - acl.MAX_FIELDS and ch["sections"]["packages"]["changed"] == 500

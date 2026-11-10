@@ -179,8 +179,10 @@ def test_cmdb_import_matches_journals_and_filters(sdm, db):
     assert all(r.changes["source"] == "connector" for r in rows)
     serial_row = next(r for r in rows if r.resource_id == a_serial.id)
     by = {f["field"]: f for f in serial_row.changes["fields"]}
-    assert by["manufacturer"] == {"field": "manufacturer", "category": "platform", "old": None, "new": "Dell"}
+    assert (by["manufacturer"]["category"], by["manufacturer"]["old"], by["manufacturer"]["new"]) == ("hardware", None, "Dell")
     assert by["ip_address"]["category"] == "identity"
+    assert by["location"]["category"] == "ownership"
+    assert by["source_system"]["category"] == "lifecycle"          # provenance changes are journalled too
 
 
 def test_cmdb_push_back_is_opt_in_and_idempotent(sdm, db):
