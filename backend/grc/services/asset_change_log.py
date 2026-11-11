@@ -34,7 +34,7 @@ import re
 from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from sqlalchemy import event, inspect as sa_inspect
 from sqlalchemy.orm import Session
@@ -373,7 +373,7 @@ _LIST_PREVIEW = 50     # current items sent per list field; the count is always 
 _MAX_TRACKS = 5000   # leaf fields; a list counts once however many items
 
 
-def field_tracks(asset: ITAsset) -> List[Dict[str, Any]]:
+def field_tracks(asset: ITAsset, preview: bool = True) -> List[Dict[str, Any]]:
     """Every field of the asset as it is now, named exactly like the journal's
     field paths so each one can be joined to its changes. kind: 'value' (one
     value), 'list' (items: count + preview), 'live' (a reading the journal
@@ -398,7 +398,7 @@ def field_tracks(asset: ITAsset) -> List[Dict[str, Any]]:
             return
         if isinstance(v, list):
             items = [x for x in v if not _ephemeral(x)]
-            put(path, section, cat, "list", [_summary(x) for x in items[:_LIST_PREVIEW]], len(items))
+            put(path, section, cat, "list", [_summary(x) for x in items[:_LIST_PREVIEW]] if preview else None, len(items))
             return
         put(path, section, cat, "value", _coerce(v))
 
@@ -411,6 +411,23 @@ def field_tracks(asset: ITAsset) -> List[Dict[str, Any]]:
             if sec not in _VOLATILE_SECTIONS and not _volatile(sec):
                 walk(sec, sec, SECTION_CATEGORIES.get(sec, "platform"), data)
     return out
+
+
+def estate_field_catalog(assets: Iterable[ITAsset]) -> Dict[str, Any]:
+    """Every field path found on any of the assets, with how many assets hold a
+    value for it (the estate-wide field-by-field history)."""
+    out: Dict[str, Dict[str, Any]] = {}
+    n = 0
+    for a in assets:
+        n += 1
+        for t in field_tracks(a, preview=False):
+            row = out.get(t["path"])
+            if row is None:
+                row = out[t["path"]] = {"path": t["path"], "section": t["section"], "category": t["category"],
+                                        "kind": t["kind"], "value": None, "count": 0}
+            if t["kind"] == "list" and t["count"] or t["kind"] != "list" and t["value"] not in (None, ""):
+                row["count"] += 1      # assets that hold a value for this field
+    return {"fields": list(out.values()), "assets": n}
 
 
 def _detail(d: _Diff) -> str:

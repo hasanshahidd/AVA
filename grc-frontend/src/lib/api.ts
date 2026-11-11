@@ -4514,6 +4514,10 @@ export const entityExtrasApi = {
   assetFields: (assetId: number) =>
     apiClient.get<{ fields: Array<{ path: string; section: string; category: string; kind: 'value' | 'list' | 'live';
       value: unknown; count: number | null; label?: string | null }> }>(`/asset-fields/${assetId}`),
+  // Every field found on any asset (count = assets holding a value): the estate field-by-field history.
+  assetFieldCatalog: () =>
+    apiClient.get<{ assets: number; fields: Array<{ path: string; section: string; category: string;
+      kind: 'value' | 'list' | 'live'; value: unknown; count: number | null }> }>('/asset-field-catalog'),
   // Per-asset recent-change counts for the inventory 'Changes' column.
   assetChangeSummary: (days?: number) =>
     apiClient.get<{ items: Record<string, { count: number; last_at: string | null }>; days: number }>(

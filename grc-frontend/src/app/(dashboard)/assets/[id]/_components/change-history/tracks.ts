@@ -20,6 +20,8 @@ export type TrackChange = {
   itemLevel: boolean;
   /** Item / sub-field below the track, e.g. "openssl" or "C: › Capacity (GB)". */
   where?: string; old: unknown; new: unknown; oldLabel?: string | null; newLabel?: string | null;
+  /** Estate view: which asset changed. */
+  assetId?: number | null; assetName?: string | null;
 };
 export type Track = Omit<FieldRow, 'kind'> & {
   kind: FieldRow['kind'] | 'gone';   // gone = no longer reported, but has history
@@ -100,6 +102,7 @@ export function buildTracks(rows: FieldRow[], entries: ChangeEntry[]): Track[] {
         at: e.created_at, source: sourceOf(e), actor: actorOf(e), change: f.change || 'changed',
         where: rest ? describeRest(rest) : undefined, itemLevel: !rest || rest.endsWith(']'),
         old: f.old, new: f.new, oldLabel: f.old_label, newLabel: f.new_label,
+        assetId: e.asset_id, assetName: e.asset_name,
       });
     }
   }
@@ -147,8 +150,12 @@ export function describeChange(t: Track, c: TrackChange): ChangeText {
 }
 
 /** Current value as text. */
-export function currentValue(t: Track): { text: string; muted: boolean } {
-  if (t.kind === 'gone') return { text: 'No longer reported', muted: true };
+export function currentValue(t: Track, estate = false): { text: string; muted: boolean } {
+  if (t.kind === 'gone') return { text: estate ? 'Not reported by any asset now' : 'No longer reported', muted: true };
+  if (estate) {   // catalog row: count = assets holding a value
+    const n = t.count ?? 0;
+    return n ? { text: `Set on ${n} asset${n === 1 ? '' : 's'}`, muted: false } : { text: 'Not set on any asset', muted: true };
+  }
   if (t.kind === 'list') {
     const n = t.count ?? 0;
     if (!n) return { text: 'None', muted: true };

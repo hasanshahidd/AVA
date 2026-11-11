@@ -209,6 +209,17 @@ def asset_fields(asset_id: int, db: Session = Depends(get_db),
     return {"fields": fields}
 
 
+@router.get("/asset-field-catalog")
+def asset_field_catalog(db: Session = Depends(get_db), current_user: GRCUser = Depends(require_auth)):
+    """Every field across the caller's assets (paths as in the change journal) with
+    how many assets hold a value for each: the estate field-by-field history."""
+    from ..services.asset_change_log import estate_field_catalog
+    tenants = get_user_tenants(current_user, db) or []
+    # shortcut: walks every asset per request (~1 s per few thousand assets); cache per tenant if it gets slow.
+    assets = db.query(ITAsset).filter(ITAsset.tenant_id.in_(tenants)).order_by(ITAsset.id).yield_per(200)
+    return estate_field_catalog(assets)
+
+
 class EstateHistoryOut(HistoryOut):
     asset_id: Optional[int] = None
     asset_name: Optional[str] = None

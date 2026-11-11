@@ -1,16 +1,19 @@
 'use client';
 
 /*
- * Inventory → Asset history (/assets?tab=history): estate-wide change journal.
- * KPI strip, filters (asset / field search, source, category, period) and a
- * day-grouped feed. Each item names its asset (linking to that asset's own
- * history page) with a one-line summary; the field diffs are the same
- * ChangeEntryCard the per-asset history uses.
+ * Inventory → Asset history (/assets?tab=history): estate-wide change journal,
+ * two views like the per-asset history:
+ *   Fields   (default) — every field found on any asset, by category; each row
+ *            says on how many assets it is set and its last change; a click
+ *            opens the field's changes across assets (EstateFieldTracker).
+ *   Activity — KPI strip, filters and a day-grouped feed; each item names its
+ *            asset and uses the same ChangeEntryCard as the per-asset history.
  */
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { entityExtrasApi } from '@/lib/api';
+import { EstateFieldTracker } from '../[id]/_components/change-history/FieldTracker';
 import {
   CategoryTabs, EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download, pickCategory,
 } from '../[id]/_components/change-history/ChangeHistory';
@@ -19,21 +22,46 @@ import {
 } from '../[id]/_components/change-history/model';
 
 const WINDOWS = [{ key: '7', label: '7 days' }, { key: '30', label: '30 days' }, { key: '90', label: '90 days' }];
-const LIMIT = 300;
+const LIMIT = 300;          // Activity feed
+const FIELDS_LIMIT = 1000;  // Fields view counts changes per field, so it reads the most the API returns
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#19A8E6]';
 
 export default function AssetHistoryFeed() {
   const [days, setDays] = useState('30');
+  const [mode, setMode] = useState<'fields' | 'activity'>('fields');
+  const limit = mode === 'fields' ? FIELDS_LIMIT : LIMIT;
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const patch = (p: Partial<Filters>) => setFilters((f) => ({ ...f, ...p }));
 
   const q = useQuery({
-    queryKey: ['asset-change-log', Number(days), LIMIT],
-    queryFn: async () => (await entityExtrasApi.assetChangeLog(Number(days), LIMIT)).data as ChangeEntry[],
+    queryKey: ['asset-change-log', Number(days), limit],
+    queryFn: async () => (await entityExtrasApi.assetChangeLog(Number(days), limit)).data as ChangeEntry[],
   });
   const items = useMemo(() => q.data ?? [], [q.data]);
   const summary = useMemo(() => summarise(items), [items]);
   const view = useMemo(() => ({ ...filters, category: pickCategory(summary, filters.category) }), [filters, summary]);
   const shown = useMemo(() => applyFilters(items, view), [items, view]);
+
+  const switcher = (
+    <div className="segwrap" role="group" aria-label="History view">
+      {([['fields', 'Fields'], ['activity', 'Activity']] as const).map(([k, l]) => (
+        <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}
+          className={`${mode === k ? 'seg on' : 'seg'} ${FOCUS}`} style={{ height: 28, padding: '0 12px', fontSize: 12.5 }}>{l}</button>
+      ))}
+    </div>
+  );
+  const period = { label: 'Period', value: days, options: WINDOWS, onChange: setDays };
+
+  if (mode === 'fields') {
+    return (
+      <div className="inv2 space-y-2.5" style={{ color: SEC }}>
+        {switcher}
+        {q.isLoading ? <StateMessage>Loading asset history…</StateMessage>
+          : q.isError ? <StateMessage tone="error">Could not load asset history. Refresh the page to try again.</StateMessage>
+            : <EstateFieldTracker entries={items} period={period} capped={items.length >= FIELDS_LIMIT} />}
+      </div>
+    );
+  }
 
   let body;
   if (q.isLoading) body = <StateMessage>Loading asset history…</StateMessage>;
@@ -52,8 +80,9 @@ export default function AssetHistoryFeed() {
 
   return (
     <div className="inv2 space-y-2.5" style={{ color: SEC }}>
+      {switcher}
       <KpiStrip items={[
-        { label: 'Changes', value: summary.entries, sub: items.length >= LIMIT ? `Latest ${LIMIT} shown` : `Last ${days} days` },
+        { label: 'Changes', value: summary.entries, sub: items.length >= limit ? `Latest ${limit} shown` : `Last ${days} days` },
         { label: 'Assets changed', value: summary.assets },
         { label: 'Fields changed', value: summary.fieldChanges, sub: `${summary.bySource.length} source${summary.bySource.length === 1 ? '' : 's'}` },
         { label: 'Last change', value: relTime(summary.last), sub: summary.last ? fmtDate(summary.last) : undefined },
@@ -61,7 +90,7 @@ export default function AssetHistoryFeed() {
       <CategoryTabs summary={summary} value={view.category} onChange={(c) => patch({ category: c })} />
       <FilterBar filters={view} patch={patch} summary={summary} showActor={false}
         placeholder="Search asset, field or value"
-        period={{ label: 'Period', value: days, options: WINDOWS, onChange: setDays }}
+        period={period}
         shown={shown.length} total={items.length}
         onExport={() => download(`asset-history-${days}d.csv`, csvOf(shown, true))} />
       {body}

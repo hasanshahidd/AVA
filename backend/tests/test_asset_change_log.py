@@ -340,3 +340,15 @@ def test_windows_per_user_service_suffix_is_not_a_change(db):
     old = [{"field": "services.data[AarSvc_7d7b4]", "section": "services", "change": "removed", "old": "AarSvc_7d7b4 (start_mode: Manual)"},
            {"field": "services.data[AarSvc_854d4]", "section": "services", "change": "added", "new": "AarSvc_854d4 (start_mode: Manual)"}]
     assert drop_churn(old) == []
+
+
+def test_estate_field_catalog_counts_assets_holding_each_field(db):
+    from grc.services.asset_change_log import estate_field_catalog
+    a = _asset(db, location="HQ", platform_properties={"services": {"status": "discovered", "data": [{"name": "x"}]}})
+    b = ITAsset(tenant_id=1, name="db02", asset_type="server")
+    db.add(b); db.commit()
+    cat = estate_field_catalog([a, b])
+    by = {f["path"]: f for f in cat["fields"]}
+    assert cat["assets"] == 2
+    assert by["location"]["count"] == 1 and by["name"]["count"] == 2
+    assert by["services.data"]["kind"] == "list" and by["services.data"]["count"] == 1 and by["services.data"]["value"] is None
