@@ -156,7 +156,9 @@ function itemName(tok: string): string {
       ?? (o.port != null ? `${o.port}/${o.proto ?? o.protocol ?? 'tcp'}` : null);
     return v != null && v !== '' ? String(v) : 'Item';
   } catch {
-    return 'Item';
+    // Older keys were cut at 120 chars, so the JSON is incomplete: read the fields straight from the text.
+    const m = /"(?:name|display_name|description|mac|mac_address)":\s*"([^"]+)"/.exec(tok);
+    return m ? m[1] : 'Item';
   }
 }
 export const isEmpty = (v: unknown) => v === null || v === undefined || v === '';
