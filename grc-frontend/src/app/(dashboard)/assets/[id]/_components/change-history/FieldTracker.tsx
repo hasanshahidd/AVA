@@ -23,7 +23,7 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { KpiStrip, StateMessage, CARD_STYLE, type Segmented } from './ChangeHistory';
 import { SourceBadge } from './ChangeEntryCard';
 import {
-  ADD, BORDER, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, PERIODS, SEC, TZ_LABEL, type ChangeEntry, categoryMeta,
+  ACCENT, ADD, BORDER, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, PERIODS, SEC, TZ_LABEL, type ChangeEntry, categoryMeta,
   dayKey, dayLabel, fmtDate, fmtTime, relTime,
 } from './model';
 import {
@@ -33,6 +33,8 @@ import {
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#19A8E6]';
 const ROW_GRID = 'md:grid md:grid-cols-[minmax(150px,1fr)_minmax(0,1.25fr)_minmax(0,1.6fr)_74px] md:items-center md:gap-x-4';
 const CHANGE_PAGE = 50;
+const HEAD_BG = '#EAF3FA';      // section heading bar (brand blue tint)
+const CHANGED_BG = '#F0F8FE';   // a field that changed: accent tint + accent stripe
 const ITEM_PREVIEW = 50;
 
 type View = { track: Track; changes: TrackChange[] };
@@ -155,11 +157,13 @@ function Row({ v, estate, onOpen }: { v: View; estate: boolean; onOpen: () => vo
   const cur = currentValue(t, estate);
   const last = changes[0];
   const d = last ? describeChange(t, last) : null;
+  const hit = changes.length > 0;
   return (
     <li>
       <button type="button" onClick={onOpen} aria-haspopup="dialog"
-        className={`w-full text-left px-3 py-[7px] ${ROW_GRID} flex flex-col gap-0.5 hover:bg-[#FAFBFC] ${FOCUS}`}>
-        <span className="block text-[12.5px] font-medium" style={{ color: INK, overflowWrap: 'anywhere' }}>
+        className={`w-full text-left px-3 py-[7px] ${ROW_GRID} flex flex-col gap-0.5 ${FOCUS} ${hit ? 'hover:bg-[#E3F1FB]' : 'hover:bg-[#FAFBFC]'}`}
+        style={hit ? { background: CHANGED_BG, boxShadow: `inset 3px 0 0 ${ACCENT}` } : undefined}>
+        <span className={`block text-[12.5px] ${hit ? 'font-semibold' : 'font-medium'}`} style={{ color: hit ? BRAND : INK, overflowWrap: 'anywhere' }}>
           {t.name}
           {t.kind === 'live' && <span className="ml-1.5 text-[10.5px] font-normal" style={{ color: MUTED }}>live reading</span>}
         </span>
@@ -178,9 +182,9 @@ function Row({ v, estate, onOpen }: { v: View; estate: boolean; onOpen: () => vo
         </span>
         <span className="flex items-center justify-end gap-1.5 text-[11.5px] tabular-nums" style={{ color: MUTED }}>
           {changes.length > 0 && (
-            <span className="rounded-full px-1.5 font-semibold" style={{ background: '#EFF5FA', color: '#005B96' }}>{changes.length}</span>
+            <span className="rounded-full min-w-[20px] text-center px-1.5 py-[1px] font-semibold text-white" style={{ background: BRAND }}>{changes.length}</span>
           )}
-          <ChevronRight className="h-4 w-4" style={{ color: FAINT }} aria-hidden />
+          <ChevronRight className="h-4 w-4" style={{ color: hit ? BRAND : FAINT }} aria-hidden />
         </span>
       </button>
     </li>
@@ -191,13 +195,16 @@ function Group({ name, views, estate, onOpen }: { name: string; views: View[]; e
   const changed = views.filter((v) => v.changes.length).length;
   return (
     <section className="rounded-[12px] bg-white overflow-hidden" style={CARD_STYLE} aria-label={name}>
-      <h3 className="flex items-baseline gap-2 px-3 py-2 border-b" style={{ borderColor: DIVIDER, background: '#FAFBFC' }}>
-        <span className="text-[13px] font-semibold" style={{ color: INK }}>{name}</span>
-        <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: MUTED }}>
-          {changed ? <><b style={{ color: '#005B96' }}>{changed}</b> of {views.length} changed</> : `${views.length} field${views.length === 1 ? '' : 's'} · no change`}
+      <h3 className="flex items-center gap-2 px-3 py-2" style={{ background: HEAD_BG, boxShadow: `inset 3px 0 0 ${BRAND}` }}>
+        <span className="text-[13.5px] font-semibold" style={{ color: BRAND }}>{name}</span>
+        <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: changed ? BRAND : MUTED }}>
+          {changed
+            ? <span className="inline-flex items-center gap-1 rounded-full px-2 py-[1px] font-semibold text-white" style={{ background: BRAND }}>{changed} of {views.length} changed</span>
+            : `${views.length} field${views.length === 1 ? '' : 's'} · no change`}
         </span>
       </h3>
-      <div className={`hidden ${ROW_GRID} px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.04em]`} style={{ color: MUTED }}>
+      <div className={`hidden ${ROW_GRID} px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] border-y`}
+        style={{ color: '#014A81', background: '#F7FAFD', borderColor: '#DCE9F3' }}>
         <span>Field</span><span>{estate ? 'Present on' : 'Current value'}</span><span>Last change</span><span className="text-right">Changes</span>
       </div>
       <ul className="divide-y divide-[#F0F3F5]">
