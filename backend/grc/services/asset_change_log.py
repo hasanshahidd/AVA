@@ -92,6 +92,9 @@ _VOLATILE_KEYS = {"timestamp", "boot_time", "last_boot_time", "last_boot_up_time
 # Runtime state that flips between reports without anyone changing anything.
 _SECTION_VOLATILE = {"services": {"state", "status", "sub_state", "active_state", "running", "pid"}}
 _EPHEMERAL_PORT = 49152   # IANA dynamic range: client sockets (e.g. a browser's UDP) churn every report
+# Windows per-user services (AarSvc_7d7b4, "Agent Activation Runtime_7d7b4") get a new
+# random suffix at every logon; compare them without it.
+_PER_USER_SUFFIX = re.compile(r"_[0-9a-f]{4,8}\b")
 _ALWAYS_VOLATILE_TOKENS = {"pid", "uptime", "temperature", "celsius", "rpm"}
 _MEASURE_TOKENS = {"free", "available", "usage", "utilization", "utilisation", "load", "used"}
 _UNIT_TOKENS = {"gb", "mb", "kb", "bytes", "pct", "percent", "percentage", "mhz"}
@@ -226,6 +229,8 @@ class _Diff:
 
     def _list(self, path: str, section: str, cat: str, a: list, b: list) -> None:
         a, b = [x for x in a if not _ephemeral(x)], [x for x in b if not _ephemeral(x)]
+        if section == "services":
+            a, b = [_per_user(x) for x in a], [_per_user(x) for x in b]
         if any(isinstance(x, dict) for x in a + b):
             def keyed(items):
                 groups: Dict[str, List[Any]] = {}
@@ -261,6 +266,13 @@ class _Diff:
         for x in a:
             if json.dumps(x, default=str) not in sb:
                 self.add(path, section, cat, "removed", x, None)
+
+
+def _per_user(item: Any) -> Any:
+    if not isinstance(item, dict):
+        return item
+    return {k: _PER_USER_SUFFIX.sub("", v) if k in ("name", "display_name", "Name", "DisplayName") and isinstance(v, str) else v
+            for k, v in item.items()}
 
 
 def _tag(item: Any, section: str) -> str:
@@ -319,8 +331,10 @@ def drop_churn(fields: List[Any]) -> List[Any]:
         ch = f.get("change") if isinstance(f, dict) else None
         if ch not in ("added", "removed"):
             return None
-        val = f.get("new" if ch == "added" else "old")
-        return ch, (_list_path(str(f.get("field", ""))), f.get("section"), json.dumps(val, default=str, sort_keys=True))
+        val = json.dumps(f.get("new" if ch == "added" else "old"), default=str, sort_keys=True)
+        if f.get("section") == "services":
+            val = _PER_USER_SUFFIX.sub("", val)
+        return ch, (_list_path(str(f.get("field", ""))), f.get("section"), val)
 
     keys = [twin(f) for f in kept]
     added = Counter(k[1] for k in keys if k and k[0] == "added")

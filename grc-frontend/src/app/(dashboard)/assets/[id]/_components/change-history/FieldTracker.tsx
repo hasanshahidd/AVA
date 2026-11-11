@@ -203,7 +203,7 @@ export default function FieldTracker({ assetId, entries }: { assetId: number; en
         { label: 'No change', value: tracked.length - changed.length },
         { label: 'Last change', value: relTime(lastAt), sub: lastAt ? fmtDate(lastAt) : undefined },
       ]} />
-      <div role="tablist" aria-label="Field categories" className="flex gap-5 border-b border-[#e8ecee] overflow-x-auto overflow-y-hidden px-0.5">
+      <div role="tablist" aria-label="Field categories" className="flex flex-wrap gap-x-4 gap-y-1 border-b border-[#e8ecee] px-0.5">
         {cats.map(({ c, total, changed: n }) => {
           const on = active === c;
           return (

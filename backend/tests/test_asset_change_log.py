@@ -323,3 +323,20 @@ def test_field_tracks_use_journal_paths_and_cover_every_column(db):
                              "defender": {"status": "discovered", "data": {"realtime_protection": False}}}
     db.commit()
     assert "defender.data.realtime_protection" in {f["field"] for f in _rows(db)[0].changes["fields"]}
+
+
+def test_windows_per_user_service_suffix_is_not_a_change(db):
+    from grc.services.asset_change_log import drop_churn
+    svc = lambda sfx, mode="Manual": {"services": {"status": "discovered", "data": [
+        {"name": f"AarSvc_{sfx}", "display_name": f"Agent Activation Runtime_{sfx}", "start_mode": mode}]}}
+    a = _asset(db, platform_properties=svc("7d7b4"))
+    a.platform_properties = svc("854d4")
+    db.commit()
+    assert _rows(db) == []
+    a.platform_properties = svc("9ab12", "Auto")
+    db.commit()
+    (row,) = _rows(db)
+    assert [(f["field"], f["change"]) for f in row.changes["fields"]] == [("services.data[AarSvc].start_mode", "changed")]
+    old = [{"field": "services.data[AarSvc_7d7b4]", "section": "services", "change": "removed", "old": "AarSvc_7d7b4 (start_mode: Manual)"},
+           {"field": "services.data[AarSvc_854d4]", "section": "services", "change": "added", "new": "AarSvc_854d4 (start_mode: Manual)"}]
+    assert drop_churn(old) == []
