@@ -32,6 +32,7 @@ const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 export default function AssetHistoryFeed() {
   const [days, setDays] = useState('30');
   const [mode, setMode] = useState<'dashboard' | 'fields' | 'activity'>('dashboard');
+  const [fieldCategory, setFieldCategory] = useState<string | undefined>();   // set by a dashboard category click
   const limit = mode === 'activity' ? LIMIT : FIELDS_LIMIT;
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const patch = (p: Partial<Filters>) => setFilters((f) => ({ ...f, ...p }));
@@ -73,7 +74,8 @@ export default function AssetHistoryFeed() {
               <EmptyCard title={`No asset changes in the last ${days} days`}>
                 Edits, scans, network discovery, connector syncs, agent reports and imports that change an asset appear here. Try a longer period.
               </EmptyCard>
-            ) : <AssetHistoryDashboard items={items} days={Number(days)} capped={items.length >= FIELDS_LIMIT} />}
+            ) : <AssetHistoryDashboard items={items} days={Number(days)} capped={items.length >= FIELDS_LIMIT}
+              onCategory={(c) => { setFieldCategory(c); setMode('fields'); }} />}
       </div>
     );
   }
@@ -84,7 +86,8 @@ export default function AssetHistoryFeed() {
         {switcher}
         {q.isLoading ? <StateMessage>Loading asset history…</StateMessage>
           : q.isError ? <StateMessage tone="error">Could not load asset history. Refresh the page to try again.</StateMessage>
-            : <EstateFieldTracker entries={items} period={period} capped={items.length >= FIELDS_LIMIT} />}
+            : <EstateFieldTracker key={fieldCategory} entries={items} period={period} capped={items.length >= FIELDS_LIMIT}
+              initialCategory={fieldCategory} />}
       </div>
     );
   }

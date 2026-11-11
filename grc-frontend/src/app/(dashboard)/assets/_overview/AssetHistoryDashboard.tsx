@@ -43,19 +43,28 @@ function Card({ title, meta, className = '', children }: { title: string; meta?:
 }
 
 /** One ranked row: label · bar · count. The count is text, so colour never carries the value alone. */
-function BarRow({ label, value, max, color, sub, title }: {
-  label: ReactNode; value: number; max: number; color: string; sub?: string; title?: string;
+function BarRow({ label, value, max, color, sub, title, onClick }: {
+  label: ReactNode; value: number; max: number; color: string; sub?: string; title?: string; onClick?: () => void;
 }) {
-  return (
-    <li className="grid grid-cols-[minmax(0,1.15fr)_minmax(48px,1fr)_auto] items-center gap-x-2.5 py-[5px] text-[12.5px]" title={title}>
-      <span className="min-w-0 truncate" style={{ color: INK }}>{label}</span>
+  const zero = value === 0;   // listed so the card shows every category / source, but quiet
+  const body = (
+    <>
+      <span className="min-w-0 truncate" style={{ color: zero ? MUTED : INK }}>{label}</span>
       <span className="h-[7px] rounded-full overflow-hidden" style={{ background: TRACK_BG }} aria-hidden>
-        <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (value / (max || 1)) * 100)}%`, background: color }} />
+        {!zero && <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (value / (max || 1)) * 100)}%`, background: color }} />}
       </span>
       <span className="text-right tabular-nums whitespace-nowrap" style={{ color: SEC }}>
-        <b className="font-semibold" style={{ color: INK }}>{value.toLocaleString()}</b>
+        <b className="font-semibold" style={{ color: zero ? MUTED : INK }}>{value.toLocaleString()}</b>
         {sub && <span className="ml-1 text-[11px]" style={{ color: MUTED }}>{sub}</span>}
       </span>
+    </>
+  );
+  const grid = 'grid grid-cols-[minmax(0,1.15fr)_minmax(48px,1fr)_auto] items-center gap-x-2.5 py-[5px] text-[12.5px]';
+  return (
+    <li title={title}>
+      {onClick
+        ? <button type="button" onClick={onClick} className={`${grid} w-full text-left rounded-[6px] px-1 -mx-1 hover:bg-[#F0F8FE] ${FOCUS}`}>{body}</button>
+        : <div className={grid}>{body}</div>}
     </li>
   );
 }
@@ -132,10 +141,14 @@ function VolumeChart({ items, summary, days }: { items: ChangeEntry[]; summary: 
 
 function SourceCard({ summary }: { summary: Summary }) {
   const max = summary.bySource[0]?.[1] ?? 0;
+  const count = new Map(summary.bySource);
+  // Every source, so it is clear which ones made no change (e.g. no manual edits this period).
+  const all: [string, number][] = [...SOURCE_ORDER, ...summary.bySource.map(([s]) => s).filter((s) => !SOURCE_ORDER.includes(s))]
+    .map((s) => [s, count.get(s) ?? 0]);
   return (
     <Card title="Who made them" meta="Changes by source">
       <ul aria-label="Changes by source">
-        {summary.bySource.map(([s, n]) => (
+        {all.map(([s, n]) => (
           <BarRow key={s} label={<><Dot color={sourceMeta(s).color} />{sourceMeta(s).label}</>} value={n} max={max}
             color={sourceMeta(s).color} sub={`${Math.round((n / (summary.entries || 1)) * 100)}%`} />
         ))}
@@ -149,41 +162,81 @@ function SourceCard({ summary }: { summary: Summary }) {
   );
 }
 
-function CategoryCard({ summary }: { summary: Summary }) {
+function CategoryCard({ summary, onCategory }: { summary: Summary; onCategory?: (c: string) => void }) {
   const max = Math.max(0, ...summary.byCategory.map(([, n]) => n));
+  const count = new Map(summary.byCategory);
+  // Every category of the asset record, so the card reads as a full checklist; a click opens its fields.
+  const cats = CATEGORY_ORDER.filter((c) => c !== 'other' || count.has(c));
   return (
-    <Card title="Where changes happen" meta="Fields changed by category">
+    <Card title="Where changes happen" meta="Fields changed · click to open">
       <ul aria-label="Fields changed by category">
-        {summary.byCategory.map(([c, n]) => (
-          <BarRow key={c} label={<><Dot color={categoryMeta(c).color} />{categoryMeta(c).label}</>} value={n} max={max}
-            color={categoryMeta(c).color} title={categoryMeta(c).hint} />
+        {cats.map((c) => (
+          <BarRow key={c} label={<><Dot color={categoryMeta(c).color} />{categoryMeta(c).label}</>} value={count.get(c) ?? 0} max={max}
+            color={categoryMeta(c).color} title={`${categoryMeta(c).hint} (open its fields)`}
+            onClick={onCategory ? () => onCategory(c) : undefined} />
         ))}
       </ul>
     </Card>
   );
 }
 
-function AssetsCard({ items }: { items: ChangeEntry[] }) {
-  const top = useMemo(() => {
-    const m = new Map<number, { id: number; name: string; type?: string | null; n: number; fields: number }>();
-    for (const e of items) {
+type AssetStat = { id: number; name: string; type?: string | null; n: number; fields: number; last?: string; cats: Map<string, number> };
+
+function AssetsCard({ items, totalAssets }: { items: ChangeEntry[]; totalAssets?: number }) {
+  const all = useMemo(() => {
+    const m = new Map<number, AssetStat>();
+    for (const e of items) {                       // newest first, so the first entry seen is the last change
       if (!e.asset_id) continue;
-      const a = m.get(e.asset_id) ?? { id: e.asset_id, name: e.asset_name || `Asset ${e.asset_id}`, type: e.asset_type, n: 0, fields: 0 };
-      m.set(e.asset_id, { ...a, n: a.n + 1, fields: a.fields + totalOf(e) });
+      const a = m.get(e.asset_id) ?? { id: e.asset_id, name: e.asset_name || `Asset ${e.asset_id}`, type: e.asset_type, n: 0, fields: 0, last: e.created_at, cats: new Map() };
+      a.n += 1;
+      a.fields += totalOf(e);
+      for (const t of Object.values(e.sections ?? {})) a.cats.set(t.category, (a.cats.get(t.category) ?? 0) + t.added + t.removed + t.changed);
+      m.set(e.asset_id, a);
     }
-    return Array.from(m.values()).sort((a, b) => b.n - a.n || b.fields - a.fields).slice(0, TOP_N);
+    return Array.from(m.values()).sort((a, b) => b.n - a.n || b.fields - a.fields);
   }, [items]);
+  const top = all.slice(0, TOP_N);
+  const unchanged = totalAssets !== undefined ? Math.max(0, totalAssets - all.length) : undefined;
   return (
     <Card title="Most-changed assets" meta="Changes · fields">
       {top.length ? (
-        <ul aria-label="Most-changed assets">
-          {top.map((a) => (
-            <BarRow key={a.id} value={a.n} max={top[0].n} color={BRAND} sub={`· ${a.fields.toLocaleString()}`}
-              label={<Link href={`/assets/${a.id}/history`} title={a.type ? `${a.name} (${a.type})` : a.name}
-                className={`font-semibold hover:underline rounded-sm ${FOCUS}`} style={{ color: BRAND }}>{a.name}</Link>} />
-          ))}
+        <ul aria-label="Most-changed assets" className="divide-y divide-[#F0F3F5]">
+          {top.map((a) => {
+            const mix = CATEGORY_ORDER.filter((c) => a.cats.get(c));
+            const sum = mix.reduce((n, c) => n + (a.cats.get(c) ?? 0), 0) || 1;
+            return (
+              <li key={a.id} className="py-1.5">
+                <div className="flex items-baseline gap-2 text-[12.5px]">
+                  <Link href={`/assets/${a.id}/history`} title={a.type ? `${a.name} (${a.type})` : a.name}
+                    className={`font-semibold truncate hover:underline rounded-sm ${FOCUS}`} style={{ color: BRAND }}>{a.name}</Link>
+                  <span className="ml-auto tabular-nums whitespace-nowrap" style={{ color: SEC }}>
+                    <b style={{ color: INK }}>{a.n}</b> change{a.n === 1 ? '' : 's'} · {a.fields.toLocaleString()} fields
+                  </span>
+                </div>
+                {/* Category mix of this asset's changes: one stacked bar + its legend. */}
+                <div className="flex h-[7px] rounded-full overflow-hidden mt-1" style={{ background: TRACK_BG }} aria-hidden>
+                  {mix.map((c) => <span key={c} style={{ width: `${((a.cats.get(c) ?? 0) / sum) * 100}%`, background: categoryMeta(c).color }} />)}
+                </div>
+                <div className="flex flex-wrap gap-x-2.5 mt-1 text-[11.5px]" style={{ color: SEC }}>
+                  {mix.map((c) => <span key={c}><Dot color={categoryMeta(c).color} />{categoryMeta(c).label} {a.cats.get(c)}</span>)}
+                  <span className="ml-auto" style={{ color: MUTED }}>last {relTime(a.last)}{a.type ? ` · ${a.type}` : ''}</span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : <None>No change names its asset.</None>}
+      {unchanged !== undefined && totalAssets ? (
+        <div className="mt-2 pt-2 text-[11.5px]" style={{ borderTop: `1px solid ${DIVIDER}`, color: SEC }}>
+          <div className="flex h-[8px] rounded-full overflow-hidden" style={{ background: TRACK_BG }} aria-hidden>
+            <span style={{ width: `${(all.length / totalAssets) * 100}%`, background: BRAND }} />
+          </div>
+          <div className="flex mt-1">
+            <span><b style={{ color: BRAND }}>{all.length}</b> changed</span>
+            <span className="ml-auto"><b style={{ color: INK }}>{unchanged}</b> of {totalAssets} assets with no change</span>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -253,7 +306,9 @@ function RecentCard({ items, rows }: { items: ChangeEntry[]; rows: FieldRow[] })
 
 /* ── dashboard ───────────────────────────────────────────────────────── */
 
-export default function AssetHistoryDashboard({ items, days, capped }: { items: ChangeEntry[]; days: number; capped: boolean }) {
+export default function AssetHistoryDashboard({ items, days, capped, onCategory }: {
+  items: ChangeEntry[]; days: number; capped: boolean; /** open the Fields view on a category */ onCategory?: (c: string) => void;
+}) {
   // Same query as the Fields view (shared cache): field catalog for plain wording + the estate's asset count.
   const catalog = useQuery({
     queryKey: ['asset-field-catalog'],
@@ -285,8 +340,8 @@ export default function AssetHistoryDashboard({ items, days, capped }: { items: 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2.5">
         <VolumeChart items={items} summary={summary} days={days} />
         <SourceCard summary={summary} />
-        <CategoryCard summary={summary} />
-        <AssetsCard items={items} />
+        <CategoryCard summary={summary} onCategory={onCategory} />
+        <AssetsCard items={items} totalAssets={totalAssets} />
         <FieldsCard summary={summary} />
         <RecentCard items={items} rows={rows} />
       </div>

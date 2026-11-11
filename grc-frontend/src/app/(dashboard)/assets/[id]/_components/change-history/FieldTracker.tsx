@@ -218,10 +218,11 @@ const segBtn = (on: boolean) => `${on ? 'seg on' : 'seg'} ${FOCUS}`;
 const SEG_STYLE = { height: 28, padding: '0 11px', fontSize: 12 };
 
 /** Shared body. `period` given → the caller owns the window (estate fetch); else filter changes here. */
-function FieldTrackerView({ rows, entries, estate, period, assetCount, capped }: {
+function FieldTrackerView({ rows, entries, estate, period, assetCount, capped, initialCategory }: {
   rows: FieldRow[]; entries: ChangeEntry[]; estate: boolean; period?: Segmented; assetCount?: number; capped: boolean;
+  initialCategory?: string;
 }) {
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(initialCategory ?? '');
   const [changedOnly, setChangedOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [localPeriod, setLocalPeriod] = useState('all');
@@ -333,7 +334,9 @@ export default function FieldTracker({ assetId, entries }: { assetId: number; en
 }
 
 /** All assets: every field found on any asset, each change naming its asset. */
-export function EstateFieldTracker({ entries, period, capped }: { entries: ChangeEntry[]; period: Segmented; capped: boolean }) {
+export function EstateFieldTracker({ entries, period, capped, initialCategory }: {
+  entries: ChangeEntry[]; period: Segmented; capped: boolean; initialCategory?: string;
+}) {
   const q = useQuery({
     queryKey: ['asset-field-catalog'],
     queryFn: async () => (await entityExtrasApi.assetFieldCatalog()).data,
@@ -342,5 +345,5 @@ export function EstateFieldTracker({ entries, period, capped }: { entries: Chang
   if (q.isLoading) return <StateMessage>Loading fields…</StateMessage>;
   if (q.isError) return <StateMessage tone="error">Could not load the estate&apos;s fields. Refresh the page to try again.</StateMessage>;
   return <FieldTrackerView rows={(q.data?.fields ?? []) as FieldRow[]} entries={entries} estate
-    period={period} assetCount={q.data?.assets} capped={capped} />;
+    period={period} assetCount={q.data?.assets} capped={capped} initialCategory={initialCategory} />;
 }
