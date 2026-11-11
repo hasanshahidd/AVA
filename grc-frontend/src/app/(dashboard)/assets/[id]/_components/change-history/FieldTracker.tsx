@@ -48,6 +48,7 @@ function Change({ t, c }: { t: Track; c: TrackChange }) {
           <ArrowRight className="h-3.5 w-3.5 flex-none" style={{ color: FAINT }} aria-label="changed to" />
         )}
         {d.to !== undefined && <span style={{ color: ADD, fontWeight: 500, overflowWrap: 'anywhere' }}>{d.to}</span>}
+        {d.note && <span className="text-[12px]" style={{ color: MUTED, overflowWrap: 'anywhere' }}>({d.note})</span>}
         <SourceBadge source={c.source} />
         {c.source === 'manual' && <span className="text-[11.5px]" style={{ color: MUTED }}>by {c.actor}</span>}
       </span>
@@ -95,6 +96,7 @@ function Row({ v }: { v: View }) {
             <><b className="font-semibold" style={{ color: '#014A81' }}>{lastText.text}</b>
               {lastText.to !== undefined && <> {lastText.from !== undefined ? `${lastText.from} → ` : ''}{lastText.to}</>}
               {lastText.to === undefined && lastText.from !== undefined && <> (was {lastText.from})</>}
+              {lastText.note && <span style={{ color: MUTED }}> ({lastText.note})</span>}
               <span style={{ color: MUTED }}> · {relTime(last.at)}</span></>
           ) : 'No change'}
       </span>
@@ -241,6 +243,12 @@ export default function FieldTracker({ assetId, entries }: { assetId: number; en
           </button>
         )}
       </div>
+      {(entries.length >= 1000 || entries.some((e) => e.truncated)) && (
+        <p className="px-1 text-[12px]" style={{ color: MUTED }}>
+          {entries.length >= 1000 ? 'Showing the newest 1,000 recorded changes; older ones are not counted here. ' : ''}
+          {entries.some((e) => e.truncated) ? 'Some very large changes (for example a first full inventory) were stored as totals only, so a field marked "No change" may have been set then.' : ''}
+        </p>
+      )}
       {groups.length
         ? groups.map(([name, vs]) => <Group key={name} name={name} views={vs} />)
         : <StateMessage>{changedOnly ? `No field in ${categoryMeta(active).label} changed in this period.` : 'No fields match this search.'}</StateMessage>}

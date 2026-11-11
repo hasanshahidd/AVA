@@ -6,7 +6,7 @@
  */
 
 import {
-  type ChangeEntry, type ChangeField, actorOf, fieldLabel, fieldsOf, fmtValue, isEmpty, itemName, label,
+  type ChangeEntry, type ChangeField, actorOf, fieldLabel, fieldsOf, fmtValue, isEmpty, itemEnd, itemName, label,
   sectionLabel, sourceOf, splitPath,
 } from './model';
 
@@ -16,6 +16,8 @@ export type FieldRow = {
 };
 export type TrackChange = {
   at?: string; source: string; actor: string; change: string;
+  /** A whole list item (or a plain list value), not a sub-field of one. */
+  itemLevel: boolean;
   /** Item / sub-field below the track, e.g. "openssl" or "C: › Capacity (GB)". */
   where?: string; old: unknown; new: unknown; oldLabel?: string | null; newLabel?: string | null;
 };
@@ -29,17 +31,12 @@ export type Track = Omit<FieldRow, 'kind'> & {
 
 export const RECORD_GROUP = 'Asset record';
 
-/** Cut points of a journal path at top-level "." and "[" (item keys may hold JSON). */
+/** Cut points of a journal path at top-level "." and "[" (item keys may hold dots / JSON). */
 function cuts(p: string): number[] {
   const out: number[] = [];
-  let depth = 0, inStr = false;
-  for (let i = 0; i < p.length; i++) {
-    const ch = p[i];
-    if (inStr) { if (ch === '\\') i++; else if (ch === '"') inStr = false; continue; }
-    if (depth > 0 && ch === '"') inStr = true;
-    else if (ch === '[') { if (depth === 0) out.push(i); depth++; }
-    else if (ch === ']') depth = Math.max(0, depth - 1);
-    else if (ch === '.' && depth === 0) out.push(i);
+  for (let i = 0; i < p.length;) {
+    if (p[i] === '[') { out.push(i); i = itemEnd(p, i) + 1; }
+    else { if (p[i] === '.') out.push(i); i++; }
   }
   return out;
 }
@@ -50,6 +47,12 @@ function describeRest(rest: string): string | undefined {
     .filter(([k, t]) => k === 'item' || (t !== 'data' && t !== 'items'))
     .map(([k, t]) => (k === 'item' ? itemName(t) : label(t)));
   return parts.length ? parts.join(' › ') : undefined;
+}
+
+/** Field label; a section whose data is the list itself (services, network) is named after the section. */
+function nameOf(path: string, section: string): string {
+  const n = fieldLabel({ field: path, section, old: null, new: null });
+  return n === 'Section data' ? sectionLabel(section) : n;
 }
 
 const groupOf = (r: FieldRow) => (r.path === r.section ? RECORD_GROUP : sectionLabel(r.section));
@@ -68,7 +71,7 @@ function owner(byPath: Map<string, Track>, f: ChangeField): [Track | undefined, 
 
 export function buildTracks(rows: FieldRow[], entries: ChangeEntry[]): Track[] {
   const tracks: Track[] = rows.map((r) => ({
-    ...r, name: fieldLabel({ field: r.path, section: r.section, old: null, new: null }), group: groupOf(r),
+    ...r, name: nameOf(r.path, r.section), group: groupOf(r),
     isList: r.kind === 'list', changes: [],
   }));
   const byPath = new Map(tracks.map((t) => [t.path, t]));
@@ -86,7 +89,7 @@ export function buildTracks(rows: FieldRow[], entries: ChangeEntry[]): Track[] {
         rest = f.field.slice(path.length);
         const gone: Track = {
           path, section: sec, category: f.category || 'other', kind: 'gone', value: undefined, count: null,
-          name: fieldLabel({ ...f, field: path }), group: path === sec ? RECORD_GROUP : sectionLabel(sec),
+          name: nameOf(path, sec), group: path === sec ? RECORD_GROUP : sectionLabel(sec),
           isList: listCut !== undefined, changes: [],
         };
         tracks.push(gone);
@@ -95,7 +98,7 @@ export function buildTracks(rows: FieldRow[], entries: ChangeEntry[]): Track[] {
       }
       t.changes.push({
         at: e.created_at, source: sourceOf(e), actor: actorOf(e), change: f.change || 'changed',
-        where: rest ? describeRest(rest) : undefined,
+        where: rest ? describeRest(rest) : undefined, itemLevel: !rest || rest.endsWith(']'),
         old: f.old, new: f.new, oldLabel: f.old_label, newLabel: f.new_label,
       });
     }
@@ -114,18 +117,26 @@ const listVerbs = (path: string): [string, string] => VERBS.find(([re]) => re.te
 export const shown = (v: unknown, lbl?: string | null) => fmtValue(v, lbl);
 
 /** One change as a sentence, e.g. "Installed KB5132061", "Version: 1.1 → 3.0", "Set to Yes". */
-export function describeChange(t: Track, c: TrackChange): { text: string; from?: string; to?: string } {
+export type ChangeText = { text: string; from?: string; to?: string; /** item details, shown muted */ note?: string };
+
+export function describeChange(t: Track, c: TrackChange): ChangeText {
   const where = c.where ? `${c.where}` : '';
   if (c.change === 'updated') return { text: `${where ? `${where}: ` : ''}Changed (values not recorded)` };
   if (c.change === 'added' || c.change === 'removed') {
     const [add, del] = listVerbs(t.path);
     const added = c.change === 'added';
     const val = added ? c.new : c.old;
+    if (t.isList && !c.itemLevel) {   // a sub-field of an item appeared / vanished
+      return added ? { text: `${where}: Set`, to: shown(val) } : { text: `${where}: Cleared`, from: shown(val) };
+    }
+    if (t.isList && !where && typeof val === 'string' && val.startsWith('[')) {
+      return added ? { text: 'First recorded', to: val } : { text: 'Cleared', from: val };   // the whole list at once
+    }
     if (t.isList) {
       // Item name, plus its details when the summary says more than the name.
       const detail = shown(val);
-      const what = where || detail;
-      return { text: `${added ? add : del} ${what}`, ...(where && detail !== where ? { to: detail } : {}) };
+      if (!where || detail.startsWith(where)) return { text: `${added ? add : del} ${detail}` };
+      return { text: `${added ? add : del} ${where}`, note: detail };
     }
     return added ? { text: `${where ? `${where}: ` : ''}Set`, to: shown(val) } : { text: `${where ? `${where}: ` : ''}Cleared`, from: shown(val) };
   }

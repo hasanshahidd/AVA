@@ -356,7 +356,7 @@ def diff_asset(asset: ITAsset) -> _Diff:
 
 
 _LIST_PREVIEW = 50     # current items sent per list field; the count is always complete
-_MAX_TRACKS = 2000
+_MAX_TRACKS = 5000   # leaf fields; a list counts once however many items
 
 
 def field_tracks(asset: ITAsset) -> List[Dict[str, Any]]:

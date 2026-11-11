@@ -132,19 +132,33 @@ export function splitPath(p: string): ['key' | 'item', string][] {
       if (j > i + 1) out.push(['key', p.slice(i + 1, j)]);
       i = j;
     } else if (p[i] === '[') {
-      let depth = 0, inStr = false, j = i;
-      for (; j < p.length; j++) {
-        const ch = p[j];
-        if (inStr) { if (ch === '\\') j++; else if (ch === '"') inStr = false; continue; }
-        if (ch === '"') inStr = true;
-        else if (ch === '[') depth++;
-        else if (ch === ']' && --depth === 0) break;
-      }
+      const j = itemEnd(p, i);
       out.push(['item', p.slice(i + 1, j)]);
       i = j + 1;
     } else i++;
   }
   return out;
+}
+
+/** Index of the "]" closing the item key opened at i. A JSON key ({…}) is scanned
+ * bracket- and string-aware; a plain key (a name, which may hold a stray " or [)
+ * ends at the first "]" followed by ".", "[" or the end of the path. */
+export function itemEnd(p: string, i: number): number {
+  if (p[i + 1] === '{') {
+    let depth = 0, inStr = false;
+    for (let j = i; j < p.length; j++) {
+      const ch = p[j];
+      if (inStr) { if (ch === '\\') j++; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === '[' || ch === '{') depth++;
+      else if ((ch === ']' || ch === '}') && --depth === 0) return j;
+    }
+    return p.length;
+  }
+  for (let j = i + 1; j < p.length; j++) {
+    if (p[j] === ']' && (j + 1 === p.length || p[j + 1] === '.' || p[j + 1] === '[')) return j;
+  }
+  return p.length;
 }
 
 /** An item key recorded as raw JSON (no natural name) reads as its name / description / MAC / port. */
