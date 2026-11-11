@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import (
@@ -216,7 +217,12 @@ def asset_field_catalog(db: Session = Depends(get_db), current_user: GRCUser = D
     from ..services.asset_change_log import estate_field_catalog
     tenants = get_user_tenants(current_user, db) or []
     # shortcut: walks every asset per request (~1 s per few thousand assets); cache per tenant if it gets slow.
-    assets = db.query(ITAsset).filter(ITAsset.tenant_id.in_(tenants)).order_by(ITAsset.id).yield_per(200)
+    # Same managed-asset set as the inventory register (GET /assets): no transient pentest ad-hoc targets.
+    assets = (db.query(ITAsset)
+              .filter(ITAsset.tenant_id.in_(tenants),
+                      func.coalesce(ITAsset.status, "") != "adhoc",
+                      func.coalesce(ITAsset.last_seen_source, "") != "pentest-adhoc")
+              .order_by(ITAsset.id).yield_per(200))
     return estate_field_catalog(assets)
 
 

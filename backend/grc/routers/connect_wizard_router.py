@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 
 from grc.crypto import encrypt_secret
 from grc.models import IntegrationConnection, get_db, ITAsset, CredentialProfile
+from grc.services.asset_change_log import change_source
 from grc.routers.auth_router import get_user_primary_tenant, require_auth, GRCUser
 
 router = APIRouter(prefix="/connect-wizard", tags=["Connect Wizard"])
@@ -293,6 +294,7 @@ def handshake(body: HandshakeIn, db: Session = Depends(get_db)):
         raise
 
 
+@change_source("scan")
 def _handshake_inner(body: "HandshakeIn", db: Session) -> dict:
     payload = _verify(body.tenant_token)
     tenant_id = payload["tenant_id"]

@@ -1853,6 +1853,8 @@ def transition_asset_lifecycle(
                 detail="An asset cannot be its own replacement",
             )
 
+    from ..services.asset_change_log import mark_source
+    mark_source(asset, "manual", user_id=getattr(current_user, "id", None))
     try:
         summary = asset_lifecycle.transition(
             db,
@@ -2093,7 +2095,8 @@ def update_asset_valuation(
         asset.integrity_rating = valuation.integrity_rating
     if valuation.availability_rating is not None:
         asset.availability_rating = valuation.availability_rating
-    
+    from ..services.asset_change_log import mark_source
+    mark_source(asset, "manual", user_id=getattr(current_user, "id", None))
     db.commit()
     db.refresh(asset)
     return asset
@@ -2734,6 +2737,8 @@ def collect_asset_service(
         asset.platform_properties = merged
         asset.platform_kind = platform_kind
         asset.last_seen_at = datetime.utcnow()
+        from ..services.asset_change_log import mark_source
+        mark_source(asset, "scan", user_id=getattr(current_user, "id", None))
         db.commit()
         return {"collected": True, "platform_kind": platform_kind}
     except Exception as exc:  # noqa: BLE001

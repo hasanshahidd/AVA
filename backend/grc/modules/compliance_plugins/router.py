@@ -1273,6 +1273,8 @@ def re_detect_asset_os(
     if norm:    asset.os_normalized = norm
     if build:   asset.os_build = build
     if edition: asset.os_edition = edition
+    from grc.services.asset_change_log import mark_source
+    mark_source(asset, "scan", user_id=getattr(current_user, "id", None))
     db.commit()
     after = {
         "os_family": asset.os_family,

@@ -39,6 +39,8 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
+from grc.services.asset_change_log import change_source
+
 from grc.models import (
     DiscoveryCampaign, DiscoveryScope, DiscoveryRun, DiscoveryJob, DiscoveryObservation,
     IntegrationConnection,
@@ -817,6 +819,7 @@ def create_run(
     return run
 
 
+@change_source("discovery")   # every asset field a run writes is journalled as network discovery
 def execute_run(
     db: Session,
     run_id: int,

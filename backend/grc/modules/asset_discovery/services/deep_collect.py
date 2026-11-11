@@ -340,6 +340,7 @@ def _resolve_or_create_asset(db: Session, obs: DiscoveryObservation) -> Tuple[IT
     return _create_from(db, obs.tenant_id, obs), True
 
 
+@change_source("discovery")
 def promote_observation(db: Session, obs: DiscoveryObservation,
                         profile: CredentialProfile, transport: str) -> ITAsset:
     """Authenticate to an unclaimed device and, ONLY on success, make it an asset.

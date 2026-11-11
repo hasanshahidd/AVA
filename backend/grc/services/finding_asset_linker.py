@@ -34,6 +34,7 @@ unique index and an explicit existence check); the caller owns the commit unless
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
+from grc.services.asset_change_log import change_source
 
 # A host token shorter than this is too ambiguous for the substring fallback
 # ("db", "01") — exact-match only below it.
@@ -270,6 +271,7 @@ def _apex_for_shared_ip(ip: Optional[str], ip_assets: Dict[str, Set[int]],
     return None
 
 
+@change_source("scan")
 def backfill_host_links(db: Session, tenant_id: int, *, commit: bool = False,
                         assign_unmatched_to_asset_id: Optional[int] = None) -> Dict[str, Any]:
     """Link every unlinked finding to the asset its ``affected_host`` names.
