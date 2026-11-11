@@ -400,3 +400,19 @@ def test_recon_parts_are_filed_where_they_belong(db):
     assert cats == {"recon.packages[openssl].version": "software", "recon.open_ports[22/tcp]": "identity"}
     by = {t["path"]: t["category"] for t in field_tracks(a)}
     assert by["recon.packages"] == "software" and by["recon.open_ports"] == "identity"
+
+
+def test_linux_running_services_list_start_stop_is_not_add_remove(db):
+    from grc.services.asset_change_log import drop_churn
+    svc = lambda *names: {"services": {"status": "discovered", "data": {"init_system": "systemd",
+        "services": [{"name": n, "state": "running"} for n in names]}}}
+    a = _asset(db, platform_properties=svc("ssh.service", "cron.service"))
+    a.platform_properties = svc("ssh.service", "cron.service", "fwupd.service")   # on-demand service started
+    db.commit()
+    assert _rows(db) == []
+    old = [{"field": "services.data.services[fwupd.service]", "section": "services", "change": "added",
+            "old": None, "new": "fwupd.service (state: running)"}]
+    assert drop_churn(old) == []
+    win = [{"field": "services.data[CoworkVMService]", "section": "services", "change": "added", "old": None,
+            "new": "CoworkVMService (account: LocalSystem, path: C:/x.exe, start_mode: Auto)"}]
+    assert drop_churn(win) == win          # a Windows service install is still a change

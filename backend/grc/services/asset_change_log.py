@@ -256,7 +256,10 @@ class _Diff:
     def _list(self, path: str, section: str, cat: str, a: list, b: list) -> None:
         a, b = [x for x in a if not _ephemeral(x)], [x for x in b if not _ephemeral(x)]
         if section == "services":
-            a, b = [_per_user(x) for x in a], [_per_user(x) for x in b]
+            # A list of only name + run state is a "what is running now" list (Linux agent):
+            # a service appearing / vanishing there is it starting / stopping, not install / remove.
+            a = [_per_user(x) for x in a if not _run_state_only(x)]
+            b = [_per_user(x) for x in b if not _run_state_only(x)]
         if any(isinstance(x, dict) for x in a + b):
             def keyed(items):
                 groups: Dict[str, List[Any]] = {}
@@ -294,6 +297,15 @@ class _Diff:
             if json.dumps(x, default=str) not in sb:
                 if not path.endswith(_ROLLING_LISTS):
                     self.add(path, section, cat, "removed", x, None)
+
+
+_RUN_STATE_KEYS = _SECTION_VOLATILE["services"]
+# Summary of such an item as stored by older rows: "fwupd.service (state: running)".
+_RUN_STATE_ONLY = re.compile(r"^\S+ \((?:state|status|sub_state|active_state|running|pid): [^,()]*\)$")
+
+
+def _run_state_only(item: Any) -> bool:
+    return isinstance(item, dict) and not (set(item) - {"name", "Name"} - _RUN_STATE_KEYS)
 
 
 def _per_user(item: Any) -> Any:
@@ -365,7 +377,11 @@ def _stale_shape(f: Dict[str, Any]) -> bool:
     field = str(f.get("field", ""))
     if f.get("change") == "removed" and (field.endswith(_ROLLING_LISTS) or _list_path(field).endswith(_ROLLING_LISTS)):
         return True
-    return f.get("section") == "services" and bool(_PER_USER_SUFFIX.search(_item_ref(field)[1]))
+    if f.get("section") != "services":
+        return False
+    if f.get("change") in ("added", "removed") and _RUN_STATE_ONLY.match(str(f.get("new" if f.get("change") == "added" else "old") or "")):
+        return True
+    return bool(_PER_USER_SUFFIX.search(_item_ref(field)[1]))
 
 
 def drop_churn(fields: List[Any]) -> List[Any]:
