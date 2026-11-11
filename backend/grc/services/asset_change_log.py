@@ -97,7 +97,7 @@ _UNIT_TOKENS = {"gb", "mb", "kb", "bytes", "pct", "percent", "percentage", "mhz"
 _ITEM_KEYS = ("name", "Name", "display_name", "DisplayName", "package", "username", "user", "UserName",
               "hotfix_id", "HotFixID", "id", "path", "mount", "mountpoint", "device", "DeviceID", "drive",
               "interface", "iface", "key", "serial", "slot", "bank", "label", "letter", "volume", "sid",
-              "model", "title")
+              "mac", "mac_address", "description", "model", "title")
 
 MAX_FIELDS = 300   # field rows stored per entry; section totals are always complete
 

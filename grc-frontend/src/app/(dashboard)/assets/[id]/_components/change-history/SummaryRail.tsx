@@ -14,7 +14,7 @@ import {
 
 function Block({ title, meta, children, first }: { title: string; meta?: string; children: ReactNode; first?: boolean }) {
   return (
-    <section className={first ? '' : 'pt-3 mt-3'} style={first ? undefined : { borderTop: `1px solid ${DIVIDER}` }}>
+    <section className={first ? '' : 'pt-2.5 mt-2.5'} style={first ? undefined : { borderTop: `1px solid ${DIVIDER}` }}>
       <div className="flex items-baseline justify-between gap-2 mb-1.5">
         <h3 className="text-[12.5px] font-semibold" style={{ color: INK }}>{title}</h3>
         {meta && <span className="text-[11px]" style={{ color: MUTED }}>{meta}</span>}
@@ -47,7 +47,7 @@ export default function SummaryRail({ summary, filters, onFilter }: {
   const max = Math.max(1, ...s.daily.map((d) => d.count));
   const active = s.daily.filter((d) => d.count).length;
   return (
-    <div className="rounded-[14px] bg-white p-4" style={{ border: '1px solid #E8ECEE', boxShadow: '0 1px 2px rgba(16,24,40,.04)' }}>
+    <div className="rounded-[12px] bg-white p-3" style={{ border: '1px solid #E8ECEE', boxShadow: '0 1px 2px rgba(16,24,40,.04)' }}>
       <Block first title="Activity" meta="Last 30 days">
         <div className="flex items-end gap-[2px] h-[40px]" role="img"
           aria-label={`Changes on ${active} of the last ${s.daily.length} days`}>

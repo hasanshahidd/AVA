@@ -114,12 +114,50 @@ export function fieldLabel(f: ChangeField): string {
   if (!isTelemetry(f)) return label(f.field);
   const rest = f.field.slice(sectionOf(f).length).replace(/^\.data\b/, '').replace(/^\.items\b/, '');
   const parts: string[] = [];
-  const re = /\[([^\]]*)\]|\.([^.[]+)/g;
-  for (let m = re.exec(rest); m; m = re.exec(rest)) {
-    if (m[1] !== undefined) parts.push(m[1]);
-    else if (m[2] && m[2] !== 'data' && m[2] !== 'items') parts.push(m[2] === 'status' ? 'Collection status' : label(m[2]));
+  for (const [kind, tok] of splitPath(rest)) {
+    if (kind === 'item') parts.push(itemName(tok));
+    else if (tok !== 'data' && tok !== 'items') parts.push(tok === 'status' ? 'Collection status' : label(tok));
   }
   return parts.length ? parts.join(' › ') : 'Section data';
+}
+
+/** ".a.b[key].c" → [['key','a'],['key','b'],['item','key'],['key','c']]; [..] may hold JSON with its own brackets/quotes. */
+function splitPath(p: string): ['key' | 'item', string][] {
+  const out: ['key' | 'item', string][] = [];
+  let i = 0;
+  while (i < p.length) {
+    if (p[i] === '.') {
+      let j = i + 1;
+      while (j < p.length && p[j] !== '.' && p[j] !== '[') j++;
+      if (j > i + 1) out.push(['key', p.slice(i + 1, j)]);
+      i = j;
+    } else if (p[i] === '[') {
+      let depth = 0, inStr = false, j = i;
+      for (; j < p.length; j++) {
+        const ch = p[j];
+        if (inStr) { if (ch === '\\') j++; else if (ch === '"') inStr = false; continue; }
+        if (ch === '"') inStr = true;
+        else if (ch === '[') depth++;
+        else if (ch === ']' && --depth === 0) break;
+      }
+      out.push(['item', p.slice(i + 1, j)]);
+      i = j + 1;
+    } else i++;
+  }
+  return out;
+}
+
+/** An item key recorded as raw JSON (no natural name) reads as its name / description / MAC / port. */
+function itemName(tok: string): string {
+  if (!tok.startsWith('{')) return tok;
+  try {
+    const o = JSON.parse(tok) as Record<string, unknown>;
+    const v = o.name ?? o.display_name ?? o.description ?? o.mac ?? o.mac_address
+      ?? (o.port != null ? `${o.port}/${o.proto ?? o.protocol ?? 'tcp'}` : null);
+    return v != null && v !== '' ? String(v) : 'Item';
+  } catch {
+    return 'Item';
+  }
 }
 export const isEmpty = (v: unknown) => v === null || v === undefined || v === '';
 

@@ -17,7 +17,7 @@ import {
   ArrowRight, ChevronDown, Cpu, FileUp, Plug, Radar, ScanLine, Settings2, type LucideIcon,
 } from 'lucide-react';
 import {
-  ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, SOFT, type ChangeEntry, type ChangeField,
+  ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, type ChangeEntry, type ChangeField,
   actorOf, categoryMeta, categoryOfField, entrySummary, fieldLabel, fieldsOf, fmtDate, fmtTime, fmtValue, isEmpty,
   isTelemetry, sectionLabel, sectionOf, sourceMeta, sourceOf,
 } from './model';
@@ -44,7 +44,7 @@ function Avatar({ entry }: { entry: ChangeEntry }) {
   const Icon = src === 'manual' ? null : SOURCE_ICON[src] ?? Settings2;
   const initials = actorOf(entry).split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <span className="flex items-center justify-center h-8 w-8 rounded-full flex-none text-[11px] font-semibold"
+    <span className="flex items-center justify-center h-7 w-7 rounded-full flex-none text-[10.5px] font-semibold"
       style={{ background: '#EFF5FA', color: '#014A81' }} aria-hidden>
       {Icon ? <Icon className="h-4 w-4" strokeWidth={1.9} /> : initials}
     </span>
@@ -75,7 +75,7 @@ function Tag({ change }: { change: 'added' | 'removed' }) {
 
 function DiffRow({ f }: { f: ChangeField }) {
   return (
-    <li className="grid grid-cols-1 sm:grid-cols-[minmax(120px,180px)_minmax(0,1fr)] gap-x-4 gap-y-0.5 py-[5px] text-[12.5px]">
+    <li className="grid grid-cols-1 sm:grid-cols-[minmax(120px,200px)_minmax(0,1fr)] gap-x-4 gap-y-0.5 py-[3px] text-[12.5px]">
       <span className="font-medium" style={{ color: SEC, overflowWrap: 'anywhere' }}>{fieldLabel(f)}</span>
       <span className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
         {f.change === 'added' || f.change === 'removed' ? (
@@ -138,7 +138,7 @@ export default function ChangeEntryCard({ entry, preview = 6, showAsset = false 
   const assetHref = entry.asset_id ? `/assets/${entry.asset_id}/history` : null;
 
   return (
-    <article className="flex gap-3 px-4 py-3.5">
+    <article className="flex gap-2.5 px-3 py-2.5">
       <Avatar entry={entry} />
       <div className="min-w-0 flex-1">
         <header className="flex flex-col sm:flex-row sm:items-start gap-x-3 gap-y-1.5">
@@ -165,10 +165,10 @@ export default function ChangeEntryCard({ entry, preview = 6, showAsset = false 
         </header>
 
         {groups.length > 0 && (
-          <div className="mt-2 rounded-[10px] px-3 py-1.5" style={{ background: SOFT, border: `1px solid ${DIVIDER}` }}>
+          <div className="mt-1">
             {groups.map((g, gi) => (
               <section key={g.c} aria-label={categoryMeta(g.c).label}
-                className={gi ? 'pt-1.5 mt-1.5' : ''} style={gi ? { borderTop: `1px solid ${DIVIDER}` } : undefined}>
+                className={gi ? 'pt-1 mt-1' : ''} style={gi ? { borderTop: `1px solid ${DIVIDER}` } : undefined}>
                 {multiCat && (
                   <h4 className="flex items-center gap-1.5 pt-1 text-[11.5px] font-semibold" style={{ color: INK }}>
                     <span className="h-[6px] w-[6px] rounded-full" style={{ background: categoryMeta(g.c).color }} aria-hidden />
@@ -199,7 +199,7 @@ export default function ChangeEntryCard({ entry, preview = 6, showAsset = false 
         )}
 
         {(recorded > preview || truncated > 0) && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
             {recorded > preview && (
               <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}
                 className="inline-flex items-center gap-1 font-semibold rounded-[6px] px-1 -mx-1 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#19A8E6]"

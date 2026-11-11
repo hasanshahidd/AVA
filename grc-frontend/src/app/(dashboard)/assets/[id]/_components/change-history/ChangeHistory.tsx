@@ -67,12 +67,12 @@ export function download(name: string, text: string) {
 
 export function KpiStrip({ items }: { items: { label: string; value: ReactNode; sub?: string }[] }) {
   return (
-    <div className="rounded-[14px] bg-white grid grid-cols-2 md:grid-cols-4 overflow-hidden" style={CARD_STYLE}>
+    <div className="rounded-[12px] bg-white grid grid-cols-2 md:grid-cols-4 overflow-hidden" style={CARD_STYLE}>
       {items.map((k, i) => (
-        <div key={k.label} className={`px-4 py-3 min-w-0 ${i % 2 ? 'border-l' : ''} ${i > 1 ? 'border-t md:border-t-0' : ''} ${i === 2 ? 'md:border-l' : ''}`}
+        <div key={k.label} className={`px-3.5 py-2 min-w-0 ${i % 2 ? 'border-l' : ''} ${i > 1 ? 'border-t md:border-t-0' : ''} ${i === 2 ? 'md:border-l' : ''}`}
           style={{ borderColor: DIVIDER }}>
           <div className="text-[11.5px]" style={{ color: MUTED }}>{k.label}</div>
-          <div className="text-[20px] font-semibold leading-tight tabular-nums truncate" style={{ color: INK }}>{k.value}</div>
+          <div className="text-[17px] font-semibold leading-tight tabular-nums truncate" style={{ color: INK }}>{k.value}</div>
           {k.sub && <div className="text-[11px] truncate" style={{ color: MUTED }}>{k.sub}</div>}
         </div>
       ))}
@@ -125,7 +125,7 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
   // Category is chosen by the toggle pages above the bar, so it isn't a filter here.
   const filtered = filters.source !== 'all' || filters.actor !== 'all' || !!filters.query.trim();
   return (
-    <div className="rounded-[14px] bg-white p-2.5" style={CARD_STYLE}>
+    <div className="rounded-[12px] bg-white p-2" style={CARD_STYLE}>
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative flex-1 min-w-[200px] basis-[220px]">
           <span className="sr-only">Search changes</span>
@@ -148,17 +148,17 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
             </button>
           ))}
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-1 pt-2 text-[11.5px]" style={{ color: MUTED }}>
-        <span aria-live="polite">Showing <b className="tabular-nums" style={{ color: INK }}>{shown}</b> of {total} change{total === 1 ? '' : 's'}</span>
+        <span className="text-[11.5px] whitespace-nowrap px-1" style={{ color: MUTED }} aria-live="polite">
+          <b className="tabular-nums" style={{ color: INK }}>{shown}</b> of {total}
+        </span>
         {filtered && (
           <button type="button" onClick={() => patch({ ...NO_FILTERS, period: filters.period, category: filters.category })}
-            className={`inline-flex items-center gap-1 font-semibold rounded-[6px] ${FOCUS}`} style={{ color: '#005B96' }}>
-            <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+            className={`inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-[6px] ${FOCUS}`} style={{ color: '#005B96' }}>
+            <X className="h-3.5 w-3.5" aria-hidden /> Clear
           </button>
         )}
         <button type="button" className={`btn ${FOCUS}`} onClick={onExport} disabled={!shown}
-          style={{ height: 30, marginLeft: 'auto', opacity: shown ? 1 : 0.45 }}>
+          style={{ height: 30, opacity: shown ? 1 : 0.45 }}>
           <Download className="h-4 w-4" aria-hidden /> Export CSV
         </button>
       </div>
@@ -171,17 +171,17 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
 export function Timeline({ items, preview, showAsset }: { items: ChangeEntry[]; preview?: number; showAsset?: boolean }) {
   const days = useMemo(() => groupByDay(items), [items]);
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {days.map((d) => (
         <section key={d.key} aria-label={`${d.title} ${d.date}`}>
-          <h3 className="flex items-baseline gap-2 px-1 mb-1.5">
+          <h3 className="flex items-baseline gap-2 px-1 mb-1">
             <span className="text-[13px] font-semibold" style={{ color: INK }}>{d.title}</span>
             <span className="text-[12px]" style={{ color: MUTED }}>{d.date}</span>
             <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: MUTED }}>
               {d.entries.length} change{d.entries.length === 1 ? '' : 's'}
             </span>
           </h3>
-          <div className="rounded-[14px] bg-white divide-y divide-[#F0F3F5]" style={CARD_STYLE}>
+          <div className="rounded-[12px] bg-white divide-y divide-[#F0F3F5]" style={CARD_STYLE}>
             {d.entries.map((e) => <ChangeEntryCard key={e.id} entry={e} preview={preview} showAsset={showAsset} />)}
           </div>
         </section>
@@ -222,15 +222,13 @@ export default function ChangeHistory({ assetId, variant, action }: {
   const view = useMemo(() => ({ ...filters, category: pickCategory(summary, filters.category) }), [filters, summary]);
   const shown = useMemo(() => applyFilters(items, view), [items, view]);
 
+  // No explanatory paragraph: it cost a row of space on every visit. Guide markers stay for the guided tour.
   const intro = (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-      <div className="flex flex-wrap items-center gap-1.5 text-[12px] min-w-0 flex-1" style={{ color: MUTED }}>
-        Every change to this asset, from manual edits, scans, network discovery, connectors, agents and imports. Entries cannot be edited or deleted.
-        <GuideMarker id="asset.historyWhy" n={1} />
-        <GuideMarker id="asset.historyActor" n={2} />
-        <GuideMarker id="asset.historyImmutable" n={3} />
-        <GuideMarker id="asset.historyAudit" n={4} />
-      </div>
+    <div className="flex items-center justify-end gap-1.5 empty:hidden">
+      <GuideMarker id="asset.historyWhy" n={1} />
+      <GuideMarker id="asset.historyActor" n={2} />
+      <GuideMarker id="asset.historyImmutable" n={3} />
+      <GuideMarker id="asset.historyAudit" n={4} />
       {action}
     </div>
   );
@@ -268,13 +266,13 @@ export default function ChangeHistory({ assetId, variant, action }: {
   );
 
   if (variant === 'tab') {
-    return <div className="inv2 space-y-3" style={{ color: SEC }}>{intro}{top}{body}</div>;
+    return <div className="inv2 space-y-2.5" style={{ color: SEC }}>{intro}{top}{body}</div>;
   }
   return (
-    <div className="inv2 space-y-3" style={{ color: SEC }}>
+    <div className="inv2 space-y-2.5" style={{ color: SEC }}>
       {intro}
       {top}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_272px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_256px] gap-3 items-start">
         <div className="min-w-0">{body}</div>
         {ready && (
           <aside className="lg:sticky lg:top-3" aria-label="Insights">

@@ -15,7 +15,7 @@ import {
   CategoryTabs, EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download, pickCategory,
 } from '../[id]/_components/change-history/ChangeHistory';
 import {
-  MUTED, NO_FILTERS, SEC, type ChangeEntry, type Filters, applyFilters, fmtDate, relTime, summarise,
+  NO_FILTERS, SEC, type ChangeEntry, type Filters, applyFilters, fmtDate, relTime, summarise,
 } from '../[id]/_components/change-history/model';
 
 const WINDOWS = [{ key: '7', label: '7 days' }, { key: '30', label: '30 days' }, { key: '90', label: '90 days' }];
@@ -51,10 +51,7 @@ export default function AssetHistoryFeed() {
   }
 
   return (
-    <div className="inv2 space-y-3" style={{ color: SEC }}>
-      <p className="text-[12px] px-0.5" style={{ color: MUTED }}>
-        Every change to every asset across the estate, newest first. Open an asset to see its full history.
-      </p>
+    <div className="inv2 space-y-2.5" style={{ color: SEC }}>
       <KpiStrip items={[
         { label: 'Changes', value: summary.entries, sub: items.length >= LIMIT ? `Latest ${LIMIT} shown` : `Last ${days} days` },
         { label: 'Assets changed', value: summary.assets },
