@@ -69,9 +69,9 @@ export function download(name: string, text: string) {
 
 export function KpiStrip({ items }: { items: { label: string; value: ReactNode; sub?: string }[] }) {
   return (
-    <div className="rounded-[12px] bg-white grid grid-cols-2 md:grid-cols-4 overflow-hidden" style={CARD_STYLE}>
+    <div className={`rounded-[12px] bg-white grid grid-cols-2 ${items.length === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} overflow-hidden`} style={CARD_STYLE}>
       {items.map((k, i) => (
-        <div key={k.label} className={`px-3.5 py-2 min-w-0 ${i % 2 ? 'border-l' : ''} ${i > 1 ? 'border-t md:border-t-0' : ''} ${i === 2 ? 'md:border-l' : ''}`}
+        <div key={k.label} className={`px-3.5 py-2 min-w-0 ${i % 2 ? 'border-l' : ''} ${i > 1 ? 'border-t md:border-t-0' : ''} ${i > 0 && i % 2 === 0 ? 'md:border-l' : ''}`}
           style={{ borderColor: DIVIDER }}>
           <div className="text-[11.5px]" style={{ color: MUTED }}>{k.label}</div>
           <div className="text-[17px] font-semibold leading-tight tabular-nums truncate" style={{ color: INK }}>{k.value}</div>
