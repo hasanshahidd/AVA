@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Plug, Plus, RefreshCw, CheckCircle, AlertCircle, Loader2, X, ExternalLink,
   Ticket, Activity, ShieldAlert, MessageSquare, BookOpenCheck, Trash2, Mic, Cpu, Fingerprint, Globe,
-  Cloud,
+  Cloud, Boxes,
 } from 'lucide-react';
 import {
   connectorsApi, integrationsApi, cloudConnectorsApi, ssoApi,
@@ -24,9 +24,10 @@ const CATEGORY_META: Record<string, { label: string; icon: typeof Ticket; descri
   collab:     { label: 'Collaboration', icon: MessageSquare,  description: 'Post alerts and findings to your team channels.' },
   transcribe: { label: 'Transcription', icon: Mic,            description: 'Pull meeting transcripts to auto-create committee meeting minutes.' },
   easm_source:{ label: 'EASM Sources',  icon: Globe,          description: 'Passive external attack-surface intel — enrich asset discovery with internet-exposure data.' },
+  cmdb:       { label: 'CMDB',           icon: Boxes,          description: 'Import configuration items from your external CMDB into the asset inventory.' },
 };
 
-const CATEGORY_ORDER = ['ticketing', 'siem', 'edr', 'identity', 'pentest', 'collab', 'transcribe', 'easm_source'] as const;
+const CATEGORY_ORDER = ['ticketing', 'siem', 'edr', 'identity', 'pentest', 'collab', 'transcribe', 'easm_source', 'cmdb'] as const;
 
 // Official brand logos, bundled locally in /public/logos/connectors (no runtime
 // CDN, no CSP concern). Keyed by provider id. SVGs are monochrome marks; PNGs are
@@ -812,7 +813,17 @@ function SetupModal({ provider, existing, onClose }: SetupModalProps) {
                   <span className="ml-2 text-[10px] font-normal text-slate-400">(leave blank to keep existing)</span>
                 )}
               </label>
-              {field.kind === 'textarea' ? (
+              {field.kind === 'toggle' ? (
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={(fields[field.key] || '') === 'true'}
+                    onChange={(e) => setField(field.key, e.target.checked ? 'true' : '')}
+                    className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  {field.placeholder || 'Enable'}
+                </label>
+              ) : field.kind === 'textarea' ? (
                 <textarea
                   required={field.required && !isEdit}
                   value={fields[field.key] || ''}

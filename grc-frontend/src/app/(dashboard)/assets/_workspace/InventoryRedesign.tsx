@@ -10,10 +10,10 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { registrableDomain, rollupCounts, rollupAssets, isExternalAsset } from '@/lib/domains';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api';
+import apiClient, { entityExtrasApi } from '@/lib/api';
 import { SCORECARD_QUERY_KEYS } from '@/components/dashboard/scorecard-query-keys';
 import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import { RowActionsMenu } from './RowActionsMenu';
@@ -119,6 +119,7 @@ const HEADS: { key: string; label: string; sortable: boolean }[] = [
   { key: 'scan', label: 'Last scan', sortable: true },
   { key: 'value', label: 'Value', sortable: true },
   { key: 'status', label: 'Status', sortable: true },
+  { key: 'changes', label: 'Changes', sortable: false },
 ];
 // Owner · Department · Data Class · Business Function share ONE column at the end —
 // mostly unset on discovered assets, so four empty columns became one quiet cell.
@@ -168,6 +169,14 @@ export default function InventoryRedesign(p: Props) {
     queryKey: [...SCORECARD_QUERY_KEYS.assets],
     queryFn: async () => { try { return (await apiClient.get('/assets/inventory-overview')).data as any; } catch { return null; } },
   });
+  const router = useRouter();
+  // Per-asset recent-change counts (30d) for the Changes column → click-through to history.
+  const changeSummaryQ = useQuery({
+    queryKey: ['asset-change-summary', 30],
+    queryFn: async () => { try { return (await entityExtrasApi.assetChangeSummary(30)).data.items; } catch { return {} as Record<string, { count: number; last_at: string | null }>; } },
+  });
+  const changeSummary: Record<string, { count: number; last_at: string | null }> = changeSummaryQ.data || {};
+
   const score: number | null = ov.data?.performance?.score ?? null;
   const grade: string | null = ov.data?.performance?.grade ?? null;
   const openVulns: number = ov.data?.counts?.open_vulnerabilities ?? 0;
@@ -435,9 +444,9 @@ export default function InventoryRedesign(p: Props) {
                   </tr></thead>
                   <tbody>
                     {p.loading ? (
-                      <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
+                      <tr><td colSpan={13} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>Loading…</td></tr>
                     ) : rows.length === 0 ? (
-                      <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
+                      <tr><td colSpan={13} style={{ ...td, textAlign: 'center', color: '#78838F', padding: 26 }}>No assets match this view.</td></tr>
                     ) : orderedRows.map((a) => {
                       const tl = TILE[typeKey(a)] || { bg: '#E4E9ED', fg: '#78838F' };
                       const ck = CRIT[critOf(a)];
@@ -481,6 +490,18 @@ export default function InventoryRedesign(p: Props) {
                           <td style={td}>{lastScan(a)}</td>
                           <td style={td}>{val(a)}</td>
                           <td style={td}>{st && stMap[st] ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#3A4653' }}><i style={{ width: 7, height: 7, borderRadius: '50%', background: stMap[st].c }} />{stMap[st].l}</span> : none()}</td>
+                          <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                            {(() => { const chg = changeSummary[String(a.id)]; const n = chg?.count || 0; return n > 0 ? (
+                              <button type="button" onClick={() => router.push(`/assets/${a.id}/history`)}
+                                title={`${n} change${n > 1 ? 's' : ''} in the last 30 days${chg?.last_at ? ' · last ' + new Date(chg.last_at).toLocaleDateString() : ''} — view full history`}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 'none', cursor: 'pointer', background: '#E7F4FB', color: '#015B96', borderRadius: 999, padding: '2px 8px', fontSize: 10.5, fontWeight: 700 }}>
+                                <i style={{ width: 6, height: 6, borderRadius: '50%', background: '#19A8E6' }} />{n}
+                              </button>
+                            ) : (
+                              <button type="button" onClick={() => router.push(`/assets/${a.id}/history`)} title="View change history"
+                                style={{ border: 'none', background: 'transparent', color: '#C4CCD3', cursor: 'pointer', fontSize: 11 }}>—</button>
+                            ); })()}
+                          </td>
                           <td style={{ ...td, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                             {p.onBulkUpdate && p.canEdit ? (
                               <input type="checkbox" checked={!!a.cde_environment}

@@ -152,7 +152,7 @@ def get_providers(
 ):
     return {
         "encryption_enabled": has_master_key(),
-        "categories": ["ticketing", "siem", "pentest", "collab", "transcribe", "easm_source"],
+        "categories": ["ticketing", "siem", "pentest", "collab", "transcribe", "easm_source", "cmdb"],
         # `internal` providers are AVA's own infrastructure (e.g. the Help Desk
         # engine), configured platform-side. They are deliberately NOT offered to
         # customers — the client must never be asked to wire up, or even see, an
@@ -179,7 +179,7 @@ def list_connectors(
         .filter(
             IntegrationConnection.tenant_id == tenant_id,
             IntegrationConnection.category.in_(
-                ["ticketing", "siem", "pentest", "collab", "transcribe", "easm_source"]
+                ["ticketing", "siem", "pentest", "collab", "transcribe", "easm_source", "cmdb"]
             ),
         )
         .order_by(IntegrationConnection.created_at.desc())

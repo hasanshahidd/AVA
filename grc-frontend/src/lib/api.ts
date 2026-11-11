@@ -4501,7 +4501,19 @@ export const entityExtrasApi = {
   addNote: (entityType: 'asset' | 'vulnerability', entityId: number, body: string) =>
     apiClient.post(`/notes/${entityType}/${entityId}`, { body }),
   history: (entityType: 'asset' | 'vulnerability', entityId: number) =>
-    apiClient.get<Array<{ id: number; action: string; detail?: string; actor_name?: string; created_at?: string }>>(`/history/${entityType}/${entityId}`),
+    apiClient.get<Array<{ id: number; action: string; detail?: string; actor_name?: string; created_at?: string;
+      source?: string; fields?: Array<{ field: string; category?: string; old: unknown; new: unknown }> }>>(`/history/${entityType}/${entityId}`),
+  // Estate-wide change journal (Inventory → Asset history): same rows as per-asset history + which asset.
+  assetChangeLog: (days = 30, limit = 300) =>
+    apiClient.get<Array<{ id: number; action: string; detail?: string; actor_name?: string; created_at?: string;
+      source?: string; fields?: Array<{ field: string; section?: string; category?: string; change?: string; old: unknown; new: unknown;
+      old_label?: string | null; new_label?: string | null }>; sections?: Record<string, { category: string; added: number; removed: number; changed: number }> | null;
+      total_fields?: number | null; truncated?: number | null; asset_id?: number | null; asset_name?: string | null; asset_type?: string | null }>>(
+      '/asset-change-log', { params: { days, limit } }),
+  // Per-asset recent-change counts for the inventory 'Changes' column.
+  assetChangeSummary: (days?: number) =>
+    apiClient.get<{ items: Record<string, { count: number; last_at: string | null }>; days: number }>(
+      '/asset-change-summary', { params: days ? { days } : undefined }),
   assetAlerts: (assetId: number) =>
     apiClient.get<Array<{
       severity: string; title: string; detail: string; kind: string;

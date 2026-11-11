@@ -16,7 +16,7 @@ same tenant-scoping.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -107,6 +107,12 @@ class HistoryOut(BaseModel):
     detail: Optional[str] = None
     actor_name: Optional[str] = None
     created_at: Optional[datetime] = None
+    # Field-level diff + source for the change-history timeline (asset.updated rows).
+    source: Optional[str] = None
+    fields: Optional[List[Dict[str, Any]]] = None
+    sections: Optional[Dict[str, Any]] = None    # per-section added/removed/changed totals
+    total_fields: Optional[int] = None
+    truncated: Optional[int] = None
 
 
 @router.get("/history/{entity_type}/{entity_id}", response_model=List[HistoryOut])
@@ -125,31 +131,180 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
             AuditLog.resource_id == entity_id,          # resource_id is Integer
         )
         .order_by(AuditLog.timestamp.desc())
-        .limit(200)
+        .limit(1000)  # shortcut: newest 1000 rows; page this if an asset ever exceeds it
         .all()
     )
-    out: List[HistoryOut] = []
-    for r in rows:
-        changes = r.changes if isinstance(r.changes, dict) else None
-        detail = None
-        if changes:
-            detail = changes.get("detail") or ", ".join(
-                f"{k}: {v}" for k, v in list(changes.items())[:4]
-            ) or None
+    names = _ref_names(db, rows)
+    out = [_history_row(r, names) for r in rows]
+    return [HistoryOut(**h) for h in out if h is not None]
+
+
+def _history_row(r: AuditLog, names: Dict[str, Dict[int, str]]) -> Optional[Dict[str, Any]]:
+    """One history entry, or None when every journalled field is now classed as
+    churn (rows written before a noise rule existed)."""
+    changes = r.changes if isinstance(r.changes, dict) else None
+    raw = changes.get("fields") if changes else None
+    fields = _with_categories(raw, names)
+    sections, total = (changes or {}).get("sections"), (changes or {}).get("total_fields")
+    if isinstance(raw, list) and raw and fields is not None and len(fields) < len(raw):
+        if not fields:
+            return None
+        if not (changes or {}).get("truncated"):   # complete rows: recount what's left
+            sections = {}
+            for f in fields:
+                t = sections.setdefault(f.get("section") or f["field"],
+                                        {"category": f["category"], "added": 0, "removed": 0, "changed": 0})
+                t[f.get("change") if f.get("change") in ("added", "removed") else "changed"] += 1
+            total = len(fields)
+    detail = None
+    if changes:
+        detail = changes.get("detail") or ", ".join(
+            f"{k}: {v}" for k, v in list(changes.items())[:4]
+        ) or None
+    actor = None
+    try:
+        if r.user is not None:
+            actor = getattr(r.user, "display_name", None) or getattr(r.user, "username", None)
+    except Exception:
         actor = None
-        try:
-            if r.user is not None:
-                actor = getattr(r.user, "display_name", None) or getattr(r.user, "username", None)
-        except Exception:
-            actor = None
-        out.append(HistoryOut(
-            id=r.id,
-            action=r.action or "changed",
-            detail=detail,
-            actor_name=actor,
-            created_at=r.timestamp,
-        ))
+    return dict(
+        id=r.id,
+        action=r.action or "changed",
+        detail=detail,
+        actor_name=actor,
+        created_at=r.timestamp,
+        source=(changes.get("source") if changes else None),
+        fields=fields,
+        sections=sections,
+        total_fields=total,
+        truncated=(changes.get("truncated") if changes else None),
+    )
+
+
+class EstateHistoryOut(HistoryOut):
+    asset_id: Optional[int] = None
+    asset_name: Optional[str] = None
+    asset_type: Optional[str] = None
+
+
+@router.get("/asset-change-log", response_model=List[EstateHistoryOut])
+def asset_change_log(days: int = 30, limit: int = 300, db: Session = Depends(get_db),
+                     current_user: GRCUser = Depends(require_auth)):
+    """Estate-wide asset change journal (newest first) for the Inventory
+    'Asset history' view: the same rows as each asset's history, plus which asset."""
+    tenants = get_user_tenants(current_user, db) or []
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
+    rows = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.tenant_id.in_(tenants),
+            AuditLog.resource_type == "it_asset",
+            AuditLog.action == "asset.updated",
+            AuditLog.timestamp >= since,
+        )
+        .order_by(AuditLog.timestamp.desc())
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
+    names = _ref_names(db, rows)
+    ids = {r.resource_id for r in rows if r.resource_id is not None}
+    assets = {a.id: a for a in db.query(ITAsset.id, ITAsset.name, ITAsset.asset_type)
+              .filter(ITAsset.id.in_(ids), ITAsset.tenant_id.in_(tenants)).all()} if ids else {}
+    out: List[EstateHistoryOut] = []
+    for r in rows:
+        h = _history_row(r, names)
+        if h is None:
+            continue
+        a = assets.get(r.resource_id)
+        out.append(EstateHistoryOut(**h, asset_id=r.resource_id,
+                                    asset_name=a.name if a else None, asset_type=a.asset_type if a else None))
     return out
+
+
+_USER_REF_FIELDS = {"owner_id", "primary_owner_id", "secondary_owner_id", "business_owner_id", "escalation_contact_id"}
+_ASSET_REF_FIELDS = {"parent_asset_id", "replacement_asset_id"}
+
+
+def _ref_names(db: Session, rows: List[AuditLog]) -> Dict[str, Dict[int, str]]:
+    """Display names for user / asset ids that appear as old/new values."""
+    want: Dict[str, set] = {"user": set(), "asset": set()}
+    for r in rows:
+        for f in ((r.changes or {}).get("fields") or []) if isinstance(r.changes, dict) else []:
+            if not isinstance(f, dict):
+                continue
+            kind = "user" if f.get("field") in _USER_REF_FIELDS else "asset" if f.get("field") in _ASSET_REF_FIELDS else None
+            if kind:
+                want[kind].update(v for v in (f.get("old"), f.get("new")) if isinstance(v, int))
+    out: Dict[str, Dict[int, str]] = {"user": {}, "asset": {}}
+    if want["user"]:
+        for u in db.query(GRCUser).filter(GRCUser.id.in_(want["user"])).all():
+            out["user"][u.id] = getattr(u, "display_name", None) or getattr(u, "username", None) or f"User #{u.id}"
+    if want["asset"]:
+        for a in db.query(ITAsset.id, ITAsset.name).filter(ITAsset.id.in_(want["asset"])).all():
+            out["asset"][a.id] = a.name
+    return out
+
+
+def _with_categories(fields: Optional[List[Dict[str, Any]]],
+                     names: Optional[Dict[str, Dict[int, str]]] = None) -> Optional[List[Dict[str, Any]]]:
+    """Re-file plain column fields into the asset-record categories (older rows
+    used a coarser set) and attach display names for user / asset references."""
+    if not isinstance(fields, list):
+        return None
+    from ..services.asset_change_log import column_category, is_noise
+    names = names or {"user": {}, "asset": {}}
+    out = []
+    for f in fields:
+        if isinstance(f, str):
+            # Older journal rows recorded only which fields changed, not the values.
+            f = {"field": f, "change": "updated", "old": None, "new": None}
+        if not isinstance(f, dict):
+            continue
+        name = f.get("field", "")
+        if is_noise(name, f.get("section")):
+            continue
+        row = {**f, "category": column_category(name) or f.get("category") or "other"}
+        kind = "user" if name in _USER_REF_FIELDS else "asset" if name in _ASSET_REF_FIELDS else None
+        if kind:
+            row["old_label"] = names[kind].get(f.get("old")) if isinstance(f.get("old"), int) else None
+            row["new_label"] = names[kind].get(f.get("new")) if isinstance(f.get("new"), int) else None
+        out.append(row)
+    return out
+
+
+@router.get("/asset-change-summary")
+def asset_change_summary(days: int = 30, db: Session = Depends(get_db),
+                         current_user: GRCUser = Depends(require_auth)):
+    """Per-asset recent-change counts for the inventory 'Changes' column.
+    Returns {asset_id: {count, last_at}} for the caller's tenants."""
+    tenants = get_user_tenants(current_user, db) or []
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
+    rows = (
+        db.query(AuditLog.resource_id, AuditLog.timestamp, AuditLog.changes)
+        .filter(
+            AuditLog.tenant_id.in_(tenants),
+            AuditLog.resource_type == "it_asset",
+            AuditLog.action == "asset.updated",
+            AuditLog.timestamp >= since,
+        )
+        .all()
+    )
+    items: Dict[str, Dict[str, Any]] = {}
+    for rid, ts, changes in rows:
+        if rid is None or _is_churn_only(changes):
+            continue   # same rows the history page hides, so the counts agree with it
+        it = items.setdefault(str(rid), {"count": 0, "last_at": None})
+        it["count"] += 1
+        if ts and (it["last_at"] is None or ts.isoformat() > it["last_at"]):
+            it["last_at"] = ts.isoformat()
+    return {"items": items, "days": days}
+
+
+def _is_churn_only(changes: Any) -> bool:
+    """True when every journalled field of a row is churn under the current rules."""
+    from ..services.asset_change_log import is_noise
+    fields = changes.get("fields") if isinstance(changes, dict) else None
+    return bool(fields) and all(isinstance(f, dict) and is_noise(f.get("field", ""), f.get("section")) for f in fields)
 
 
 # ─── Alerts (derived, no table) ──────────────────────────────────────────────
@@ -272,6 +427,35 @@ def asset_alerts(asset_id: int, db: Session = Depends(get_db),
                 title=f"Not seen for {days} days",
                 detail="No scan or agent contact recently — the record may be stale.",
             ))
+
+    # Recent configuration changes — surface the field-level change journal as an
+    # alert so an edit / scan / connector change is noticed, not just logged.
+    change_rows = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.resource_type == "it_asset",
+            AuditLog.resource_id == asset_id,
+            AuditLog.action == "asset.updated",
+            AuditLog.timestamp >= now - timedelta(days=7),
+        )
+        .order_by(AuditLog.timestamp.desc())
+        .all()
+    )
+    change_rows = [r for r in change_rows if not _is_churn_only(r.changes)]
+    if change_rows:
+        lc = change_rows[0].changes if isinstance(change_rows[0].changes, dict) else {}
+        n = len(change_rows)
+        by_source: Dict[str, int] = {}
+        for r in change_rows:
+            src = (r.changes or {}).get("source") if isinstance(r.changes, dict) else None
+            by_source[src or "manual"] = by_source.get(src or "manual", 0) + 1
+        mix = ", ".join(f"{c} {s}" for s, c in sorted(by_source.items(), key=lambda kv: -kv[1]))
+        detail_txt = f"Latest: {lc.get('detail') or 'details changed'}. By source: {mix}."
+        alerts.append(AlertOut(
+            severity="info", kind="change",
+            title=f"{n} configuration change{'s' if n != 1 else ''} in the last 7 days",
+            detail=detail_txt,
+        ))
 
     # Overlay the stored human response onto each derived alert.
     states = {

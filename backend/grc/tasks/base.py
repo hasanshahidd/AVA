@@ -175,6 +175,11 @@ class TenantTask(Task):
     max_retries = 3
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        # tenant_slug may arrive positionally (.delay(slug)) OR as a keyword
+        # (.delay(tenant_slug=slug)). The fan-out dispatchers use the keyword
+        # form, so normalise either style to args[0] instead of rejecting it.
+        if not args and "tenant_slug" in kwargs:
+            args = (kwargs.pop("tenant_slug"),)
         if not args:
             raise ValueError(f"{self.name} called without tenant_slug as first arg")
         tenant_slug = args[0]

@@ -15,6 +15,7 @@ import InventoryScorecard from '@/components/dashboard/InventoryScorecard';
 import InventoryRedesign from './_workspace/InventoryRedesign';
 import { RowActionsMenu } from './_workspace/RowActionsMenu';
 import InventoryOverview from './_overview/InventoryOverview';
+import AssetHistoryFeed from './_overview/AssetHistoryFeed';
 import { SmartImportWizard } from './_import/SmartImportWizard';
 import {
   Loader2,
@@ -30,6 +31,7 @@ import {
   Plus,
   LayoutDashboard,
   Boxes,
+  History,
 } from 'lucide-react';
 // CIS Benchmark now lives as a tab inside IT Asset Inventory (merged from the
 // former standalone /compliance-overview page). Render just the overview body —
@@ -49,11 +51,11 @@ export default function AssetsPage() {
   // Overview (default) ↔ Inventory register ↔ CIS Benchmark tab. Overview is the
   // C-level landing; the register is one click away at ?tab=inventory. Existing
   // deep-links to ?tab=cis (e.g. from the Performance dashboard) still resolve.
-  const [activeView, setActiveView] = useState<'overview' | 'inventory' | 'cis'>(() => {
+  const [activeView, setActiveView] = useState<'overview' | 'inventory' | 'cis' | 'history'>(() => {
     const t = searchParams.get('tab');
-    return t === 'cis' ? 'cis' : t === 'inventory' ? 'inventory' : 'overview';
+    return t === 'cis' || t === 'inventory' || t === 'history' ? t : 'overview';
   });
-  const switchView = (v: 'overview' | 'inventory' | 'cis') => {
+  const switchView = (v: 'overview' | 'inventory' | 'cis' | 'history') => {
     setActiveView(v);
     router.replace(v === 'overview' ? '/assets' : `/assets?tab=${v}`, { scroll: false });
   };
@@ -375,6 +377,7 @@ export default function AssetsPage() {
                 { key: 'overview', label: 'Overview', icon: LayoutDashboard, onClick: () => switchView('overview'), active: activeView === 'overview' },
                 { key: 'inventory', label: 'Inventory', icon: Boxes, onClick: () => switchView('inventory'), active: activeView === 'inventory' },
                 { key: 'cis', label: 'CIS Benchmark', icon: ShieldCheck, onClick: () => switchView('cis'), active: activeView === 'cis' },
+                { key: 'history', label: 'Asset history', icon: History, onClick: () => switchView('history'), active: activeView === 'history' },
                 { key: 'add', label: 'Add asset', icon: Plus, onClick: () => setIsModalOpen(true), hidden: !canCreate },
                 { key: 'import', label: 'Import assets', icon: Upload, onClick: () => setIsImportModalOpen(true), hidden: !canCreate },
               ]}
@@ -395,6 +398,8 @@ export default function AssetsPage() {
         <InventoryOverview />
       ) : activeView === 'cis' ? (
         <CisBenchmark view={cisView} />
+      ) : activeView === 'history' ? (
+        <AssetHistoryFeed />
       ) : (
       <InventoryRedesign
         hideHead

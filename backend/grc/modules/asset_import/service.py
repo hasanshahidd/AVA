@@ -7,6 +7,7 @@ recompute, OS normalization) but lives here so the existing endpoint is untouche
 """
 from __future__ import annotations
 
+from grc.services.asset_change_log import change_source
 import csv
 import io
 import uuid
@@ -146,6 +147,7 @@ def _tag(asset: ITAsset, batch: str, filename: str, created: bool) -> None:
     asset.platform_properties = props
 
 
+@change_source("import")
 def commit(db: Session, tenant_id: int, content: bytes, filename: str,
            colmap: Dict[str, Optional[str]], dupe_strategy: str = "skip",
            header_row: Optional[int] = None) -> Dict[str, Any]:
