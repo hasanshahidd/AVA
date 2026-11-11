@@ -59,7 +59,8 @@ log "3/8 python wheels (exactly what prod's venv runs)"
 "$SRC/backend/venv/bin/pip" wheel -q -r "$B/artifacts/requirements.lock" -w "$B/artifacts/wheels"
 
 log "4/8 OS packages (clean ubuntu:24.04 dependency closure)"
-"$HERE/fetch-debs.sh" "$B"
+# CAIVA_DEBS_FROM=<dir>: reuse a verified debs/ from an earlier build when Launchpad/PPA mirrors are down
+if [ -n "${CAIVA_DEBS_FROM:-}" ]; then cp -a "$CAIVA_DEBS_FROM"/. "$B/debs/"; else "$HERE/fetch-debs.sh" "$B"; fi
 [ -s "$B/debs/Packages.gz" ] || { echo "ABORT: package index not built"; exit 1; }
 
 log "5/8 agents, Linux CIS content, nuclei templates, wordlists"
