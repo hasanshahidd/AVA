@@ -352,3 +352,36 @@ def test_estate_field_catalog_counts_assets_holding_each_field(db):
     assert cat["assets"] == 2
     assert by["location"]["count"] == 1 and by["name"]["count"] == 2
     assert by["services.data"]["kind"] == "list" and by["services.data"]["count"] == 1 and by["services.data"]["value"] is None
+
+
+def test_hotfix_rolling_off_recent_list_is_not_an_uninstall(db):
+    hf = lambda *ids: {"windows_update": {"status": "discovered", "data": {
+        "recent_hotfixes": [{"id": i, "type": "Security Update"} for i in ids]}}}
+    a = _asset(db, platform_properties=hf("KB1", "KB2"))
+    a.platform_properties = hf("KB2", "KB3")
+    db.commit()
+    (row,) = _rows(db)
+    assert [(f["field"], f["change"]) for f in row.changes["fields"]] == [
+        ("windows_update.data.recent_hotfixes[KB3]", "added")]
+
+
+def test_virtual_adapter_new_mac_is_a_mac_change_not_remove_add(db):
+    nic = lambda mac: {"network": {"status": "discovered", "data": [{"name": "", "description": "WAN Miniport (IP)", "mac": mac}]}}
+    a = _asset(db, platform_properties=nic("BE:E3:20:52:41:53"))
+    a.platform_properties = nic("6C:68:20:52:41:53")
+    db.commit()
+    (row,) = _rows(db)
+    assert [(f["field"], f["change"]) for f in row.changes["fields"]] == [("network.data[WAN Miniport (IP)].mac", "changed")]
+
+
+def test_history_read_drops_order_paired_duplicates_and_rolled_off_hotfixes():
+    from grc.services.asset_change_log import drop_churn
+    rows = [
+        {"field": "recon.open_ports[5353/udp].service", "section": "recon", "change": "changed", "old": "chrome", "new": "msedge"},
+        {"field": "recon.open_ports[5353/udp']", "section": "recon", "change": "added", "old": None, "new": "port: 5353"},
+        {"field": "recon.windows.hotfixes", "section": "recon", "change": "removed", "old": "KB5127648", "new": None},
+        {"field": "windows_update.data.recent_hotfixes[KB5127648]", "section": "windows_update", "change": "removed", "old": "KB5127648", "new": None},
+        {"field": "services.data[OneSyncSvc_1cf2d1]", "section": "services", "change": "removed", "old": "OneSyncSvc_1cf2d1", "new": None},
+        {"field": "recon.open_ports[8834/tcp]", "section": "recon", "change": "added", "old": None, "new": "port: 8834"},
+    ]
+    assert [f["field"] for f in drop_churn(rows)] == ["recon.open_ports[8834/tcp]"]

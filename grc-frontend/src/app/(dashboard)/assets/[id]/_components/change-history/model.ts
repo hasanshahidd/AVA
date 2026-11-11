@@ -202,11 +202,24 @@ export function categoriesOf(e: ChangeEntry): string[] {
 }
 export const totalOf = (e: ChangeEntry) => e.total_fields ?? fieldsOf(e).length;
 
+/* Times: the journal stores UTC without a zone mark ("2026-11-11T12:07:08"), which a browser
+ * would read as its own local time. Entries are normalised to UTC on fetch (withUtc) and every
+ * date / time is shown in Pakistan time, whatever the viewer's computer is set to. */
+export const TIME_ZONE = 'Asia/Karachi';
+export const TZ_LABEL = 'PKT';
+const HAS_ZONE = /(Z|[+-]\d{2}:?\d{2})$/i;
+export const asUtc = (iso?: string | null) => (iso && !HAS_ZONE.test(iso) ? `${iso}Z` : iso ?? undefined);
+export function withUtc<T extends { created_at?: string }>(items: T[]): T[] {
+  return items.map((e) => (e.created_at && !HAS_ZONE.test(e.created_at) ? { ...e, created_at: `${e.created_at}Z` } : e));
+}
+
 export function fmtDate(iso?: string) {
-  return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: TIME_ZONE }) : '—';
 }
 export function fmtTime(iso?: string, seconds = false) {
-  return iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }) : '';
+  return iso ? new Date(iso).toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}), timeZone: TIME_ZONE,
+  }) : '';
 }
 /** "just now", "5 min ago", "3 h ago", "2 days ago", else the date. */
 export function relTime(iso?: string) {
@@ -218,25 +231,20 @@ export function relTime(iso?: string) {
   const d = Math.round(mins / 1440);
   return d < 14 ? `${d} day${d === 1 ? '' : 's'} ago` : fmtDate(iso);
 }
-function sameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
+/** Calendar day in Pakistan time, e.g. "2026-11-11". */
+const pkDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 export function dayKey(iso?: string) {
-  if (!iso) return 'undated';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return iso ? pkDay(new Date(iso)) : 'undated';
 }
 /** Day heading: { title: "Today" | "Monday", date: "9 November 2026" }. */
 export function dayLabel(iso?: string): { title: string; date: string } {
   if (!iso) return { title: 'Undated', date: '' };
   const d = new Date(iso);
-  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const now = new Date();
-  const yest = new Date(now);
-  yest.setDate(now.getDate() - 1);
-  if (sameDay(d, now)) return { title: 'Today', date };
-  if (sameDay(d, yest)) return { title: 'Yesterday', date };
-  return { title: d.toLocaleDateString('en-GB', { weekday: 'long' }), date };
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: TIME_ZONE });
+  const day = pkDay(d);
+  if (day === pkDay(new Date())) return { title: 'Today', date };
+  if (day === pkDay(new Date(Date.now() - 86_400_000))) return { title: 'Yesterday', date };
+  return { title: d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: TIME_ZONE }), date };
 }
 export type DayGroup = { key: string; title: string; date: string; entries: ChangeEntry[] };
 /** Entries arrive newest first; consecutive same-day entries share a group. */
@@ -337,11 +345,9 @@ export function summarise(items: ChangeEntry[], days = 30): Summary {
   }
   const dated = items.map((e) => e.created_at).filter(Boolean).sort() as string[];
   const daily: Summary['daily'] = [];
-  const today = new Date();
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    daily.push({ key: dayKey(d.toISOString()), label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), count: 0 });
+    const d = new Date(Date.now() - i * 86_400_000);
+    daily.push({ key: dayKey(d.toISOString()), label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: TIME_ZONE }), count: 0 });
   }
   const idx = new Map(daily.map((d, i) => [d.key, i]));
   for (const e of items) {

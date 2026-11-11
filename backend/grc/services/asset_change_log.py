@@ -95,6 +95,11 @@ _EPHEMERAL_PORT = 49152   # IANA dynamic range: client sockets (e.g. a browser's
 # Windows per-user services (AarSvc_7d7b4, "Agent Activation Runtime_7d7b4") get a new
 # random suffix at every logon; compare them without it.
 _PER_USER_SUFFIX = re.compile(r"_[0-9a-f]{4,8}\b")
+# "Latest N" lists: an older entry rolling off is not an uninstall, so only additions count.
+_ROLLING_LISTS = ("hotfixes", "recent_hotfixes")
+# Virtual adapters (WAN Miniport…) have no name and get a new MAC on reboot: key them by description.
+_SECTION_ITEM_KEYS: Dict[str, Tuple[str, ...]] = {
+    "network": ("name", "description", "interface", "iface", "mac", "mac_address")}
 _ALWAYS_VOLATILE_TOKENS = {"pid", "uptime", "temperature", "celsius", "rpm"}
 _MEASURE_TOKENS = {"free", "available", "usage", "utilization", "utilisation", "load", "used"}
 _UNIT_TOKENS = {"gb", "mb", "kb", "bytes", "pct", "percent", "percentage", "mhz"}
@@ -179,7 +184,7 @@ def _item_key(item: Any, section: str = "") -> str:
     if isinstance(item, dict) and item.get("port") is not None:
         return f"{item['port']}/{item.get('proto') or item.get('protocol') or 'tcp'}"
     if isinstance(item, dict):
-        for k in _ITEM_KEYS:
+        for k in _SECTION_ITEM_KEYS.get(section, ()) + _ITEM_KEYS:
             if item.get(k) not in (None, ""):
                 return str(item[k])
         # No identity field: key on the stable fields only, or a free-space wobble
@@ -254,7 +259,8 @@ class _Diff:
                 if k not in ka:
                     self.add(f"{path}[{k}]", section, cat, "added", None, kb[k])
                 elif k not in kb:
-                    self.add(f"{path}[{k}]", section, cat, "removed", ka[k], None)
+                    if not path.endswith(_ROLLING_LISTS):
+                        self.add(f"{path}[{k}]", section, cat, "removed", ka[k], None)
                 else:
                     self.tree(f"{path}[{k}]", section, cat, ka[k], kb[k])
             return
@@ -265,7 +271,8 @@ class _Diff:
                 self.add(path, section, cat, "added", None, x)
         for x in a:
             if json.dumps(x, default=str) not in sb:
-                self.add(path, section, cat, "removed", x, None)
+                if not path.endswith(_ROLLING_LISTS):
+                    self.add(path, section, cat, "removed", x, None)
 
 
 def _per_user(item: Any) -> Any:
@@ -321,11 +328,37 @@ def _list_path(field: str) -> str:
     return field.split("[", 1)[0]   # key truncated mid-bracket
 
 
+_ITEM_REF = re.compile(r"^(.*?)\[([^\[\]]*)\](?:\.[^\[\]]*)?$")
+
+
+def _item_ref(field: str) -> Tuple[str, str]:
+    """(list path, item key) of the plain-keyed list item a path points into, e.g.
+    'recon.open_ports[5353/udp].service' -> ('recon.open_ports', '5353/udp')."""
+    m = _ITEM_REF.match(field)
+    return (m.group(1), m.group(2)) if m else ("", "")
+
+
+def _stale_shape(f: Dict[str, Any]) -> bool:
+    """Rows of a kind the journal no longer writes: a hotfix rolling off a 'latest N'
+    list, or a Windows per-user service instance (new random suffix every logon)."""
+    field = str(f.get("field", ""))
+    if f.get("change") == "removed" and (field.endswith(_ROLLING_LISTS) or _list_path(field).endswith(_ROLLING_LISTS)):
+        return True
+    return f.get("section") == "services" and bool(_PER_USER_SUFFIX.search(_item_ref(field)[1]))
+
+
 def drop_churn(fields: List[Any]) -> List[Any]:
     """Journalled fields minus churn under the current rules: noise rows, plus
     removed+added pairs of one list item that read identically (rows written
     when a keyless item was keyed on a volatile value such as free space)."""
-    kept = [f for f in fields if not (isinstance(f, dict) and is_noise(str(f.get("field", "")), f.get("section")))]
+    kept = [f for f in fields if not (isinstance(f, dict) and (
+        is_noise(str(f.get("field", "")), f.get("section")) or _stale_shape(f)))]
+    # Rows written when two items shared a key (5353/udp and 5353/udp') were paired by
+    # list order, so every row on that key in that entry is unreliable.
+    refs = [_item_ref(str(f.get("field", ""))) if isinstance(f, dict) else ("", "") for f in kept]
+    dup = {(p, k.rstrip("'")) for p, k in refs if k.endswith("'")}
+    if dup:
+        kept = [f for f, (p, k) in zip(kept, refs) if (p, k.rstrip("'")) not in dup]
 
     def twin(f: Any) -> Optional[Tuple[str, Any, str]]:
         ch = f.get("change") if isinstance(f, dict) else None
@@ -369,7 +402,7 @@ def diff_asset(asset: ITAsset) -> _Diff:
     return d
 
 
-_LIST_PREVIEW = 50     # current items sent per list field; the count is always complete
+_LIST_PREVIEW = 500    # current items sent per list field (all of them for most lists); the count is always complete
 _MAX_TRACKS = 5000   # leaf fields; a list counts once however many items
 
 

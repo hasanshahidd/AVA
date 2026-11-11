@@ -24,8 +24,8 @@ import FieldTracker from './FieldTracker';
 import SummaryRail from './SummaryRail';
 import {
   BORDER, CATEGORY_ORDER, DIVIDER, INK, MUTED, NO_FILTERS, PERIODS, SEC, SOURCE_ORDER, type ChangeEntry, type Filters,
-  type Summary, actorOf, applyFilters, categoryMeta, categoryOfField, fieldLabel, fieldsOf, fmtDate, fmtValue,
-  groupByDay, isTelemetry, relTime, sectionLabel, sectionOf, sourceMeta, sourceOf, summarise,
+  type Summary, withUtc, actorOf, applyFilters, categoryMeta, categoryOfField, fieldLabel, fieldsOf, fmtDate, fmtValue,
+  dayKey, fmtTime, groupByDay, isTelemetry, relTime, sectionLabel, sectionOf, sourceMeta, sourceOf, summarise,
 } from './model';
 
 export const CARD_STYLE = { border: `1px solid ${BORDER}`, boxShadow: '0 1px 2px rgba(16,24,40,.04)' };
@@ -39,11 +39,10 @@ export function csvOf(items: ChangeEntry[], withAsset = false): string {
     const s = String(v ?? '');
     return `"${(/^\s*[=+\-@]|^[\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
   };
-  const head = ['Date', 'Time', ...(withAsset ? ['Asset'] : []), 'Who', 'Source', 'Category', 'Section', 'Field', 'Change', 'Before', 'After'];
+  const head = ['Date (PKT)', 'Time (PKT)', ...(withAsset ? ['Asset'] : []), 'Who', 'Source', 'Category', 'Section', 'Field', 'Change', 'Before', 'After'];
   const rows = [head];
   for (const e of items) {
-    const d = e.created_at ? new Date(e.created_at) : null;
-    const base = [d ? d.toISOString().slice(0, 10) : '', d ? d.toISOString().slice(11, 19) + 'Z' : '',
+    const base = [e.created_at ? dayKey(e.created_at) : '', fmtTime(e.created_at, true),
       ...(withAsset ? [e.asset_name ?? ''] : []), actorOf(e), sourceMeta(sourceOf(e)).label];
     const fs = fieldsOf(e);
     if (!fs.length) rows.push([...base, '', '', e.action, '', '', e.detail ?? '']);
@@ -219,7 +218,7 @@ export default function ChangeHistory({ assetId, variant, action }: {
 
   const q = useQuery({
     queryKey: ['entity-history', 'asset', assetId],
-    queryFn: async () => (await entityExtrasApi.history('asset', assetId)).data as ChangeEntry[],
+    queryFn: async () => withUtc((await entityExtrasApi.history('asset', assetId)).data as ChangeEntry[]),
   });
   const items = useMemo(() => q.data ?? [], [q.data]);
   const summary = useMemo(() => summarise(items), [items]);

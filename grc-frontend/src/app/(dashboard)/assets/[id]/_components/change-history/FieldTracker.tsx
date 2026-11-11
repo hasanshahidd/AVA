@@ -23,8 +23,8 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { KpiStrip, StateMessage, CARD_STYLE, type Segmented } from './ChangeHistory';
 import { SourceBadge } from './ChangeEntryCard';
 import {
-  ADD, BORDER, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, PERIODS, SEC, type ChangeEntry, categoryMeta,
-  fmtDate, fmtTime, relTime,
+  ADD, BORDER, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, PERIODS, SEC, TZ_LABEL, type ChangeEntry, categoryMeta,
+  dayKey, dayLabel, fmtDate, fmtTime, relTime,
 } from './model';
 import {
   RECORD_GROUP, type FieldRow, type Track, type TrackChange, buildTracks, currentValue, describeChange, inPeriod, shown,
@@ -40,27 +40,42 @@ const catOf = (t: Track) => (CATEGORY_ORDER.includes(t.category) ? t.category : 
 
 /* ── popup: one field's whole track ───────────────────────────────────── */
 
+/** One change as its own box: time (PKT) + source on top, what changed below. */
 function Change({ t, c, estate }: { t: Track; c: TrackChange; estate: boolean }) {
   const d = describeChange(t, c);
   return (
-    <li className="grid grid-cols-1 sm:grid-cols-[132px_minmax(0,1fr)] gap-x-4 gap-y-0.5 px-5 py-2 text-[12.5px]">
-      <span className="tabular-nums whitespace-nowrap" style={{ color: MUTED }}>{fmtDate(c.at)} · {fmtTime(c.at)}</span>
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+    <li className="rounded-[10px] bg-white px-3 py-2 text-[12.5px]" style={{ border: `1px solid ${BORDER}` }}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+        <time dateTime={c.at} className="tabular-nums font-semibold" style={{ color: INK }}>{fmtTime(c.at)} {TZ_LABEL}</time>
+        <SourceBadge source={c.source} />
+        {c.source === 'manual' && <span className="text-[11.5px]" style={{ color: MUTED }}>by {c.actor}</span>}
         {estate && c.assetId && (
-          <Link href={`/assets/${c.assetId}/history`} className={`font-semibold hover:underline rounded ${FOCUS}`} style={{ color: '#005B96' }}>
+          <Link href={`/assets/${c.assetId}/history`} className={`ml-auto font-semibold hover:underline rounded ${FOCUS}`} style={{ color: '#005B96' }}>
             {c.assetName || `Asset ${c.assetId}`}
           </Link>
         )}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
         <span className="font-medium" style={{ color: INK, overflowWrap: 'anywhere' }}>{d.text}</span>
         {d.from !== undefined && <span style={{ color: DEL, textDecoration: 'line-through', overflowWrap: 'anywhere' }}>{d.from}</span>}
         {d.from !== undefined && d.to !== undefined && <ArrowRight className="h-3.5 w-3.5 flex-none" style={{ color: FAINT }} aria-label="changed to" />}
         {d.to !== undefined && <span style={{ color: ADD, fontWeight: 500, overflowWrap: 'anywhere' }}>{d.to}</span>}
         {d.note && <span className="text-[12px]" style={{ color: MUTED, overflowWrap: 'anywhere' }}>({d.note})</span>}
-        <SourceBadge source={c.source} />
-        {c.source === 'manual' && <span className="text-[11.5px]" style={{ color: MUTED }}>by {c.actor}</span>}
-      </span>
+      </div>
     </li>
   );
+}
+
+/** Changes (newest first) under day headings, in Pakistan time. */
+function byDay(changes: TrackChange[]) {
+  const out: { key: string; title: string; date: string; items: TrackChange[] }[] = [];
+  for (const c of changes) {
+    const key = dayKey(c.at);
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.items.push(c);
+    else out.push({ key, ...dayLabel(c.at), items: [c] });
+  }
+  return out;
 }
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -95,9 +110,18 @@ function FieldPopup({ v, estate, onClose }: { v: View; estate: boolean; onClose:
         <p className="px-5 py-3 text-[12.5px]" style={{ color: MUTED }}>A live reading that changes on every report, so it is not tracked as a change.</p>
       )}
       {changes.length > 0 ? (
-        <ul className="divide-y" style={{ borderColor: DIVIDER }}>
-          {changes.slice(0, shownN).map((c, i) => <Change key={i} t={t} c={c} estate={estate} />)}
-        </ul>
+        <div className="px-5 py-3 space-y-3" style={{ background: '#F7F9FA' }}>
+          {byDay(changes.slice(0, shownN)).map((g) => (
+            <section key={g.key} aria-label={`${g.title} ${g.date}`}>
+              <h4 className="flex items-baseline gap-2 mb-1.5">
+                <span className="text-[12.5px] font-semibold" style={{ color: INK }}>{g.title}</span>
+                <span className="text-[12px]" style={{ color: MUTED }}>{g.date}</span>
+                <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: MUTED }}>{g.items.length} change{g.items.length === 1 ? '' : 's'}</span>
+              </h4>
+              <ul className="space-y-1.5">{g.items.map((c, i) => <Change key={i} t={t} c={c} estate={estate} />)}</ul>
+            </section>
+          ))}
+        </div>
       ) : t.kind !== 'live' && (
         <p className="px-5 py-6 text-center text-[13px]" style={{ color: MUTED }}>No change recorded for this field{estate ? ' on any asset' : ''} in this period.</p>
       )}

@@ -19,7 +19,7 @@ import {
 import {
   ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, type ChangeEntry, type ChangeField,
   actorOf, categoryMeta, categoryOfField, entrySummary, fieldLabel, fieldsOf, fmtDate, fmtTime, fmtValue, isEmpty,
-  isTelemetry, sectionLabel, sectionOf, sourceMeta, sourceOf,
+  isTelemetry, sectionLabel, sectionOf, sourceMeta, sourceOf, TZ_LABEL,
 } from './model';
 
 const MONO = "font-['IBM_Plex_Mono',ui-monospace,monospace] text-[11.5px]";
@@ -157,9 +157,9 @@ export default function ChangeEntryCard({ entry, preview = 6, showAsset = false 
           </div>
           <div className="flex items-center gap-2 flex-none">
             <SourceBadge source={src} />
-            <time dateTime={entry.created_at} title={`${fmtDate(entry.created_at)} ${fmtTime(entry.created_at, true)}`}
-              className="text-[11.5px] tabular-nums w-[38px] text-right" style={{ color: MUTED }}>
-              {fmtTime(entry.created_at)}
+            <time dateTime={entry.created_at} title={`${fmtDate(entry.created_at)} ${fmtTime(entry.created_at, true)} ${TZ_LABEL}`}
+              className="text-[11.5px] tabular-nums whitespace-nowrap text-right" style={{ color: MUTED }}>
+              {fmtTime(entry.created_at)} {TZ_LABEL}
             </time>
           </div>
         </header>

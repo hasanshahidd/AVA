@@ -15,7 +15,7 @@ export type FieldRow = {
   value: unknown; count: number | null; label?: string | null;
 };
 export type TrackChange = {
-  at?: string; source: string; actor: string; change: string;
+  entry: number; at?: string; source: string; actor: string; change: string;
   /** A whole list item (or a plain list value), not a sub-field of one. */
   itemLevel: boolean;
   /** Item / sub-field below the track, e.g. "openssl" or "C: › Capacity (GB)". */
@@ -99,14 +99,72 @@ export function buildTracks(rows: FieldRow[], entries: ChangeEntry[]): Track[] {
         t = gone;
       }
       t.changes.push({
-        at: e.created_at, source: sourceOf(e), actor: actorOf(e), change: f.change || 'changed',
+        entry: e.id, at: e.created_at, source: sourceOf(e), actor: actorOf(e), change: f.change || 'changed',
         where: rest ? describeRest(rest) : undefined, itemLevel: !rest || rest.endsWith(']'),
         old: f.old, new: f.new, oldLabel: f.old_label, newLabel: f.new_label,
         assetId: e.asset_id, assetName: e.asset_name,
       });
     }
   }
+  for (const t of tracks) {
+    if (!t.isList || !t.changes.length) continue;
+    if (t.changes.length > 1) t.changes = tidyList(t.changes);
+    // Never show "removed" for an item the asset still has (needs the complete current list).
+    const now = Array.isArray(t.value) && t.value.length === t.count ? new Set((t.value as unknown[]).map((x) => shown(x))) : null;
+    if (now) t.changes = t.changes.filter((c) => !(c.itemLevel && c.change === 'removed' && now.has(shown(c.old))));
+  }
   return tracks;
+}
+
+const DESC = /\bdescription: ([^,)]+)/;
+const SERVICE = /\bservice: ([^,)]+)/;
+/** Identity of a list item across reports: an adapter by its description (its MAC can change on
+ *  reboot), a port by port/proto + the process on it, anything else by its key or value. */
+function itemOf(c: TrackChange): string {
+  const v = shown(c.change === 'added' ? c.new : c.old);
+  const desc = DESC.exec(v)?.[1];
+  const id = desc ?? `${c.where ?? v}${SERVICE.exec(v) ? ` ${SERVICE.exec(v)![1]}` : ''}`;
+  return `${c.assetId ?? ''}|${id}`;
+}
+
+/** List history read as people expect it:
+ *  - one report that removed X and added Y on the same sub-field (Wi-Fi › Gateway) → one change X → Y;
+ *  - an item reported missing and then back again (a report that briefly lacked it) → both dropped,
+ *    so something that is still there is never shown as removed. */
+export function tidyList(changes: TrackChange[]): TrackChange[] {
+  let out: TrackChange[] = [];
+  const pairs = new Map<string, TrackChange[]>();
+  for (const c of changes) {
+    if (c.itemLevel || (c.change !== 'added' && c.change !== 'removed')) continue;
+    const k = `${c.entry}|${c.assetId ?? ''}|${c.where ?? ''}`;
+    pairs.set(k, [...(pairs.get(k) ?? []), c]);
+  }
+  const merged = new Set<TrackChange>();
+  for (const cs of Array.from(pairs.values())) {
+    const rem = cs.filter((c) => c.change === 'removed');
+    const add = cs.filter((c) => c.change === 'added');
+    if (rem.length === 1 && add.length === 1) {
+      merged.add(rem[0]);
+      Object.assign(add[0], { change: 'changed', old: rem[0].old, oldLabel: rem[0].oldLabel });
+    }
+  }
+  out = changes.filter((c) => !merged.has(c));
+
+  // Changes arrive newest first; walk each item's own events oldest → newest.
+  const drop = new Set<TrackChange>();
+  const lastEvent = new Map<string, TrackChange>();
+  for (let i = out.length - 1; i >= 0; i--) {
+    const c = out[i];
+    if (!c.itemLevel || (c.change !== 'added' && c.change !== 'removed')) continue;
+    const k = itemOf(c);
+    const prev = lastEvent.get(k);
+    if (prev && prev.change === 'removed' && c.change === 'added') {
+      drop.add(prev);
+      drop.add(c);
+      lastEvent.delete(k);
+    } else lastEvent.set(k, c);
+  }
+  return drop.size ? out.filter((c) => !drop.has(c)) : out;
 }
 
 /* ── plain-English wording ───────────────────────────────────────────── */

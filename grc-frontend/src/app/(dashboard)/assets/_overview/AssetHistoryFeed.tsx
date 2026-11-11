@@ -18,7 +18,7 @@ import {
   CategoryTabs, EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download, pickCategory,
 } from '../[id]/_components/change-history/ChangeHistory';
 import {
-  NO_FILTERS, SEC, type ChangeEntry, type Filters, applyFilters, fmtDate, relTime, summarise,
+  NO_FILTERS, SEC, withUtc, type ChangeEntry, type Filters, applyFilters, fmtDate, relTime, summarise,
 } from '../[id]/_components/change-history/model';
 
 const WINDOWS = [{ key: '7', label: '7 days' }, { key: '30', label: '30 days' }, { key: '90', label: '90 days' }];
@@ -35,7 +35,7 @@ export default function AssetHistoryFeed() {
 
   const q = useQuery({
     queryKey: ['asset-change-log', Number(days), limit],
-    queryFn: async () => (await entityExtrasApi.assetChangeLog(Number(days), limit)).data as ChangeEntry[],
+    queryFn: async () => withUtc((await entityExtrasApi.assetChangeLog(Number(days), limit)).data as ChangeEntry[]),
   });
   const items = useMemo(() => q.data ?? [], [q.data]);
   const summary = useMemo(() => summarise(items), [items]);
