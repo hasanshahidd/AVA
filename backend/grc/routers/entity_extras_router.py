@@ -181,6 +181,34 @@ def _history_row(r: AuditLog, names: Dict[str, Dict[int, str]]) -> Optional[Dict
     )
 
 
+@router.get("/asset-fields/{asset_id}")
+def asset_fields(asset_id: int, db: Session = Depends(get_db),
+                 current_user: GRCUser = Depends(require_auth)):
+    """Every field of one asset as it is now (columns + telemetry), with the same
+    paths as the change journal, for the field-by-field history view."""
+    from ..services.asset_change_log import field_tracks
+    tenants = get_user_tenants(current_user, db) or []
+    asset = db.query(ITAsset).filter(ITAsset.id == asset_id, ITAsset.tenant_id.in_(tenants)).first()
+    if asset is None:
+        raise HTTPException(404, "asset not found in this tenant")
+    fields = field_tracks(asset)
+    # Owner / parent ids read as names, like they do in the history rows.
+    ids = {k: {t["value"] for t in fields if t["path"] in refs and isinstance(t["value"], int)}
+           for k, refs in (("user", _USER_REF_FIELDS), ("asset", _ASSET_REF_FIELDS))}
+    names: Dict[str, Dict[int, str]] = {"user": {}, "asset": {}}
+    if ids["user"]:
+        names["user"] = {u.id: getattr(u, "display_name", None) or u.username
+                         for u in db.query(GRCUser).filter(GRCUser.id.in_(ids["user"])).all()}
+    if ids["asset"]:
+        names["asset"] = dict(db.query(ITAsset.id, ITAsset.name).filter(
+            ITAsset.id.in_(ids["asset"]), ITAsset.tenant_id.in_(tenants)).all())
+    for t in fields:
+        kind = "user" if t["path"] in _USER_REF_FIELDS else "asset" if t["path"] in _ASSET_REF_FIELDS else None
+        if kind and isinstance(t["value"], int):
+            t["label"] = names[kind].get(t["value"])
+    return {"fields": fields}
+
+
 class EstateHistoryOut(HistoryOut):
     asset_id: Optional[int] = None
     asset_name: Optional[str] = None

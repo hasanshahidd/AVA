@@ -4510,6 +4510,10 @@ export const entityExtrasApi = {
       old_label?: string | null; new_label?: string | null }>; sections?: Record<string, { category: string; added: number; removed: number; changed: number }> | null;
       total_fields?: number | null; truncated?: number | null; asset_id?: number | null; asset_name?: string | null; asset_type?: string | null }>>(
       '/asset-change-log', { params: { days, limit } }),
+  // Every field of one asset as it is now (same paths as the change journal): the field-by-field history view.
+  assetFields: (assetId: number) =>
+    apiClient.get<{ fields: Array<{ path: string; section: string; category: string; kind: 'value' | 'list' | 'live';
+      value: unknown; count: number | null; label?: string | null }> }>(`/asset-fields/${assetId}`),
   // Per-asset recent-change counts for the inventory 'Changes' column.
   assetChangeSummary: (days?: number) =>
     apiClient.get<{ items: Record<string, { count: number; last_at: string | null }>; days: number }>(

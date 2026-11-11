@@ -1,9 +1,11 @@
 'use client';
 
 /*
- * Asset change history: KPI strip → one-row filter bar (search, source,
- * category, contributor, period, export) → day-grouped timeline, plus a light
- * Insights card on the full page.
+ * Asset change history, two views:
+ *   Fields   (default) — every field of the asset by category, each with its
+ *            own track: current value, last change or "No change" (FieldTracker).
+ *   Activity — KPI strip → filter bar → day-grouped timeline (+ Insights card
+ *            on the full page).
  *   variant="page" → timeline + Insights column (stacked on narrow screens).
  *   variant="tab"  → single column for the asset record's History tab.
  * KpiStrip / FilterBar / Timeline / csvOf are shared with the estate-wide
@@ -18,6 +20,7 @@ import { GuideMarker } from '@/components/guide';
 import { FilterSelect } from '../../../_workspace/FilterSelect';
 import '../../../inventory-redesign.css';   // .inv2 tokens: .seg / .btn / .search / .fsel
 import ChangeEntryCard from './ChangeEntryCard';
+import FieldTracker from './FieldTracker';
 import SummaryRail from './SummaryRail';
 import {
   BORDER, CATEGORY_ORDER, DIVIDER, INK, MUTED, NO_FILTERS, PERIODS, SEC, SOURCE_ORDER, type ChangeEntry, type Filters,
@@ -211,6 +214,7 @@ export default function ChangeHistory({ assetId, variant, action }: {
   assetId: number; variant: 'page' | 'tab'; /** e.g. the tab's "Open full history" link, shown beside the intro. */ action?: ReactNode;
 }) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [mode, setMode] = useState<'fields' | 'activity'>('fields');
   const patch = (p: Partial<Filters>) => setFilters((f) => ({ ...f, ...p }));
 
   const q = useQuery({
@@ -224,7 +228,13 @@ export default function ChangeHistory({ assetId, variant, action }: {
 
   // No explanatory paragraph: it cost a row of space on every visit. Guide markers stay for the guided tour.
   const intro = (
-    <div className="flex items-center justify-end gap-1.5 empty:hidden">
+    <div className="flex items-center gap-1.5">
+      <div className="segwrap mr-auto" role="group" aria-label="History view">
+        {([['fields', 'Fields'], ['activity', 'Activity']] as const).map(([k, l]) => (
+          <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}
+            className={`${mode === k ? 'seg on' : 'seg'} ${FOCUS}`} style={{ height: 28, padding: '0 12px', fontSize: 12.5 }}>{l}</button>
+        ))}
+      </div>
       <GuideMarker id="asset.historyWhy" n={1} />
       <GuideMarker id="asset.historyActor" n={2} />
       <GuideMarker id="asset.historyImmutable" n={3} />
@@ -246,6 +256,17 @@ export default function ChangeHistory({ assetId, variant, action }: {
     body = shown.length
       ? <Timeline items={shown} preview={variant === 'tab' ? 4 : 6} />
       : <StateMessage>No changes match these filters.</StateMessage>;
+  }
+
+  if (mode === 'fields') {
+    return (
+      <div className="inv2 space-y-2.5" style={{ color: SEC }}>
+        {intro}
+        {q.isLoading ? <StateMessage>Loading change history…</StateMessage>
+          : q.isError ? <StateMessage tone="error">Could not load change history. Refresh the page to try again.</StateMessage>
+            : <FieldTracker assetId={assetId} entries={items} />}
+      </div>
+    );
   }
 
   const ready = !q.isLoading && !q.isError && items.length > 0;

@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from grc.models import AuditLog, ITAsset
 from grc.services.asset_change_log import (
-    CATEGORIES, COLUMN_CATEGORIES, SECTION_CATEGORIES, TRACKED_COLUMNS, change_source, mark_source,
+    CATEGORIES, COLUMN_CATEGORIES, SECTION_CATEGORIES, TRACKED_COLUMNS, change_source, field_tracks, mark_source,
 )
 
 
@@ -302,3 +302,24 @@ def test_shared_port_listeners_are_not_paired_by_order(db):
     (row,) = _rows(db)
     assert sorted((f["field"], f["change"]) for f in row.changes["fields"]) == [
         ("recon.data.open_ports[5353/udp (chrome)]", "removed"), ("recon.data.open_ports[5353/udp (msedge)]", "added")]
+
+
+def test_field_tracks_use_journal_paths_and_cover_every_column(db):
+    a = _asset(db, location="HQ", platform_properties={
+        "defender": {"status": "discovered", "data": {"realtime_protection": True, "signature_age_days": 2}},
+        "storage": {"status": "discovered", "data": {"volumes": [{"drive_letter": "C:", "capacity_gb": 237, "free_gb": 9}]}},
+        "processes": {"status": "discovered", "data": [{"name": "x"}]}})
+    by = {t["path"]: t for t in field_tracks(a)}
+    assert {c for c in TRACKED_COLUMNS if c != "platform_properties"} <= set(by)
+    assert by["location"] == {"path": "location", "section": "location", "category": "ownership",
+                              "kind": "value", "value": "HQ", "count": None}
+    assert by["defender.data.realtime_protection"]["category"] == "security"
+    assert by["defender.data.signature_age_days"]["kind"] == "value"
+    vols = by["storage.data.volumes"]
+    assert vols["kind"] == "list" and vols["count"] == 1 and vols["category"] == "hardware"
+    assert not any(p.startswith("processes") for p in by)        # volatile section never listed
+    # Same naming as the journal: a real change lands on a listed path.
+    a.platform_properties = {**a.platform_properties,
+                             "defender": {"status": "discovered", "data": {"realtime_protection": False}}}
+    db.commit()
+    assert "defender.data.realtime_protection" in {f["field"] for f in _rows(db)[0].changes["fields"]}

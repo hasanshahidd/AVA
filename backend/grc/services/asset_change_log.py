@@ -39,7 +39,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 from sqlalchemy import event, inspect as sa_inspect
 from sqlalchemy.orm import Session
 
-from ..audit_capture import _coerce, _collector
+from ..audit_capture import _coerce, _collector, is_sensitive_key
 from ..models import AuditLog, ITAsset
 
 logger = logging.getLogger(__name__)
@@ -353,6 +353,50 @@ def diff_asset(asset: ITAsset) -> _Diff:
         else:
             d.tree(col, col, COLUMN_CATEGORIES.get(col, "other"), old, new)
     return d
+
+
+_LIST_PREVIEW = 50     # current items sent per list field; the count is always complete
+_MAX_TRACKS = 2000
+
+
+def field_tracks(asset: ITAsset) -> List[Dict[str, Any]]:
+    """Every field of the asset as it is now, named exactly like the journal's
+    field paths so each one can be joined to its changes. kind: 'value' (one
+    value), 'list' (items: count + preview), 'live' (a reading the journal
+    deliberately ignores, e.g. free space)."""
+    out: List[Dict[str, Any]] = []
+
+    def put(path: str, section: str, cat: str, kind: str, value: Any, count: Optional[int] = None) -> None:
+        if len(out) < _MAX_TRACKS:
+            hidden = is_sensitive_key(path.rsplit(".", 1)[-1]) and value not in (None, "")
+            out.append({"path": path, "section": section, "category": cat, "kind": kind,
+                        "value": "***" if hidden else value, "count": count})
+
+    def walk(path: str, section: str, cat: str, v: Any) -> None:
+        if isinstance(v, dict):
+            skip = _SECTION_VOLATILE.get(section, ())
+            for k in sorted(v, key=str):
+                if _volatile(k) or k in skip:
+                    if not isinstance(v[k], (dict, list)):
+                        put(f"{path}.{k}", section, cat, "live", _coerce(v[k]))
+                    continue
+                walk(f"{path}.{k}", section, cat, v[k])
+            return
+        if isinstance(v, list):
+            items = [x for x in v if not _ephemeral(x)]
+            put(path, section, cat, "list", [_summary(x) for x in items[:_LIST_PREVIEW]], len(items))
+            return
+        put(path, section, cat, "value", _coerce(v))
+
+    for col in TRACKED_COLUMNS:
+        v = getattr(asset, col, None)
+        if col != "platform_properties":
+            walk(col, col, COLUMN_CATEGORIES.get(col, "other"), v)
+            continue
+        for sec, data in sorted((v or {}).items(), key=lambda kv: str(kv[0])):
+            if sec not in _VOLATILE_SECTIONS and not _volatile(sec):
+                walk(sec, sec, SECTION_CATEGORIES.get(sec, "platform"), data)
+    return out
 
 
 def _detail(d: _Diff) -> str:

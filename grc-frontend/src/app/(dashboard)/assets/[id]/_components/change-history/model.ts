@@ -101,7 +101,7 @@ export function titleCase(s: string) {
   return t ? t[0].toUpperCase() + t.slice(1) : s;
 }
 const UNIT = /_(gb|mb|kb|tb|mhz|ghz|pct|percentage)$/i;
-const label = (k: string) => LABELS[k] ?? (UNIT.test(k)
+export const label = (k: string) => LABELS[k] ?? (UNIT.test(k)
   ? `${titleCase(k.replace(UNIT, ''))} (${k.match(UNIT)![1].replace(/pct|percentage/i, '%').toUpperCase()})`
   : titleCase(k));
 export const sectionOf = (f: ChangeField) => f.section || f.field;
@@ -122,7 +122,7 @@ export function fieldLabel(f: ChangeField): string {
 }
 
 /** ".a.b[key].c" → [['key','a'],['key','b'],['item','key'],['key','c']]; [..] may hold JSON with its own brackets/quotes. */
-function splitPath(p: string): ['key' | 'item', string][] {
+export function splitPath(p: string): ['key' | 'item', string][] {
   const out: ['key' | 'item', string][] = [];
   let i = 0;
   while (i < p.length) {
@@ -148,7 +148,7 @@ function splitPath(p: string): ['key' | 'item', string][] {
 }
 
 /** An item key recorded as raw JSON (no natural name) reads as its name / description / MAC / port. */
-function itemName(tok: string): string {
+export function itemName(tok: string): string {
   if (!tok.startsWith('{')) return tok;
   try {
     const o = JSON.parse(tok) as Record<string, unknown>;
