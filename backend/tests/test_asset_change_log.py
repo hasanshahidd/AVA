@@ -211,3 +211,18 @@ def test_history_reads_legacy_name_only_rows():
     assert [(r["field"], r["category"], r.get("change")) for r in rows] == [
         ("confidentiality_rating", "business", "updated"), ("is_internet_facing", "identity", "updated"),
         ("name", "identity", None)]
+
+
+def test_estate_change_log_lists_changes_across_assets(db, monkeypatch):
+    from types import SimpleNamespace
+    import grc.routers.entity_extras_router as R
+    a, b = _asset(db, location="HQ"), ITAsset(tenant_id=1, name="db02", asset_type="server")
+    db.add(b); db.commit()
+    with change_source("agent"):
+        a.location = "DC-1"
+        b.os_version = "22.04"
+    db.commit()
+    monkeypatch.setattr(R, "get_user_tenants", lambda u, d: [1])
+    rows = R.asset_change_log(30, 300, db=db, current_user=SimpleNamespace(id=1))
+    assert {(r.asset_name, r.source) for r in rows} == {("web01", "agent"), ("db02", "agent")}
+    assert all(r.asset_id and r.fields for r in rows)

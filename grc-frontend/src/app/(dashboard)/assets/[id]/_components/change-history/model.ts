@@ -16,16 +16,19 @@ export type ChangeEntry = {
   id: number; action: string; detail?: string; actor_name?: string; created_at?: string;
   source?: string; fields?: ChangeField[]; sections?: Record<string, SectionTotals> | null;
   total_fields?: number | null; truncated?: number | null;
+  // Estate-wide feed (/asset-change-log) only: which asset the entry belongs to.
+  asset_id?: number | null; asset_name?: string | null; asset_type?: string | null;
 };
 
 export const BRAND = '#005B96';
 export const ACCENT = '#19A8E6';
 export const INK = '#0F1F2B';
 export const SEC = '#3A4653';
-export const MUTED = '#6B7785';
-export const FAINT = '#9AA5B1';
-export const BORDER = '#E3E8EC';
-export const SOFT = '#F5F8FA';
+export const MUTED = '#6B7785';     // smallest text colour that still passes 4.5:1 on white
+export const FAINT = '#9AA5B1';     // icons / arrows only, never body text
+export const BORDER = '#E8ECEE';
+export const DIVIDER = '#F0F3F5';
+export const SOFT = '#FAFBFC';
 export const ADD = '#1F7A54';
 export const DEL = '#B23A3A';
 
@@ -148,8 +151,18 @@ export const totalOf = (e: ChangeEntry) => e.total_fields ?? fieldsOf(e).length;
 export function fmtDate(iso?: string) {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
-export function fmtTime(iso?: string) {
-  return iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+export function fmtTime(iso?: string, seconds = false) {
+  return iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }) : '';
+}
+/** "just now", "5 min ago", "3 h ago", "2 days ago", else the date. */
+export function relTime(iso?: string) {
+  if (!iso) return '—';
+  const mins = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 24 * 60) return `${Math.round(mins / 60)} h ago`;
+  const d = Math.round(mins / 1440);
+  return d < 14 ? `${d} day${d === 1 ? '' : 's'} ago` : fmtDate(iso);
 }
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -159,26 +172,55 @@ export function dayKey(iso?: string) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
-export function dayLabel(iso?: string) {
-  if (!iso) return 'Undated';
+/** Day heading: { title: "Today" | "Monday", date: "9 November 2026" }. */
+export function dayLabel(iso?: string): { title: string; date: string } {
+  if (!iso) return { title: 'Undated', date: '' };
   const d = new Date(iso);
-  const full = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const now = new Date();
   const yest = new Date(now);
   yest.setDate(now.getDate() - 1);
-  if (sameDay(d, now)) return `Today · ${full}`;
-  if (sameDay(d, yest)) return `Yesterday · ${full}`;
-  return full;
+  if (sameDay(d, now)) return { title: 'Today', date };
+  if (sameDay(d, yest)) return { title: 'Yesterday', date };
+  return { title: d.toLocaleDateString('en-GB', { weekday: 'long' }), date };
+}
+export type DayGroup = { key: string; title: string; date: string; entries: ChangeEntry[] };
+/** Entries arrive newest first; consecutive same-day entries share a group. */
+export function groupByDay(items: ChangeEntry[]): DayGroup[] {
+  const out: DayGroup[] = [];
+  for (const e of items) {
+    const key = dayKey(e.created_at);
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.entries.push(e);
+    else out.push({ key, ...dayLabel(e.created_at), entries: [e] });
+  }
+  return out;
 }
 
-export type Filters = { category: string; source: string; actor: string; query: string };
-export const NO_FILTERS: Filters = { category: 'all', source: 'all', actor: 'all', query: '' };
+/** One-line summary, e.g. "changed 3 fields in Hardware telemetry and Security telemetry". */
+export function entrySummary(e: ChangeEntry): string {
+  const fs = fieldsOf(e);
+  const n = totalOf(e);
+  if (!n) return e.detail || titleCase(e.action);
+  const legacy = fs.length > 0 && fs.every((f) => f.change === 'updated');
+  const cats = CATEGORY_ORDER.filter((c) => categoriesOf(e).includes(c)).map((c) => categoryMeta(c).label);
+  const where = cats.length <= 2 ? cats.join(' and ') : `${cats.slice(0, 2).join(', ')} and ${cats.length - 2} more`;
+  return `${legacy ? 'updated' : 'changed'} ${n} field${n === 1 ? '' : 's'} in ${where}`;
+}
+
+export type Filters = { category: string; source: string; actor: string; query: string; period: string };
+export const NO_FILTERS: Filters = { category: 'all', source: 'all', actor: 'all', query: '', period: 'all' };
+export const PERIODS: { key: string; label: string }[] = [
+  { key: 'all', label: 'All time' }, { key: '90', label: '90 days' }, { key: '30', label: '30 days' }, { key: '7', label: '7 days' },
+];
 
 /** Entries matching the filters; with a category filter, only that category's fields are kept. */
 export function applyFilters(items: ChangeEntry[], f: Filters): ChangeEntry[] {
   const q = f.query.trim().toLowerCase();
   const out: ChangeEntry[] = [];
+  const since = f.period !== 'all' ? Date.now() - Number(f.period) * 86_400_000 : null;
   for (const e of items) {
+    if (since !== null && (!e.created_at || Date.parse(e.created_at) < since)) continue;
     if (f.source !== 'all' && sourceOf(e) !== f.source) continue;
     if (f.actor !== 'all' && actorOf(e) !== f.actor) continue;
     let fields = fieldsOf(e);
@@ -187,11 +229,11 @@ export function applyFilters(items: ChangeEntry[], f: Filters): ChangeEntry[] {
       fields = fields.filter((x) => categoryOfField(x) === f.category);
     }
     if (q) {
-      const hay = [e.detail, e.action, actorOf(e), ...fields.flatMap((x) => [
+      const hay = [e.detail, e.action, actorOf(e), e.asset_name, ...fields.flatMap((x) => [
         fieldLabel(x), x.field, sectionLabel(sectionOf(x)), fmtValue(x.old, x.old_label), fmtValue(x.new, x.new_label)])]
         .join(' ').toLowerCase();
       if (!hay.includes(q)) continue;
-      // Narrow to matching rows; if only the entry itself matched (actor, detail), keep them all.
+      // Narrow to matching rows; if only the entry itself matched (asset, actor, detail), keep them all.
       const hit = fields.filter((x) => [fieldLabel(x), x.field, sectionLabel(sectionOf(x)),
         fmtValue(x.old, x.old_label), fmtValue(x.new, x.new_label)].join(' ').toLowerCase().includes(q));
       if (hit.length) fields = hit;
@@ -202,7 +244,7 @@ export function applyFilters(items: ChangeEntry[], f: Filters): ChangeEntry[] {
 }
 
 export type Summary = {
-  entries: number; fieldChanges: number; first?: string; last?: string;
+  entries: number; fieldChanges: number; assets: number; first?: string; last?: string;
   bySource: [string, number][]; byCategory: [string, number][];
   byActor: [string, number][]; topFields: [string, number][];
   daily: { key: string; label: string; count: number }[];
@@ -253,7 +295,7 @@ export function summarise(items: ChangeEntry[], days = 30): Summary {
     if (i !== undefined) daily[i].count += 1;
   }
   return {
-    entries: items.length, fieldChanges, first: dated[0], last: dated[dated.length - 1],
+    entries: items.length, fieldChanges, assets: new Set(items.map((e) => e.asset_id).filter(Boolean)).size, first: dated[0], last: dated[dated.length - 1],
     bySource: ranked(bySource),
     byCategory: ranked(byCategory).sort((a, b) => CATEGORY_ORDER.indexOf(a[0]) - CATEGORY_ORDER.indexOf(b[0])),
     byActor: ranked(byActor), topFields: ranked(byField).slice(0, 8), daily,

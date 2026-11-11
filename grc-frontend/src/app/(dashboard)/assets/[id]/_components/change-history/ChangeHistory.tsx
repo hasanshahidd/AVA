@@ -1,63 +1,60 @@
 'use client';
 
 /*
- * Asset change history: filter bar (search / category / source / contributor),
- * a day-grouped timeline of full field-level entries, and a summary rail.
- * variant="page" → two columns (timeline + rail), one column on narrow screens.
- * variant="tab"  → single column with a compact stat strip (asset History tab).
+ * Asset change history: KPI strip → one-row filter bar (search, source,
+ * category, contributor, period, export) → day-grouped timeline, plus a light
+ * Insights card on the full page.
+ *   variant="page" → timeline + Insights column (stacked on narrow screens).
+ *   variant="tab"  → single column for the asset record's History tab.
+ * KpiStrip / FilterBar / Timeline / csvOf are shared with the estate-wide
+ * Inventory → Asset history feed (assets/_overview/AssetHistoryFeed.tsx).
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Search, X } from 'lucide-react';
 import { entityExtrasApi } from '@/lib/api';
 import { GuideMarker } from '@/components/guide';
+import { FilterSelect } from '../../../_workspace/FilterSelect';
+import '../../../inventory-redesign.css';   // .inv2 tokens: .seg / .btn / .search / .fsel
 import ChangeEntryCard from './ChangeEntryCard';
 import SummaryRail from './SummaryRail';
 import {
-  BORDER, CATEGORY_ORDER, FAINT, INK, MUTED, SEC, NO_FILTERS, SOURCE_ORDER, type ChangeEntry, type Filters,
-  actorOf, applyFilters, categoryMeta, categoryOfField, dayKey, dayLabel, fieldLabel, fieldsOf, fmtValue, isTelemetry,
-  sectionLabel, sectionOf, sourceMeta, sourceOf, summarise,
+  BORDER, CATEGORY_ORDER, DIVIDER, INK, MUTED, NO_FILTERS, PERIODS, SEC, SOURCE_ORDER, type ChangeEntry, type Filters,
+  type Summary, actorOf, applyFilters, categoryMeta, categoryOfField, fieldLabel, fieldsOf, fmtDate, fmtValue,
+  groupByDay, isTelemetry, relTime, sectionLabel, sectionOf, sourceMeta, sourceOf, summarise,
 } from './model';
 
-function Chip({ on, color, label, count, onClick }: {
-  on: boolean; color: string; label: string; count: number; onClick: () => void;
-}) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={on}
-      className="inline-flex items-center gap-1.5 h-[27px] px-2.5 rounded-full text-[11.5px] font-semibold whitespace-nowrap transition-colors"
-      style={on
-        ? { background: color, color: '#fff', border: `1px solid ${color}` }
-        : { background: '#fff', color: SEC, border: `1px solid ${BORDER}` }}>
-      {!on && <span className="h-[7px] w-[7px] rounded-full" style={{ background: color }} aria-hidden />}
-      {label}
-      <span className="tabular-nums" style={{ color: on ? 'rgba(255,255,255,.8)' : FAINT }}>{count}</span>
-    </button>
-  );
-}
+export const CARD_STYLE = { border: `1px solid ${BORDER}`, boxShadow: '0 1px 2px rgba(16,24,40,.04)' };
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#19A8E6]';
 
-function csvOf(items: ChangeEntry[]): string {
+/* ── CSV ─────────────────────────────────────────────────────────────── */
+
+export function csvOf(items: ChangeEntry[], withAsset = false): string {
   // Values come from scans/connectors/agents; a leading = + - @ would run as a spreadsheet formula.
   const esc = (v: unknown) => {
     const s = String(v ?? '');
     return `"${(/^\s*[=+\-@]|^[\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
   };
-  const rows = [['Date', 'Time', 'Who', 'Source', 'Category', 'Section', 'Field', 'Change', 'Before', 'After']];
+  const head = ['Date', 'Time', ...(withAsset ? ['Asset'] : []), 'Who', 'Source', 'Category', 'Section', 'Field', 'Change', 'Before', 'After'];
+  const rows = [head];
   for (const e of items) {
     const d = e.created_at ? new Date(e.created_at) : null;
     const base = [d ? d.toISOString().slice(0, 10) : '', d ? d.toISOString().slice(11, 19) + 'Z' : '',
-      actorOf(e), sourceMeta(sourceOf(e)).label];
+      ...(withAsset ? [e.asset_name ?? ''] : []), actorOf(e), sourceMeta(sourceOf(e)).label];
     const fs = fieldsOf(e);
     if (!fs.length) rows.push([...base, '', '', e.action, '', '', e.detail ?? '']);
     for (const f of fs) {
+      const notRecorded = f.change === 'updated';
       rows.push([...base, categoryMeta(categoryOfField(f)).label, isTelemetry(f) ? sectionLabel(sectionOf(f)) : '',
-        fieldLabel(f), f.change || 'changed', fmtValue(f.old, f.old_label), fmtValue(f.new, f.new_label)]);
+        fieldLabel(f), f.change || 'changed',
+        notRecorded ? 'not recorded' : fmtValue(f.old, f.old_label), notRecorded ? 'not recorded' : fmtValue(f.new, f.new_label)]);
     }
   }
   return rows.map((r) => r.map(esc).join(',')).join('\n');
 }
 
-function download(name: string, text: string) {
+export function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = url;
@@ -66,7 +63,125 @@ function download(name: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function ChangeHistory({ assetId, variant }: { assetId: number; variant: 'page' | 'tab' }) {
+/* ── KPI strip ───────────────────────────────────────────────────────── */
+
+export function KpiStrip({ items }: { items: { label: string; value: ReactNode; sub?: string }[] }) {
+  return (
+    <div className="rounded-[14px] bg-white grid grid-cols-2 md:grid-cols-4 overflow-hidden" style={CARD_STYLE}>
+      {items.map((k, i) => (
+        <div key={k.label} className={`px-4 py-3 min-w-0 ${i % 2 ? 'border-l' : ''} ${i > 1 ? 'border-t md:border-t-0' : ''} ${i === 2 ? 'md:border-l' : ''}`}
+          style={{ borderColor: DIVIDER }}>
+          <div className="text-[11.5px]" style={{ color: MUTED }}>{k.label}</div>
+          <div className="text-[20px] font-semibold leading-tight tabular-nums truncate" style={{ color: INK }}>{k.value}</div>
+          {k.sub && <div className="text-[11px] truncate" style={{ color: MUTED }}>{k.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────── */
+
+export type Segmented = { value: string; options: { key: string; label: string }[]; onChange: (v: string) => void; label: string };
+
+export function FilterBar({ filters, patch, summary, showActor = true, period, placeholder, shown, total, onExport }: {
+  filters: Filters; patch: (p: Partial<Filters>) => void; summary: Summary; showActor?: boolean;
+  period: Segmented; placeholder: string; shown: number; total: number; onExport: () => void;
+}) {
+  const srcs = [...SOURCE_ORDER, ...summary.bySource.map(([s]) => s).filter((s) => !SOURCE_ORDER.includes(s))]
+    .filter((s) => summary.bySource.some(([k]) => k === s));
+  const srcCount = new Map(summary.bySource);
+  const catCount = new Map(summary.byCategory);
+  const filtered = filters.category !== 'all' || filters.source !== 'all' || filters.actor !== 'all' || !!filters.query.trim();
+  return (
+    <div className="rounded-[14px] bg-white p-2.5" style={CARD_STYLE}>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative flex-1 min-w-[200px] basis-[220px]">
+          <span className="sr-only">Search changes</span>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: MUTED }} aria-hidden />
+          <input className="search" value={filters.query} onChange={(e) => patch({ query: e.target.value })}
+            placeholder={placeholder} style={{ fontFamily: 'inherit', color: INK }} />
+        </label>
+        <FilterSelect title="Source" value={filters.source} onChange={(v) => patch({ source: v })} minWidth={190}
+          options={[{ value: 'all', label: 'All sources' },
+            ...srcs.map((s) => ({ value: s, label: `${sourceMeta(s).label} (${srcCount.get(s)})` }))]} />
+        <FilterSelect title="Category" value={filters.category} onChange={(v) => patch({ category: v })} minWidth={230}
+          options={[{ value: 'all', label: 'All categories' },
+            ...CATEGORY_ORDER.filter((c) => catCount.has(c)).map((c) => ({ value: c, label: `${categoryMeta(c).label} (${catCount.get(c)})` }))]} />
+        {showActor && summary.byActor.length > 1 && (
+          <FilterSelect title="Contributor" value={filters.actor} onChange={(v) => patch({ actor: v })} minWidth={190}
+            options={[{ value: 'all', label: 'All contributors' }, ...summary.byActor.map(([a, n]) => ({ value: a, label: `${a} (${n})` }))]} />
+        )}
+        <div className="segwrap" role="group" aria-label={period.label}>
+          {period.options.map((o) => (
+            <button key={o.key} type="button" aria-pressed={period.value === o.key} onClick={() => period.onChange(o.key)}
+              className={`${period.value === o.key ? 'seg on' : 'seg'} ${FOCUS}`} style={{ height: 28, padding: '0 11px', fontSize: 12 }}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-1 pt-2 text-[11.5px]" style={{ color: MUTED }}>
+        <span aria-live="polite">Showing <b className="tabular-nums" style={{ color: INK }}>{shown}</b> of {total} change{total === 1 ? '' : 's'}</span>
+        {filtered && (
+          <button type="button" onClick={() => patch({ ...NO_FILTERS, period: filters.period })}
+            className={`inline-flex items-center gap-1 font-semibold rounded-[6px] ${FOCUS}`} style={{ color: '#005B96' }}>
+            <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+          </button>
+        )}
+        <button type="button" className={`btn ${FOCUS}`} onClick={onExport} disabled={!shown}
+          style={{ height: 30, marginLeft: 'auto', opacity: shown ? 1 : 0.45 }}>
+          <Download className="h-4 w-4" aria-hidden /> Export CSV
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────── */
+
+export function Timeline({ items, preview, showAsset }: { items: ChangeEntry[]; preview?: number; showAsset?: boolean }) {
+  const days = useMemo(() => groupByDay(items), [items]);
+  return (
+    <div className="space-y-4">
+      {days.map((d) => (
+        <section key={d.key} aria-label={`${d.title} ${d.date}`}>
+          <h3 className="flex items-baseline gap-2 px-1 mb-1.5">
+            <span className="text-[13px] font-semibold" style={{ color: INK }}>{d.title}</span>
+            <span className="text-[12px]" style={{ color: MUTED }}>{d.date}</span>
+            <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: MUTED }}>
+              {d.entries.length} change{d.entries.length === 1 ? '' : 's'}
+            </span>
+          </h3>
+          <div className="rounded-[14px] bg-white divide-y divide-[#F0F3F5]" style={CARD_STYLE}>
+            {d.entries.map((e) => <ChangeEntryCard key={e.id} entry={e} preview={preview} showAsset={showAsset} />)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export function StateMessage({ tone = 'muted', children }: { tone?: 'muted' | 'error'; children: ReactNode }) {
+  return (
+    <p className="py-10 text-center text-[13px]" style={{ color: tone === 'error' ? '#B23A3A' : MUTED }}>{children}</p>
+  );
+}
+
+export function EmptyCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-[14px] bg-white py-12 px-6 text-center" style={{ border: `1px dashed ${BORDER}` }}>
+      <p className="text-[14px] font-semibold" style={{ color: INK }}>{title}</p>
+      <p className="text-[12.5px] mt-1 max-w-[560px] mx-auto" style={{ color: MUTED }}>{children}</p>
+    </div>
+  );
+}
+
+/* ── Per-asset history ───────────────────────────────────────────────── */
+
+export default function ChangeHistory({ assetId, variant, action }: {
+  assetId: number; variant: 'page' | 'tab'; /** e.g. the tab's "Open full history" link, shown beside the intro. */ action?: ReactNode;
+}) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const patch = (p: Partial<Filters>) => setFilters((f) => ({ ...f, ...p }));
 
@@ -78,155 +193,61 @@ export default function ChangeHistory({ assetId, variant }: { assetId: number; v
   const summary = useMemo(() => summarise(items), [items]);
   const shown = useMemo(() => applyFilters(items, filters), [items, filters]);
 
-  const days = useMemo(() => {
-    const out: { key: string; label: string; entries: ChangeEntry[] }[] = [];
-    for (const e of shown) {
-      const key = dayKey(e.created_at);
-      const last = out[out.length - 1];
-      if (last && last.key === key) last.entries.push(e);
-      else out.push({ key, label: dayLabel(e.created_at), entries: [e] });
-    }
-    return out;
-  }, [shown]);
-
-  const catCounts = new Map(summary.byCategory);
-  const srcCounts = new Map(summary.bySource);
-  const filtered = filters.category !== 'all' || filters.source !== 'all' || filters.actor !== 'all' || !!filters.query.trim();
-
-  const toolbar = (
-    <div className="rounded-[12px] bg-white p-3 space-y-2.5" style={{ border: `1px solid ${BORDER}` }}>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="relative flex-1 min-w-[200px]">
-          <span className="sr-only">Search changes</span>
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: FAINT }} aria-hidden />
-          <input value={filters.query} onChange={(e) => patch({ query: e.target.value })}
-            placeholder="Search field, value or person…"
-            className="w-full h-[34px] rounded-[9px] pl-8 pr-3 text-[12.5px] outline-none focus:ring-2 focus:ring-[#19A8E6]/40"
-            style={{ border: `1px solid ${BORDER}`, color: INK }} />
-        </label>
-        {summary.byActor.length > 1 && (
-          <select value={filters.actor} onChange={(e) => patch({ actor: e.target.value })} aria-label="Filter by contributor"
-            className="h-[34px] rounded-[9px] px-2.5 text-[12.5px] bg-white" style={{ border: `1px solid ${BORDER}`, color: SEC }}>
-            <option value="all">All contributors</option>
-            {summary.byActor.map(([a, n]) => <option key={a} value={a}>{a} ({n})</option>)}
-          </select>
-        )}
-        <button type="button" onClick={() => download(`asset-${assetId}-change-history.csv`, csvOf(shown))}
-          disabled={!shown.length}
-          className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-[9px] text-[12.5px] font-semibold text-white disabled:opacity-40"
-          style={{ background: '#005B96' }}>
-          <Download className="h-4 w-4" aria-hidden /> Export CSV
-        </button>
+  const intro = (
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-center gap-1.5 text-[12px] min-w-0 flex-1" style={{ color: MUTED }}>
+        Every change to this asset, from manual edits, scans, network discovery, connectors, agents and imports. Entries cannot be edited or deleted.
+        <GuideMarker id="asset.historyWhy" n={1} />
+        <GuideMarker id="asset.historyActor" n={2} />
+        <GuideMarker id="asset.historyImmutable" n={3} />
+        <GuideMarker id="asset.historyAudit" n={4} />
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.06em] w-[64px]" style={{ color: FAINT }}>Category</span>
-        <Chip on={filters.category === 'all'} color={INK} label="All" count={summary.fieldChanges} onClick={() => patch({ category: 'all' })} />
-        {CATEGORY_ORDER.filter((c) => catCounts.has(c)).map((c) => (
-          <Chip key={c} on={filters.category === c} color={categoryMeta(c).color} label={categoryMeta(c).label}
-            count={catCounts.get(c) ?? 0} onClick={() => patch({ category: filters.category === c ? 'all' : c })} />
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.06em] w-[64px]" style={{ color: FAINT }}>Source</span>
-        <Chip on={filters.source === 'all'} color={INK} label="All" count={summary.entries} onClick={() => patch({ source: 'all' })} />
-        {[...SOURCE_ORDER, ...Array.from(srcCounts.keys()).filter((s) => !SOURCE_ORDER.includes(s))]
-          .filter((s) => srcCounts.has(s)).map((s) => (
-            <Chip key={s} on={filters.source === s} color={sourceMeta(s).color} label={sourceMeta(s).label}
-              count={srcCounts.get(s) ?? 0} onClick={() => patch({ source: filters.source === s ? 'all' : s })} />
-          ))}
-      </div>
-      <div className="flex items-center justify-between text-[11.5px]" style={{ color: MUTED }}>
-        <span>Showing <b style={{ color: INK }}>{shown.length}</b> of {items.length} change{items.length === 1 ? '' : 's'}</span>
-        {filtered && (
-          <button type="button" onClick={() => setFilters(NO_FILTERS)} className="inline-flex items-center gap-1 font-semibold" style={{ color: '#005B96' }}>
-            <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
-          </button>
-        )}
-      </div>
+      {action}
     </div>
   );
 
-  const timeline = (
-    <div className="relative">
-      <div className="absolute left-[7px] top-2 bottom-2 w-[2px]" style={{ background: BORDER }} aria-hidden />
-      {days.map((d) => (
-        <section key={d.key} className="relative pl-6 pb-2">
-          <h3 className="sticky top-0 z-[2] -ml-6 pl-6 py-2 text-[11px] font-bold uppercase tracking-[0.06em] bg-[#F7F9FB]"
-            style={{ color: SEC }}>
-            <span className="absolute left-[2px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white"
-              style={{ border: '2px solid #005B96' }} aria-hidden />
-            {d.label}
-            <span className="ml-2 font-semibold normal-case tracking-normal" style={{ color: FAINT }}>
-              {d.entries.length} change{d.entries.length === 1 ? '' : 's'}
-            </span>
-          </h3>
-          <div className="space-y-2.5">
-            {d.entries.map((e) => <ChangeEntryCard key={e.id} entry={e} />)}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-
-  const header = (
-    <div className="flex items-center gap-1.5 text-[11px]" style={{ color: MUTED }}>
-      Immutable journal of every field change — manual edits, scans, network discovery, connectors, agents and imports.
-      <GuideMarker id="asset.historyWhy" n={1} />
-      <GuideMarker id="asset.historyActor" n={2} />
-      <GuideMarker id="asset.historyImmutable" n={3} />
-      <GuideMarker id="asset.historyAudit" n={4} />
-    </div>
-  );
-
-  let body;
-  if (q.isLoading) body = <p className="py-10 text-center text-[13px]" style={{ color: FAINT }}>Loading change history…</p>;
-  else if (q.isError) body = <p className="py-10 text-center text-[13px]" style={{ color: '#B23A3A' }}>Could not load change history. Try again shortly.</p>;
+  let body: ReactNode;
+  if (q.isLoading) body = <StateMessage>Loading change history…</StateMessage>;
+  else if (q.isError) body = <StateMessage tone="error">Could not load change history. Refresh the page to try again.</StateMessage>;
   else if (!items.length) {
     body = (
-      <div className="rounded-[12px] bg-white py-12 px-6 text-center" style={{ border: `1px dashed ${BORDER}` }}>
-        <p className="text-[14px] font-semibold" style={{ color: INK }}>No changes recorded yet</p>
-        <p className="text-[12.5px] mt-1" style={{ color: MUTED }}>
-          Every change from here on, whether an edit, scan, network discovery, connector sync, agent report or import, appears here with before and after values.
-        </p>
-      </div>
+      <EmptyCard title="No changes recorded yet">
+        Every change from now on, whether an edit, scan, network discovery, connector sync, agent report or import, appears here with its before and after values.
+      </EmptyCard>
     );
   } else {
-    body = shown.length ? timeline : (
-      <p className="py-10 text-center text-[13px]" style={{ color: FAINT }}>No changes match these filters.</p>
-    );
+    body = shown.length
+      ? <Timeline items={shown} preview={variant === 'tab' ? 4 : 6} />
+      : <StateMessage>No changes match these filters.</StateMessage>;
   }
+
+  const ready = !q.isLoading && !q.isError && items.length > 0;
+  const top = ready && (
+    <>
+      <KpiStrip items={[
+        { label: 'Changes', value: summary.entries, sub: summary.first ? `Since ${fmtDate(summary.first)}` : undefined },
+        { label: 'Fields changed', value: summary.fieldChanges, sub: `${summary.byCategory.length} categor${summary.byCategory.length === 1 ? 'y' : 'ies'}` },
+        { label: 'Contributors', value: summary.byActor.length, sub: `${summary.bySource.length} source${summary.bySource.length === 1 ? '' : 's'}` },
+        { label: 'Last change', value: relTime(summary.last), sub: fmtDate(summary.last) },
+      ]} />
+      <FilterBar filters={filters} patch={patch} summary={summary} placeholder="Search field, value or person"
+        period={{ label: 'Period', value: filters.period, options: PERIODS, onChange: (v) => patch({ period: v }) }}
+        shown={shown.length} total={items.length}
+        onExport={() => download(`asset-${assetId}-change-history.csv`, csvOf(shown))} />
+    </>
+  );
 
   if (variant === 'tab') {
-    return (
-      <div className="space-y-3">
-        {header}
-        {items.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {[['Changes', summary.entries], ['Field edits', summary.fieldChanges],
-              ['Contributors', summary.byActor.length], ['Sources', summary.bySource.length]].map(([l, v]) => (
-              <div key={l as string} className="rounded-[10px] bg-white px-3 py-2" style={{ border: `1px solid ${BORDER}` }}>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.05em]" style={{ color: MUTED }}>{l}</div>
-                <div className="text-[18px] font-semibold" style={{ color: INK }}>{v}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {items.length > 0 && toolbar}
-        {body}
-      </div>
-    );
+    return <div className="inv2 space-y-3" style={{ color: SEC }}>{intro}{top}{body}</div>;
   }
-
   return (
-    <div className="space-y-3">
-      {header}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-        <div className="space-y-3 min-w-0">
-          {items.length > 0 && toolbar}
-          {body}
-        </div>
-        {items.length > 0 && (
-          <aside className="lg:sticky lg:top-3" aria-label="Change summary">
+    <div className="inv2 space-y-3" style={{ color: SEC }}>
+      {intro}
+      {top}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_272px] gap-4 items-start">
+        <div className="min-w-0">{body}</div>
+        {ready && (
+          <aside className="lg:sticky lg:top-3" aria-label="Insights">
             <SummaryRail summary={summary} filters={filters} onFilter={patch} />
           </aside>
         )}
