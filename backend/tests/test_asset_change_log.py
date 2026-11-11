@@ -258,3 +258,33 @@ def test_history_read_hides_old_churn_rows():
         {"field": "ip_address", "section": "ip_address", "category": "identity", "old": "1", "new": "2"}], "total_fields": 2}})
     h = _history_row(mixed, {"user": {}, "asset": {}})
     assert h["total_fields"] == 1 and list(h["sections"]) == ["ip_address"]
+
+
+def test_volume_free_space_wobble_is_not_add_remove(db):
+    vols = lambda free: {"volumes": {"status": "discovered", "data": [
+        {"filesystem": "NTFS", "drive_letter": "C:", "capacity_gb": 237, "free_gb": free},
+        {"filesystem": "ext4", "capacity_gb": 50, "used_gb": 50 - free}]}}   # second one has no identity key
+    a = _asset(db, platform_properties=vols(40))
+    a.platform_properties = vols(31)
+    db.commit()
+    assert _rows(db) == []
+    a.platform_properties = {"volumes": {"status": "discovered", "data": [
+        {"filesystem": "NTFS", "drive_letter": "C:", "capacity_gb": 512, "free_gb": 3},
+        {"filesystem": "ext4", "capacity_gb": 50, "used_gb": 9}]}}
+    db.commit()
+    (row,) = _rows(db)
+    assert [(f["field"], f["change"]) for f in row.changes["fields"]] == [("volumes.data[C:].capacity_gb", "changed")]
+
+
+def test_history_read_drops_identical_remove_add_pairs():
+    from grc.services.asset_change_log import drop_churn
+    same = "NTFS (drive_letter: C:, capacity_gb: 237)"
+    pair = [
+        {"field": 'volumes.data[{"capacity_gb": 237, "free_gb": 40}]', "section": "volumes", "change": "removed", "old": same, "new": None},
+        {"field": 'volumes.data[{"capacity_gb": 237, "free_gb": 31}]', "section": "volumes", "change": "added", "old": None, "new": same},
+    ]
+    real = {"field": "volumes.data[D:]", "section": "volumes", "change": "added", "old": None, "new": "D: (capacity_gb: 1)"}
+    assert drop_churn(pair) == []
+    assert drop_churn(pair + [real]) == [real]
+    moved = [{**pair[0], "field": "volumes.data[X]"}, {**pair[1], "field": "disks.data[X]"}]   # different list: kept
+    assert drop_churn(moved) == moved

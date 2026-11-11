@@ -251,18 +251,16 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
     used a coarser set) and attach display names for user / asset references."""
     if not isinstance(fields, list):
         return None
-    from ..services.asset_change_log import column_category, is_noise
+    from ..services.asset_change_log import column_category, drop_churn
     names = names or {"user": {}, "asset": {}}
     out = []
-    for f in fields:
+    for f in drop_churn(fields):
         if isinstance(f, str):
             # Older journal rows recorded only which fields changed, not the values.
             f = {"field": f, "change": "updated", "old": None, "new": None}
         if not isinstance(f, dict):
             continue
         name = f.get("field", "")
-        if is_noise(name, f.get("section")):
-            continue
         row = {**f, "category": column_category(name) or f.get("category") or "other"}
         kind = "user" if name in _USER_REF_FIELDS else "asset" if name in _ASSET_REF_FIELDS else None
         if kind:
@@ -302,9 +300,9 @@ def asset_change_summary(days: int = 30, db: Session = Depends(get_db),
 
 def _is_churn_only(changes: Any) -> bool:
     """True when every journalled field of a row is churn under the current rules."""
-    from ..services.asset_change_log import is_noise
+    from ..services.asset_change_log import drop_churn
     fields = changes.get("fields") if isinstance(changes, dict) else None
-    return bool(fields) and all(isinstance(f, dict) and is_noise(f.get("field", ""), f.get("section")) for f in fields)
+    return isinstance(fields, list) and bool(fields) and all(isinstance(f, dict) for f in fields) and not drop_churn(fields)
 
 
 # ─── Alerts (derived, no table) ──────────────────────────────────────────────

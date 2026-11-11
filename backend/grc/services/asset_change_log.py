@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Dict, Iterator, List, Optional, Tuple
@@ -96,7 +97,8 @@ _MEASURE_TOKENS = {"free", "available", "usage", "utilization", "utilisation", "
 _UNIT_TOKENS = {"gb", "mb", "kb", "bytes", "pct", "percent", "percentage", "mhz"}
 _ITEM_KEYS = ("name", "Name", "display_name", "DisplayName", "package", "username", "user", "UserName",
               "hotfix_id", "HotFixID", "id", "path", "mount", "mountpoint", "device", "DeviceID", "drive",
-              "interface", "iface", "key", "serial", "slot", "bank", "label", "letter", "volume", "sid",
+              "interface", "iface", "key", "serial", "slot", "bank", "label", "letter", "drive_letter",
+              "volume", "sid",
               "mac", "mac_address", "description", "model", "title")
 
 MAX_FIELDS = 300   # field rows stored per entry; section totals are always complete
@@ -170,13 +172,17 @@ def _summary(v: Any) -> Any:
     return _coerce(v)
 
 
-def _item_key(item: Any) -> str:
+def _item_key(item: Any, section: str = "") -> str:
     if isinstance(item, dict) and item.get("port") is not None:
         return f"{item['port']}/{item.get('proto') or item.get('protocol') or 'tcp'}"
     if isinstance(item, dict):
         for k in _ITEM_KEYS:
             if item.get(k) not in (None, ""):
                 return str(item[k])
+        # No identity field: key on the stable fields only, or a free-space wobble
+        # would read as the item being removed and re-added every report.
+        skip = _SECTION_VOLATILE.get(section, ())
+        item = {k: v for k, v in item.items() if not _volatile(k) and k not in skip}
     return json.dumps(item, default=str, sort_keys=True)[:120]
 
 
@@ -224,7 +230,7 @@ class _Diff:
             def keyed(items):
                 out: Dict[str, Any] = {}
                 for it in items:
-                    k = _item_key(it)
+                    k = _item_key(it, section)
                     while k in out:
                         k += "'"
                     out[k] = it
@@ -270,6 +276,44 @@ def is_noise(field: str, section: Optional[str] = None) -> bool:
             return False
     leaf = _BRACKET_TAIL.sub("", field).rsplit(".", 1)[-1] if not m else ""
     return bool(leaf) and (_volatile(leaf) or leaf in _SECTION_VOLATILE.get(section, ()))
+
+
+def _list_path(field: str) -> str:
+    """'pp.volumes[<item key>]' -> 'pp.volumes' (balanced scan; keys may be JSON)."""
+    if not field.endswith("]"):
+        return field
+    depth = 0
+    for i in range(len(field) - 1, -1, -1):
+        depth += {"]": 1, "[": -1}.get(field[i], 0)
+        if depth == 0:
+            return field[:i]
+    return field.split("[", 1)[0]   # key truncated mid-bracket
+
+
+def drop_churn(fields: List[Any]) -> List[Any]:
+    """Journalled fields minus churn under the current rules: noise rows, plus
+    removed+added pairs of one list item that read identically (rows written
+    when a keyless item was keyed on a volatile value such as free space)."""
+    kept = [f for f in fields if not (isinstance(f, dict) and is_noise(str(f.get("field", "")), f.get("section")))]
+
+    def twin(f: Any) -> Optional[Tuple[str, Any, str]]:
+        ch = f.get("change") if isinstance(f, dict) else None
+        if ch not in ("added", "removed"):
+            return None
+        val = f.get("new" if ch == "added" else "old")
+        return ch, (_list_path(str(f.get("field", ""))), f.get("section"), json.dumps(val, default=str, sort_keys=True))
+
+    keys = [twin(f) for f in kept]
+    added = Counter(k[1] for k in keys if k and k[0] == "added")
+    removed = Counter(k[1] for k in keys if k and k[0] == "removed")
+    budget = {"added": added & removed, "removed": added & removed}
+    out = []
+    for f, k in zip(kept, keys):
+        if k and budget[k[0]][k[1]] > 0:
+            budget[k[0]][k[1]] -= 1
+            continue
+        out.append(f)
+    return out
 
 
 def diff_asset(asset: ITAsset) -> _Diff:
