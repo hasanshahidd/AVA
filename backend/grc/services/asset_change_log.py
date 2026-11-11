@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Dict, Iterator, List, Optional, Tuple
@@ -84,9 +85,12 @@ SECTION_CATEGORIES: Dict[str, str] = {
     "cmdb": "lifecycle",
 }
 _VOLATILE_SECTIONS = {"processes", "running_processes", "connections", "netstat", "sessions"}
-_VOLATILE_KEYS = {"collected_at", "reported_at", "scanned_at", "checked_at", "generated_at", "refreshed_at",
-                  "timestamp", "boot_time", "last_boot_time", "last_boot_up_time", "uptime", "uptime_hours",
-                  "uptime_seconds", "current_clock_mhz", "current_clock_speed", "duration_ms"}
+_VOLATILE_KEYS = {"timestamp", "boot_time", "last_boot_time", "last_boot_up_time", "uptime", "uptime_hours",
+                  "uptime_seconds", "current_clock_mhz", "current_clock_speed", "duration_ms",
+                  "speed_bps", "speed_mbps", "link_speed", "rssi", "signal", "signal_strength", "signal_quality"}
+# Runtime state that flips between reports without anyone changing anything.
+_SECTION_VOLATILE = {"services": {"state", "status", "sub_state", "active_state", "running", "pid"}}
+_EPHEMERAL_PORT = 49152   # IANA dynamic range: client sockets (e.g. a browser's UDP) churn every report
 _ALWAYS_VOLATILE_TOKENS = {"pid", "uptime", "temperature", "celsius", "rpm"}
 _MEASURE_TOKENS = {"free", "available", "usage", "utilization", "utilisation", "load", "used"}
 _UNIT_TOKENS = {"gb", "mb", "kb", "bytes", "pct", "percent", "percentage", "mhz"}
@@ -141,7 +145,8 @@ def _volatile(key: str) -> bool:
     "updates_available" stays tracked; "available_gb" does not."""
     k = str(key).lower()
     toks = set(k.split("_"))
-    if k in _VOLATILE_KEYS or k.startswith("last_") or toks & _ALWAYS_VOLATILE_TOKENS:
+    if (k in _VOLATILE_KEYS or k.startswith(("last_", "days_since")) or k.endswith("_at")
+            or toks & _ALWAYS_VOLATILE_TOKENS):
         return True
     return bool(toks & _MEASURE_TOKENS) and (bool(toks & _UNIT_TOKENS) or toks <= _MEASURE_TOKENS)
 
@@ -166,6 +171,8 @@ def _summary(v: Any) -> Any:
 
 
 def _item_key(item: Any) -> str:
+    if isinstance(item, dict) and item.get("port") is not None:
+        return f"{item['port']}/{item.get('proto') or item.get('protocol') or 'tcp'}"
     if isinstance(item, dict):
         for k in _ITEM_KEYS:
             if item.get(k) not in (None, ""):
@@ -196,8 +203,9 @@ class _Diff:
         elif b is None and isinstance(a, dict):
             b = {}
         if isinstance(a, dict) and isinstance(b, dict):
+            skip = _SECTION_VOLATILE.get(section, ())
             for k in sorted(set(a) | set(b), key=str):
-                if not _volatile(k):
+                if not _volatile(k) and k not in skip:
                     self.tree(f"{path}.{k}", section, cat, a.get(k), b.get(k))
             return
         if isinstance(a, list) and isinstance(b, list):
@@ -211,6 +219,7 @@ class _Diff:
             self.add(path, section, cat, "changed", a, b)
 
     def _list(self, path: str, section: str, cat: str, a: list, b: list) -> None:
+        a, b = [x for x in a if not _ephemeral(x)], [x for x in b if not _ephemeral(x)]
         if any(isinstance(x, dict) for x in a + b):
             def keyed(items):
                 out: Dict[str, Any] = {}
@@ -237,6 +246,30 @@ class _Diff:
         for x in a:
             if json.dumps(x, default=str) not in sb:
                 self.add(path, section, cat, "removed", x, None)
+
+
+def _ephemeral(item: Any) -> bool:
+    port = item.get("port") if isinstance(item, dict) else None
+    return isinstance(port, int) and port >= _EPHEMERAL_PORT
+
+
+_BRACKET_TAIL = re.compile(r"\[([^\[\]]*)\]$")
+
+
+def is_noise(field: str, section: Optional[str] = None) -> bool:
+    """Same rules as the live diff, applied at read time so rows journalled
+    before a rule existed don't show churn (timestamps, link speed, run state,
+    ephemeral ports). Plain columns are never noise."""
+    if not section or field == section:
+        return False
+    m = _BRACKET_TAIL.search(field)
+    if m and m.group(1).startswith("{"):
+        try:
+            return _ephemeral(json.loads(m.group(1)))
+        except ValueError:
+            return False
+    leaf = _BRACKET_TAIL.sub("", field).rsplit(".", 1)[-1] if not m else ""
+    return bool(leaf) and (_volatile(leaf) or leaf in _SECTION_VOLATILE.get(section, ()))
 
 
 def diff_asset(asset: ITAsset) -> _Diff:

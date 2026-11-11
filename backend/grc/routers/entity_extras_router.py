@@ -135,11 +135,27 @@ def entity_history(entity_type: str, entity_id: int, db: Session = Depends(get_d
         .all()
     )
     names = _ref_names(db, rows)
-    return [HistoryOut(**_history_row(r, names)) for r in rows]
+    out = [_history_row(r, names) for r in rows]
+    return [HistoryOut(**h) for h in out if h is not None]
 
 
-def _history_row(r: AuditLog, names: Dict[str, Dict[int, str]]) -> Dict[str, Any]:
+def _history_row(r: AuditLog, names: Dict[str, Dict[int, str]]) -> Optional[Dict[str, Any]]:
+    """One history entry, or None when every journalled field is now classed as
+    churn (rows written before a noise rule existed)."""
     changes = r.changes if isinstance(r.changes, dict) else None
+    raw = changes.get("fields") if changes else None
+    fields = _with_categories(raw, names)
+    sections, total = (changes or {}).get("sections"), (changes or {}).get("total_fields")
+    if isinstance(raw, list) and raw and fields is not None and len(fields) < len(raw):
+        if not fields:
+            return None
+        if not (changes or {}).get("truncated"):   # complete rows: recount what's left
+            sections = {}
+            for f in fields:
+                t = sections.setdefault(f.get("section") or f["field"],
+                                        {"category": f["category"], "added": 0, "removed": 0, "changed": 0})
+                t[f.get("change") if f.get("change") in ("added", "removed") else "changed"] += 1
+            total = len(fields)
     detail = None
     if changes:
         detail = changes.get("detail") or ", ".join(
@@ -158,9 +174,9 @@ def _history_row(r: AuditLog, names: Dict[str, Dict[int, str]]) -> Dict[str, Any
         actor_name=actor,
         created_at=r.timestamp,
         source=(changes.get("source") if changes else None),
-        fields=_with_categories(changes.get("fields") if changes else None, names),
-        sections=(changes.get("sections") if changes else None),
-        total_fields=(changes.get("total_fields") if changes else None),
+        fields=fields,
+        sections=sections,
+        total_fields=total,
         truncated=(changes.get("truncated") if changes else None),
     )
 
@@ -196,8 +212,11 @@ def asset_change_log(days: int = 30, limit: int = 300, db: Session = Depends(get
               .filter(ITAsset.id.in_(ids), ITAsset.tenant_id.in_(tenants)).all()} if ids else {}
     out: List[EstateHistoryOut] = []
     for r in rows:
+        h = _history_row(r, names)
+        if h is None:
+            continue
         a = assets.get(r.resource_id)
-        out.append(EstateHistoryOut(**_history_row(r, names), asset_id=r.resource_id,
+        out.append(EstateHistoryOut(**h, asset_id=r.resource_id,
                                     asset_name=a.name if a else None, asset_type=a.asset_type if a else None))
     return out
 
@@ -232,7 +251,7 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
     used a coarser set) and attach display names for user / asset references."""
     if not isinstance(fields, list):
         return None
-    from ..services.asset_change_log import column_category
+    from ..services.asset_change_log import column_category, is_noise
     names = names or {"user": {}, "asset": {}}
     out = []
     for f in fields:
@@ -242,6 +261,8 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
         if not isinstance(f, dict):
             continue
         name = f.get("field", "")
+        if is_noise(name, f.get("section")):
+            continue
         row = {**f, "category": column_category(name) or f.get("category") or "other"}
         kind = "user" if name in _USER_REF_FIELDS else "asset" if name in _ASSET_REF_FIELDS else None
         if kind:
@@ -256,25 +277,34 @@ def asset_change_summary(days: int = 30, db: Session = Depends(get_db),
                          current_user: GRCUser = Depends(require_auth)):
     """Per-asset recent-change counts for the inventory 'Changes' column.
     Returns {asset_id: {count, last_at}} for the caller's tenants."""
-    from sqlalchemy import func as _func
     tenants = get_user_tenants(current_user, db) or []
     since = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
     rows = (
-        db.query(AuditLog.resource_id, _func.count(AuditLog.id), _func.max(AuditLog.timestamp))
+        db.query(AuditLog.resource_id, AuditLog.timestamp, AuditLog.changes)
         .filter(
             AuditLog.tenant_id.in_(tenants),
             AuditLog.resource_type == "it_asset",
             AuditLog.action == "asset.updated",
             AuditLog.timestamp >= since,
         )
-        .group_by(AuditLog.resource_id)
         .all()
     )
-    items = {
-        str(rid): {"count": int(cnt or 0), "last_at": (ts.isoformat() if ts else None)}
-        for rid, cnt, ts in rows if rid is not None
-    }
+    items: Dict[str, Dict[str, Any]] = {}
+    for rid, ts, changes in rows:
+        if rid is None or _is_churn_only(changes):
+            continue   # same rows the history page hides, so the counts agree with it
+        it = items.setdefault(str(rid), {"count": 0, "last_at": None})
+        it["count"] += 1
+        if ts and (it["last_at"] is None or ts.isoformat() > it["last_at"]):
+            it["last_at"] = ts.isoformat()
     return {"items": items, "days": days}
+
+
+def _is_churn_only(changes: Any) -> bool:
+    """True when every journalled field of a row is churn under the current rules."""
+    from ..services.asset_change_log import is_noise
+    fields = changes.get("fields") if isinstance(changes, dict) else None
+    return bool(fields) and all(isinstance(f, dict) and is_noise(f.get("field", ""), f.get("section")) for f in fields)
 
 
 # ─── Alerts (derived, no table) ──────────────────────────────────────────────
@@ -411,6 +441,7 @@ def asset_alerts(asset_id: int, db: Session = Depends(get_db),
         .order_by(AuditLog.timestamp.desc())
         .all()
     )
+    change_rows = [r for r in change_rows if not _is_churn_only(r.changes)]
     if change_rows:
         lc = change_rows[0].changes if isinstance(change_rows[0].changes, dict) else {}
         n = len(change_rows)

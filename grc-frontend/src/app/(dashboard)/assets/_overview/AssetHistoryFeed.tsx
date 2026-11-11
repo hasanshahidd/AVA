@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { entityExtrasApi } from '@/lib/api';
 import {
-  EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download,
+  CategoryTabs, EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download, pickCategory,
 } from '../[id]/_components/change-history/ChangeHistory';
 import {
   MUTED, NO_FILTERS, SEC, type ChangeEntry, type Filters, applyFilters, fmtDate, relTime, summarise,
@@ -32,7 +32,8 @@ export default function AssetHistoryFeed() {
   });
   const items = useMemo(() => q.data ?? [], [q.data]);
   const summary = useMemo(() => summarise(items), [items]);
-  const shown = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const view = useMemo(() => ({ ...filters, category: pickCategory(summary, filters.category) }), [filters, summary]);
+  const shown = useMemo(() => applyFilters(items, view), [items, view]);
 
   let body;
   if (q.isLoading) body = <StateMessage>Loading asset history…</StateMessage>;
@@ -60,7 +61,8 @@ export default function AssetHistoryFeed() {
         { label: 'Fields changed', value: summary.fieldChanges, sub: `${summary.bySource.length} source${summary.bySource.length === 1 ? '' : 's'}` },
         { label: 'Last change', value: relTime(summary.last), sub: summary.last ? fmtDate(summary.last) : undefined },
       ]} />
-      <FilterBar filters={filters} patch={patch} summary={summary} showActor={false}
+      <CategoryTabs summary={summary} value={view.category} onChange={(c) => patch({ category: c })} />
+      <FilterBar filters={view} patch={patch} summary={summary} showActor={false}
         placeholder="Search asset, field or value"
         period={{ label: 'Period', value: days, options: WINDOWS, onChange: setDays }}
         shown={shown.length} total={items.length}

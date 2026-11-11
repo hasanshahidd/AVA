@@ -80,6 +80,37 @@ export function KpiStrip({ items }: { items: { label: string; value: ReactNode; 
   );
 }
 
+/* ── Category toggle pages ───────────────────────────────────────────── */
+
+/** The category page to show: the requested one if it has changes, else the first that does. */
+export function pickCategory(summary: Summary, requested: string): string {
+  const cats = CATEGORY_ORDER.filter((c) => summary.byCategory.some(([k]) => k === c));
+  return cats.includes(requested) ? requested : (cats[0] ?? 'all');
+}
+
+/** One toggle page per category (same underline tabs as the asset Overview), never one long mixed page. */
+export function CategoryTabs({ summary, value, onChange }: { summary: Summary; value: string; onChange: (c: string) => void }) {
+  const count = new Map(summary.byCategory);
+  const cats = CATEGORY_ORDER.filter((c) => count.has(c));
+  if (!cats.length) return null;
+  return (
+    <div role="tablist" aria-label="Change categories"
+      className="flex gap-5 border-b border-[#e8ecee] overflow-x-auto overflow-y-hidden px-0.5">
+      {cats.map((c) => {
+        const on = value === c;
+        return (
+          <button key={c} type="button" role="tab" aria-selected={on} onClick={() => onChange(c)}
+            className={`text-[12.5px] whitespace-nowrap pb-1.5 -mb-px border-b-2 rounded-t-[4px] ${FOCUS} ${on
+              ? 'font-semibold text-[#014A81] border-[#005B96]' : 'font-medium text-[#6b7787] border-transparent hover:text-[#0f1f2b]'}`}>
+            {categoryMeta(c).label}
+            <span className="ml-1.5 text-[11px] tabular-nums" style={{ color: on ? '#005B96' : MUTED }}>{count.get(c)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Filter bar ──────────────────────────────────────────────────────── */
 
 export type Segmented = { value: string; options: { key: string; label: string }[]; onChange: (v: string) => void; label: string };
@@ -91,8 +122,8 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
   const srcs = [...SOURCE_ORDER, ...summary.bySource.map(([s]) => s).filter((s) => !SOURCE_ORDER.includes(s))]
     .filter((s) => summary.bySource.some(([k]) => k === s));
   const srcCount = new Map(summary.bySource);
-  const catCount = new Map(summary.byCategory);
-  const filtered = filters.category !== 'all' || filters.source !== 'all' || filters.actor !== 'all' || !!filters.query.trim();
+  // Category is chosen by the toggle pages above the bar, so it isn't a filter here.
+  const filtered = filters.source !== 'all' || filters.actor !== 'all' || !!filters.query.trim();
   return (
     <div className="rounded-[14px] bg-white p-2.5" style={CARD_STYLE}>
       <div className="flex flex-wrap items-center gap-2">
@@ -105,9 +136,6 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
         <FilterSelect title="Source" value={filters.source} onChange={(v) => patch({ source: v })} minWidth={190}
           options={[{ value: 'all', label: 'All sources' },
             ...srcs.map((s) => ({ value: s, label: `${sourceMeta(s).label} (${srcCount.get(s)})` }))]} />
-        <FilterSelect title="Category" value={filters.category} onChange={(v) => patch({ category: v })} minWidth={230}
-          options={[{ value: 'all', label: 'All categories' },
-            ...CATEGORY_ORDER.filter((c) => catCount.has(c)).map((c) => ({ value: c, label: `${categoryMeta(c).label} (${catCount.get(c)})` }))]} />
         {showActor && summary.byActor.length > 1 && (
           <FilterSelect title="Contributor" value={filters.actor} onChange={(v) => patch({ actor: v })} minWidth={190}
             options={[{ value: 'all', label: 'All contributors' }, ...summary.byActor.map(([a, n]) => ({ value: a, label: `${a} (${n})` }))]} />
@@ -124,7 +152,7 @@ export function FilterBar({ filters, patch, summary, showActor = true, period, p
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-1 pt-2 text-[11.5px]" style={{ color: MUTED }}>
         <span aria-live="polite">Showing <b className="tabular-nums" style={{ color: INK }}>{shown}</b> of {total} change{total === 1 ? '' : 's'}</span>
         {filtered && (
-          <button type="button" onClick={() => patch({ ...NO_FILTERS, period: filters.period })}
+          <button type="button" onClick={() => patch({ ...NO_FILTERS, period: filters.period, category: filters.category })}
             className={`inline-flex items-center gap-1 font-semibold rounded-[6px] ${FOCUS}`} style={{ color: '#005B96' }}>
             <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
           </button>
@@ -191,7 +219,8 @@ export default function ChangeHistory({ assetId, variant, action }: {
   });
   const items = useMemo(() => q.data ?? [], [q.data]);
   const summary = useMemo(() => summarise(items), [items]);
-  const shown = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const view = useMemo(() => ({ ...filters, category: pickCategory(summary, filters.category) }), [filters, summary]);
+  const shown = useMemo(() => applyFilters(items, view), [items, view]);
 
   const intro = (
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -230,7 +259,8 @@ export default function ChangeHistory({ assetId, variant, action }: {
         { label: 'Contributors', value: summary.byActor.length, sub: `${summary.bySource.length} source${summary.bySource.length === 1 ? '' : 's'}` },
         { label: 'Last change', value: relTime(summary.last), sub: fmtDate(summary.last) },
       ]} />
-      <FilterBar filters={filters} patch={patch} summary={summary} placeholder="Search field, value or person"
+      <CategoryTabs summary={summary} value={view.category} onChange={(c) => patch({ category: c })} />
+      <FilterBar filters={view} patch={patch} summary={summary} placeholder="Search field, value or person"
         period={{ label: 'Period', value: filters.period, options: PERIODS, onChange: (v) => patch({ period: v }) }}
         shown={shown.length} total={items.length}
         onExport={() => download(`asset-${assetId}-change-history.csv`, csvOf(shown))} />
@@ -248,7 +278,7 @@ export default function ChangeHistory({ assetId, variant, action }: {
         <div className="min-w-0">{body}</div>
         {ready && (
           <aside className="lg:sticky lg:top-3" aria-label="Insights">
-            <SummaryRail summary={summary} filters={filters} onFilter={patch} />
+            <SummaryRail summary={summary} filters={view} onFilter={patch} />
           </aside>
         )}
       </div>

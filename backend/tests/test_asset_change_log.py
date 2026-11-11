@@ -226,3 +226,35 @@ def test_estate_change_log_lists_changes_across_assets(db, monkeypatch):
     rows = R.asset_change_log(30, 300, db=db, current_user=SimpleNamespace(id=1))
     assert {(r.asset_name, r.source) for r in rows} == {("web01", "agent"), ("db02", "agent")}
     assert all(r.asset_id and r.fields for r in rows)
+
+
+def test_agent_report_churn_is_not_journalled(db):
+    pp = lambda ports, state, ts, speed: {
+        "recon": {"status": "discovered", "data": {"open_ports": ports}},
+        "services": {"status": "discovered", "data": [{"name": "Spooler", "state": state, "start_mode": "Auto"}]},
+        "network": {"status": "discovered", "data": [{"name": "Wi-Fi", "speed_bps": speed, "gateway": "10.0.0.1"}]},
+    }
+    a = _asset(db, platform_properties=pp([{"port": 445, "proto": "tcp"}, {"port": 50001, "proto": "udp"}], "Running", "t1", 1),
+               security_posture={"computed_at": "t1", "has_antivirus": True})
+    a.platform_properties = pp([{"port": 445, "proto": "tcp"}, {"port": 61234, "proto": "udp"}], "Stopped", "t2", 9)
+    a.security_posture = {"computed_at": "t2", "has_antivirus": True}
+    db.commit()
+    assert _rows(db) == []                                 # ephemeral port, run state, speed, computed_at
+    a.platform_properties = pp([{"port": 445, "proto": "tcp"}, {"port": 3389, "proto": "tcp"}], "Stopped", "t3", 9)
+    db.commit()
+    (row,) = _rows(db)
+    assert [(f["field"], f["change"]) for f in row.changes["fields"]] == [("recon.data.open_ports[3389/tcp]", "added")]
+
+
+def test_history_read_hides_old_churn_rows():
+    from types import SimpleNamespace
+    from grc.routers.entity_extras_router import _history_row
+    noise = SimpleNamespace(id=1, action="asset.updated", timestamp=None, user=None, changes={
+        "source": "agent", "fields": [{"field": "security_posture.computed_at", "section": "security_posture",
+                                       "category": "security", "old": "a", "new": "b"}],
+        "sections": {"security_posture": {"category": "security", "added": 0, "removed": 0, "changed": 1}}, "total_fields": 1})
+    assert _history_row(noise, {"user": {}, "asset": {}}) is None
+    mixed = SimpleNamespace(**{**noise.__dict__, "changes": {**noise.changes, "fields": noise.changes["fields"] + [
+        {"field": "ip_address", "section": "ip_address", "category": "identity", "old": "1", "new": "2"}], "total_fields": 2}})
+    h = _history_row(mixed, {"user": {}, "asset": {}})
+    assert h["total_fields"] == 1 and list(h["sections"]) == ["ip_address"]
