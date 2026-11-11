@@ -564,8 +564,9 @@ def get_sla_trends(
     total_on_time = 0
     total_resolved = 0
     
-    while current_date < datetime.utcnow():
-        interval_end = min(current_date + timedelta(days=interval_days), datetime.utcnow())
+    now = datetime.utcnow()  # fixed end: re-reading the clock each pass never let the loop finish
+    while current_date < now:
+        interval_end = min(current_date + timedelta(days=interval_days), now)
         
         interval_vulns = [v for v in resolved_vulns 
                          if v.resolved_at and current_date <= v.resolved_at < interval_end]
@@ -1962,6 +1963,7 @@ def _header_table_style(border_color, header_bg):
 def _styled_kv_table(rows, border_color, header_bg, bold_last: bool = False):
     """2-column key/value table with a header row. Optionally bolds the
     final row (used for "Total" lines)."""
+    from reportlab.lib.units import inch
     from reportlab.platypus import Table, TableStyle
     t = Table(rows, hAlign="LEFT", colWidths=[3.0 * inch, 1.5 * inch])
     cmds = [
