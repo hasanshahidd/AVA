@@ -7,10 +7,8 @@
  * Clicking a field opens a popup with its whole track in plain words
  * ("Installed KB5132061", "Owner: Ali → Sara"), when, and which source.
  *
- *   default export FieldTracker      — one asset   (GET /asset-fields/{id})
- *   EstateFieldTracker               — all assets  (GET /asset-field-catalog);
- *                                      "current value" = how many assets hold it,
- *                                      each change names its asset.
+ * Default export FieldTracker: one asset (GET /asset-fields/{id}). The view also has an
+ * `estate` mode (rows from GET /asset-field-catalog) that names each change's asset.
  * Live readings (free space, uptime) are listed but marked as not tracked.
  */
 
@@ -182,7 +180,7 @@ function Row({ v, estate, onOpen }: { v: View; estate: boolean; onOpen: () => vo
         </span>
         <span className="flex items-center justify-end gap-1.5 text-[11.5px] tabular-nums" style={{ color: MUTED }}>
           {changes.length > 0 && (
-            <span className="rounded-full min-w-[20px] text-center px-1.5 py-[1px] font-semibold text-white" style={{ background: BRAND }}>{changes.length}</span>
+            <span className="rounded-full min-w-[20px] text-center px-1.5 py-[1px] font-semibold" style={{ background: BRAND, color: "#fff" }}>{changes.length}</span>
           )}
           <ChevronRight className="h-4 w-4" style={{ color: hit ? BRAND : FAINT }} aria-hidden />
         </span>
@@ -199,7 +197,7 @@ function Group({ name, views, estate, onOpen }: { name: string; views: View[]; e
         <span className="text-[13.5px] font-semibold" style={{ color: BRAND }}>{name}</span>
         <span className="ml-auto text-[11.5px] tabular-nums" style={{ color: changed ? BRAND : MUTED }}>
           {changed
-            ? <span className="inline-flex items-center gap-1 rounded-full px-2 py-[1px] font-semibold text-white" style={{ background: BRAND }}>{changed} of {views.length} changed</span>
+            ? <span className="inline-flex items-center gap-1 rounded-full px-2 py-[1px] font-semibold" style={{ background: BRAND, color: "#fff" }}>{changed} of {views.length} changed</span>
             : `${views.length} field${views.length === 1 ? '' : 's'} · no change`}
         </span>
       </h3>
@@ -331,19 +329,4 @@ export default function FieldTracker({ assetId, entries }: { assetId: number; en
   if (q.isLoading) return <StateMessage>Loading fields…</StateMessage>;
   if (q.isError) return <StateMessage tone="error">Could not load this asset&apos;s fields. Refresh the page to try again.</StateMessage>;
   return <FieldTrackerView rows={q.data ?? []} entries={entries} estate={false} capped={entries.length >= 1000} />;
-}
-
-/** All assets: every field found on any asset, each change naming its asset. */
-export function EstateFieldTracker({ entries, period, capped, initialCategory }: {
-  entries: ChangeEntry[]; period: Segmented; capped: boolean; initialCategory?: string;
-}) {
-  const q = useQuery({
-    queryKey: ['asset-field-catalog'],
-    queryFn: async () => (await entityExtrasApi.assetFieldCatalog()).data,
-    staleTime: 5 * 60_000,
-  });
-  if (q.isLoading) return <StateMessage>Loading fields…</StateMessage>;
-  if (q.isError) return <StateMessage tone="error">Could not load the estate&apos;s fields. Refresh the page to try again.</StateMessage>;
-  return <FieldTrackerView rows={(q.data?.fields ?? []) as FieldRow[]} entries={entries} estate
-    period={period} assetCount={q.data?.assets} capped={capped} initialCategory={initialCategory} />;
 }

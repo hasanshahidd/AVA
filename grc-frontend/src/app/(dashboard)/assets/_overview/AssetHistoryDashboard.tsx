@@ -17,7 +17,7 @@ import { entityExtrasApi } from '@/lib/api';
 import { CARD_STYLE, KpiStrip } from '../[id]/_components/change-history/ChangeHistory';
 import { SourceBadge } from '../[id]/_components/change-history/ChangeEntryCard';
 import {
-  ACCENT, ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, SOURCE_ORDER, TZ_LABEL, type ChangeEntry,
+  ACCENT, ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, SOURCE_ORDER, TIME_ZONE, TZ_LABEL, type ChangeEntry,
   type Summary, categoryMeta, dayKey, dayLabel, fmtDate, fmtTime, relTime, sourceMeta, sourceOf, summarise, totalOf,
 } from '../[id]/_components/change-history/model';
 import { type FieldRow, type Track, type TrackChange, buildTracks, describeChange } from '../[id]/_components/change-history/tracks';
@@ -74,14 +74,18 @@ const None = ({ children }: { children: ReactNode }) => <p className="py-4 text-
 
 /* ── change volume over time ─────────────────────────────────────────── */
 
-type DayRow = { key: string; label: string; total: number } & Record<string, number | string>;
+type DayRow = { key: string; label: string; title: string; total: number } & Record<string, number | string>;
+
+/** Hour bucket in Pakistan time, e.g. "2026-11-11 17". */
+const hourKey = (ms: number) => new Date(ms).toLocaleString('en-CA', {
+  timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false,
+});
 
 function VolumeTip({ active, row, sources }: { active?: boolean; row?: DayRow; sources: string[] }) {
   if (!active || !row) return null;
-  const date = dayLabel(`${row.key}T12:00:00+05:00`);
   return (
     <div className="rounded-[8px] bg-white px-2.5 py-2 text-[12px] shadow-md" style={{ border: `1px solid ${DIVIDER}`, color: SEC }}>
-      <div className="font-semibold mb-1" style={{ color: INK }}>{date.title === date.date ? date.date : `${date.title}, ${date.date}`}</div>
+      <div className="font-semibold mb-1" style={{ color: INK }}>{row.title}</div>
       {sources.filter((s) => Number(row[s])).map((s) => (
         <div key={s} className="flex items-center gap-3"><span><Dot color={sourceMeta(s).color} />{sourceMeta(s).label}</span>
           <span className="ml-auto tabular-nums font-semibold" style={{ color: INK }}>{row[s]}</span></div>
@@ -96,28 +100,49 @@ function VolumeTip({ active, row, sources }: { active?: boolean; row?: DayRow; s
 function VolumeChart({ items, summary, days }: { items: ChangeEntry[]; summary: Summary; days: number }) {
   const sources = useMemo(() => [...SOURCE_ORDER, ...summary.bySource.map(([s]) => s).filter((s) => !SOURCE_ORDER.includes(s))]
     .filter((s) => summary.bySource.some(([k]) => k === s)), [summary]);
+  // The axis fits the data so the bars fill the chart: hourly when everything is within two days,
+  // else daily from the first change to today (not the whole period with one bar at the end).
+  const hourly = useMemo(() => {
+    const first = summary.first ? Date.parse(summary.first) : Date.now();
+    return Date.now() - first <= 2 * 86_400_000;
+  }, [summary.first]);
   const rows = useMemo(() => {
-    const out: DayRow[] = summary.daily.map((d) => ({ key: d.key, label: d.label, total: d.count, ...Object.fromEntries(sources.map((s) => [s, 0])) }));
-    const idx = new Map(out.map((r, i) => [r.key, i]));
+    const stepMs = hourly ? 3_600_000 : 86_400_000;
+    const keyOf = (ms: number) => (hourly ? hourKey(ms) : dayKey(new Date(ms).toISOString()));
+    const first = summary.first ? Date.parse(summary.first) : Date.now();
+    const out: DayRow[] = [];
+    const idx = new Map<string, number>();
+    for (let ms = first; ms <= Date.now() + stepMs - 1; ms += stepMs) {
+      const key = keyOf(ms);
+      if (idx.has(key)) continue;
+      const iso = new Date(ms).toISOString();
+      idx.set(key, out.length);
+      out.push({ key, label: hourly ? `${fmtTime(iso).slice(0, 2)}:00` : fmtDate(iso).replace(/ \d{4}$/, ''),
+        title: hourly ? `${dayLabel(iso).title}, ${fmtTime(iso).slice(0, 2)}:00–${fmtTime(new Date(ms + 3_600_000).toISOString()).slice(0, 2)}:00 ${TZ_LABEL}` : (() => { const d = dayLabel(iso); return d.title === d.date ? d.date : `${d.title}, ${d.date}`; })(),
+        total: 0, ...Object.fromEntries(sources.map((s) => [s, 0])) });
+    }
     for (const e of items) {
-      const i = idx.get(dayKey(e.created_at));
-      if (i !== undefined) out[i][sourceOf(e)] = Number(out[i][sourceOf(e)] ?? 0) + 1;
+      const i = e.created_at ? idx.get(keyOf(Date.parse(e.created_at))) : undefined;
+      if (i === undefined) continue;
+      out[i][sourceOf(e)] = Number(out[i][sourceOf(e)] ?? 0) + 1;
+      out[i].total += 1;
     }
     return out;
-  }, [items, summary, sources]);
+  }, [items, summary.first, sources, hourly]);
   const busiest = rows.reduce<DayRow | null>((b, r) => (!b || r.total > b.total ? r : b), null);
   const inChart = rows.reduce((n, r) => n + r.total, 0);
-  const aria = `Changes per day over the last ${days} days, stacked by source: ${inChart} in total`
+  const unit = hourly ? 'hour' : 'day';
+  const aria = `Changes per ${unit} over the last ${days} days, stacked by source: ${inChart} in total`
     + `${busiest?.total ? `, busiest day ${busiest.label} with ${busiest.total}` : ''}. `
     + sources.map((s) => `${sourceMeta(s).label} ${summary.bySource.find(([k]) => k === s)?.[1] ?? 0}`).join(', ');
 
   return (
     <Card title="Change volume" className="lg:col-span-2"
-      meta={`Per day, ${TZ_LABEL}${busiest?.total ? ` · busiest ${busiest.label} (${busiest.total})` : ''}`}>
+      meta={`Per ${unit}, ${TZ_LABEL}${busiest?.total ? ` · busiest ${busiest.label} (${busiest.total})` : ''}`}>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 mb-1 text-[11.5px]" aria-label="Sources" style={{ color: SEC }}>
         {sources.map((s) => <li key={s}><Dot color={sourceMeta(s).color} />{sourceMeta(s).label}</li>)}
       </ul>
-      <div role="img" aria-label={aria} className="h-[210px] -ml-2">
+      <div role="img" aria-label={aria} className="h-[290px] -ml-2">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 6, right: 4, bottom: 0, left: 0 }} barCategoryGap="18%">
             <CartesianGrid vertical={false} stroke={DIVIDER} />
@@ -128,7 +153,7 @@ function VolumeChart({ items, summary, days }: { items: ChangeEntry[]; summary: 
               content={({ active, payload }) => <VolumeTip active={active} row={payload?.[0]?.payload as DayRow | undefined} sources={sources} />} />
             {sources.map((s) => (
               <Bar key={s} dataKey={s} name={sourceMeta(s).label} stackId="day" fill={sourceMeta(s).color}
-                stroke="#fff" strokeWidth={1} maxBarSize={22} isAnimationActive={false} />
+                stroke="#fff" strokeWidth={1} maxBarSize={44} isAnimationActive={false} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -145,8 +170,23 @@ function SourceCard({ summary }: { summary: Summary }) {
   // Every source, so it is clear which ones made no change (e.g. no manual edits this period).
   const all: [string, number][] = [...SOURCE_ORDER, ...summary.bySource.map(([s]) => s).filter((s) => !SOURCE_ORDER.includes(s))]
     .map((s) => [s, count.get(s) ?? 0]);
+  // The three ways an asset changes, at a glance (agentless = credentialed scan + network discovery).
+  const groups: [string, number, string][] = [
+    ['Agent', count.get('agent') ?? 0, 'Endpoint agent reports'],
+    ['Agentless', (count.get('scan') ?? 0) + (count.get('discovery') ?? 0), 'Credentialed scans and network discovery'],
+    ['Manual', count.get('manual') ?? 0, 'Edits made by people in CAIVA'],
+  ];
   return (
     <Card title="Who made them" meta="Changes by source">
+      <div className="grid grid-cols-3 gap-1.5 mb-1.5" aria-label="Agent, agentless and manual changes">
+        {groups.map(([label, n, hint]) => (
+          <div key={label} className="rounded-[8px] px-2 py-1.5 text-center" title={hint}
+            style={{ background: n ? '#EAF3FA' : '#F4F6F7', border: `1px solid ${n ? '#CFE3F2' : DIVIDER}` }}>
+            <div className="text-[16px] font-semibold leading-tight tabular-nums" style={{ color: n ? BRAND : MUTED }}>{n}</div>
+            <div className="text-[11px]" style={{ color: n ? BRAND : MUTED }}>{label}</div>
+          </div>
+        ))}
+      </div>
       <ul aria-label="Changes by source">
         {all.map(([s, n]) => (
           <BarRow key={s} label={<><Dot color={sourceMeta(s).color} />{sourceMeta(s).label}</>} value={n} max={max}
@@ -168,11 +208,11 @@ function CategoryCard({ summary, onCategory }: { summary: Summary; onCategory?: 
   // Every category of the asset record, so the card reads as a full checklist; a click opens its fields.
   const cats = CATEGORY_ORDER.filter((c) => c !== 'other' || count.has(c));
   return (
-    <Card title="Where changes happen" meta="Fields changed · click to open">
+    <Card title="Where changes happen" meta="Fields changed · click to see its assets">
       <ul aria-label="Fields changed by category">
         {cats.map((c) => (
           <BarRow key={c} label={<><Dot color={categoryMeta(c).color} />{categoryMeta(c).label}</>} value={count.get(c) ?? 0} max={max}
-            color={categoryMeta(c).color} title={`${categoryMeta(c).hint} (open its fields)`}
+            color={categoryMeta(c).color} title={`${categoryMeta(c).hint} (see the assets that changed here)`}
             onClick={onCategory ? () => onCategory(c) : undefined} />
         ))}
       </ul>
@@ -307,7 +347,7 @@ function RecentCard({ items, rows }: { items: ChangeEntry[]; rows: FieldRow[] })
 /* ── dashboard ───────────────────────────────────────────────────────── */
 
 export default function AssetHistoryDashboard({ items, days, capped, onCategory }: {
-  items: ChangeEntry[]; days: number; capped: boolean; /** open the Fields view on a category */ onCategory?: (c: string) => void;
+  items: ChangeEntry[]; days: number; capped: boolean; /** open the Assets view on a category */ onCategory?: (c: string) => void;
 }) {
   // Same query as the Fields view (shared cache): field catalog for plain wording + the estate's asset count.
   const catalog = useQuery({

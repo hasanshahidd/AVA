@@ -5,9 +5,9 @@
  * three views:
  *   Dashboard (default) — KPIs, daily volume, categories, sources, most-changed
  *            assets / fields and recent security changes (AssetHistoryDashboard).
- *   Fields   — every field found on any asset, by category; each row
- *            says on how many assets it is set and its last change; a click
- *            opens the field's changes across assets (EstateFieldTracker).
+ *   Assets   — every asset with what changed on it (changes, fields, category mix,
+ *            sources, last change); picking one opens its field-by-field history
+ *            in place (AssetChangesOverview).
  *   Activity — KPI strip, filters and a day-grouped feed; each item names its
  *            asset and uses the same ChangeEntryCard as the per-asset history.
  */
@@ -15,7 +15,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { entityExtrasApi } from '@/lib/api';
-import { EstateFieldTracker } from '../[id]/_components/change-history/FieldTracker';
+import AssetChangesOverview from './AssetChangesOverview';
 import AssetHistoryDashboard from './AssetHistoryDashboard';
 import {
   CategoryTabs, EmptyCard, FilterBar, KpiStrip, StateMessage, Timeline, csvOf, download, pickCategory,
@@ -26,13 +26,13 @@ import {
 
 const WINDOWS = [{ key: '7', label: '7 days' }, { key: '30', label: '30 days' }, { key: '90', label: '90 days' }];
 const LIMIT = 300;          // Activity feed
-const FIELDS_LIMIT = 1000;  // Dashboard and Fields views count changes per field, so it reads the most the API returns
+const FIELDS_LIMIT = 1000;  // Dashboard and Assets views count every change, so they read the most the API returns
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#19A8E6]';
 
 export default function AssetHistoryFeed() {
   const [days, setDays] = useState('30');
-  const [mode, setMode] = useState<'dashboard' | 'fields' | 'activity'>('dashboard');
-  const [fieldCategory, setFieldCategory] = useState<string | undefined>();   // set by a dashboard category click
+  const [mode, setMode] = useState<'dashboard' | 'assets' | 'activity'>('dashboard');
+  const [assetCategory, setAssetCategory] = useState<string | undefined>();   // set by a dashboard category click
   const limit = mode === 'activity' ? LIMIT : FIELDS_LIMIT;
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const patch = (p: Partial<Filters>) => setFilters((f) => ({ ...f, ...p }));
@@ -48,8 +48,8 @@ export default function AssetHistoryFeed() {
 
   const switcher = (
     <div className="segwrap" role="group" aria-label="History view">
-      {([['dashboard', 'Dashboard'], ['fields', 'Fields'], ['activity', 'Activity']] as const).map(([k, l]) => (
-        <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}
+      {([['dashboard', 'Dashboard'], ['assets', 'Assets'], ['activity', 'Activity']] as const).map(([k, l]) => (
+        <button key={k} type="button" aria-pressed={mode === k} onClick={() => { setMode(k); if (k === 'assets') setAssetCategory(undefined); }}
           className={`${mode === k ? 'seg on' : 'seg'} ${FOCUS}`} style={{ height: 28, padding: '0 12px', fontSize: 12.5 }}>{l}</button>
       ))}
     </div>
@@ -75,19 +75,27 @@ export default function AssetHistoryFeed() {
                 Edits, scans, network discovery, connector syncs, agent reports and imports that change an asset appear here. Try a longer period.
               </EmptyCard>
             ) : <AssetHistoryDashboard items={items} days={Number(days)} capped={items.length >= FIELDS_LIMIT}
-              onCategory={(c) => { setFieldCategory(c); setMode('fields'); }} />}
+              onCategory={(c) => { setAssetCategory(c); setMode('assets'); }} />}
       </div>
     );
   }
 
-  if (mode === 'fields') {
+  if (mode === 'assets') {
     return (
       <div className="inv2 space-y-2.5" style={{ color: SEC }}>
-        {switcher}
+        <div className="flex flex-wrap items-center gap-2">
+          {switcher}
+          <div className="segwrap" role="group" aria-label={period.label}>
+            {WINDOWS.map((o) => (
+              <button key={o.key} type="button" aria-pressed={days === o.key} onClick={() => setDays(o.key)}
+                className={`${days === o.key ? 'seg on' : 'seg'} ${FOCUS}`} style={{ height: 28, padding: '0 11px', fontSize: 12 }}>{o.label}</button>
+            ))}
+          </div>
+        </div>
         {q.isLoading ? <StateMessage>Loading asset history…</StateMessage>
           : q.isError ? <StateMessage tone="error">Could not load asset history. Refresh the page to try again.</StateMessage>
-            : <EstateFieldTracker key={fieldCategory} entries={items} period={period} capped={items.length >= FIELDS_LIMIT}
-              initialCategory={fieldCategory} />}
+            : <AssetChangesOverview key={assetCategory ?? 'all'} items={items} initialCategory={assetCategory}
+              periodLabel={`Last ${days} days`} />}
       </div>
     );
   }
