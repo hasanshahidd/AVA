@@ -75,7 +75,9 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 function FieldPopup({ v, estate, onClose }: { v: View; estate: boolean; onClose: () => void }) {
   const { track: t, changes } = v;
   const [shownN, setShownN] = useState(CHANGE_PAGE);
-  const cur = currentValue(t, estate);
+  // A list's items are shown under "Now" below; the fact box only needs the count.
+  const cur = !estate && t.kind === 'list' && t.count
+    ? { text: `${t.count} item${t.count === 1 ? '' : 's'}`, muted: false } : currentValue(t, estate);
   const items = !estate && t.isList && Array.isArray(t.value) ? (t.value as unknown[]) : [];
   const assets = new Set(changes.map((c) => c.assetId).filter(Boolean)).size;
   return (
