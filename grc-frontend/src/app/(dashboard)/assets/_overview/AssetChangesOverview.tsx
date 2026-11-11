@@ -13,7 +13,7 @@ import { ArrowLeft, ChevronRight, Search, X } from 'lucide-react';
 import { assetsApi } from '@/lib/api';
 import ChangeHistory, { CARD_STYLE, StateMessage } from '../[id]/_components/change-history/ChangeHistory';
 import {
-  BRAND, CATEGORY_ORDER, DIVIDER, INK, MUTED, SEC, TZ_LABEL, type ChangeEntry, categoryMeta, fmtDate, fmtTime,
+  BRAND, CATEGORY_ORDER, DIVIDER, INK, MUTED, SEC, TZ_LABEL, type ChangeEntry, categoryCounts, categoryMeta, fmtDate, fmtTime,
   relTime, sourceMeta, sourceOf, totalOf,
 } from '../[id]/_components/change-history/model';
 
@@ -32,9 +32,7 @@ function statsByAsset(items: ChangeEntry[]): Map<number, Stat> {
     s.n += 1;
     s.fields += totalOf(e);
     s.sources.set(sourceOf(e), (s.sources.get(sourceOf(e)) ?? 0) + 1);
-    for (const t of Object.values(e.sections ?? {})) {
-      s.cats.set(t.category, (s.cats.get(t.category) ?? 0) + t.added + t.removed + t.changed);
-    }
+    for (const [c, n] of Array.from(categoryCounts(e).entries())) s.cats.set(c, (s.cats.get(c) ?? 0) + n);
     m.set(e.asset_id, s);
   }
   return m;

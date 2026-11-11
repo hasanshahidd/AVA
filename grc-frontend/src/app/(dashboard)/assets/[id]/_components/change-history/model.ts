@@ -194,11 +194,24 @@ export function fieldsOf(e: ChangeEntry): ChangeField[] {
   return Array.isArray(e.fields) ? e.fields : [];
 }
 export const categoryOfField = (f: ChangeField) => (f.category && CATEGORY_META[f.category] ? f.category : 'other');
-export function categoriesOf(e: ChangeEntry): string[] {
+/** Changed fields per category. From the field rows when the entry kept all of them (a mixed
+ *  section such as recon spans categories), else from the per-section totals (complete when capped). */
+export function categoryCounts(e: ChangeEntry): Map<string, number> {
+  const m = new Map<string, number>();
   const fs = fieldsOf(e);
-  const fromSections = e.sections ? Object.values(e.sections).map((s) => s.category) : [];
-  const cats = new Set([...fs.map(categoryOfField), ...fromSections]);
-  return cats.size ? Array.from(cats) : ['other'];
+  if (fs.length && !e.truncated) {
+    for (const f of fs) m.set(categoryOfField(f), (m.get(categoryOfField(f)) ?? 0) + 1);
+    return m;
+  }
+  for (const t of Object.values(e.sections ?? {})) {
+    const c = CATEGORY_META[t.category] ? t.category : 'other';
+    m.set(c, (m.get(c) ?? 0) + t.added + t.removed + t.changed);
+  }
+  return m;
+}
+export function categoriesOf(e: ChangeEntry): string[] {
+  const cats = Array.from(categoryCounts(e).keys());
+  return cats.length ? cats : ['other'];
 }
 export const totalOf = (e: ChangeEntry) => e.total_fields ?? fieldsOf(e).length;
 
@@ -328,19 +341,13 @@ export function summarise(items: ChangeEntry[], days = 30): Summary {
     bump(byActor, actorOf(e));
     const fs = fieldsOf(e);
     fieldChanges += totalOf(e);
+    for (const [c, n] of Array.from(categoryCounts(e).entries())) bump(byCategory, c, n);
     if (e.sections && Object.keys(e.sections).length) {
       // Section totals are complete even when stored rows were capped.
-      for (const [sec, t] of Object.entries(e.sections)) {
-        const n = t.added + t.removed + t.changed;
-        bump(byCategory, CATEGORY_META[t.category] ? t.category : 'other', n);
-        bump(byField, sectionLabel(sec), n);   // a column is its own section
-      }
+      for (const [sec, t] of Object.entries(e.sections)) bump(byField, sectionLabel(sec), t.added + t.removed + t.changed);   // a column is its own section
     } else {
       if (!fs.length) bump(byCategory, 'other');
-      for (const f of fs) {
-        bump(byCategory, categoryOfField(f));
-        bump(byField, fieldLabel(f));
-      }
+      for (const f of fs) bump(byField, fieldLabel(f));
     }
   }
   const dated = items.map((e) => e.created_at).filter(Boolean).sort() as string[];

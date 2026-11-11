@@ -385,3 +385,18 @@ def test_history_read_drops_order_paired_duplicates_and_rolled_off_hotfixes():
         {"field": "recon.open_ports[8834/tcp]", "section": "recon", "change": "added", "old": None, "new": "port: 8834"},
     ]
     assert [f["field"] for f in drop_churn(rows)] == ["recon.open_ports[8834/tcp]"]
+
+
+def test_recon_parts_are_filed_where_they_belong(db):
+    from grc.services.asset_change_log import category_for
+    assert category_for("recon", "recon.packages[openssl].version", "identity") == "software"
+    assert category_for("recon", "recon.windows.hotfixes", "identity") == "security"
+    assert category_for("recon", "recon.open_ports[445/tcp]", "identity") == "identity"
+    assert category_for("defender", "defender.data.x", "security") == "security"
+    a = _asset(db, platform_properties={"recon": {"packages": [{"name": "openssl", "version": "1"}], "open_ports": []}})
+    a.platform_properties = {"recon": {"packages": [{"name": "openssl", "version": "3"}], "open_ports": [{"port": 22, "proto": "tcp"}]}}
+    db.commit()
+    cats = {f["field"]: f["category"] for f in _rows(db)[0].changes["fields"]}
+    assert cats == {"recon.packages[openssl].version": "software", "recon.open_ports[22/tcp]": "identity"}
+    by = {t["path"]: t["category"] for t in field_tracks(a)}
+    assert by["recon.packages"] == "software" and by["recon.open_ports"] == "identity"

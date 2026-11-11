@@ -296,7 +296,7 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
     used a coarser set) and attach display names for user / asset references."""
     if not isinstance(fields, list):
         return None
-    from ..services.asset_change_log import column_category, drop_churn
+    from ..services.asset_change_log import category_for, column_category, drop_churn
     names = names or {"user": {}, "asset": {}}
     out = []
     for f in drop_churn(fields):
@@ -306,7 +306,7 @@ def _with_categories(fields: Optional[List[Dict[str, Any]]],
         if not isinstance(f, dict):
             continue
         name = f.get("field", "")
-        row = {**f, "category": column_category(name) or f.get("category") or "other"}
+        row = {**f, "category": column_category(name) or category_for(f.get("section"), name, f.get("category")) or "other"}
         kind = "user" if name in _USER_REF_FIELDS else "asset" if name in _ASSET_REF_FIELDS else None
         if kind:
             row["old_label"] = names[kind].get(f.get("old")) if isinstance(f.get("old"), int) else None

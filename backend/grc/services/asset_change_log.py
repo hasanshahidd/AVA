@@ -85,6 +85,26 @@ SECTION_CATEGORIES: Dict[str, str] = {
                      "sec_updates", "security_updates", "roles", "logins", "security"), "security"),
     "cmdb": "lifecycle",
 }
+# "recon" mixes everything a scan learns; file each part where it belongs on the asset record.
+_MIXED_SECTION_KEYS: Dict[str, Dict[str, str]] = {"recon": {
+    **dict.fromkeys(("packages", "pkg", "software", "os_family", "os_build", "os_edition", "os", "services"), "software"),
+    **dict.fromkeys(("hotfixes", "smb", "local_admins", "uac", "winrm", "rdp", "firewall", "defender",
+                     "security_updates", "users", "sudoers", "sshd"), "security"),
+}}
+_PATH_TOKEN = re.compile(r"[.\[\]]")
+
+
+def category_for(section: Optional[str], field: str, default: Optional[str]) -> Optional[str]:
+    """Category of a journalled field: its section's, except in mixed sections (recon),
+    where the first known key under the section decides (packages -> software…)."""
+    keys = _MIXED_SECTION_KEYS.get(section or "")
+    if keys:
+        for tok in _PATH_TOKEN.split(field[len(section):]):
+            if tok in keys:
+                return keys[tok]
+    return default
+
+
 _VOLATILE_SECTIONS = {"processes", "running_processes", "connections", "netstat", "sessions"}
 _VOLATILE_KEYS = {"timestamp", "boot_time", "last_boot_time", "last_boot_up_time", "uptime", "uptime_hours",
                   "uptime_seconds", "current_clock_mhz", "current_clock_speed", "duration_ms",
@@ -201,6 +221,7 @@ class _Diff:
         self.total = 0
 
     def add(self, field: str, section: str, cat: str, change: str, old: Any, new: Any) -> None:
+        cat = category_for(section, field, cat) or cat
         self.total += 1
         s = self.sections.setdefault(section, {"category": cat, "added": 0, "removed": 0, "changed": 0})
         s[change] += 1
@@ -416,7 +437,7 @@ def field_tracks(asset: ITAsset, preview: bool = True) -> List[Dict[str, Any]]:
     def put(path: str, section: str, cat: str, kind: str, value: Any, count: Optional[int] = None) -> None:
         if len(out) < _MAX_TRACKS:
             hidden = is_sensitive_key(path.rsplit(".", 1)[-1]) and value not in (None, "")
-            out.append({"path": path, "section": section, "category": cat, "kind": kind,
+            out.append({"path": path, "section": section, "category": category_for(section, path, cat) or cat, "kind": kind,
                         "value": "***" if hidden else value, "count": count})
 
     def walk(path: str, section: str, cat: str, v: Any) -> None:

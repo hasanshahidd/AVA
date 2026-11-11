@@ -18,7 +18,7 @@ import { CARD_STYLE, KpiStrip } from '../[id]/_components/change-history/ChangeH
 import { SourceBadge } from '../[id]/_components/change-history/ChangeEntryCard';
 import {
   ACCENT, ADD, BRAND, CATEGORY_ORDER, DEL, DIVIDER, FAINT, INK, MUTED, SEC, SOURCE_ORDER, TIME_ZONE, TZ_LABEL, type ChangeEntry,
-  type Summary, categoryMeta, dayKey, dayLabel, fmtDate, fmtTime, relTime, sourceMeta, sourceOf, summarise, totalOf,
+  type Summary, categoryCounts, categoryMeta, dayKey, dayLabel, fmtDate, fmtTime, relTime, sourceMeta, sourceOf, summarise, totalOf,
 } from '../[id]/_components/change-history/model';
 import { type FieldRow, type Track, type TrackChange, buildTracks, describeChange } from '../[id]/_components/change-history/tracks';
 
@@ -208,7 +208,7 @@ function CategoryCard({ summary, onCategory }: { summary: Summary; onCategory?: 
   // Every category of the asset record, so the card reads as a full checklist; a click opens its fields.
   const cats = CATEGORY_ORDER.filter((c) => c !== 'other' || count.has(c));
   return (
-    <Card title="Where changes happen" meta="Fields changed · click to see its assets">
+    <Card title="Where changes happen" meta="Click to see assets">
       <ul aria-label="Fields changed by category">
         {cats.map((c) => (
           <BarRow key={c} label={<><Dot color={categoryMeta(c).color} />{categoryMeta(c).label}</>} value={count.get(c) ?? 0} max={max}
@@ -230,7 +230,7 @@ function AssetsCard({ items, totalAssets }: { items: ChangeEntry[]; totalAssets?
       const a = m.get(e.asset_id) ?? { id: e.asset_id, name: e.asset_name || `Asset ${e.asset_id}`, type: e.asset_type, n: 0, fields: 0, last: e.created_at, cats: new Map() };
       a.n += 1;
       a.fields += totalOf(e);
-      for (const t of Object.values(e.sections ?? {})) a.cats.set(t.category, (a.cats.get(t.category) ?? 0) + t.added + t.removed + t.changed);
+      for (const [c, n] of Array.from(categoryCounts(e).entries())) a.cats.set(c, (a.cats.get(c) ?? 0) + n);
       m.set(e.asset_id, a);
     }
     return Array.from(m.values()).sort((a, b) => b.n - a.n || b.fields - a.fields);
