@@ -1,0 +1,13 @@
+[Unit]
+Description=CAIVA scheduler (grc.celery_app worker + embedded beat: KEV/EPSS refresh, exception expiry, cloud/connector/CMDB sync, scheduled network discovery, zombie-scan reconcile)
+After=network.target redis-server.service postgresql.service caiva-backend.service
+Wants=redis-server.service
+
+[Service]
+WorkingDirectory=/opt/caiva/backend
+ExecStart=/bin/bash /opt/caiva/backend/run-scheduler.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

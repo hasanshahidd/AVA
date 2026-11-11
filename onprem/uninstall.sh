@@ -13,7 +13,7 @@ for a in "$@"; do case "$a" in
 
 echo "[uninstall] services"
 # one unit at a time: a single missing/transient unit (caiva-setup) aborts a multi-unit call
-for u in caiva-backend caiva-worker caiva-frontend caiva-setup; do
+for u in caiva-backend caiva-worker caiva-scheduler caiva-frontend caiva-setup; do
   systemctl stop "$u" 2>/dev/null; systemctl disable "$u" 2>/dev/null
 done
 rm -f /etc/systemd/system/caiva-*.service; systemctl daemon-reload

@@ -221,8 +221,8 @@ configure() {
   step services "starting services"
   cp "$B"/templates/caiva-*.service /etc/systemd/system/
   systemctl daemon-reload
-  systemctl enable caiva-backend caiva-worker caiva-frontend
-  systemctl restart caiva-backend caiva-worker caiva-frontend
+  systemctl enable caiva-backend caiva-worker caiva-scheduler caiva-frontend
+  systemctl restart caiva-backend caiva-worker caiva-scheduler caiva-frontend
   systemctl reload nginx
   # Metasploit RPC for exploit validation — the backend only starts it in a hook that
   # doesn't run in the web process, so the installer owns it (restarts with the box).
