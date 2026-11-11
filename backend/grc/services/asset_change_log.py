@@ -228,12 +228,21 @@ class _Diff:
         a, b = [x for x in a if not _ephemeral(x)], [x for x in b if not _ephemeral(x)]
         if any(isinstance(x, dict) for x in a + b):
             def keyed(items):
-                out: Dict[str, Any] = {}
+                groups: Dict[str, List[Any]] = {}
                 for it in items:
-                    k = _item_key(it, section)
-                    while k in out:
-                        k += "'"
-                    out[k] = it
+                    groups.setdefault(_item_key(it, section), []).append(it)
+                out: Dict[str, Any] = {}
+                for k, its in groups.items():
+                    if len(its) == 1:
+                        out[k] = its[0]
+                        continue
+                    # Same key twice (e.g. chrome + msedge both on 5353/udp): name each one,
+                    # never pair them by list order, which flips between reports.
+                    for it in sorted(its, key=lambda x: json.dumps(x, default=str, sort_keys=True)):
+                        kk = f"{k} ({_tag(it, section)})"
+                        while kk in out:
+                            kk += "'"
+                        out[kk] = it
                 return out
             ka, kb = keyed(a), keyed(b)
             for k in sorted(set(ka) | set(kb)):
@@ -252,6 +261,16 @@ class _Diff:
         for x in a:
             if json.dumps(x, default=str) not in sb:
                 self.add(path, section, cat, "removed", x, None)
+
+
+def _tag(item: Any, section: str) -> str:
+    if isinstance(item, dict):
+        for k in ("service", "process", "process_name", "program", "address", "ip"):
+            if item.get(k) not in (None, ""):
+                return str(item[k])
+        skip = _SECTION_VOLATILE.get(section, ())
+        item = {k: v for k, v in item.items() if not _volatile(k) and k not in skip}
+    return json.dumps(item, default=str, sort_keys=True)[:60]
 
 
 def _ephemeral(item: Any) -> bool:

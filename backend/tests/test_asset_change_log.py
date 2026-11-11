@@ -288,3 +288,17 @@ def test_history_read_drops_identical_remove_add_pairs():
     assert drop_churn(pair + [real]) == [real]
     moved = [{**pair[0], "field": "volumes.data[X]"}, {**pair[1], "field": "disks.data[X]"}]   # different list: kept
     assert drop_churn(moved) == moved
+
+
+def test_shared_port_listeners_are_not_paired_by_order(db):
+    ports = lambda *svcs: {"recon": {"status": "discovered", "data": {"open_ports": [
+        {"port": 5353, "proto": "udp", "service": s} for s in svcs] + [{"port": 445, "proto": "tcp"}]}}}
+    a = _asset(db, platform_properties=ports("chrome", "svchost"))
+    a.platform_properties = ports("svchost", "chrome")          # same listeners, other order
+    db.commit()
+    assert _rows(db) == []
+    a.platform_properties = ports("svchost", "msedge")
+    db.commit()
+    (row,) = _rows(db)
+    assert sorted((f["field"], f["change"]) for f in row.changes["fields"]) == [
+        ("recon.data.open_ports[5353/udp (chrome)]", "removed"), ("recon.data.open_ports[5353/udp (msedge)]", "added")]
