@@ -62,6 +62,13 @@ def main() -> None:
     tc.execute("update grc_users set username='admin', email=%s, password_hash=%s, display_name=%s, is_active=true, "
                "failed_login_attempts=0, locked_until=NULL",
                (a.admin_email, hash_password(pw), f"{a.org} Administrator"))
+    # CIS library / OS registry query these with jsonb operators; the seed stores plain json
+    for col in ("os_keys", "target_builds"):
+        tc.execute("select data_type from information_schema.columns "
+                   "where table_name='grc_compliance_plugins' and column_name=%s", (col,))
+        r = tc.fetchone()
+        if r and r[0] == "json":
+            tc.execute(f"alter table grc_compliance_plugins alter column {col} type jsonb using {col}::jsonb")
     for t in RUNTIME_TABLES:
         tc.execute(f"truncate {t}")
 
