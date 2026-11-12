@@ -159,8 +159,9 @@ configure() {
 
   step database "database"
   pg() { sudo -u postgres psql -v ON_ERROR_STOP=1 -tA "$@"; }
-  [ -n "$(pg -c "select 1 from pg_roles where rolname='grc_app'")" ] || pg -c "create role grc_app login createdb password '$DB_PW'"
-  pg -c "alter role grc_app password '$DB_PW'" >/dev/null
+  pgin() { sudo -u postgres psql -v ON_ERROR_STOP=1 -tA; }  # SQL on stdin: keeps the password out of argv and the sudo journal
+  [ -n "$(pg -c "select 1 from pg_roles where rolname='grc_app'")" ] || printf "create role grc_app login createdb password '%s'" "$DB_PW" | pgin
+  printf "alter role grc_app password '%s'" "$DB_PW" | pgin >/dev/null
   restore() {  # db dump
     if [ -n "$(pg -c "select 1 from pg_database where datname='$1'")" ]; then echo "$1 exists — kept"; return; fi
     pg -c "create database $1 owner grc_app"
