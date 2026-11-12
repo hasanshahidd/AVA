@@ -734,7 +734,7 @@ async def bulk_upload_vulnerabilities(
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
-@router.get("/vulnerabilities/{vuln_id}", response_model=VulnerabilityResponse)
+@router.get("/vulnerabilities/{vuln_id:int}", response_model=VulnerabilityResponse)
 def get_vulnerability(
     vuln_id: int,
     db: Session = Depends(get_db),
@@ -793,7 +793,7 @@ def get_vulnerability(
     return _build_vulnerability_response(vuln, solution_count=solution_count)
 
 
-@router.put("/vulnerabilities/{vuln_id}", response_model=VulnerabilityResponse)
+@router.put("/vulnerabilities/{vuln_id:int}", response_model=VulnerabilityResponse)
 def update_vulnerability(
     vuln_id: int,
     request: VulnerabilityUpdate,
@@ -821,7 +821,7 @@ def update_vulnerability(
     return _build_vulnerability_response(vuln)
 
 
-@router.delete("/vulnerabilities/{vuln_id}", response_model=MessageResponse)
+@router.delete("/vulnerabilities/{vuln_id:int}", response_model=MessageResponse)
 def delete_vulnerability(
     vuln_id: int,
     db: Session = Depends(get_db),

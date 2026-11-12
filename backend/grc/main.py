@@ -5,6 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+import email_validator
+# Banks often use internal mail domains (corp.local); EmailStr rejects '.local' as special-use.
+if "local" in email_validator.SPECIAL_USE_DOMAIN_NAMES:
+    email_validator.SPECIAL_USE_DOMAIN_NAMES.remove("local")
 from .models import init_master_db
 from .audit_logger import should_audit_request, parse_request_payload, write_audit_log
 from . import audit_capture  # noqa: F401 — registers the before_flush field-diff listener at startup

@@ -19,7 +19,7 @@ the UI's style maps key on.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -101,6 +101,23 @@ class TicketCreate(BaseModel):
     ci_id: Optional[int] = None
     business_service_id: Optional[int] = None
     support_group_code: Optional[str] = None  # ITIL support group → routes to its mapped team
+    # problem / change / request detail entered in the create form (create_ticket's
+    # _extension_kwargs already persists them; approval_* stay update-only on purpose)
+    planned_start: Optional[str] = None
+    planned_end: Optional[str] = None
+    implementation_plan: Optional[str] = None
+    backout_plan: Optional[str] = None
+    root_cause: Optional[str] = None
+    workaround: Optional[str] = None
+    known_error: Optional[Any] = None
+    linked_incident_ids: Optional[Any] = None
+    origin_ticket_id: Optional[int] = None
+    origin_process: Optional[str] = None
+    request_category: Optional[str] = None
+    request_subcategory: Optional[str] = None
+    incident_category_id: Optional[int] = None
+    problem_category_id: Optional[int] = None
+    change_category_id: Optional[int] = None
 
 
 class SavedReplyBody(BaseModel):

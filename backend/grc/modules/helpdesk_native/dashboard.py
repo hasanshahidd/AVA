@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...models import (
@@ -485,7 +485,8 @@ dashboard_router = APIRouter(prefix="/helpdesk", tags=["Help Desk analytics (nat
 
 @dashboard_router.get("/dashboard-data")
 def dashboard_data(
-    dashboard_type: str,
+    dashboard_type: Optional[str] = None,
+    type_: Optional[str] = Query(None, alias="type"),  # the dashboard page sends ?type=
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     team: Optional[str] = None,
@@ -505,6 +506,7 @@ def dashboard_data(
         raise HTTPException(status_code=403,
                             detail="You are not allowed to view this dashboard data.")
 
+    dashboard_type = dashboard_type or type_
     nd = NativeDashboard(db, tenant_id(db), from_date, to_date, team, agent)
     if dashboard_type == "number_card":
         return nd.number_cards()
