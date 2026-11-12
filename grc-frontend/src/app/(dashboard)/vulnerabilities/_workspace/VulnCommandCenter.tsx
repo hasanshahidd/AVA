@@ -183,7 +183,9 @@ export default function VulnCommandCenter({
     const totalOpen = dashboard?.open_vulnerabilities ?? open.length;
 
     // ── Severity composition of open findings (the lead story) ──
-    const sevDist = SEV_ORDER.map((k) => ({ k, label: SEV[k].label, c: SEV[k].c, n: open.filter((v) => normSev(v.severity) === k).length }));
+    // Severity counts come from the server dashboard's deduped by_severity (whole register), NOT the
+    // newest-500 list sample — a recent info-heavy scan can flood that window and zero out the donut.
+    const sevDist = SEV_ORDER.map((k) => ({ k, label: SEV[k].label, c: SEV[k].c, n: dashboard?.by_severity?.[k] ?? open.filter((v) => normSev(v.severity) === k).length }));
     const critHigh = sevDist[0].n + sevDist[1].n;
     const sevMax = Math.max(1, ...sevDist.map((x) => x.n));
 
