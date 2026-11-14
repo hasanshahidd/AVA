@@ -59,7 +59,7 @@ find "$A" -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} 
 # compile OUR code (NOT venv — third-party public libs, created on target from wheels)
 for d in backend ava-pentest-engine; do
   [ -d "$A/$d" ] || continue
-  "$PYBIN" -m compileall -b -q -j 0 -x '(/venv/|/node_modules/|/tests?/)' "$A/$d"     || { echo "ABORT: bytecode compile failed in $d"; exit 1; }
+  "$PYBIN" -m compileall -b -q -j 0 -x '(/venv/|/node_modules/)' "$A/$d"     || { echo "ABORT: bytecode compile failed in $d"; exit 1; }
 done
 # drop each .py that now has a .pyc beside it (keeps any uncompiled .py, e.g. venv has none here)
 find "$A/backend" "$A/ava-pentest-engine" -name '*.py' -not -path '*/venv/*'   -exec sh -c '[ -f "${1%.py}c" ] && rm -f "$1"' _ {} \;
