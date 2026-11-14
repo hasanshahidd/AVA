@@ -11,7 +11,7 @@ OUT=$(cd "$OUT" && pwd)
 # Keep in sync with install.sh (PKGS).
 PKGS="postgresql-18 redis-server nginx docker.io nmap openscap-scanner sshpass git openssh-client
       tesseract-ocr python3.11 python3.11-venv python3.11-dev libpq-dev build-essential nodejs zstd
-      openssl jq curl ca-certificates openjdk-17-jre-headless"
+      openssl jq curl ca-certificates openjdk-17-jre-headless openscap-utils unzip"
 
 docker run --rm -v "$OUT/debs:/out" ubuntu:24.04 bash -euo pipefail -c "
   export DEBIAN_FRONTEND=noninteractive
