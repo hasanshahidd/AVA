@@ -50,6 +50,24 @@ rm -rf "$B"; mkdir -p "$B"/{app,seed,artifacts,lanes,debs}
 log "1/8 code @ $SHA"
 git -C "$SRC" archive HEAD | tar -x -C "$B/app"
 
+log "1b/8 strip dev files + compile our Python to bytecode (ship .pyc, no source)"
+A="$B/app"; PYBIN="$SRC/backend/venv/bin/python"
+# developer-only material that never runs the product (pure IP leakage)
+rm -rf "$A/_archive_old_control_library" "$A/_deferred_stage5_attack_pipeline" "$A/ai-pentest-eval" "$A/docs"
+find "$A" -maxdepth 1 -type f \( -name '*.md' -o -name '*.html' -o -name '*.png' -o -name '*.jpg' -o -name '*.JPG' -o -name '*.csv' \) -delete
+find "$A" -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} + 2>/dev/null || true
+# compile OUR code (NOT venv — third-party public libs, created on target from wheels)
+for d in backend ava-pentest-engine; do
+  [ -d "$A/$d" ] || continue
+  "$PYBIN" -m compileall -b -q -j 0 -x '(/venv/|/node_modules/|/tests?/)' "$A/$d"     || { echo "ABORT: bytecode compile failed in $d"; exit 1; }
+done
+# drop each .py that now has a .pyc beside it (keeps any uncompiled .py, e.g. venv has none here)
+find "$A/backend" "$A/ava-pentest-engine" -name '*.py' -not -path '*/venv/*'   -exec sh -c '[ -f "${1%.py}c" ] && rm -f "$1"' _ {} \;
+# sanity: the app entrypoints must exist as bytecode and no source must remain in our tree
+[ -f "$A/backend/grc/main.pyc" ] || { echo "ABORT: grc/main not compiled"; exit 1; }
+n=$(find "$A/backend/grc" "$A/ava-pentest-engine" -name '*.py' -not -path '*/venv/*' | wc -l)
+[ "$n" -eq 0 ] || { echo "ABORT: $n source .py still present after compile"; exit 1; }
+
 log "2/8 web interface (pre-built on this OS)"
 tar -C "$SRC/grc-frontend" -cf - .next node_modules | zstd -T0 -q -o "$B/artifacts/frontend.tar.zst"
 
