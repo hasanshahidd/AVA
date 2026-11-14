@@ -56,16 +56,16 @@ A="$B/app"; PYBIN="$SRC/backend/venv/bin/python"
 rm -rf "$A/_archive_old_control_library" "$A/_deferred_stage5_attack_pipeline" "$A/ai-pentest-eval" "$A/docs"
 find "$A" -maxdepth 1 -type f \( -name '*.md' -o -name '*.html' -o -name '*.png' -o -name '*.jpg' -o -name '*.JPG' -o -name '*.csv' \) -delete
 find "$A" -type d \( -name tests -o -name __pycache__ \) -prune -exec rm -rf {} + 2>/dev/null || true
-# compile OUR code (NOT venv — third-party public libs, created on target from wheels)
-for d in backend ava-pentest-engine; do
-  [ -d "$A/$d" ] || continue
-  "$PYBIN" -m compileall -b -q -j 0 -x '(/venv/|/node_modules/)' "$A/$d"     || { echo "ABORT: bytecode compile failed in $d"; exit 1; }
-done
-# compileall above ran with || ABORT, so every .py now has a .pyc beside it — drop all source
-find "$A/backend" "$A/ava-pentest-engine" -name '*.py' -not -path '*/venv/*' -delete
-# sanity: the app entrypoints must exist as bytecode and no source must remain in our tree
+# Lock the grc backend app to bytecode. NOT venv (public libs, built on target from wheels) and
+# NOT ava-pentest-engine — its scripts (tools/scan_one.py, run_live.py, web.py) re-exec themselves by
+# .py path via subprocess, so they must stay as source; the engine is only orchestration glue.
+"$PYBIN" -m compileall -b -q -j 0 -x '(/venv/|/node_modules/)' "$A/backend" \
+  || { echo "ABORT: bytecode compile failed"; exit 1; }
+# compileall above ran with || ABORT, so every backend .py now has a .pyc beside it — drop all source
+find "$A/backend" -name '*.py' -not -path '*/venv/*' -delete
+# sanity: the app entrypoint must exist as bytecode and no grc source may remain
 [ -f "$A/backend/grc/main.pyc" ] || { echo "ABORT: grc/main not compiled"; exit 1; }
-n=$(find "$A/backend/grc" "$A/ava-pentest-engine" -name '*.py' -not -path '*/venv/*' | wc -l)
+n=$(find "$A/backend/grc" -name '*.py' -not -path '*/venv/*' | wc -l)
 [ "$n" -eq 0 ] || { echo "ABORT: $n source .py still present after compile"; exit 1; }
 
 log "2/8 web interface (pre-built on this OS)"
