@@ -4,6 +4,7 @@ After=network.target redis-server.service caiva-backend.service
 
 [Service]
 WorkingDirectory=/opt/caiva/backend
+Environment=HOME=/root
 ExecStart=/bin/bash /opt/caiva/backend/run-worker.sh
 Restart=always
 RestartSec=5

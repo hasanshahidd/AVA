@@ -33,7 +33,7 @@ finish() { [ -n "$CUR" ] && mark "$CUR" done; CUR=""; }
 
 PKGS="postgresql-18 redis-server nginx docker.io nmap openscap-scanner sshpass git openssh-client
       tesseract-ocr python3.11 python3.11-venv python3.11-dev libpq-dev build-essential nodejs zstd
-      openssl jq curl ca-certificates"
+      openssl jq curl ca-certificates openjdk-17-jre-headless"
 
 # ═════════════════════════════ prepare ═════════════════════════════════════
 prepare() {
@@ -95,6 +95,8 @@ prepare() {
   done
   [ -d /opt/ssg ] || die "Linux CIS content (/opt/ssg) missing from bundle"
   if [ -f "$B/artifacts/wordlists.tar.zst" ] && [ ! -d /root/wordlists ]; then zstd -dc "$B/artifacts/wordlists.tar.zst" | tar -x -C /root; fi
+  # OWASP ZAP (web pentest lane) — the engine launches ~/ZAP_2.17.0/zap.sh; services run with HOME=/root
+  [ -f "$B/artifacts/zap.tar.zst" ] && { rm -rf /root/ZAP_2.17.0; zstd -dc "$B/artifacts/zap.tar.zst" | tar -x -C /root; }
 
   step lanes "pentest lane images"
   # lanes are inside an all-in-one bundle, or a caiva-lanes-<ver>.tar.zst next to the .run

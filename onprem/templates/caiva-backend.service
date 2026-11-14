@@ -5,6 +5,7 @@ Wants=postgresql.service redis-server.service
 
 [Service]
 WorkingDirectory=/opt/caiva/backend
+Environment=HOME=/root
 EnvironmentFile=/opt/caiva/backend/.env
 ExecStart=/opt/caiva/backend/venv/bin/uvicorn main:app --host 127.0.0.1 --port 4000
 Restart=always

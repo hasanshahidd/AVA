@@ -86,6 +86,8 @@ cp -r "$SRC/agent-dist" "$B/artifacts/agent-dist"
 tar -C /opt -cf - ssg | zstd -T0 -q -o "$B/artifacts/ssg.tar.zst"
 [ -d /opt/nuclei-templates ] && tar -C /opt -cf - nuclei-templates | zstd -T0 -q -o "$B/artifacts/nuclei-templates.tar.zst"
 [ $WORDLISTS = 1 ] && [ -d /root/wordlists ] && tar -C /root -cf - wordlists | zstd -T0 -q -o "$B/artifacts/wordlists.tar.zst"
+# OWASP ZAP (host-side web pentest scanner — not in git, not in a lane; needs the bundled JRE)
+[ -d /root/ZAP_2.17.0 ] && tar -C /root -cf - ZAP_2.17.0 | zstd -T0 -q -o "$B/artifacts/zap.tar.zst"
 
 log "6/8 seed databases (clean tenant cyber_$SEED, id $LOCAL_ID)"
 sudo -u postgres pg_dump -Fc --no-owner --no-acl "cyber_$SEED" > "$B/seed/tenant.dump"
