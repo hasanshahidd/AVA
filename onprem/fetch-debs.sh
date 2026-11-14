@@ -15,7 +15,7 @@ PKGS="postgresql-18 redis-server nginx docker.io nmap openscap-scanner openscap-
       python3-jinja2 python3-json-pointer python3-jsonpatch python3-jsonschema python3-markupsafe
       python3-pyrsistent python3-serial python3-tz python-babel-localedata
       build-essential golang-go libffi-dev libpq-dev nodejs zstd openssl jq curl ca-certificates gnupg gnupg2
-      unzip sqlite3 pv tmux apt-transport-https apt-utils eatmydata openjdk-17-jre-headless certbot
+      unzip pv tmux apt-transport-https apt-utils eatmydata openjdk-17-jre-headless certbot
       xvfb gnome-keyring fonts-freefont-ttf fonts-ipafont-gothic fonts-liberation fonts-noto-color-emoji
       fonts-tlwg-loma-otf fonts-unifont fonts-wqy-zenhei xfonts-cyrillic xfonts-scalable
       libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 libcairo2 libcups2t64 libdbus-1-3
