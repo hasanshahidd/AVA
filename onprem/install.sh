@@ -31,9 +31,20 @@ step() { [ -n "$CUR" ] && mark "$CUR" done; CUR=$1; mark "$1" running; echo; ech
 plan() { : > "$STEPS_FILE"; for s in "$@"; do echo "$s|pending" >> "$STEPS_FILE"; done; rm -f "$STATE/error"; }
 finish() { [ -n "$CUR" ] && mark "$CUR" done; CUR=""; }
 
-PKGS="postgresql-18 redis-server nginx docker.io nmap openscap-scanner sshpass git openssh-client
-      tesseract-ocr python3.11 python3.11-venv python3.11-dev libpq-dev build-essential nodejs zstd
-      openssl jq curl ca-certificates openjdk-17-jre-headless openscap-utils unzip"
+# Full parity with the cloud host (minus base-OS / kernel / DO-agent / our-VPN / firefox-snap, which
+# would harm the target or are cloud-only). Size is deliberately not minimised. Keep in sync with fetch-debs.sh.
+PKGS="postgresql-18 redis-server nginx docker.io nmap openscap-scanner openscap-utils sshpass git
+      openssh-client openssh-server openssh-sftp-server tesseract-ocr
+      python3.11 python3.11-venv python3.11-dev python3-pip python3-venv python3-babel python3-certbot-nginx
+      python3-jinja2 python3-json-pointer python3-jsonpatch python3-jsonschema python3-markupsafe
+      python3-pyrsistent python3-serial python3-tz python-babel-localedata
+      build-essential golang-go libffi-dev libpq-dev nodejs zstd openssl jq curl ca-certificates gnupg gnupg2
+      unzip sqlite3 pv tmux apt-transport-https apt-utils eatmydata openjdk-17-jre-headless certbot
+      xvfb gnome-keyring fonts-freefont-ttf fonts-ipafont-gothic fonts-liberation fonts-noto-color-emoji
+      fonts-tlwg-loma-otf fonts-unifont fonts-wqy-zenhei xfonts-cyrillic xfonts-scalable
+      libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 libcairo2 libcups2t64 libdbus-1-3
+      libdrm2 libfontconfig1 libfreetype6 libgbm1 libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 libwrap0
+      libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2"
 
 # ═════════════════════════════ prepare ═════════════════════════════════════
 prepare() {
