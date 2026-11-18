@@ -58,6 +58,19 @@ def _helpdesk_conn(db, tenants) -> IntegrationConnection:
     if conn:
         return conn
     tid = tenants[0] if tenants else None
+    # A native marker may already exist but be inactive (e.g. deactivated by a
+    # connector cleanup). Reactivate it instead of a blind INSERT, which would hit
+    # uq_connection_name_tenant on (tenant_id, "Help Desk") and 500 the push.
+    existing = db.query(IntegrationConnection).filter(
+        IntegrationConnection.tenant_id == tid,
+        IntegrationConnection.category == "ticketing",
+        IntegrationConnection.integration_type == NATIVE_HELPDESK_TYPE,
+    ).order_by(IntegrationConnection.id.asc()).first()
+    if existing:
+        existing.is_active = True
+        existing.status = "connected"
+        db.flush()
+        return existing
     conn = IntegrationConnection(
         tenant_id=tid,
         integration_type=NATIVE_HELPDESK_TYPE,
